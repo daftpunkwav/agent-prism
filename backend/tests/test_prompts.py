@@ -4,8 +4,11 @@ from app.arena.prompts import BASE_SYSTEM, build_messages
 
 
 def test_zero_shot_strips_and_no_suffix():
+    # zero_shot 无额外 suffix，但默认加入 reasoning + harness 后缀
     system, user = build_messages("  现在几点？  ", "zero_shot")
-    assert system == BASE_SYSTEM
+    # system 包含 base + reasoning(react) + harness(bare) 后缀
+    assert system.startswith(BASE_SYSTEM)
+    assert "ReAct" in system
     assert user == "现在几点？"
 
 

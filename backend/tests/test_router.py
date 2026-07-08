@@ -36,9 +36,9 @@ def test_unknown_dimension_raises(router):
         router.route("nonexistent")  # type: ignore[arg-type]
 
 
-def test_only_framework_and_prompt_are_mvp_ready(router):
+def test_all_dimensions_are_mvp_ready(router):
     assert router.is_mvp_ready("framework") is True
     assert router.is_mvp_ready("prompt") is True
-    assert router.is_mvp_ready("reasoning") is False
-    assert router.is_mvp_ready("context") is False
-    assert router.is_mvp_ready("harness") is False
+    assert router.is_mvp_ready("reasoning") is True
+    assert router.is_mvp_ready("context") is True
+    assert router.is_mvp_ready("harness") is True

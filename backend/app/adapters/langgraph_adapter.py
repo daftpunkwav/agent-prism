@@ -41,7 +41,7 @@ class LangGraphAdapter:
         try:
             llm = create_chat_model()
             agent = create_react_agent(llm, ARENA_TOOLS)
-            system, user = build_messages(question, config.prompt_profile)
+            system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
             tracker.seed_prompt(system, user)
             yield token_update_event(label, tracker)
 

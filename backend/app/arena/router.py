@@ -70,4 +70,4 @@ class DimensionRouter:
         return len(self.route(dimension))
 
     def is_mvp_ready(self, dimension: DimensionId) -> bool:
-        return dimension in ("framework", "prompt")
+        return dimension in ("framework", "prompt", "reasoning", "context", "harness")
