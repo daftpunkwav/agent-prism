@@ -8,7 +8,6 @@ Tool 分为两类：
 from __future__ import annotations
 
 import ast
-import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -38,29 +37,35 @@ def get_current_time(format: str = "iso") -> str:
     return now.isoformat()
 
 
-@tool
-def calculate(expression: str) -> str:
-    """计算简单数学表达式，仅支持 + - * / ** // % 和括号。变量名仅限 a-z。"""
-    allowed_chars = set("0123456789+-*/(). %")
-    if not all(c in allowed_chars for c in expression):
-        # 允许简单变量名
-        var_names = re.findall(r"[a-z]", expression)
-        if not var_names:
-            return "错误：表达式含非法字符"
+def _safe_calculate(expression: str) -> str:
+    """计算简单数学表达式，仅支持 + - * / ** // % 和括号。数字仅限阿拉伯数字。"""
     try:
         tree = ast.parse(expression, mode="eval")
-        # 只允许安全的 AST 节点
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant,
-                                      ast.Call, ast.Name, ast.Load, ast.Add, ast.Sub,
-                                      ast.Mult, ast.Div, ast.Pow, ast.FloorDiv, ast.Mod,
-                                      ast.USub, ast.UAdd, ast.Paren, ast.Operator,
-                                      ast.Num if hasattr(ast, 'Num') else ast.Constant)):
-                return "错误：表达式包含不安全操作"
+    except SyntaxError:
+        return "错误: 表达式语法错误"
+
+    ALLOWED_NODES = (
+        ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant,
+        ast.Add, ast.Sub, ast.Mult, ast.Div,
+        ast.Pow, ast.FloorDiv, ast.Mod, ast.USub, ast.UAdd,
+    )
+    for node in ast.walk(tree):
+        if not isinstance(node, ALLOWED_NODES):
+            return f"错误: 不允许的语法元素: {type(node).__name__}"
+        if isinstance(node, ast.Constant) and not isinstance(node.value, (int, float)):
+            return "错误: 只能使用数字"
+
+    try:
         result = eval(compile(tree, "<expr>", "eval"), {"__builtins__": {}}, {})
         return str(result)
     except Exception as exc:
         return f"计算错误: {exc}"
+
+
+@tool
+def calculate(expression: str) -> str:
+    """计算简单数学表达式，仅支持 + - * / ** // % 和括号。"""
+    return _safe_calculate(expression)
 
 
 # ===== 工作空间工具 =====
@@ -153,9 +158,8 @@ class _RunCodeInput(BaseModel):
     timeout: int = Field(default=5, description="超时秒数（最大 10）")
 
 
-@tool(args_schema=_RunCodeInput)
-def run_code(code: str, timeout: int = 5) -> str:
-    """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程。"""
+def _safe_run_code(code: str, timeout: int = 5) -> str:
+    """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
     import io
     import sys
     import traceback as tb_mod
@@ -168,46 +172,20 @@ def run_code(code: str, timeout: int = 5) -> str:
     sys.stderr = captured
 
     try:
-        # 在受限命名空间中执行
         safe_ns = {
             "__builtins__": {
-                "print": print,
-                "len": len,
-                "range": range,
-                "str": str,
-                "int": int,
-                "float": float,
-                "bool": bool,
-                "list": list,
-                "dict": dict,
-                "set": set,
-                "tuple": tuple,
-                "sum": sum,
-                "min": min,
-                "max": max,
-                "abs": abs,
-                "round": round,
-                "sorted": sorted,
-                "enumerate": enumerate,
-                "zip": zip,
-                "map": map,
-                "filter": filter,
-                "all": all,
-                "any": any,
-                "True": True,
-                "False": False,
-                "None": None,
-                "isinstance": isinstance,
-                "type": type,
-                "getattr": getattr,
-                "setattr": setattr,
-                "hasattr": hasattr,
-                "Exception": Exception,
-                "ValueError": ValueError,
-                "TypeError": TypeError,
-                "KeyError": KeyError,
-                "IndexError": IndexError,
-                "AttributeError": AttributeError,
+                "print": print, "len": len, "range": range,
+                "str": str, "int": int, "float": float, "bool": bool,
+                "list": list, "dict": dict, "set": set, "tuple": tuple,
+                "sum": sum, "min": min, "max": max, "abs": abs,
+                "round": round, "sorted": sorted, "enumerate": enumerate,
+                "zip": zip, "map": map, "filter": filter,
+                "all": all, "any": any,
+                "True": True, "False": False, "None": None,
+                "isinstance": isinstance, "type": type,
+                "Exception": Exception, "ValueError": ValueError,
+                "TypeError": TypeError, "KeyError": KeyError,
+                "IndexError": IndexError, "AttributeError": AttributeError,
             }
         }
         compiled = compile(code, "<run_code>", "exec")
@@ -219,6 +197,12 @@ def run_code(code: str, timeout: int = 5) -> str:
     finally:
         sys.stdout = old_stdout
         sys.stderr = old_stderr
+
+
+@tool(args_schema=_RunCodeInput)
+def run_code(code: str, timeout: int = 5) -> str:
+    """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
+    return _safe_run_code(code, min(timeout, 10))
 
 
 # ===== 文本摘要工具 =====
