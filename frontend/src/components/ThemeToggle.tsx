@@ -23,7 +23,8 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
-      className="btn-ghost !h-8 !w-8 !px-0 justify-center"
+      className="btn-ghost justify-center"
+      style={{ height: 34, width: 34, padding: 0 }}
       onClick={toggle}
       aria-label="切换主题"
       title={theme === "dark" ? "切换到浅色" : "切换到深色"}
