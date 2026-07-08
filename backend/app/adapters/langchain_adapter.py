@@ -7,11 +7,13 @@ from typing import AsyncIterator
 
 from langchain.agents import create_agent
 
+from app.adapters.common import build_metrics, token_update_event
 from app.arena.llm import create_chat_model
 from app.arena.prompts import build_messages
 from app.arena.stream_utils import extract_chunk_text
+from app.arena.token_utils import TokenTracker, extract_usage
 from app.arena.tools import ARENA_TOOLS
-from app.models import ArenaEvent, PipelineConfig, PipelineMetrics
+from app.models import ArenaEvent, PipelineConfig
 
 
 class LangChainAdapter:
@@ -25,10 +27,13 @@ class LangChainAdapter:
         started = time.perf_counter()
         step = 0
         tool_calls = 0
+        tracker = TokenTracker.from_provider()
 
         try:
             llm = create_chat_model()
             system, user = build_messages(question, config.prompt_profile)
+            tracker.seed_prompt(system, user)
+            yield token_update_event(label, tracker)
 
             yield ArenaEvent(
                 type="thought",
@@ -57,6 +62,11 @@ class LangChainAdapter:
                             step=step,
                             content=str(text),
                         )
+                elif kind == "on_chat_model_end":
+                    usage = extract_usage(data)
+                    if usage["input_tokens"] or usage["output_tokens"]:
+                        tracker.add_usage(usage)
+                        yield token_update_event(label, tracker)
                 elif kind == "on_tool_start":
                     tool_calls += 1
                     step += 1
@@ -82,12 +92,14 @@ class LangChainAdapter:
             yield ArenaEvent(
                 type="complete",
                 pipeline=label,
-                metrics=PipelineMetrics(
+                metrics=build_metrics(
+                    tracker,
                     success=True,
                     duration_ms=duration_ms,
                     tool_calls=tool_calls,
                     steps=step,
                 ),
+                token_stats=tracker.as_dict(),
             )
         except Exception as exc:  # noqa: BLE001
             yield ArenaEvent(
@@ -98,10 +110,12 @@ class LangChainAdapter:
             yield ArenaEvent(
                 type="complete",
                 pipeline=label,
-                metrics=PipelineMetrics(
+                metrics=build_metrics(
+                    tracker,
                     success=False,
                     duration_ms=int((time.perf_counter() - started) * 1000),
                     tool_calls=tool_calls,
                     steps=step,
                 ),
+                token_stats=tracker.as_dict(),
             )

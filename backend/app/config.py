@@ -51,6 +51,9 @@ class ProviderConfig(BaseSettings):
     auth_field: str = "ANTHROPIC_AUTH_TOKEN"
     model: str = "step-3.7-flash"
     temperature: float = 0.0
+    context_window: int = 128_000
+    max_input_tokens: int = 120_000
+    max_output_tokens: int = 2048
 
 
 def load_provider_config() -> ProviderConfig:

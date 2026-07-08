@@ -17,5 +17,5 @@ def create_chat_model(config: ProviderConfig | None = None) -> ChatAnthropic:
         api_key=cfg.api_key,
         base_url=cfg.base_url.rstrip("/"),
         temperature=cfg.temperature,
-        max_tokens=2048,
+        max_tokens=cfg.max_output_tokens,
     )

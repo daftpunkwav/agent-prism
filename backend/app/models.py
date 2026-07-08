@@ -16,6 +16,7 @@ EventType = Literal[
     "reflect",
     "complete",
     "error",
+    "token_update",
 ]
 
 
@@ -40,9 +41,16 @@ class ArenaRunRequest(BaseModel):
 class PipelineMetrics(BaseModel):
     success: bool
     duration_ms: int
+    input_tokens: int = 0
+    output_tokens: int = 0
     total_tokens: int = 0
     tool_calls: int = 0
     steps: int = 0
+    context_window: int = 128_000
+    max_input_tokens: int = 120_000
+    max_output_tokens: int = 2048
+    context_usage_pct: float = 0.0
+    input_usage_pct: float = 0.0
 
 
 class ArenaEvent(BaseModel):
@@ -57,6 +65,7 @@ class ArenaEvent(BaseModel):
     reason: str = ""
     metrics: PipelineMetrics | None = None
     message: str = ""
+    token_stats: dict[str, int | float] | None = None
 
 
 class ProviderConfigPublic(BaseModel):
@@ -73,6 +82,9 @@ class ProviderConfigPublic(BaseModel):
     auth_field: str
     model: str
     temperature: float
+    context_window: int
+    max_input_tokens: int
+    max_output_tokens: int
 
 
 class ProviderConfigUpdate(BaseModel):
@@ -86,6 +98,9 @@ class ProviderConfigUpdate(BaseModel):
     auth_field: str = "ANTHROPIC_AUTH_TOKEN"
     model: str = "step-3.7-flash"
     temperature: float = 0.0
+    context_window: int = 128_000
+    max_input_tokens: int = 120_000
+    max_output_tokens: int = 2048
 
 
 class ConnectionTestResult(BaseModel):
