@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, HelpCircle, Send, X, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle, Send, X, PanelRightClose, PanelRightOpen, Zap, BarChart3 } from "lucide-react";
 import { TokenStatsPanel } from "@/components/TokenStatsPanel";
 import { TraceView } from "@/components/TraceView";
 import { ExperimentPanel } from "@/components/ExperimentPanel";
@@ -44,6 +44,86 @@ function metricsToTokenStats(m: NonNullable<ArenaEvent["metrics"]>): TokenStats 
   };
 }
 
+/** 生成对比报告 HTML */
+function ComparisonReport({ columns }: { columns: Record<string, ColumnState> }) {
+  const cols = Object.values(columns).filter((c) => c.metrics);
+  if (cols.length === 0) return null;
+
+  // 按耗时排序
+  const sorted = [...cols].sort((a, b) => (a.metrics!.duration_ms) - (b.metrics!.duration_ms));
+  const fastest = sorted[0];
+  const lowestToken = [...cols].sort((a, b) => a.metrics!.total_tokens - b.metrics!.total_tokens)[0];
+
+  return (
+    <div className="rounded-lg border border-border bg-card/50 p-4 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-2">
+        <BarChart3 className="h-4 w-4 text-foreground/70" />
+        <h3 className="text-sm font-semibold">对比报告</h3>
+      </div>
+
+      {/* 硬指标对比表 */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Agent</th>
+              <th className="text-right py-2 px-3 font-medium text-muted-foreground">耗时</th>
+              <th className="text-right py-2 px-3 font-medium text-muted-foreground">Token</th>
+              <th className="text-right py-2 px-3 font-medium text-muted-foreground">工具调用</th>
+              <th className="text-right py-2 px-3 font-medium text-muted-foreground">步骤</th>
+              <th className="text-center py-2 pl-3 font-medium text-muted-foreground">状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cols.map((col) => (
+              <tr key={col.label} className="border-b border-border/50 last:border-0">
+                <td className="py-2.5 pr-4 font-medium">{col.label}</td>
+                <td className={`py-2.5 px-3 text-right font-mono ${col.metrics!.duration_ms === fastest.metrics!.duration_ms ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
+                  {col.metrics!.duration_ms}ms
+                  {col.metrics!.duration_ms === fastest.metrics!.duration_ms && " ⚡"}
+                </td>
+                <td className={`py-2.5 px-3 text-right font-mono ${col.metrics!.total_tokens === lowestToken.metrics!.total_tokens ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
+                  {col.metrics!.total_tokens.toLocaleString()}
+                  {col.metrics!.total_tokens === lowestToken.metrics!.total_tokens && " 💰"}
+                </td>
+                <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">
+                  {col.metrics!.tool_calls}
+                </td>
+                <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">
+                  {col.metrics!.steps}
+                </td>
+                <td className="py-2.5 pl-3 text-center">
+                  {col.metrics!.success ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                      成功
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-destructive">
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                      失败
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 简要洞察 */}
+      <div className="text-[11px] text-muted-foreground space-y-1">
+        <p>
+          ⚡ 最快: <span className="font-medium text-foreground">{fastest.label}</span>（{fastest.metrics!.duration_ms}ms）
+        </p>
+        <p>
+          💰 最省 Token: <span className="font-medium text-foreground">{lowestToken.label}</span>（{lowestToken.metrics!.total_tokens.toLocaleString()} tokens）
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function ArenaPage() {
   const [meta, setMeta] = useState<ArenaMeta | null>(null);
   const [dimension, setDimension] = useState<DimensionId>("framework");
@@ -54,6 +134,7 @@ export default function ArenaPage() {
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [providerCfg, setProviderCfg] = useState<ProviderConfig | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const [metaLoading, setMetaLoading] = useState(true);
 
   // 确定当前活跃的 workspace（第一个完成或有内容的列）
   const activeWorkspace = useMemo(() => {
@@ -67,7 +148,9 @@ export default function ArenaPage() {
   }, [columns]);
 
   useEffect(() => {
-    fetchArenaMeta().then(setMeta).catch(console.error);
+    fetchArenaMeta()
+      .then(setMeta)
+      .finally(() => setMetaLoading(false));
   }, []);
 
   const activeDim = meta?.dimensions.find((d) => d.id === dimension);
@@ -155,6 +238,17 @@ export default function ArenaPage() {
     } as ProviderConfig);
   }, []);
 
+  if (metaLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="space-y-4 text-center">
+          <div className="w-12 h-12 mx-auto rounded-xl border-2 border-foreground/20 border-t-foreground animate-spin" />
+          <p className="text-sm text-muted-foreground">加载 Arena 配置…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex gap-4 h-[calc(100vh-8rem)]">
       {/* ===== 左侧栏：维度 + 实验参数 ===== */}
@@ -240,21 +334,31 @@ export default function ArenaPage() {
           }}
         >
           {columnList.length === 0 && !running
-            ? placeholderLabels.slice(0, columnCount).map((name) => (
-                <div key={name} className="column-card opacity-50">
+            ? placeholderLabels.slice(0, columnCount).map((name, i) => (
+                <div key={name} className="column-card opacity-60">
                   <div className="column-header">
                     <span className="font-semibold text-sm">{name}</span>
                   </div>
-                  <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
-                    输入问题后点击发送
+                  <div className="flex flex-1 items-center justify-center p-6">
+                    <div className="text-center space-y-3">
+                      <div className="w-10 h-10 mx-auto rounded-full border-2 border-border flex items-center justify-center">
+                        <Zap className="h-5 w-5 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-xs text-muted-foreground">等待运行</p>
+                    </div>
                   </div>
                 </div>
               ))
-            : columnList.map((col) => (
-                <div key={col.label} className="column-card min-h-0">
+            : columnList.map((col, i) => (
+                <div
+                  key={col.label}
+                  className="column-card min-h-0"
+                  style={{ animationDelay: `${i * 80}ms` }}
+                >
                   <div className="column-header">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
+                        <span className={"column-status-dot " + (running && !col.metrics ? "running" : col.metrics ? "done" : "") + " " + (col.error ? "error" : "")} />
                         <span className="font-semibold text-sm">{col.label}</span>
                         {col.metrics && (
                           <span className="font-mono text-[10px] text-muted-foreground">
@@ -301,17 +405,22 @@ export default function ArenaPage() {
               ))}
         </div>
 
+        {/* 对比报告 */}
+        {Object.values(columns).some((c) => c.metrics) && (
+          <ComparisonReport columns={columns} />
+        )}
+
         {/* 输入区 */}
-        <section className="rounded border border-border bg-card p-4 space-y-3">
+        <section className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-4 space-y-3">
           <div className="flex flex-wrap gap-1.5">
             {TASK_TEMPLATES.map((t) => (
               <button
                 key={t}
                 type="button"
-                className="btn-ghost text-[11px]"
+                className="btn-ghost text-[11px] transition-all hover:scale-[1.02]"
                 onClick={() => setQuestion(t)}
               >
-                {t.length > 22 ? `${t.slice(0, 22)}…` : t}
+                {t.length > 24 ? `${t.slice(0, 24)}…` : t}
               </button>
             ))}
           </div>

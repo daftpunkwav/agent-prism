@@ -175,6 +175,18 @@ body {
   flex-direction: column;
   min-height: 420px;
   overflow: hidden;
+  animation: column-enter 0.3s ease both;
+}
+
+@keyframes column-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .column-header {
@@ -184,6 +196,71 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* 列运行指示器 */
+.column-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+  flex-shrink: 0;
+}
+.column-status-dot.running {
+  background: #22c55e;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+.column-status-dot.done {
+  background: var(--foreground);
+}
+.column-status-dot.error {
+  background: #ef4444;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* 入场动画 */
+.animate-in {
+  animation: animate-in 0.3s ease both;
+}
+.fade-in {
+  animation: fade-in 0.4s ease both;
+}
+.slide-in-from-bottom-4 {
+  animation: slide-in-from-bottom-4 0.4s ease both;
+}
+
+@keyframes animate-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-in-from-bottom-4 {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 改进的按钮过渡 */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 /* 单行系统提示：展示框架/策略初始化信息，弱化处理 */
