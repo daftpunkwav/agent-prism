@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from app.adapters.common import get_workspace_mgr
 from app.models import Project, ProjectCreate
-
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 PROJECTS_FILE = DATA_DIR / "projects.json"

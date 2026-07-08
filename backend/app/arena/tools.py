@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import ast
 from datetime import datetime, timezone
-from typing import Optional
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
@@ -192,7 +191,7 @@ def _safe_run_code(code: str, timeout: int = 5) -> str:
         exec(compiled, safe_ns, safe_ns)
         output = captured.getvalue()
         return output if output else "(代码执行成功，无输出)"
-    except Exception as exc:
+    except Exception:
         return f"执行错误:\n{tb_mod.format_exc()}"
     finally:
         sys.stdout = old_stdout
@@ -220,7 +219,7 @@ def summarize_text(text: str, max_length: int = 200) -> str:
     return text[:max_length] + f"...[已截断，原长 {len(text)} 字符]"
 
 
-def _get_ws() -> Optional[Workspace]:
+def _get_ws() -> Workspace | None:
     """获取当前 Agent 运行的工作空间（通过线程本地变量）。"""
     name = get_current_workspace_name()
     if name:

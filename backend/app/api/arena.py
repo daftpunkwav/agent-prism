@@ -10,9 +10,9 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.adapters.base import FrameworkAdapterRegistry
 from app.adapters.common import get_workspace_mgr
-from app.arena.runner import RunnerPool, build_registry
-from app.arena.router import DimensionRouter
 from app.arena.project import get_project_manager
+from app.arena.router import DimensionRouter
+from app.arena.runner import RunnerPool, build_registry
 from app.arena.workspace import WorkspaceManager
 from app.models import ArenaRunRequest, ProjectCreate
 
@@ -83,7 +83,6 @@ async def arena_run(request: ArenaRunRequest):
 
 # ===== 工作空间 API =====
 
-from fastapi import HTTPException, Query
 
 @router.get("/workspace/{workspace_name}/files")
 async def workspace_files(workspace_name: str):
@@ -144,7 +143,6 @@ async def workspace_delete_file(workspace_name: str, path: str = Query(...)):
 
 # ===== 项目管理 API =====
 
-from fastapi import Body
 
 @router.get("/projects")
 async def list_projects():

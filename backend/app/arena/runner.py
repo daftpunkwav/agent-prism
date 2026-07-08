@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from app.adapters.base import FrameworkAdapterRegistry
 from app.adapters.langchain_adapter import LangChainAdapter

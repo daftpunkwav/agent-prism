@@ -1,8 +1,7 @@
 """RAG 向量检索的单元测试。"""
 
-import pytest
 
-from app.arena.rag import SimpleVectorStore, ContextRetriever, chunk_text
+from app.arena.rag import ContextRetriever, SimpleVectorStore, chunk_text
 
 
 def test_chunk_text_short():

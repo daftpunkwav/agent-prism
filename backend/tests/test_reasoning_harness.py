@@ -1,6 +1,5 @@
 """推理模式引擎和 Harness 引擎的单元测试。"""
 
-import pytest
 
 from app.arena.harness import apply_harness_level, get_harness_description
 from app.arena.reasoning import apply_reasoning_mode, get_reasoning_description

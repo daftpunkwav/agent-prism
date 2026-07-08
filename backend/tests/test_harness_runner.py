@@ -1,12 +1,10 @@
 """Harness 引擎的单元测试。"""
 
-import json
-from unittest.mock import MagicMock
 
 from app.arena.harness import (
     HarnessRunner,
-    get_harness_description,
     apply_harness_level,
+    get_harness_description,
 )
 
 

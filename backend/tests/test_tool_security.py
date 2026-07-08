@@ -1,9 +1,7 @@
 """工具安全的单元测试。"""
 
-import pytest
 
-from app.arena.tools import _safe_calculate, _safe_run_code, calculate, run_code
-
+from app.arena.tools import _safe_calculate, _safe_run_code
 
 # ===== calculate 安全测试 =====
 

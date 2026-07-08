@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
-from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
 from app.arena.llm import create_chat_model
 from app.arena.tools import ARENA_TOOLS
-
 
 ReasoningMode = Literal["react", "cot_tool", "tot", "reflexion"]
 
@@ -44,7 +42,6 @@ def _react_node(state: AgentState) -> dict:
 
 def _react_tool_node(state: AgentState) -> dict:
     """执行工具调用"""
-    from langchain_core.tools import tool
 
     last_msg = state["messages"][-1]
     tool_calls = last_msg.tool_calls if hasattr(last_msg, "tool_calls") else []

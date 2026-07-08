@@ -8,7 +8,6 @@ from typing import Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.arena.llm import create_chat_model
-from app.models import ArenaEvent, PipelineConfig
 
 HarnessLevel = Literal["bare", "verify", "reflect", "self_evolve"]
 

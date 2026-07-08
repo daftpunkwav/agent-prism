@@ -1,6 +1,6 @@
 """框架适配器注册表的单元测试。"""
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import pytest
 

@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import time
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langgraph.graph import END, StateGraph
-from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
-from app.arena.llm import create_chat_model
-from app.arena.prompts import build_messages
 from app.arena.harness import HarnessRunner, reflect_on_failure, verify_result
+from app.arena.prompts import build_messages
 from app.arena.reasoning_graph import (
     build_cot_tool_graph,
     build_react_graph,
@@ -22,7 +19,6 @@ from app.arena.reasoning_graph import (
 )
 from app.arena.stream_utils import extract_chunk_text
 from app.arena.token_utils import TokenTracker, extract_usage
-from app.arena.tools import ARENA_TOOLS
 from app.arena.workspace import clear_current_workspace, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
