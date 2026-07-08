@@ -6,20 +6,12 @@ from typing import Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
-from typing_extensions import TypedDict
 
+from app.arena.agent_state import AgentState
 from app.arena.llm import create_chat_model
 from app.arena.tools import ARENA_TOOLS
 
 ReasoningMode = Literal["react", "cot_tool", "tot", "reflexion"]
-
-
-class AgentState(TypedDict):
-    messages: list
-    step_count: int
-    max_steps: int
-    tool_calls: int
-    reflections: list[str]
 
 
 def _create_llm():

@@ -6,7 +6,6 @@ import time
 from collections.abc import AsyncIterator
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from typing_extensions import TypedDict
 
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
 from app.arena.harness import HarnessRunner, reflect_on_failure, verify_result
@@ -21,14 +20,6 @@ from app.arena.stream_utils import extract_chunk_text
 from app.arena.token_utils import TokenTracker, extract_usage
 from app.arena.workspace import clear_current_workspace, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
-
-
-class AgentState(TypedDict):
-    messages: list
-    step_count: int
-    max_steps: int
-    tool_calls: int
-    reflections: list[str]
 
 
 class LangGraphAdapter:
