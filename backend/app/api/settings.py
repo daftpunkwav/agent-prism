@@ -37,6 +37,9 @@ def _to_public(cfg: ProviderConfig) -> ProviderConfigPublic:
         auth_field=cfg.auth_field,
         model=cfg.model,
         temperature=cfg.temperature,
+        context_window=cfg.context_window,
+        max_input_tokens=cfg.max_input_tokens,
+        max_output_tokens=cfg.max_output_tokens,
     )
 
 
