@@ -8,12 +8,13 @@ from typing import AsyncIterator
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.adapters.common import build_metrics, token_update_event
+from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
 from app.arena.llm import create_chat_model
 from app.arena.prompts import build_messages
 from app.arena.stream_utils import extract_chunk_text
 from app.arena.token_utils import TokenTracker, extract_usage
-from app.arena.tools import ARENA_TOOLS
+from app.arena.tools import ARENA_TOOLS, set_current_workspace
+from app.arena.workspace import clear_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
 
@@ -29,6 +30,13 @@ class LangGraphAdapter:
         step = 0
         tool_calls = 0
         tracker = TokenTracker.from_provider()
+
+        # 创建工作空间
+        ws_name = f"{label}_{int(started * 1000)}"
+        ws = get_workspace_mgr().create(ws_name)
+        set_current_workspace(ws_name)
+        # 初始化一些示例文件
+        ws.write_file("README.md", f"# {label} Agent 工作空间\n\n问题: {question}\n")
 
         try:
             llm = create_chat_model()
@@ -51,7 +59,7 @@ class LangGraphAdapter:
                 ]
             }
 
-            buffer = ""  # 累积文本内容
+            buffer = ""
 
             async for event in agent.astream_events(inputs, version="v2"):
                 kind = event.get("event", "")
@@ -129,3 +137,5 @@ class LangGraphAdapter:
                 ),
                 token_stats=tracker.as_dict(),
             )
+        finally:
+            clear_current_workspace()

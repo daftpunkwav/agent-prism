@@ -8,12 +8,13 @@ from typing import AsyncIterator
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.adapters.common import build_metrics, token_update_event
+from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
 from app.arena.llm import create_chat_model
 from app.arena.prompts import build_messages
 from app.arena.stream_utils import extract_chunk_text
 from app.arena.token_utils import TokenTracker, extract_usage
-from app.arena.tools import ARENA_TOOLS
+from app.arena.tools import ARENA_TOOLS, set_current_workspace
+from app.arena.workspace import clear_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
 
@@ -30,6 +31,12 @@ class LangChainAdapter:
         tool_calls = 0
         tracker = TokenTracker.from_provider()
 
+        # 创建工作空间
+        ws_name = f"{label}_{int(started * 1000)}"
+        ws = get_workspace_mgr().create(ws_name)
+        set_current_workspace(ws_name)
+        ws.write_file("README.md", f"# {label} Agent 工作空间\n\n问题: {question}\n")
+
         try:
             llm = create_chat_model()
             system, user = build_messages(question, config.prompt_profile)
@@ -45,9 +52,8 @@ class LangChainAdapter:
 
             agent = create_agent(llm, ARENA_TOOLS, system_prompt=system)
 
-            buffer = ""  # 累积单个模型回合的推理文本，回合结束时整段发出
+            buffer = ""
 
-            # 使用 LangChain Message 对象（兼容各版本）
             messages = [SystemMessage(content=system), HumanMessage(content=user)]
 
             async for event in agent.astream_events(
@@ -128,3 +134,5 @@ class LangChainAdapter:
                 ),
                 token_stats=tracker.as_dict(),
             )
+        finally:
+            clear_current_workspace()

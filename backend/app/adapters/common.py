@@ -3,7 +3,16 @@
 from __future__ import annotations
 
 from app.arena.token_utils import TokenTracker
-from app.models import ArenaEvent, PipelineMetrics
+from app.arena.workspace import WorkspaceManager, get_current_workspace_name, set_current_workspace
+from app.models import ArenaEvent, PipelineConfig
+
+
+# 全局工作空间管理器（单例）
+_workspace_mgr = WorkspaceManager()
+
+
+def get_workspace_mgr() -> WorkspaceManager:
+    return _workspace_mgr
 
 
 def token_update_event(label: str, tracker: TokenTracker) -> ArenaEvent:
