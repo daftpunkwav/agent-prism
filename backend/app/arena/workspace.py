@@ -42,9 +42,18 @@ class Workspace:
 
     def _normalize(self, path: str) -> str:
         """规范化路径，防止目录遍历。"""
-        path = os.path.normpath(path)
-        if path.startswith("/"):
-            path = path[1:]
+        # 拒绝绝对路径
+        path = path.strip()
+        if not path or path.startswith("/") or path.startswith("\\"):
+            return ""
+        # 规范化
+        path = os.path.normpath(path).replace("\\", "/")
+        # 拒绝向上遍历
+        if path in ("..", "../", ".") or path.startswith("../"):
+            return ""
+        # 移除可能的前导 ./
+        if path.startswith("./"):
+            path = path[2:]
         return path
 
     def list_files(self, dir_path: str = "") -> list[str]:
