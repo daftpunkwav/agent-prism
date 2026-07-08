@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Hexagon, Settings, Zap } from "lucide-react";
+import { Settings, Zap } from "lucide-react";
 
 const NAV = [
   { href: "/arena", label: "Arena", icon: Zap },
@@ -14,11 +14,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-border bg-background">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
           <Link href="/arena" className="flex items-center gap-2.5 font-semibold">
-            <span className="prism-accent flex h-8 w-8 items-center justify-center rounded-[10px]">
-              <Hexagon className="h-4 w-4 text-background" strokeWidth={2.2} />
+            <span className="flex h-7 w-7 items-center justify-center rounded border border-border text-xs font-mono">
+              AP
             </span>
             <span>AgentPrism</span>
           </Link>

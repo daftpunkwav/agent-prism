@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HelpCircle, Send, X } from "lucide-react";
+import { TokenStatsPanel } from "@/components/TokenStatsPanel";
 import {
   ArenaEvent,
   ArenaMeta,
   DimensionId,
+  TokenStats,
   fetchArenaMeta,
   streamArenaRun,
 } from "@/lib/api";
@@ -14,6 +16,7 @@ type ColumnState = {
   label: string;
   events: ArenaEvent[];
   metrics?: ArenaEvent["metrics"];
+  tokenStats?: TokenStats;
   error?: string;
 };
 
@@ -23,6 +26,19 @@ const TASK_TEMPLATES = [
   "获取当前时间，并计算距离午夜的分钟数（先取时间再计算）",
 ];
 
+function metricsToTokenStats(m: NonNullable<ArenaEvent["metrics"]>): TokenStats {
+  return {
+    input_tokens: m.input_tokens,
+    output_tokens: m.output_tokens,
+    total_tokens: m.total_tokens,
+    context_window: m.context_window,
+    max_input_tokens: m.max_input_tokens,
+    max_output_tokens: m.max_output_tokens,
+    context_usage_pct: m.context_usage_pct,
+    input_usage_pct: m.input_usage_pct,
+  };
+}
+
 export default function ArenaPage() {
   const [meta, setMeta] = useState<ArenaMeta | null>(null);
   const [dimension, setDimension] = useState<DimensionId>("framework");
@@ -30,7 +46,6 @@ export default function ArenaPage() {
   const [running, setRunning] = useState(false);
   const [columns, setColumns] = useState<Record<string, ColumnState>>({});
   const [showPromptBanner, setShowPromptBanner] = useState(true);
-  const [showConfirm, setShowConfirm] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -44,9 +59,20 @@ export default function ArenaPage() {
     const label = event.pipeline;
     setColumns((prev) => {
       const col = prev[label] ?? { label, events: [] };
-      const next = { ...col, events: [...col.events, event] };
-      if (event.type === "complete" && event.metrics) next.metrics = event.metrics;
+      const next = { ...col };
+
+      if (event.type === "token_update" && event.token_stats) {
+        next.tokenStats = event.token_stats;
+      } else if (event.type !== "token_update") {
+        next.events = [...col.events, event];
+      }
+
+      if (event.type === "complete" && event.metrics) {
+        next.metrics = event.metrics;
+        next.tokenStats = event.token_stats ?? metricsToTokenStats(event.metrics);
+      }
       if (event.type === "error") next.error = event.message;
+
       return { ...prev, [label]: next };
     });
   }, []);
@@ -63,17 +89,20 @@ export default function ArenaPage() {
       console.error(err);
     } finally {
       setRunning(false);
-      setShowConfirm(false);
     }
   };
 
   const columnList = useMemo(() => Object.values(columns), [columns]);
 
-  const estimatedTokens = columnCount * 4200;
+  const placeholderLabels =
+    dimension === "framework"
+      ? ["LangChain", "LangGraph"]
+      : dimension === "prompt"
+        ? ["Zero-shot", "Few-shot", "CoT Prompt", "Structured"]
+        : Array.from({ length: columnCount }, (_, i) => `列 ${i + 1}`);
 
   return (
     <div className="space-y-5">
-      {/* 维度 Tab */}
       <section className="space-y-2">
         <div className="flex flex-wrap gap-2">
           {meta?.dimensions.map((d) => (
@@ -88,7 +117,7 @@ export default function ArenaPage() {
               title={!d.mvp ? "后续版本开放" : undefined}
             >
               {d.label}
-              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-mono">
+              <span className="ml-1.5 rounded border border-border px-1.5 py-0.5 text-[10px] font-mono">
                 {d.columns}列
               </span>
             </button>
@@ -99,32 +128,18 @@ export default function ArenaPage() {
         )}
       </section>
 
-      {/* CoT 消歧 Banner */}
       {dimension === "prompt" && showPromptBanner && (
-        <div className="flex items-start gap-3 rounded-[var(--radius)] border border-border bg-card p-4 text-sm">
-          <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-chart-4" />
-          <div className="flex-1 space-y-1">
-            <p>
-              提示词维度的「CoT Prompt」只改文案；若要看编排层「先推理后行动」，请切换到
-              <button
-                type="button"
-                className="mx-1 text-primary underline"
-                onClick={() => setDimension("reasoning")}
-                disabled
-                title="推理模式维度将在后续版本开放"
-              >
-                推理模式 → CoT+Tool
-              </button>
-              （即将支持）。
-            </p>
-          </div>
+        <div className="flex items-start gap-3 rounded border border-border bg-card p-4 text-sm">
+          <HelpCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p className="flex-1">
+            「CoT Prompt」只改 Prompt 文案；编排层「先推理后行动」见推理模式 → CoT+Tool（即将支持）。
+          </p>
           <button type="button" className="btn-ghost !h-8 !px-2" onClick={() => setShowPromptBanner(false)}>
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
 
-      {/* 列网格 */}
       <div
         className="grid gap-4"
         style={{
@@ -132,40 +147,37 @@ export default function ArenaPage() {
         }}
       >
         {columnList.length === 0 && !running
-          ? Array.from({ length: columnCount }).map((_, i) => (
-              <div key={i} className="column-card opacity-50">
+          ? placeholderLabels.slice(0, columnCount).map((name) => (
+              <div key={name} className="column-card opacity-60">
                 <div className="column-header">
-                  <span className="font-mono text-xs text-muted-foreground">等待运行…</span>
+                  <span className="font-semibold">{name}</span>
                 </div>
                 <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
-                  输入问题后发送
+                  输入问题后点击发送
                 </div>
               </div>
             ))
           : columnList.map((col) => (
               <div key={col.label} className="column-card">
                 <div className="column-header">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full prism-accent" />
-                    <span className="font-semibold">{col.label}</span>
-                    {col.label === "CoT Prompt" && (
-                      <span title="在 Prompt 中引导逐步思考，ReAct 编排不变">
-                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                      </span>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{col.label}</span>
+                      {col.metrics && (
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {col.metrics.success ? "OK" : "FAIL"} · {col.metrics.duration_ms}ms
+                        </span>
+                      )}
+                    </div>
+                    {col.tokenStats && <div className="mt-2"><TokenStatsPanel stats={col.tokenStats} compact /></div>}
                   </div>
-                  {col.metrics && (
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {col.metrics.success ? "✅" : "❌"} {col.metrics.duration_ms}ms
-                    </span>
-                  )}
                 </div>
-                <div className="flex-1 overflow-y-auto max-h-[480px] p-1">
+                <div className="flex-1 overflow-y-auto max-h-[400px] p-1">
                   {col.events.map((ev, idx) => {
-                    if (ev.type === "complete") return null;
+                    if (ev.type === "complete" || ev.type === "token_update") return null;
                     const cls =
                       ev.type === "thought"
-                        ? `trace-thought${col.label === "CoT Prompt" ? " prompt-cot" : ""}`
+                        ? "trace-thought"
                         : ev.type === "action"
                           ? "trace-action"
                           : ev.type === "observation"
@@ -189,20 +201,22 @@ export default function ArenaPage() {
                       </div>
                     );
                   })}
-                  {running && <p className="p-3 text-xs text-muted-foreground animate-pulse">运行中…</p>}
+                  {running && !col.metrics && (
+                    <p className="p-3 text-xs text-muted-foreground">运行中…</p>
+                  )}
                 </div>
+                {col.tokenStats && <TokenStatsPanel stats={col.tokenStats} />}
                 {col.metrics && (
-                  <div className="border-t border-border px-4 py-2 font-mono text-[11px] text-muted-foreground flex gap-3">
-                    <span>🔧 {col.metrics.tool_calls}</span>
-                    <span>📊 {col.metrics.steps} steps</span>
+                  <div className="border-t border-border px-3 py-2 font-mono text-[10px] text-muted-foreground flex gap-3">
+                    <span>工具 {col.metrics.tool_calls}</span>
+                    <span>步骤 {col.metrics.steps}</span>
                   </div>
                 )}
               </div>
             ))}
       </div>
 
-      {/* 输入区 */}
-      <section className="rounded-[var(--radius)] border border-border bg-card p-4 space-y-3">
+      <section className="rounded border border-border bg-card p-4 space-y-3">
         <div className="flex flex-wrap gap-2">
           {TASK_TEMPLATES.map((t) => (
             <button
@@ -221,43 +235,25 @@ export default function ArenaPage() {
             placeholder="输入你的问题…"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && setShowConfirm(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                runArena();
+              }
+            }}
             disabled={running}
           />
           <button
             type="button"
             className="btn-primary shrink-0"
             disabled={running || !question.trim()}
-            onClick={() => setShowConfirm(true)}
+            onClick={runArena}
           >
             <Send className="h-4 w-4" />
             发送
           </button>
         </div>
       </section>
-
-      {/* 跑前确认 */}
-      {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-[var(--radius)] border border-border bg-card p-6 space-y-4">
-            <h3 className="font-semibold">确认运行实验</h3>
-            <p className="text-sm text-muted-foreground">
-              维度：<strong className="text-foreground">{activeDim?.label}</strong> · {columnCount} 条管线并行
-            </p>
-            <p className="font-mono text-sm">
-              预估消耗：~{(estimatedTokens / 1000).toFixed(1)}k tokens
-            </p>
-            <div className="flex justify-end gap-2">
-              <button type="button" className="btn-ghost" onClick={() => setShowConfirm(false)}>
-                取消
-              </button>
-              <button type="button" className="btn-primary" onClick={runArena}>
-                确认运行
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

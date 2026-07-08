@@ -25,6 +25,20 @@ export interface ProviderConfig {
   auth_field: string;
   model: string;
   temperature: number;
+  context_window: number;
+  max_input_tokens: number;
+  max_output_tokens: number;
+}
+
+export interface TokenStats {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  context_window: number;
+  max_input_tokens: number;
+  max_output_tokens: number;
+  context_usage_pct: number;
+  input_usage_pct: number;
 }
 
 export interface ArenaEvent {
@@ -39,10 +53,18 @@ export interface ArenaEvent {
   metrics?: {
     success: boolean;
     duration_ms: number;
+    input_tokens: number;
+    output_tokens: number;
     total_tokens: number;
     tool_calls: number;
     steps: number;
+    context_window: number;
+    max_input_tokens: number;
+    max_output_tokens: number;
+    context_usage_pct: number;
+    input_usage_pct: number;
   };
+  token_stats?: TokenStats;
 }
 
 export async function fetchArenaMeta(): Promise<ArenaMeta> {

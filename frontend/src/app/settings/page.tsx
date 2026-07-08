@@ -23,6 +23,9 @@ export default function SettingsPage() {
     auth_field: "ANTHROPIC_AUTH_TOKEN",
     model: "step-3.7-flash",
     temperature: 0,
+    context_window: 128000,
+    max_input_tokens: 120000,
+    max_output_tokens: 2048,
   });
 
   useEffect(() => {
@@ -39,6 +42,9 @@ export default function SettingsPage() {
           auth_field: cfg.auth_field,
           model: cfg.model,
           temperature: cfg.temperature,
+          context_window: cfg.context_window,
+          max_input_tokens: cfg.max_input_tokens,
+          max_output_tokens: cfg.max_output_tokens,
           api_key: "",
         }));
       })
@@ -189,7 +195,7 @@ export default function SettingsPage() {
           </div>
         </details>
 
-        <div className="rounded-[calc(var(--radius)-6px)] border border-border p-4 space-y-3">
+        <div className="rounded border border-border p-4 space-y-4">
           <p className="eyebrow">模型映射</p>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <Field label="实际请求模型">
@@ -211,13 +217,46 @@ export default function SettingsPage() {
               />
             </Field>
           </div>
+          <p className="eyebrow pt-2">上下文窗口</p>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <Field label="上下文窗口 (tokens)">
+              <input
+                className="form-input font-mono text-sm"
+                type="number"
+                min="1024"
+                value={form.context_window}
+                onChange={(e) => setForm({ ...form, context_window: parseInt(e.target.value, 10) || 0 })}
+              />
+            </Field>
+            <Field label="最大输入 (tokens)">
+              <input
+                className="form-input font-mono text-sm"
+                type="number"
+                min="256"
+                value={form.max_input_tokens}
+                onChange={(e) => setForm({ ...form, max_input_tokens: parseInt(e.target.value, 10) || 0 })}
+              />
+            </Field>
+            <Field label="最大输出 (tokens)">
+              <input
+                className="form-input font-mono text-sm"
+                type="number"
+                min="64"
+                value={form.max_output_tokens}
+                onChange={(e) => setForm({ ...form, max_output_tokens: parseInt(e.target.value, 10) || 0 })}
+              />
+            </Field>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            上下文占比 = (输入 + 输出) / 上下文窗口；输入占比 = 输入 / 最大输入。
+          </p>
         </div>
 
         {testResult && (
           <div
-            className={`rounded-[calc(var(--radius)-6px)] border p-3 text-sm ${
+            className={`rounded border p-3 text-sm ${
               testResult.ok
-                ? "border-chart-3/40 bg-chart-3/10 text-chart-3"
+                ? "border-foreground/30 bg-muted text-foreground"
                 : "border-destructive/40 bg-destructive/10 text-destructive"
             }`}
           >

@@ -1,28 +1,24 @@
 @import "tailwindcss";
 
-/* Vibe Camp 暗色令牌 — 源自 GaoKaiBlog / dl_builtin_vibe_camp */
+/* 黑白极简主题 */
 :root {
-  --brand-500: #f7663c;
-  --brand-600: #f1481e;
-  --background: #1e1a16;
-  --foreground: #f2ede7;
-  --card: #2a2521;
-  --card-foreground: #f2ede7;
-  --muted: #221d19;
-  --muted-foreground: #b4aba2;
-  --border: #3a322c;
-  --input: #3a332d;
-  --primary: var(--brand-600);
-  --primary-foreground: #31150d;
-  --ring: var(--brand-500);
-  --destructive: #ff6b57;
-  --chart-1: #ff845f;
-  --chart-2: #f4b366;
-  --chart-3: #3ccf8e;
-  --chart-4: #b3a6ff;
-  --chart-5: #f0d2a6;
-  --sidebar: #2b2520;
-  --radius: 18px;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #0a0a0a;
+  --card-foreground: #ffffff;
+  --muted: #111111;
+  --muted-foreground: #a3a3a3;
+  --border: #262626;
+  --input: #262626;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --ring: #ffffff;
+  --destructive: #ef4444;
+  --chart-1: #ffffff;
+  --chart-2: #d4d4d4;
+  --chart-3: #737373;
+  --chart-4: #525252;
+  --radius: 8px;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-roboto-mono), ui-monospace, monospace;
 }
@@ -64,51 +60,29 @@ body {
   min-height: 100vh;
 }
 
-/* 棱镜折射签名渐变 — 列头与激活 Tab */
-.prism-accent {
-  background: linear-gradient(
-    135deg,
-    var(--chart-4) 0%,
-    var(--chart-1) 35%,
-    var(--chart-2) 65%,
-    var(--chart-3) 100%
-  );
-}
-
 .eyebrow {
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
 
 .form-input {
   width: 100%;
-  height: 48px;
-  padding: 0 14px;
+  height: 44px;
+  padding: 0 12px;
   background: var(--card);
-  border: 1px solid var(--input);
-  border-radius: calc(var(--radius) - 6px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   color: var(--foreground);
-  font-size: 0.92rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  font-size: 0.9rem;
+  transition: border-color 0.15s;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent);
-}
-
-.form-label {
-  display: block;
-  margin-bottom: 8px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
+  border-color: var(--foreground);
 }
 
 .btn-primary {
@@ -117,23 +91,22 @@ body {
   justify-content: center;
   gap: 8px;
   height: 44px;
-  padding: 0 20px;
-  border-radius: calc(var(--radius) - 6px);
+  padding: 0 18px;
+  border-radius: var(--radius);
   background: var(--primary);
-  color: #fff7f3;
+  color: var(--primary-foreground);
   font-weight: 600;
   border: none;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.15s;
+  transition: opacity 0.15s;
 }
 
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.92;
-  transform: translateY(-1px);
+  opacity: 0.85;
 }
 
 .btn-primary:disabled {
-  opacity: 0.45;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
@@ -141,40 +114,39 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: calc(var(--radius) - 8px);
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius);
   background: transparent;
   border: 1px solid var(--border);
   color: var(--muted-foreground);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 .btn-ghost:hover {
-  border-color: var(--ring);
+  border-color: var(--foreground);
   color: var(--foreground);
 }
 
 .seg-tab {
-  padding: 8px 14px;
-  border-radius: calc(var(--radius) - 8px);
+  padding: 8px 12px;
+  border-radius: var(--radius);
   font-size: 0.85rem;
   color: var(--muted-foreground);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .seg-tab[data-active="true"] {
   background: var(--card);
   border-color: var(--border);
   color: var(--foreground);
-  box-shadow: inset 0 -2px 0 var(--primary);
 }
 
 .seg-tab[data-disabled="true"] {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
@@ -189,41 +161,51 @@ body {
 }
 
 .column-header {
-  padding: 12px 16px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .trace-step {
   padding: 10px 12px;
-  margin: 8px 12px;
-  border-radius: calc(var(--radius) - 8px);
+  margin: 8px 10px;
+  border-radius: var(--radius);
   background: var(--muted);
   font-size: 0.85rem;
   line-height: 1.5;
+  border-left: 2px solid var(--border);
 }
 
 .trace-thought {
-  border-left: 3px solid var(--chart-4);
-}
-
-.trace-thought.prompt-cot {
-  border-left-color: var(--chart-4);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chart-4) 25%, transparent);
+  border-left-color: var(--chart-2);
 }
 
 .trace-action {
-  border-left: 3px solid var(--chart-1);
+  border-left-color: var(--foreground);
 }
 
 .trace-observation {
-  border-left: 3px solid var(--chart-2);
+  border-left-color: var(--chart-3);
 }
 
 .trace-error {
-  border-left: 3px solid var(--destructive);
+  border-left-color: var(--destructive);
+}
+
+.token-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.token-bar-fill {
+  height: 100%;
+  background: var(--foreground);
+  transition: width 0.3s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
