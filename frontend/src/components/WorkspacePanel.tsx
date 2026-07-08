@@ -1,7 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { File, FolderOpen, X, RefreshCw, ChevronRight, ChevronDown } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  File,
+  FolderOpen,
+  X,
+  RefreshCw,
+  ChevronRight,
+  ChevronDown,
+  Edit3,
+  Save,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 interface WorkspacePanelProps {
   /** 工作空间名称（唯一标识） */
@@ -21,6 +32,18 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
+  const [showNewFile, setShowNewFile] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const flashToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
 
   const loadFiles = useCallback(async () => {
     if (!workspaceName) return;
@@ -31,7 +54,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
         setFiles(data.files || []);
       }
     } catch {
-      // 静默处理
+      // 静默
     }
   }, [workspaceName]);
 
@@ -43,6 +66,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
       if (res.ok) {
         const data = await res.json();
         setContent(data.content || "");
+        setEditContent(data.content || "");
       }
     } catch {
       setContent("加载失败");
@@ -51,11 +75,89 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
     }
   }, [workspaceName]);
 
+  const saveFile = useCallback(async () => {
+    if (!workspaceName || !selectedFile) return;
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/arena/workspace/${encodeURIComponent(workspaceName)}/file`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: selectedFile, content: editContent }),
+        }
+      );
+      if (res.ok) {
+        setContent(editContent);
+        setEditing(false);
+        flashToast("已保存");
+        loadFiles();
+      } else {
+        const err = await res.json();
+        flashToast(`保存失败: ${err.detail}`);
+      }
+    } catch {
+      flashToast("保存失败");
+    } finally {
+      setSaving(false);
+    }
+  }, [workspaceName, selectedFile, editContent, loadFiles]);
+
+  const createFile = useCallback(async () => {
+    if (!workspaceName || !newFileName.trim()) return;
+    const path = newFileName.trim();
+    try {
+      const res = await fetch(
+        `/api/arena/workspace/${encodeURIComponent(workspaceName)}/file`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path, content: "", create_only: true }),
+        }
+      );
+      if (res.ok) {
+        flashToast(`已创建: ${path}`);
+        setNewFileName("");
+        setShowNewFile(false);
+        await loadFiles();
+        setSelectedFile(path);
+        loadFile(path);
+      } else {
+        const err = await res.json();
+        flashToast(`创建失败: ${err.detail}`);
+      }
+    } catch {
+      flashToast("创建失败");
+    }
+  }, [workspaceName, newFileName, loadFiles, loadFile]);
+
+  const deleteFile = useCallback(async (path: string) => {
+    if (!workspaceName) return;
+    if (!confirm(`删除文件 ${path}？`)) return;
+    try {
+      const res = await fetch(
+        `/api/arena/workspace/${encodeURIComponent(workspaceName)}/file?path=${encodeURIComponent(path)}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        flashToast("已删除");
+        if (selectedFile === path) {
+          setSelectedFile(null);
+          setContent("");
+        }
+        loadFiles();
+      }
+    } catch {
+      flashToast("删除失败");
+    }
+  }, [workspaceName, selectedFile, loadFiles]);
+
   useEffect(() => {
     if (!workspaceName) {
       setFiles([]);
       setSelectedFile(null);
       setContent("");
+      setEditing(false);
       return;
     }
     loadFiles();
@@ -65,6 +167,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
 
   useEffect(() => {
     if (selectedFile) {
+      setEditing(false);
       loadFile(selectedFile);
     }
   }, [selectedFile, loadFile]);
@@ -81,7 +184,6 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
     });
   };
 
-  // 构建树形结构
   const tree = buildTree(files);
 
   if (!workspaceName) {
@@ -93,25 +195,59 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col h-full">
       {/* 文件树 */}
-      <div className="w-48 border-r border-border overflow-y-auto flex-shrink-0">
+      <div className="border-b border-border overflow-y-auto max-h-40 flex-shrink-0">
         <div className="sticky top-0 bg-card border-b border-border px-2 py-1.5 flex items-center justify-between">
           <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
             文件
           </span>
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground p-0.5"
-            onClick={loadFiles}
-            title="刷新"
-          >
-            <RefreshCw className="h-3 w-3" />
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground p-0.5"
+              onClick={() => setShowNewFile(!showNewFile)}
+              title="新建文件"
+            >
+              <Plus className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground p-0.5"
+              onClick={loadFiles}
+              title="刷新"
+            >
+              <RefreshCw className="h-3 w-3" />
+            </button>
+          </div>
         </div>
+
+        {showNewFile && (
+          <div className="px-2 py-1.5 border-b border-border flex items-center gap-1">
+            <input
+              autoFocus
+              className="flex-1 h-7 px-2 text-xs bg-muted/30 border border-border rounded font-mono"
+              placeholder="main.py"
+              value={newFileName}
+              onChange={(e) => setNewFileName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") createFile();
+                if (e.key === "Escape") setShowNewFile(false);
+              }}
+            />
+            <button
+              type="button"
+              className="btn-ghost !h-7 !px-2 text-[10px]"
+              onClick={createFile}
+            >
+              创建
+            </button>
+          </div>
+        )}
+
         <div className="p-1">
           {tree.length === 0 && (
-            <p className="text-[10px] text-muted-foreground px-2 py-3">空工作空间</p>
+            <p className="text-[10px] text-muted-foreground px-2 py-3">空工作空间 · 点击 + 新建</p>
           )}
           {tree.map((node) => (
             <TreeNode
@@ -119,7 +255,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
               node={node}
               depth={0}
               expanded={expandedDirs.has(node.path)}
-              onToggle={(path) => toggleDir(path)}
+              onToggle={toggleDir}
               onSelect={setSelectedFile}
               selectedPath={selectedFile}
             />
@@ -128,40 +264,105 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
       </div>
 
       {/* 文件内容 */}
-      <div className="flex-1 overflow-y-auto min-w-0">
+      <div className="flex-1 overflow-y-auto min-w-0 flex flex-col">
         {selectedFile ? (
-          <div className="h-full flex flex-col">
-            <div className="flex items-center justify-between border-b border-border px-3 py-1.5 bg-muted/30">
-              <span className="text-xs font-mono truncate">{selectedFile}</span>
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground p-0.5"
-                onClick={() => setSelectedFile(null)}
-              >
-                <X className="h-3 w-3" />
-              </button>
+          <>
+            <div className="flex items-center justify-between border-b border-border px-3 py-1.5 bg-muted/30 sticky top-0">
+              <span className="text-xs font-mono truncate flex-1">{selectedFile}</span>
+              <div className="flex items-center gap-0.5 shrink-0">
+                {editing ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-ghost !h-7 !px-2 text-[10px]"
+                      onClick={saveFile}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <span className="h-3 w-3 border border-foreground/30 border-t-foreground rounded-full animate-spin" />
+                      ) : (
+                        <Save className="h-3 w-3" />
+                      )}
+                      保存
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost !h-7 !px-2 text-[10px]"
+                      onClick={() => {
+                        setEditContent(content);
+                        setEditing(false);
+                      }}
+                    >
+                      取消
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-ghost !h-7 !px-2 text-[10px]"
+                      onClick={() => {
+                        setEditContent(content);
+                        setEditing(true);
+                        setTimeout(() => textareaRef.current?.focus(), 50);
+                      }}
+                      title="编辑"
+                    >
+                      <Edit3 className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost !h-7 !px-2 text-[10px]"
+                      onClick={() => deleteFile(selectedFile)}
+                      title="删除"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className="btn-ghost !h-7 !px-2 text-[10px]"
+                  onClick={() => setSelectedFile(null)}
+                  title="关闭"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             </div>
-            <pre className="flex-1 p-3 text-xs font-mono overflow-auto whitespace-pre-wrap break-words">
-              {loading ? "加载中…" : content || "(空文件)"}
-            </pre>
-          </div>
+
+            {editing ? (
+              <textarea
+                ref={textareaRef}
+                className="flex-1 w-full p-3 text-xs font-mono bg-card resize-none border-0 outline-none focus:ring-1 focus:ring-foreground/30"
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                spellCheck={false}
+              />
+            ) : (
+              <pre className="flex-1 p-3 text-xs font-mono overflow-auto whitespace-pre-wrap break-words">
+                {loading ? "加载中…" : content || "(空文件)"}
+              </pre>
+            )}
+          </>
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-            选择文件查看内容
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground p-4 text-center">
+            选择文件查看或编辑
           </div>
         )}
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="absolute bottom-3 right-3 left-3 bg-foreground text-background text-xs px-3 py-2 rounded shadow-lg animate-in fade-in">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
 
 // ===== 树形组件 =====
-
-interface FileTreeNode {
-  path: string;
-  name: string;
-  children: FileTreeNode[];
-}
 
 interface TreeNodeProps {
   node: FileTreeNode;
@@ -237,7 +438,6 @@ function buildTree(files: FileEntry[]): FileTreeNode[] {
   const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
   const nodeMap = new Map<string, FileTreeNode>();
 
-  // Ensure root node exists
   const rootNode: FileTreeNode = { path: "", name: "workspace", children: [] };
   nodeMap.set("", rootNode);
 
