@@ -13,6 +13,7 @@ from typing_extensions import TypedDict
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
 from app.arena.llm import create_chat_model
 from app.arena.prompts import build_messages
+from app.arena.harness import HarnessRunner, reflect_on_failure, verify_result
 from app.arena.reasoning_graph import (
     build_cot_tool_graph,
     build_react_graph,
@@ -21,8 +22,8 @@ from app.arena.reasoning_graph import (
 )
 from app.arena.stream_utils import extract_chunk_text
 from app.arena.token_utils import TokenTracker, extract_usage
-from app.arena.tools import ARENA_TOOLS, set_current_workspace
-from app.arena.workspace import clear_current_workspace
+from app.arena.tools import ARENA_TOOLS
+from app.arena.workspace import clear_current_workspace, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
 
@@ -53,6 +54,9 @@ class LangGraphAdapter:
         set_current_workspace(ws_name)
         ws.write_file("README.md", f"# {label} Agent 工作空间\n\n问题: {question}\n")
 
+        # Harness 运行器
+        harness_runner = HarnessRunner(level=config.harness)
+
         try:
             system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
             tracker.seed_prompt(system, user)
@@ -82,7 +86,7 @@ class LangGraphAdapter:
             graph_builder = graph_map.get(config.reasoning, build_react_graph)
             graph = graph_builder().compile()
 
-            inputs = {
+            initial_state = {
                 "messages": [
                     SystemMessage(content=system),
                     HumanMessage(content=user),
@@ -94,67 +98,82 @@ class LangGraphAdapter:
             }
 
             buffer = ""
+            step_inner = [0]
+            tc_inner = [0]
+            buf_inner = [""]
 
-            async for event in graph.astream_events(inputs, version="v2"):
+            async def process_event(event):
                 kind = event.get("event", "")
                 data = event.get("data", {})
                 node_name = event.get("name", "")
 
-                # 流式文本输出
                 if kind == "on_chat_model_stream":
                     chunk = data.get("chunk")
                     text = extract_chunk_text(chunk)
                     if text:
-                        buffer += str(text)
+                        buf_inner[0] += str(text)
                 elif kind == "on_chat_model_end":
-                    if buffer.strip():
-                        step += 1
+                    if buf_inner[0].strip():
+                        step_inner[0] += 1
                         yield ArenaEvent(
-                            type="thought",
-                            pipeline=label,
-                            step=step,
-                            content=buffer.strip(),
+                            type="thought", pipeline=label,
+                            step=step_inner[0], content=buf_inner[0].strip(),
                         )
-                    buffer = ""
+                    buf_inner[0] = ""
                     usage = extract_usage(data)
                     if usage["input_tokens"] or usage["output_tokens"]:
                         tracker.add_usage(usage)
                         yield token_update_event(label, tracker)
-
-                # 工具调用
                 elif kind == "on_tool_start":
-                    tool_calls += 1
-                    step += 1
+                    tc_inner[0] += 1
+                    step_inner[0] += 1
                     tool_name = data.get("name", node_name)
                     tool_input = data.get("input", {})
                     yield ArenaEvent(
-                        type="action",
-                        pipeline=label,
-                        step=step,
-                        tool=tool_name,
+                        type="action", pipeline=label,
+                        step=step_inner[0], tool=tool_name,
                         args=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
                     )
                 elif kind == "on_tool_end":
-                    step += 1
+                    step_inner[0] += 1
                     output = data.get("output", "")
                     yield ArenaEvent(
-                        type="observation",
-                        pipeline=label,
-                        step=step,
-                        result=str(output),
+                        type="observation", pipeline=label,
+                        step=step_inner[0], result=str(output),
+                    )
+                elif kind == "on_node_start" and node_name not in ("agent", "execute"):
+                    yield ArenaEvent(
+                        type="thought", pipeline=label,
+                        step=step_inner[0], content=f"[阶段: {node_name}]",
                     )
 
-                # 节点执行标记（用于区分推理阶段）
-                elif kind == "on_node_start":
-                    if node_name not in ("agent", "execute"):
+            async for event in graph.astream_events(initial_state, version="v2"):
+                async for ev in process_event(event):
+                    yield ev
+                step = step_inner[0]
+                tool_calls = tc_inner[0]
+                buffer = buf_inner[0]
+
+            # Harness: 非裸运行时执行验证/反思
+            if config.harness != "bare" and step_inner[0] > 0:
+                messages_list = initial_state.get("messages", [])
+                if messages_list:
+                    last_msg = messages_list[-1]
+                    answer = getattr(last_msg, "content", str(last_msg))
+                    passed, reason = verify_result(question, answer[:2000])
+                    yield ArenaEvent(
+                        type="verify", pipeline=label,
+                        step=step_inner[0] + 1,
+                        content=f"[{config.harness}] 验证: {reason}",
+                        passed=passed,
+                    )
+                    if not passed:
+                        insight = reflect_on_failure(question, answer[:2000], reason)
                         yield ArenaEvent(
-                            type="thought",
-                            pipeline=label,
-                            step=step,
-                            content=f"[阶段: {node_name}]",
+                            type="reflect", pipeline=label,
+                            step=step_inner[0] + 2,
+                            content=f"[反思] {insight}",
                         )
-                elif kind == "on_node_end":
-                    pass
 
             duration_ms = int((time.perf_counter() - started) * 1000)
             yield ArenaEvent(
