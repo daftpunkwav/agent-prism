@@ -120,18 +120,31 @@ export async function streamArenaRun(
   const decoder = new TextDecoder();
   let buffer = "";
 
+  const flush = (rawEvent: string) => {
+    // 兼容 \r\n / \n 行分隔；一个事件可能含多行 data:
+    const dataLines = rawEvent
+      .split(/\r?\n/)
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).trimStart());
+    if (dataLines.length === 0) return;
+    const json = dataLines.join("\n").trim();
+    if (!json) return;
+    try {
+      onEvent(JSON.parse(json));
+    } catch {
+      // 忽略无法解析的分片
+    }
+  };
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split("\n\n");
+    // SSE 事件以空行分隔，兼容 \r\n\r\n 与 \n\n
+    const parts = buffer.split(/\r?\n\r?\n/);
     buffer = parts.pop() ?? "";
-
-    for (const part of parts) {
-      const dataLine = part.split("\n").find((l) => l.startsWith("data:"));
-      if (!dataLine) continue;
-      const json = dataLine.slice(5).trim();
-      if (json) onEvent(JSON.parse(json));
-    }
+    for (const part of parts) flush(part);
   }
+
+  if (buffer.trim()) flush(buffer);
 }

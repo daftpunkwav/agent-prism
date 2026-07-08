@@ -186,30 +186,66 @@ body {
   gap: 12px;
 }
 
-.trace-step {
-  padding: 10px 12px;
-  margin: 8px 10px;
+/* 单行系统提示：展示框架/策略初始化信息，弱化处理 */
+.trace-system {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+  padding: 2px 4px;
+}
+
+/* 语义分段：连续 token 合并后的气泡 */
+.trace-seg {
+  padding: 8px 12px;
   border-radius: var(--radius);
   background: var(--muted);
   font-size: 0.85rem;
-  line-height: 1.5;
+  line-height: 1.55;
   border-left: 2px solid var(--border);
 }
 
+.trace-tag {
+  display: inline-block;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+
 .trace-thought {
-  border-left-color: var(--chart-2);
+  border-left-color: var(--foreground);
 }
 
 .trace-action {
   border-left-color: var(--foreground);
+  background: transparent;
+  border: 1px dashed var(--border);
 }
 
 .trace-observation {
-  border-left-color: var(--chart-3);
+  border-left-color: var(--border);
 }
 
 .trace-error {
   border-left-color: var(--destructive);
+}
+
+/* 流式光标 */
+.trace-cursor {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--foreground);
+  animation: trace-blink 1s steps(2, start) infinite;
+}
+
+@keyframes trace-blink {
+  to {
+    visibility: hidden;
+  }
 }
 
 .token-bar {

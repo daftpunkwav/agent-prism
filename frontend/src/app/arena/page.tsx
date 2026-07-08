@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HelpCircle, Send, X } from "lucide-react";
 import { TokenStatsPanel } from "@/components/TokenStatsPanel";
+import { TraceView } from "@/components/TraceView";
 import {
   ArenaEvent,
   ArenaMeta,
@@ -172,38 +173,8 @@ export default function ArenaPage() {
                     {col.tokenStats && <div className="mt-2"><TokenStatsPanel stats={col.tokenStats} compact /></div>}
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto max-h-[400px] p-1">
-                  {col.events.map((ev, idx) => {
-                    if (ev.type === "complete" || ev.type === "token_update") return null;
-                    const cls =
-                      ev.type === "thought"
-                        ? "trace-thought"
-                        : ev.type === "action"
-                          ? "trace-action"
-                          : ev.type === "observation"
-                            ? "trace-observation"
-                            : ev.type === "error"
-                              ? "trace-error"
-                              : "";
-                    return (
-                      <div key={idx} className={`trace-step ${cls}`}>
-                        <div className="eyebrow mb-1">
-                          {ev.type} · step {ev.step}
-                        </div>
-                        {ev.content && <p className="whitespace-pre-wrap">{ev.content}</p>}
-                        {ev.tool && (
-                          <p className="font-mono text-xs mt-1">
-                            {ev.tool}({JSON.stringify(ev.args)})
-                          </p>
-                        )}
-                        {ev.result && <p className="mt-1 text-muted-foreground">{ev.result}</p>}
-                        {ev.message && <p className="text-destructive">{ev.message}</p>}
-                      </div>
-                    );
-                  })}
-                  {running && !col.metrics && (
-                    <p className="p-3 text-xs text-muted-foreground">运行中…</p>
-                  )}
+                <div className="flex-1 overflow-y-auto max-h-[440px]">
+                  <TraceView events={col.events} running={running && !col.metrics} />
                 </div>
                 {col.tokenStats && <TokenStatsPanel stats={col.tokenStats} />}
                 {col.metrics && (

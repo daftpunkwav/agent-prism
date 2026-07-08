@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-50 border-b border-border bg-background">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
+        <div className="mx-auto flex h-14 max-w-[1680px] items-center justify-between px-4 md:px-8">
           <Link href="/arena" className="flex items-center gap-2.5 font-semibold">
             <span className="flex h-7 w-7 items-center justify-center rounded border border-border text-xs font-mono">
               AP
@@ -44,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-[1680px] flex-1 px-4 py-6 md:px-8">{children}</main>
     </div>
   );
 }

@@ -44,6 +44,8 @@ class LangChainAdapter:
 
             agent = create_agent(llm, ARENA_TOOLS, system_prompt=system)
 
+            buffer = ""  # 累积单个模型回合的推理文本，回合结束时整段发出
+
             async for event in agent.astream_events(
                 {"messages": [("user", user)]},
                 version="v2",
@@ -55,14 +57,17 @@ class LangChainAdapter:
                     chunk = data.get("chunk")
                     text = extract_chunk_text(chunk)
                     if text:
+                        buffer += str(text)
+                elif kind == "on_chat_model_end":
+                    if buffer.strip():
                         step += 1
                         yield ArenaEvent(
                             type="thought",
                             pipeline=label,
                             step=step,
-                            content=str(text),
+                            content=buffer.strip(),
                         )
-                elif kind == "on_chat_model_end":
+                    buffer = ""
                     usage = extract_usage(data)
                     if usage["input_tokens"] or usage["output_tokens"]:
                         tracker.add_usage(usage)
