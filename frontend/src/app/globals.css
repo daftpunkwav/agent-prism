@@ -1,13 +1,36 @@
 @import "tailwindcss";
 
-/* 黑白极简主题 */
+/* ===== 浅色主题（白）===== */
 :root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #fafafa;
+  --card-foreground: #0a0a0a;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
+  --ring: #0a0a0a;
+  --destructive: #dc2626;
+  --chart-1: #0a0a0a;
+  --chart-2: #52525b;
+  --chart-3: #a1a1aa;
+  --chart-4: #d4d4d8;
+  --radius: 8px;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-roboto-mono), ui-monospace, monospace;
+}
+
+/* ===== 深色主题（黑）===== */
+.dark {
   --background: #000000;
-  --foreground: #ffffff;
-  --card: #0a0a0a;
-  --card-foreground: #ffffff;
-  --muted: #111111;
-  --muted-foreground: #a3a3a3;
+  --foreground: #fafafa;
+  --card: #0c0c0c;
+  --card-foreground: #fafafa;
+  --muted: #171717;
+  --muted-foreground: #a1a1aa;
   --border: #262626;
   --input: #262626;
   --primary: #ffffff;
@@ -15,12 +38,9 @@
   --ring: #ffffff;
   --destructive: #ef4444;
   --chart-1: #ffffff;
-  --chart-2: #d4d4d4;
-  --chart-3: #737373;
-  --chart-4: #525252;
-  --radius: 8px;
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-roboto-mono), ui-monospace, monospace;
+  --chart-2: #d4d4d8;
+  --chart-3: #71717a;
+  --chart-4: #3f3f46;
 }
 
 @theme inline {
@@ -49,15 +69,12 @@
   box-sizing: border-box;
 }
 
-html {
-  color-scheme: dark;
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
   min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .eyebrow {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings, Zap } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV = [
   { href: "/arena", label: "Arena", icon: Zap },
@@ -38,6 +39,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            <span className="mx-1 h-4 w-px bg-border" />
+            <ThemeToggle />
           </nav>
         </div>
       </header>
