@@ -267,3 +267,86 @@ body {
     transition: none !important;
   }
 }
+
+/* ===== Markdown 渲染样式 ===== */
+.prose {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+.prose pre {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  overflow-x: auto;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.prose code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  background: var(--muted);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+}
+.prose pre code {
+  background: none;
+  padding: 0;
+}
+.prose ul, .prose ol {
+  padding-left: 1.2rem;
+}
+.prose li {
+  margin: 0.15rem 0;
+}
+.prose p {
+  margin: 0.35rem 0;
+}
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.9rem;
+}
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.78rem;
+}
+.prose th, .prose td {
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+}
+.prose th {
+  background: var(--muted);
+  font-weight: 600;
+}
+
+/* ===== 代码语法高亮 ===== */
+.hl-keyword {
+  color: #c678dd;
+  font-weight: 500;
+}
+.hl-string {
+  color: #98c379;
+}
+.hl-number {
+  color: #d19a66;
+}
+.hl-comment {
+  color: #5c6370;
+  font-style: italic;
+}
+.dark .hl-keyword {
+  color: #c586c0;
+}
+.dark .hl-string {
+  color: #ce9178;
+}
+.dark .hl-number {
+  color: #b5cea8;
+}
+.dark .hl-comment {
+  color: #6a9955;
+}
