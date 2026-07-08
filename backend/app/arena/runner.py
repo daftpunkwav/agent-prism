@@ -32,15 +32,6 @@ class RunnerPool:
             ]
         return configs
 
-    async def run_pipeline(
-        self, config: PipelineConfig, question: str
-    ) -> list[ArenaEvent]:
-        adapter = self.registry.get(config.framework)
-        events: list[ArenaEvent] = []
-        async for event in adapter.run(question, config):
-            events.append(event)
-        return events
-
     async def stream_parallel(
         self, request: ArenaRunRequest
     ) -> AsyncIterator[ArenaEvent]:

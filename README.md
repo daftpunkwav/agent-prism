@@ -123,7 +123,18 @@ npm install --include=dev
 
 API Key 保存在本地 `data/provider_config.json`，不会提交到 Git。
 
-### 4. MVP 功能
+### 4. 测试与代码质量
+
+```powershell
+cd backend
+# 安装开发工具（pytest / ruff / mypy）
+.\.venv\Scripts\pip install -e ".[dev]"
+
+.\.venv\Scripts\python -m pytest   # 单元测试
+.\.venv\Scripts\python -m ruff check .   # 静态检查
+```
+
+### 5. MVP 功能
 
 - ✅ Arena 框架对比（LangChain vs LangGraph，2 列并行）
 - ✅ Arena 提示词对比（4 列，Zero-shot / Few-shot / CoT Prompt / Structured）
