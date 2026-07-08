@@ -108,3 +108,24 @@ class ConnectionTestResult(BaseModel):
     ok: bool
     message: str
     model: str = ""
+
+
+# ===== 项目管理模型 =====
+
+class Project(BaseModel):
+    id: str
+    name: str
+    question: str
+    dimension: str
+    created_at: str
+    results: list[dict] = Field(default_factory=list)
+    workspace_files: dict[str, str] = Field(default_factory=dict)
+    metrics_summary: dict[str, dict] = Field(default_factory=dict)
+
+
+class ProjectCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    question: str
+    dimension: str
+    pipeline_labels: list[str]
+    workspace_names: list[str] = Field(default_factory=list)

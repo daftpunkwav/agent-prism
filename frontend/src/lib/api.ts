@@ -121,7 +121,6 @@ export async function streamArenaRun(
   let buffer = "";
 
   const flush = (rawEvent: string) => {
-    // 兼容 \r\n / \n 行分隔；一个事件可能含多行 data:
     const dataLines = rawEvent
       .split(/\r?\n/)
       .filter((l) => l.startsWith("data:"))
@@ -140,11 +139,55 @@ export async function streamArenaRun(
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    // SSE 事件以空行分隔，兼容 \r\n\r\n 与 \n\n
     const parts = buffer.split(/\r?\n\r?\n/);
     buffer = parts.pop() ?? "";
     for (const part of parts) flush(part);
   }
 
   if (buffer.trim()) flush(buffer);
+}
+
+// ===== 项目管理 API =====
+
+export interface Project {
+  id: string;
+  name: string;
+  question: string;
+  dimension: string;
+  created_at: string;
+  results: Array<{ label: string; workspace: string; file_count: number; files: string[] }>;
+  workspace_files: Record<string, Record<string, string>>;
+  metrics_summary: Record<string, Record<string, number>>;
+}
+
+export interface ProjectCreate {
+  name: string;
+  question: string;
+  dimension: string;
+  pipeline_labels: string[];
+  workspace_names: string[];
+}
+
+export async function listProjects(): Promise<Project[]> {
+  const res = await fetch(`${API_BASE}/api/arena/projects`, { cache: "no-store" });
+  if (!res.ok) throw new Error("加载项目失败");
+  const data = await res.json();
+  return data.projects || [];
+}
+
+export async function createProject(body: ProjectCreate): Promise<{ project: Project }> {
+  const res = await fetch(`${API_BASE}/api/arena/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("创建项目失败");
+  return res.json();
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/arena/projects/${encodeURIComponent(projectId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("删除项目失败");
 }

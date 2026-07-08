@@ -10,8 +10,9 @@ from sse_starlette.sse import EventSourceResponse
 from app.adapters.base import FrameworkAdapterRegistry
 from app.arena.runner import RunnerPool, build_registry
 from app.arena.router import DimensionRouter
+from app.arena.project import get_project_manager
 from app.arena.workspace import WorkspaceManager, get_workspace_mgr
-from app.models import ArenaRunRequest
+from app.models import ArenaRunRequest, ProjectCreate
 
 router = APIRouter(prefix="/api/arena", tags=["arena"])
 
@@ -44,21 +45,21 @@ async def arena_meta():
                 "label": "推理模式",
                 "subtitle": "仅切换推理图节点，Prompt 基线保持一致",
                 "columns": 4,
-                "mvp": False,
+                "mvp": True,
             },
             {
                 "id": "context",
                 "label": "上下文",
                 "subtitle": "仅切换 Memory 策略，需使用多轮任务模板",
                 "columns": 4,
-                "mvp": False,
+                "mvp": True,
             },
             {
                 "id": "harness",
                 "label": "Harness",
                 "subtitle": "仅切换验证 / 反思循环，其余配置保持一致",
                 "columns": 4,
-                "mvp": False,
+                "mvp": True,
             },
         ],
         "frameworks": registry.list_available() + registry.list_reserved(),
@@ -102,3 +103,29 @@ async def workspace_file(workspace_name: str, path: str = Query(...)):
     if content.startswith("错误:"):
         raise HTTPException(status_code=404, detail=content)
     return {"path": path, "content": content}
+
+
+# ===== 项目管理 API =====
+
+from fastapi import Body
+
+@router.get("/projects")
+async def list_projects():
+    mgr = get_project_manager()
+    return {"projects": [p.model_dump() for p in mgr.list_projects()]}
+
+
+@router.post("/projects")
+async def create_project(body: ProjectCreate):
+    mgr = get_project_manager()
+    project = mgr.create_from_run(body)
+    return {"project": project.model_dump()}
+
+
+@router.delete("/projects/{project_id}")
+async def delete_project(project_id: str):
+    mgr = get_project_manager()
+    ok = mgr.delete_project(project_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return {"deleted": project_id}
