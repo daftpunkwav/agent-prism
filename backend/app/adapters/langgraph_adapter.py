@@ -6,6 +6,7 @@ import time
 from typing import AsyncIterator
 
 from langgraph.prebuilt import create_react_agent
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.adapters.common import build_metrics, token_update_event
 from app.arena.llm import create_chat_model
@@ -45,12 +46,12 @@ class LangGraphAdapter:
 
             inputs = {
                 "messages": [
-                    ("system", system),
-                    ("user", user),
+                    SystemMessage(content=system),
+                    HumanMessage(content=user),
                 ]
             }
 
-            buffer = ""  # 累积单个模型回合的推理文本，回合结束时整段发出
+            buffer = ""  # 累积文本内容
 
             async for event in agent.astream_events(inputs, version="v2"):
                 kind = event.get("event", "")

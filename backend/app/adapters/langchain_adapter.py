@@ -6,6 +6,7 @@ import time
 from typing import AsyncIterator
 
 from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.adapters.common import build_metrics, token_update_event
 from app.arena.llm import create_chat_model
@@ -46,8 +47,11 @@ class LangChainAdapter:
 
             buffer = ""  # 累积单个模型回合的推理文本，回合结束时整段发出
 
+            # 使用 LangChain Message 对象（兼容各版本）
+            messages = [SystemMessage(content=system), HumanMessage(content=user)]
+
             async for event in agent.astream_events(
-                {"messages": [("user", user)]},
+                {"messages": messages},
                 version="v2",
             ):
                 kind = event.get("event", "")

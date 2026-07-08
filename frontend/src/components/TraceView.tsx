@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+"use client";
+
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import { ArenaEvent } from "@/lib/api";
 
-const TICK_MS = 24; // 打字机帧间隔
-// 自适应速度：文字越长每帧吐越多字符，总时长封顶约 1.4s
+const TICK_MS = 24;
+
 function charsPerTick(len: number): number {
   return Math.max(1, Math.ceil(len / 60));
 }
@@ -12,55 +14,98 @@ function isThought(ev: ArenaEvent): boolean {
 }
 
 /**
- * 缓冲队列播放：
- * - 运行中扣住最后收到的一步（releasable = 收到数 - 1），等下一步到了再释放，
- *   让打字机播第 N 步的耗时掩盖第 N+1 步的生成延迟，做到连续流式。
- * - 顺序播放：一次只播一步，thought 走打字机，其余即时显示。
- * - 运行结束后释放全部剩余。
+ * 缓冲队列播放 Trace：
+ * - playIndex / typed 存在 ref 中，避免触发重渲染导致动画重置
+ * - 运行中扣住最后一步（releasable = 收到数 - 1）
+ * - 用 requestAnimationFrame 驱动，不依赖 React 重渲染节拍
  */
 export function TraceView({ events, running }: { events: ArenaEvent[]; running: boolean }) {
+  // 排除不需要显示的段
   const segments = events.filter(
     (ev) => ev.type !== "complete" && ev.type !== "token_update"
   );
 
-  const [playIndex, setPlayIndex] = useState(0); // 已完成播放的段数
-  const [typed, setTyped] = useState(0); // 当前 thought 已吐出的字符数
+  const containerRef = useRef<HTMLDivElement>(null);
+  const playIndexRef = useRef(0);   // 当前正在播放的段索引
+  const typedRef = useRef(0);        // 当前 thought 已吐出的字符数
+  const tickRef = useRef<number>(0); // requestAnimationFrame id
+  const segmentsRef = useRef(segments);
+  const runningRef = useRef(running);
 
-  const releasable = running ? Math.max(0, segments.length - 1) : segments.length;
+  // 保持 ref 与 props 同步
+  segmentsRef.current = segments;
+  runningRef.current = running;
 
-  useEffect(() => {
-    if (playIndex >= releasable) return; // 无可播放 / 正扣住最后一步
-    const seg = segments[playIndex];
-    if (!seg) return;
+  const releasable = running
+    ? Math.max(0, segments.length - 1)
+    : segments.length;
 
-    // 非推理段（系统提示 / 工具调用 / 结果 / 错误）即时推进
+  const tick = useCallback(() => {
+    const segs = segmentsRef.current;
+    const idx = playIndexRef.current;
+    const runningNow = runningRef.current;
+    const rel = runningNow ? Math.max(0, segs.length - 1) : segs.length;
+
+    // 无可播放 / 扣住最后一步
+    if (idx >= rel) {
+      tickRef.current = requestAnimationFrame(tick);
+      return;
+    }
+
+    const seg = segs[idx];
+    if (!seg) {
+      tickRef.current = requestAnimationFrame(tick);
+      return;
+    }
+
+    // 非 thought 段即时推进
     if (!isThought(seg)) {
-      setPlayIndex((i) => i + 1);
-      setTyped(0);
+      playIndexRef.current = idx + 1;
+      typedRef.current = 0;
+      tickRef.current = requestAnimationFrame(tick);
       return;
     }
 
     const text = seg.content ?? "";
-    if (typed >= text.length) {
-      setPlayIndex((i) => i + 1);
-      setTyped(0);
+    if (typedRef.current >= text.length) {
+      playIndexRef.current = idx + 1;
+      typedRef.current = 0;
+      tickRef.current = requestAnimationFrame(tick);
       return;
     }
 
-    const step = charsPerTick(text.length);
-    const id = setTimeout(() => {
-      setTyped((t) => Math.min(t + step, text.length));
-    }, TICK_MS);
-    return () => clearTimeout(id);
-  }, [segments, releasable, playIndex, typed]);
+    typedRef.current = Math.min(
+      typedRef.current + charsPerTick(text.length),
+      text.length
+    );
+    // 触发一次重渲染以显示最新 typed 值
+    forceUpdate();
+    tickRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  // 用一个微型 state 强制 React 重渲染（仅用于打字机可视化）
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+
+  useEffect(() => {
+    tickRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (tickRef.current) cancelAnimationFrame(tickRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+
+  // 渲染：segments 全部当前可用的段，playIndex 决定可见范围
+  const visibleCount = running
+    ? Math.max(0, segments.length - 1)
+    : segments.length;
 
   return (
-    <div className="flex flex-col gap-2 p-3">
+    <div ref={containerRef} className="flex flex-col gap-2 p-3">
       {segments.map((ev, idx) => {
-        if (idx > playIndex) return null; // 尚未轮到播放
-        const isCurrent = idx === playIndex;
+        if (idx > visibleCount) return null;
+        const isCurrent = idx === playIndexRef.current;
         // 当前段正扣住未释放，不渲染
-        if (isCurrent && playIndex >= releasable) return null;
+        if (isCurrent && playIndexRef.current >= releasable && running) return null;
 
         if (ev.type === "thought" && ev.step === 0) {
           return (
@@ -71,8 +116,9 @@ export function TraceView({ events, running }: { events: ArenaEvent[]; running: 
         }
         if (ev.type === "thought") {
           const text = ev.content ?? "";
-          const shown = isCurrent ? text.slice(0, typed) : text;
-          const typing = isCurrent && typed < text.length;
+          const showCount = isCurrent ? typedRef.current : text.length;
+          const shown = text.slice(0, showCount);
+          const typing = isCurrent && typedRef.current < text.length;
           return (
             <div key={idx} className="trace-seg trace-thought">
               <span className="trace-tag">推理</span>
@@ -114,7 +160,7 @@ export function TraceView({ events, running }: { events: ArenaEvent[]; running: 
         }
         return null;
       })}
-      {running && playIndex === 0 && (
+      {running && playIndexRef.current === 0 && segments.length === 0 && (
         <p className="text-xs text-muted-foreground">连接模型中…</p>
       )}
     </div>

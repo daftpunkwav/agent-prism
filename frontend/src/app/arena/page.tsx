@@ -49,6 +49,10 @@ export default function ArenaPage() {
   const [showPromptBanner, setShowPromptBanner] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
+  // 用 ref 保持 columns 的最新值，避免 handleEvent 闭包过期
+  const columnsRef = useRef(columns);
+  columnsRef.current = columns;
+
   useEffect(() => {
     fetchArenaMeta().then(setMeta).catch(console.error);
   }, []);
@@ -63,14 +67,17 @@ export default function ArenaPage() {
       const next = { ...col };
 
       if (event.type === "token_update" && event.token_stats) {
-        next.tokenStats = event.token_stats;
-      } else if (event.type !== "token_update") {
+        next.tokenStats = event.token_stats as TokenStats;
+      } else {
+        // 不追加 token_update 到 events 数组
         next.events = [...col.events, event];
       }
 
       if (event.type === "complete" && event.metrics) {
         next.metrics = event.metrics;
-        next.tokenStats = event.token_stats ?? metricsToTokenStats(event.metrics);
+        next.tokenStats = event.token_stats
+          ? ({ ...event.token_stats } as TokenStats)
+          : metricsToTokenStats(event.metrics);
       }
       if (event.type === "error") next.error = event.message;
 
@@ -81,6 +88,7 @@ export default function ArenaPage() {
   const runArena = async () => {
     if (!question.trim() || running) return;
     setRunning(true);
+    // 清理上一轮状态
     setColumns({});
     abortRef.current = new AbortController();
 
@@ -92,6 +100,16 @@ export default function ArenaPage() {
       setRunning(false);
     }
   };
+
+  const cancelRun = useCallback(() => {
+    abortRef.current?.abort();
+    setRunning(false);
+  }, []);
+
+  // 维度切换时清理状态
+  useEffect(() => {
+    setColumns({});
+  }, [dimension]);
 
   const columnList = useMemo(() => Object.values(columns), [columns]);
 
@@ -172,15 +190,33 @@ export default function ArenaPage() {
                     </div>
                     {col.tokenStats && <div className="mt-2"><TokenStatsPanel stats={col.tokenStats} compact /></div>}
                   </div>
+                  {running && !col.metrics && (
+                    <button
+                      type="button"
+                      className="btn-ghost !h-7 !px-2 text-[10px]"
+                      onClick={cancelRun}
+                    >
+                      取消
+                    </button>
+                  )}
                 </div>
                 <div className="flex-1 overflow-y-auto max-h-[440px]">
                   <TraceView events={col.events} running={running && !col.metrics} />
                 </div>
-                {col.tokenStats && <TokenStatsPanel stats={col.tokenStats} />}
+                {col.tokenStats && !col.metrics && (
+                  <div className="px-3 pb-2">
+                    <TokenStatsPanel stats={col.tokenStats} />
+                  </div>
+                )}
                 {col.metrics && (
                   <div className="border-t border-border px-3 py-2 font-mono text-[10px] text-muted-foreground flex gap-3">
                     <span>工具 {col.metrics.tool_calls}</span>
                     <span>步骤 {col.metrics.steps}</span>
+                  </div>
+                )}
+                {col.error && (
+                  <div className="border-t border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                    {col.error}
                   </div>
                 )}
               </div>
@@ -214,15 +250,25 @@ export default function ArenaPage() {
             }}
             disabled={running}
           />
-          <button
-            type="button"
-            className="btn-primary shrink-0"
-            disabled={running || !question.trim()}
-            onClick={runArena}
-          >
-            <Send className="h-4 w-4" />
-            发送
-          </button>
+          {running ? (
+            <button
+              type="button"
+              className="btn-ghost shrink-0"
+              onClick={cancelRun}
+            >
+              停止
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-primary shrink-0"
+              disabled={!question.trim()}
+              onClick={runArena}
+            >
+              <Send className="h-4 w-4" />
+              发送
+            </button>
+          )}
         </div>
       </section>
     </div>

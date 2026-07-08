@@ -19,10 +19,10 @@ def test_list_of_text_dict_blocks():
         content=[
             {"type": "text", "text": "现在"},
             {"type": "text", "text": "是"},
-            {"type": "thinking", "text": "忽略"},  # 非 text 块被跳过
+            {"type": "thinking", "text": "思考中"},  # thinking 块也提取
         ]
     )
-    assert extract_chunk_text(chunk) == "现在是"
+    assert extract_chunk_text(chunk) == "现在是思考中"
 
 
 def test_list_of_object_blocks_with_text_attr():

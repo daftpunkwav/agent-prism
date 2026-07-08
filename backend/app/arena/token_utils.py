@@ -60,12 +60,13 @@ class TokenTracker:
         self.estimated_input_tokens = estimate_tokens(system) + estimate_tokens(user)
 
     def add_usage(self, usage: dict[str, int]) -> None:
-        inp = usage.get("input_tokens", 0)
-        out = usage.get("output_tokens", 0)
+        """累加一次 LLM 调用的 token 用量。"""
+        inp = usage.get("input_tokens", 0) or 0
+        out = usage.get("output_tokens", 0) or 0
+        self.input_tokens += inp
+        self.output_tokens += out
         if inp or out:
             self._usage_from_api = True
-            self.input_tokens += inp
-            self.output_tokens += out
 
     @property
     def effective_input_tokens(self) -> int:

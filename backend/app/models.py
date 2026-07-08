@@ -17,6 +17,7 @@ EventType = Literal[
     "complete",
     "error",
     "token_update",
+    "thinking",      # extended thinking 块（Anthropic extended thinking）
 ]
 
 
