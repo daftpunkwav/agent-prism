@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, HelpCircle, Send, X, PanelRightClose, PanelR
 import { TokenStatsPanel } from "@/components/TokenStatsPanel";
 import { TraceView } from "@/components/TraceView";
 import { ExperimentPanel } from "@/components/ExperimentPanel";
+import { TraceDiff } from "@/components/TraceDiff";
 import { WorkspacePanel } from "@/components/WorkspacePanel";
 import {
   ArenaEvent,
@@ -408,6 +409,11 @@ export default function ArenaPage() {
         {/* 对比报告 */}
         {Object.values(columns).some((c) => c.metrics) && (
           <ComparisonReport columns={columns} />
+        )}
+
+        {/* Trace 对比 */}
+        {!running && columnList.length >= 2 && columnList.every((c) => c.metrics) && (
+          <TraceDiff columns={columnList} />
         )}
 
         {/* 输入区 */}
