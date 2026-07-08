@@ -1,0 +1,47 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Hexagon, Settings, Zap } from "lucide-react";
+
+const NAV = [
+  { href: "/arena", label: "Arena", icon: Zap },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
+          <Link href="/arena" className="flex items-center gap-2.5 font-semibold">
+            <span className="prism-accent flex h-8 w-8 items-center justify-center rounded-[10px]">
+              <Hexagon className="h-4 w-4 text-background" strokeWidth={2.2} />
+            </span>
+            <span>AgentPrism</span>
+          </Link>
+          <nav className="flex items-center gap-1">
+            {NAV.map(({ href, label, icon: Icon }) => {
+              const active = pathname.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className="seg-tab flex items-center gap-1.5"
+                  data-active={active}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6">{children}</main>
+    </div>
+  );
+}
