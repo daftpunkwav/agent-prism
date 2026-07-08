@@ -1,0 +1,106 @@
+"""LangChain 框架适配器 — create_agent 链式 Tool Calling。"""
+
+from __future__ import annotations
+
+import time
+from typing import AsyncIterator
+
+from langchain.agents import create_agent
+
+from app.arena.llm import create_chat_model
+from app.arena.prompts import build_messages
+from app.arena.tools import ARENA_TOOLS
+from app.models import ArenaEvent, PipelineConfig, PipelineMetrics
+
+
+class LangChainAdapter:
+    framework_id = "langchain"
+    display_name = "LangChain"
+
+    async def run(
+        self, question: str, config: PipelineConfig
+    ) -> AsyncIterator[ArenaEvent]:
+        label = config.label or self.display_name
+        started = time.perf_counter()
+        step = 0
+        tool_calls = 0
+
+        try:
+            llm = create_chat_model()
+            system, user = build_messages(question, config.prompt_profile)
+
+            yield ArenaEvent(
+                type="thought",
+                pipeline=label,
+                step=step,
+                content=f"[LangChain create_agent] 初始化 Tool Calling · {config.prompt_profile}",
+            )
+
+            agent = create_agent(llm, ARENA_TOOLS, system_prompt=system)
+
+            async for event in agent.astream_events(
+                {"messages": [("user", user)]},
+                version="v2",
+            ):
+                kind = event.get("event", "")
+                data = event.get("data", {})
+
+                if kind == "on_chat_model_stream":
+                    chunk = data.get("chunk")
+                    text = getattr(chunk, "content", "") if chunk else ""
+                    if text:
+                        step += 1
+                        yield ArenaEvent(
+                            type="thought",
+                            pipeline=label,
+                            step=step,
+                            content=str(text),
+                        )
+                elif kind == "on_tool_start":
+                    tool_calls += 1
+                    step += 1
+                    yield ArenaEvent(
+                        type="action",
+                        pipeline=label,
+                        step=step,
+                        tool=event.get("name", "tool"),
+                        args=data.get("input", {})
+                        if isinstance(data.get("input"), dict)
+                        else {"input": data.get("input")},
+                    )
+                elif kind == "on_tool_end":
+                    step += 1
+                    yield ArenaEvent(
+                        type="observation",
+                        pipeline=label,
+                        step=step,
+                        result=str(data.get("output", "")),
+                    )
+
+            duration_ms = int((time.perf_counter() - started) * 1000)
+            yield ArenaEvent(
+                type="complete",
+                pipeline=label,
+                metrics=PipelineMetrics(
+                    success=True,
+                    duration_ms=duration_ms,
+                    tool_calls=tool_calls,
+                    steps=step,
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001
+            yield ArenaEvent(
+                type="error",
+                pipeline=label,
+                message=str(exc),
+            )
+            yield ArenaEvent(
+                type="complete",
+                pipeline=label,
+                metrics=PipelineMetrics(
+                    success=False,
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                    tool_calls=tool_calls,
+                    steps=step,
+                ),
+            )

@@ -41,6 +41,7 @@ Thumbs.db
 
 # Chroma / local data
 chroma_data/
+data/
 *.db
 *.sqlite3
 
