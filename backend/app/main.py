@@ -1,11 +1,22 @@
 """AgentPrism FastAPI 入口。"""
 
+import logging
+import sys
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import arena, settings
 from app.config import settings as app_settings
+
+# 日志配置
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AgentPrism", version="0.1.0")
 
@@ -25,6 +36,7 @@ MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10MB
 async def limit_request_size(request: Request, call_next):
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > MAX_REQUEST_SIZE:
+        logger.warning("拒绝超大请求: %s (%s bytes)", request.url.path, content_length)
         return JSONResponse(
             status_code=413,
             content={"detail": f"请求体超过最大限制 ({MAX_REQUEST_SIZE // 1024 // 1024}MB)"},
@@ -39,3 +51,9 @@ app.include_router(arena.router)
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "agentprism"}
+
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("AgentPrism 启动完成")
+    logger.info("Provider: %s, Model: %s", app_settings.llm_provider_name, app_settings.llm_model)
