@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import threading
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 # 线程本地存储当前运行的工作空间名称
@@ -20,7 +19,7 @@ def clear_current_workspace() -> None:
     _thread_local.workspace_name = ""
 
 
-def get_current_workspace_name() -> Optional[str]:
+def get_current_workspace_name() -> str | None:
     return getattr(_thread_local, "workspace_name", None)
 
 
@@ -148,7 +147,7 @@ class WorkspaceManager:
         self._workspaces[name] = ws
         return ws
 
-    def get(self, name: str) -> Optional[Workspace]:
+    def get(self, name: str) -> Workspace | None:
         return self._workspaces.get(name)
 
     def remove(self, name: str) -> None:
