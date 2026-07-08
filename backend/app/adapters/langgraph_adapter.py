@@ -1,21 +1,37 @@
-"""LangGraph 框架适配器。"""
+"""LangGraph 框架适配器 — 真实推理模式图结构。"""
 
 from __future__ import annotations
 
 import time
 from typing import AsyncIterator
 
-from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.graph import END, StateGraph
+from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
 
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
 from app.arena.llm import create_chat_model
 from app.arena.prompts import build_messages
+from app.arena.reasoning_graph import (
+    build_cot_tool_graph,
+    build_react_graph,
+    build_reflexion_graph,
+    build_tot_graph,
+)
 from app.arena.stream_utils import extract_chunk_text
 from app.arena.token_utils import TokenTracker, extract_usage
 from app.arena.tools import ARENA_TOOLS, set_current_workspace
 from app.arena.workspace import clear_current_workspace
 from app.models import ArenaEvent, PipelineConfig
+
+
+class AgentState(TypedDict):
+    messages: list
+    step_count: int
+    max_steps: int
+    tool_calls: int
+    reflections: list[str]
 
 
 class LangGraphAdapter:
@@ -35,36 +51,56 @@ class LangGraphAdapter:
         ws_name = f"{label}_{int(started * 1000)}"
         ws = get_workspace_mgr().create(ws_name)
         set_current_workspace(ws_name)
-        # 初始化一些示例文件
         ws.write_file("README.md", f"# {label} Agent 工作空间\n\n问题: {question}\n")
 
         try:
-            llm = create_chat_model()
-            agent = create_react_agent(llm, ARENA_TOOLS)
             system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
             tracker.seed_prompt(system, user)
             yield token_update_event(label, tracker)
 
+            mode_label = {
+                "react": "ReAct 循环",
+                "cot_tool": "CoT+Tool 推理→行动",
+                "tot": "Tree-of-Thought 多分支",
+                "reflexion": "Reflexion 反思重试",
+            }.get(config.reasoning, "ReAct 循环")
+
             yield ArenaEvent(
                 type="thought",
                 pipeline=label,
-                step=step,
-                content=f"[LangGraph StateGraph] 启动 ReAct 循环 · {config.prompt_profile}",
+                step=0,
+                content=f"[LangGraph {mode_label}] 启动 · {config.prompt_profile}",
             )
+
+            # 根据推理模式构建图
+            graph_map = {
+                "react": build_react_graph,
+                "cot_tool": build_cot_tool_graph,
+                "tot": build_tot_graph,
+                "reflexion": build_reflexion_graph,
+            }
+            graph_builder = graph_map.get(config.reasoning, build_react_graph)
+            graph = graph_builder().compile()
 
             inputs = {
                 "messages": [
                     SystemMessage(content=system),
                     HumanMessage(content=user),
-                ]
+                ],
+                "step_count": 0,
+                "max_steps": 10,
+                "tool_calls": 0,
+                "reflections": [],
             }
 
             buffer = ""
 
-            async for event in agent.astream_events(inputs, version="v2"):
+            async for event in graph.astream_events(inputs, version="v2"):
                 kind = event.get("event", "")
                 data = event.get("data", {})
+                node_name = event.get("name", "")
 
+                # 流式文本输出
                 if kind == "on_chat_model_stream":
                     chunk = data.get("chunk")
                     text = extract_chunk_text(chunk)
@@ -84,10 +120,12 @@ class LangGraphAdapter:
                     if usage["input_tokens"] or usage["output_tokens"]:
                         tracker.add_usage(usage)
                         yield token_update_event(label, tracker)
+
+                # 工具调用
                 elif kind == "on_tool_start":
                     tool_calls += 1
                     step += 1
-                    tool_name = event.get("name", "tool")
+                    tool_name = data.get("name", node_name)
                     tool_input = data.get("input", {})
                     yield ArenaEvent(
                         type="action",
@@ -105,6 +143,18 @@ class LangGraphAdapter:
                         step=step,
                         result=str(output),
                     )
+
+                # 节点执行标记（用于区分推理阶段）
+                elif kind == "on_node_start":
+                    if node_name not in ("agent", "execute"):
+                        yield ArenaEvent(
+                            type="thought",
+                            pipeline=label,
+                            step=step,
+                            content=f"[阶段: {node_name}]",
+                        )
+                elif kind == "on_node_end":
+                    pass
 
             duration_ms = int((time.perf_counter() - started) * 1000)
             yield ArenaEvent(
