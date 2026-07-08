@@ -9,6 +9,7 @@ from langgraph.prebuilt import create_react_agent
 
 from app.arena.llm import create_chat_model
 from app.arena.prompts import build_messages
+from app.arena.stream_utils import extract_chunk_text
 from app.arena.tools import ARENA_TOOLS
 from app.models import ArenaEvent, PipelineConfig, PipelineMetrics
 
@@ -52,7 +53,7 @@ class LangGraphAdapter:
 
                 if kind == "on_chat_model_stream":
                     chunk = data.get("chunk")
-                    text = getattr(chunk, "content", "") if chunk else ""
+                    text = extract_chunk_text(chunk)
                     if text:
                         step += 1
                         yield ArenaEvent(

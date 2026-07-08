@@ -74,7 +74,20 @@ async def test_provider(body: ProviderConfigUpdate | None = None) -> ConnectionT
             max_tokens=32,
             messages=[{"role": "user", "content": "ping"}],
         )
-        text = msg.content[0].text if msg.content else "ok"
-        return ConnectionTestResult(ok=True, message=f"连接成功: {text[:80]}", model=cfg.model)
+        snippet = ""
+        for block in msg.content:
+            text = getattr(block, "text", None)
+            if text:
+                snippet = text
+                break
+            thinking = getattr(block, "thinking", None)
+            if thinking:
+                snippet = str(thinking)[:80]
+                break
+        return ConnectionTestResult(
+            ok=True,
+            message=f"连接成功: {snippet or 'ok'}",
+            model=cfg.model,
+        )
     except Exception as exc:  # noqa: BLE001
         return ConnectionTestResult(ok=False, message=str(exc), model=cfg.model)
