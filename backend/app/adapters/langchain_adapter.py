@@ -13,8 +13,8 @@ from app.arena.llm import create_chat_model
 from app.arena.prompts import build_messages
 from app.arena.stream_utils import extract_chunk_text
 from app.arena.token_utils import TokenTracker, extract_usage
-from app.arena.tools import ARENA_TOOLS, set_current_workspace
-from app.arena.workspace import clear_current_workspace
+from app.arena.tools import ARENA_TOOLS
+from app.arena.workspace import clear_current_workspace, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
 

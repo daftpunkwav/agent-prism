@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 
 from app.adapters.base import FrameworkAdapterRegistry
+from app.adapters.common import get_workspace_mgr
 from app.arena.runner import RunnerPool, build_registry
 from app.arena.router import DimensionRouter
 from app.arena.project import get_project_manager
-from app.arena.workspace import WorkspaceManager, get_workspace_mgr
+from app.arena.workspace import WorkspaceManager
 from app.models import ArenaRunRequest, ProjectCreate
 
 router = APIRouter(prefix="/api/arena", tags=["arena"])
@@ -69,8 +71,12 @@ async def arena_meta():
 @router.post("/run")
 async def arena_run(request: ArenaRunRequest):
     async def event_generator():
-        async for event in _pool.stream_parallel(request):
-            yield {"event": "arena", "data": json.dumps(event.model_dump(), ensure_ascii=False)}
+        try:
+            async for event in _pool.stream_parallel(request):
+                yield {"event": "arena", "data": json.dumps(event.model_dump(), ensure_ascii=False)}
+        except asyncio.CancelledError:
+            # 客户端断开连接时静默退出
+            pass
 
     return EventSourceResponse(event_generator())
 
