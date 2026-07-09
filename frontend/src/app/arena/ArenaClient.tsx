@@ -94,6 +94,8 @@ function ComparisonReport({ columns }: { columns: Record<string, ColumnState> })
   const sorted = [...cols].sort((a, b) => (a.metrics!.duration_ms) - (b.metrics!.duration_ms));
   const fastest = sorted[0];
   const lowestToken = [...cols].sort((a, b) => a.metrics!.total_tokens - b.metrics!.total_tokens)[0];
+  // 安全访问：filter 后 length >= 1，但 TS noUncheckedIndexedAccess 仍需断言
+  if (!fastest?.metrics || !lowestToken?.metrics) return null;
 
   return (
     <div className="space-y-4">
@@ -268,13 +270,23 @@ export function ArenaClient() {
     if (cols.length === 0) return null;
     const completed = cols.find((c) => c.tokenStats);
     if (completed) return `${completed.label}_`;
-    return `${cols[0].label}_`;
+    const first = cols[0];
+    return first ? `${first.label}_` : null;
   }, [columns]);
 
   useEffect(() => {
-    fetchArenaMeta()
+    const ac = new AbortController();
+    fetchArenaMeta({ signal: ac.signal })
       .then(setMeta)
-      .finally(() => setMetaLoading(false));
+      .catch((err: Error) => {
+        if (err.name !== "AbortError") {
+          setError(`加载 Arena 配置失败: ${err.message}`);
+        }
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setMetaLoading(false);
+      });
+    return () => ac.abort();
   }, []);
 
   const activeDim = useMemo(

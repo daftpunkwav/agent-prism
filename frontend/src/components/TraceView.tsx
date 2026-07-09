@@ -123,7 +123,7 @@ export function TraceView({
   running: boolean;
   colorIndex?: number;
 }) {
-  const accentColor = COLUMN_COLORS[colorIndex % COLUMN_COLORS.length];
+  const accentColor = COLUMN_COLORS[colorIndex % COLUMN_COLORS.length] ?? "var(--chart-1)";
   const segments = mergeEvents(events);
 
   // 实时跟随:若有未完成 thought,容器自动滚到底部
@@ -238,6 +238,12 @@ function renderSegment(seg: DisplaySegment, accentColor: string) {
     const argKeys = Object.keys(args);
     const firstKey = argKeys[0];
     const firstVal = firstKey ? args[firstKey] : null;
+    // 安全 stringify：firstVal 在 noUncheckedIndexedAccess 下是 T | undefined
+    const stringifiedFirst = (() => {
+      if (firstVal == null) return "";
+      const json = JSON.stringify(firstVal, null, 2);
+      return json.length > 200 ? json.slice(0, 200) : json;
+    })();
     return (
       <div key={seg.id} className="trace-seg trace-action">
         <span className="trace-tag flex items-center gap-1">
@@ -249,7 +255,7 @@ function renderSegment(seg: DisplaySegment, accentColor: string) {
           <pre className="mt-1.5 rounded border border-border bg-muted/50 p-2 text-[11px] font-mono overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap break-all">
             {typeof firstVal === "string"
               ? firstVal.length > 200 ? firstVal.slice(0, 200) + "..." : firstVal
-              : JSON.stringify(firstVal, null, 2).slice(0, 200)}
+              : stringifiedFirst}
           </pre>
         )}
         {displayArgs}

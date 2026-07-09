@@ -449,8 +449,9 @@ function buildTree(files: FileEntry[]): FileTreeNode[] {
     const parts = file.path.split("/");
     let currentPath = "";
 
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
+    for (const part of parts) {
+      // 跳过空段（如路径以 "/" 开头时产生的前导空段）
+      if (!part) continue;
       const parentPath = currentPath;
       currentPath = currentPath ? `${currentPath}/${part}` : part;
 
