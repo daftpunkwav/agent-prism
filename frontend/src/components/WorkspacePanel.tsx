@@ -48,10 +48,21 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
   // 当前 workspace 的 fetch 控制器，切换 workspace 时取消上一轮未完成的请求
   const fetchAbortRef = useRef<AbortController | null>(null);
 
-  const flashToast = (msg: string) => {
+  // 存储当前 toast 定时器，卸载时清理
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(msg);
-    setTimeout(() => setToast(null), 2500);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
+  }, []);
+
+  // 卸载时清理 toast 定时器
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   // 切换 workspace 时取消上一轮 polling
   useEffect(() => {
@@ -84,6 +95,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
     async (path: string) => {
       if (!workspaceName) return;
       setLoading(true);
+      setEditing(false);
       try {
         const text = await readWorkspaceFile(workspaceName, path, newAbort());
         setContent(text);
@@ -106,23 +118,23 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
       await saveWorkspaceFile(workspaceName, selectedFile, editContent, false, newAbort());
       setContent(editContent);
       setEditing(false);
-      flashToast("已保存");
+      showToast("已保存");
       loadFiles();
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
-        flashToast(`保存失败: ${(err as Error).message}`);
+        showToast(`保存失败: ${(err as Error).message}`);
       }
     } finally {
       setSaving(false);
     }
-  }, [workspaceName, selectedFile, editContent, loadFiles, newAbort]);
+  }, [workspaceName, selectedFile, editContent, loadFiles, newAbort, showToast]);
 
   const createFile = useCallback(async () => {
     if (!workspaceName || !newFileName.trim()) return;
     const path = newFileName.trim();
     try {
       await saveWorkspaceFile(workspaceName, path, "", true, newAbort());
-      flashToast(`已创建: ${path}`);
+      showToast(`已创建: ${path}`);
       setNewFileName("");
       setShowNewFile(false);
       await loadFiles();
@@ -130,10 +142,10 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
       loadFile(path);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
-        flashToast(`创建失败: ${(err as Error).message}`);
+        showToast(`创建失败: ${(err as Error).message}`);
       }
     }
-  }, [workspaceName, newFileName, loadFiles, loadFile, newAbort]);
+  }, [workspaceName, newFileName, loadFiles, loadFile, newAbort, showToast]);
 
   const deleteFile = useCallback(
     async (path: string) => {
@@ -141,7 +153,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
       if (!confirm(`删除文件 ${path}？`)) return;
       try {
         await deleteWorkspaceFile(workspaceName, path, newAbort());
-        flashToast("已删除");
+        showToast("已删除");
         if (selectedFile === path) {
           setSelectedFile(null);
           setContent("");
@@ -149,11 +161,11 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
         loadFiles();
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
-          flashToast(`删除失败: ${(err as Error).message}`);
+          showToast(`删除失败: ${(err as Error).message}`);
         }
       }
     },
-    [workspaceName, selectedFile, loadFiles, newAbort],
+    [workspaceName, selectedFile, loadFiles, newAbort, showToast],
   );
 
   useEffect(() => {
@@ -171,7 +183,6 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
 
   useEffect(() => {
     if (selectedFile) {
-      setEditing(false);
       loadFile(selectedFile);
     }
   }, [selectedFile, loadFile]);

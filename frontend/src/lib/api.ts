@@ -53,6 +53,7 @@ export interface TokenStats {
   input_usage_pct: number;
 }
 
+/** Arena SSE 事件类型 */
 export interface ArenaEvent {
   type: string;
   pipeline: string;
@@ -62,21 +63,25 @@ export interface ArenaEvent {
   result?: string;
   step?: number;
   message?: string;
-  metrics?: {
-    success: boolean;
-    duration_ms: number;
-    input_tokens: number;
-    output_tokens: number;
-    total_tokens: number;
-    tool_calls: number;
-    steps: number;
-    context_window: number;
-    max_input_tokens: number;
-    max_output_tokens: number;
-    context_usage_pct: number;
-    input_usage_pct: number;
-  };
+  metrics?: ArenaEventMetrics;
   token_stats?: TokenStats;
+  passed?: boolean;
+  reason?: string;
+}
+
+export interface ArenaEventMetrics {
+  success: boolean;
+  duration_ms: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  tool_calls: number;
+  steps: number;
+  context_window: number;
+  max_input_tokens: number;
+  max_output_tokens: number;
+  context_usage_pct: number;
+  input_usage_pct: number;
 }
 
 export async function fetchArenaMeta(options?: { signal?: AbortSignal }): Promise<ArenaMeta> {
@@ -98,10 +103,13 @@ export async function fetchProvider(options?: { signal?: AbortSignal }): Promise
 }
 
 export async function saveProvider(body: Record<string, unknown>): Promise<ProviderConfig> {
+  // 不发送 api_key 字段，避免在请求体中传输（后端 keep-existing 逻辑）
+  const { api_key: _ak, ...rest } = body as Record<string, unknown> & { api_key?: string };
+  void _ak;
   const res = await fetch(`${API_BASE}/api/settings/provider`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(rest),
   });
   if (!res.ok) throw new Error("保存失败");
   return res.json();
@@ -140,30 +148,38 @@ export async function streamArenaRun(
   let buffer = "";
 
   const flush = (rawEvent: string) => {
-    const dataLines = rawEvent
-      .split(/\r?\n/)
-      .filter((l) => l.startsWith("data:"))
-      .map((l) => l.slice(5).trimStart());
+    const lines = rawEvent.split(/\r?\n/);
+    const dataLines: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+    }
     if (dataLines.length === 0) return;
     const json = dataLines.join("\n").trim();
-    if (!json) return;
+    if (!json || json === "[DONE]") return;
     try {
-      onEvent(JSON.parse(json));
+      onEvent(JSON.parse(json) as ArenaEvent);
     } catch {
       // 忽略无法解析的分片
     }
   };
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split(/\r?\n\r?\n/);
-    buffer = parts.pop() ?? "";
-    for (const part of parts) flush(part);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split(/\r?\n\r?\n/);
+      buffer = parts.pop() ?? "";
+      for (const part of parts) {
+        if (part.trim()) flush(part);
+      }
+    }
+    if (buffer.trim()) flush(buffer);
+  } finally {
+    reader.releaseLock();
   }
-
-  if (buffer.trim()) flush(buffer);
 }
 
 // ===== 项目管理 API =====
@@ -205,9 +221,10 @@ export async function createProject(body: ProjectCreate): Promise<{ project: Pro
 }
 
 export async function deleteProject(projectId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/arena/projects/${encodeURIComponent(projectId)}`, {
-    method: "DELETE",
-  });
+  const res = await fetch(
+    `${API_BASE}/api/arena/projects/${encodeURIComponent(projectId)}`,
+    { method: "DELETE" },
+  );
   if (!res.ok) throw new Error("删除项目失败");
 }
 

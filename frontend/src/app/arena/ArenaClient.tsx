@@ -563,6 +563,7 @@ export function ArenaClient() {
                   type="button"
                   className="btn-ghost !h-6 !px-1.5 shrink-0"
                   onClick={() => setShowPromptBanner(false)}
+                  aria-label="关闭提示"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -689,20 +690,20 @@ export function ArenaClient() {
           className="btn-ghost !h-8 !w-8 !p-0"
           onClick={() => setShowLeftPanel(!showLeftPanel)}
           title={showLeftPanel ? "隐藏左侧维度栏" : "显示左侧维度栏"}
+          aria-label={showLeftPanel ? "隐藏左侧维度栏" : "显示左侧维度栏"}
         >
           {showLeftPanel ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
         </button>
-        {/* 右侧栏按钮：移动端展开 + 桌面端展开 */}
-        {(!showRightPanel || true) && (
-          <button
-            type="button"
-            className="btn-ghost !h-8 !w-8 !p-0"
-            onClick={() => setShowRightPanel(!showRightPanel)}
-            title={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
-          >
-            {showRightPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-          </button>
-        )}
+        {/* 右侧栏按钮 */}
+        <button
+          type="button"
+          className="btn-ghost !h-8 !w-8 !p-0"
+          onClick={() => setShowRightPanel(!showRightPanel)}
+          title={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
+          aria-label={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
+        >
+          {showRightPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+        </button>
       </div>
     </div>
   );

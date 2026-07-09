@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -128,12 +128,9 @@ export function TraceView({
 
   // 实时跟随:若有未完成 thought,容器自动滚到底部
   const containerRef = useRef<HTMLDivElement | null>(null);
-  // 用 state 触发滚动 — 增量累积导致 segments 引用变化时会更新
-  const [tick, setTick] = useState(0);
 
-  // 当 segments 变化且有未完成段,触发 tick + 滚到底部
+  // 当 segments 变化且有未完成段,滚到底部
   useEffect(() => {
-    setTick((x) => x + 1);
     const c = containerRef.current;
     if (!c) return;
     const hasStreaming = segments.some((s) => !s.completed);
