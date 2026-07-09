@@ -25,6 +25,7 @@ __all__ = [
     "ProviderConfigPublic",
     "ProviderConfigUpdate",
     "ConnectionTestResult",
+    "PipelineRunResult",
     "Project",
     "ProjectCreate",
     "WorkspaceFileUpsert",
@@ -47,8 +48,8 @@ class ArenaRunRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     dimension: DimensionId = "framework"
     # 该维度下用户选中的子项 value 列表；空 = 全选，但至少 2 项（router 校验）
-    selections: list[str] = Field(default_factory=list)
-    temperature: float | None = None
+    selections: list[str] = Field(default_factory=list, max_length=16)
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
 
 class PipelineMetrics(BaseModel):
@@ -107,22 +108,27 @@ class ProviderConfigPublic(BaseModel):
 
 
 class ProviderConfigUpdate(BaseModel):
-    provider_name: str = "StepFun"
-    notes: str = ""
-    website_url: str = ""
-    api_key: str = ""
-    base_url: str = ""
+    """Provider 配置更新请求体。
+
+    ``api_key`` 留空 (``""``) 表示保留已保存的 key — 后端会自动从磁盘加载当前值。
+    """
+
+    provider_name: str = Field(default="StepFun", max_length=100)
+    notes: str = Field(default="", max_length=500)
+    website_url: str = Field(default="", max_length=500)
+    api_key: str = Field(default="", max_length=4096)
+    base_url: str = Field(default="", max_length=500)
     use_full_url: bool = True
     api_format: ApiFormat = "anthropic_messages"
-    auth_field: str = "ANTHROPIC_AUTH_TOKEN"
-    model: str = "step-3.7-flash"
-    temperature: float = 0.0
-    top_p: float = 1.0
-    frequency_penalty: float = 0.0
-    presence_penalty: float = 0.0
-    context_window: int = 128_000
-    max_input_tokens: int = 120_000
-    max_output_tokens: int = 2048
+    auth_field: str = Field(default="ANTHROPIC_AUTH_TOKEN", max_length=100)
+    model: str = Field(default="step-3.7-flash", max_length=200)
+    temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    top_p: float = Field(default=1.0, ge=0.0, le=1.0)
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    context_window: int = Field(default=128_000, ge=1024, le=10_000_000)
+    max_input_tokens: int = Field(default=120_000, ge=256, le=10_000_000)
+    max_output_tokens: int = Field(default=2048, ge=64, le=128_000)
 
 
 class ConnectionTestResult(BaseModel):
@@ -134,29 +140,44 @@ class ConnectionTestResult(BaseModel):
 # ===== 项目管理模型 =====
 
 
+class PipelineRunResult(BaseModel):
+    """单条 Pipeline 运行结果（在 Project.results 中）。"""
+
+    label: str
+    workspace: str
+    file_count: int = Field(default=0, ge=0)
+    files: list[str] = Field(default_factory=list)
+
+
 class Project(BaseModel):
-    id: str
-    name: str
-    question: str
-    dimension: str
-    created_at: str
-    results: list[dict] = Field(default_factory=list)
+    id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    question: str = Field(max_length=8000)
+    dimension: str = Field(max_length=50)
+    created_at: str = Field(max_length=64)
+    results: list[PipelineRunResult] = Field(default_factory=list)
     # workspace_files: {workspace_name: {file_path: content}} — 嵌套映射
     workspace_files: dict[str, dict[str, str]] = Field(default_factory=dict)
-    metrics_summary: dict[str, dict] = Field(default_factory=dict)
+    metrics_summary: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
 class ProjectCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    question: str
-    dimension: str
-    pipeline_labels: list[str]
-    workspace_names: list[str] = Field(default_factory=list)
+    """项目创建请求。
+
+    ``pipeline_labels`` 与 ``workspace_names`` 必须一一对应（同 index 即同一管线）。
+    两者至少需要 1 个 — 通过 model_validator 校验一致性。
+    """
+
+    name: str = Field(min_length=1, max_length=200)
+    question: str = Field(max_length=8000)
+    dimension: str = Field(max_length=50)
+    pipeline_labels: list[str] = Field(min_length=1, max_length=16)
+    workspace_names: list[str] = Field(default_factory=list, max_length=16)
 
 
 class WorkspaceFileUpsert(BaseModel):
     """工作空间文件保存请求体。"""
 
-    path: str = Field(min_length=1)
-    content: str = ""
+    path: str = Field(min_length=1, max_length=512)
+    content: str = Field(default="", max_length=512 * 1024)
     create_only: bool = False

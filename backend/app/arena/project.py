@@ -19,7 +19,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from app.adapters.common import get_workspace_mgr
-from app.models import Project, ProjectCreate
+from app.models import PipelineRunResult, Project, ProjectCreate
 from app.storage import _atomic_write_json
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ class ProjectManager:
         """
         ws_mgr = get_workspace_mgr()
         ws_data: dict[str, dict[str, str]] = {}
-        results: list[dict] = []
+        results: list[PipelineRunResult] = []
 
         with self._lock:
             for ws_name in create.workspace_names:
@@ -97,12 +97,12 @@ class ProjectManager:
                     continue
                 ws_data[ws_name] = {path: f.content for path, f in ws.files.items()}
                 results.append(
-                    {
-                        "label": ws_name,
-                        "workspace": ws_name,
-                        "file_count": len(ws.files),
-                        "files": list(ws.files.keys()),
-                    }
+                    PipelineRunResult(
+                        label=ws_name,
+                        workspace=ws_name,
+                        file_count=len(ws.files),
+                        files=list(ws.files.keys()),
+                    )
                 )
 
             project = Project(

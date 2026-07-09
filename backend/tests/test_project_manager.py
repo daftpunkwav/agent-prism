@@ -21,8 +21,8 @@ def _make_create(name: str, workspace_names: list[str] | None = None) -> Project
         name=name,
         question="测试问题",
         dimension="framework",
-        pipeline_labels=[],
-        workspace_names=workspace_names or [],
+        pipeline_labels=["default"],
+        workspace_names=workspace_names or ["default"],
     )
 
 
