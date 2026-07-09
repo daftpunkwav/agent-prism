@@ -34,6 +34,9 @@ export interface ProviderConfig {
   auth_field: string;
   model: string;
   temperature: number;
+  top_p: number;
+  frequency_penalty: number;
+  presence_penalty: number;
   context_window: number;
   max_input_tokens: number;
   max_output_tokens: number;
