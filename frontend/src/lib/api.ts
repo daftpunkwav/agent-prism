@@ -204,3 +204,68 @@ export async function deleteProject(projectId: string): Promise<void> {
   });
   if (!res.ok) throw new Error("删除项目失败");
 }
+
+// ===== Workspace API =====
+
+export interface WorkspaceFileEntry {
+  path: string;
+  size: number;
+}
+
+export async function listWorkspaceFiles(workspaceName: string, signal?: AbortSignal): Promise<WorkspaceFileEntry[]> {
+  const res = await fetch(
+    `${API_BASE}/api/arena/workspace/${encodeURIComponent(workspaceName)}/files`,
+    { signal },
+  );
+  if (!res.ok) throw new Error("加载文件列表失败");
+  const data = await res.json();
+  return data.files || [];
+}
+
+export async function readWorkspaceFile(
+  workspaceName: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await fetch(
+    `${API_BASE}/api/arena/workspace/${encodeURIComponent(workspaceName)}/file?path=${encodeURIComponent(path)}`,
+    { signal },
+  );
+  if (!res.ok) throw new Error("读取文件失败");
+  const data = await res.json();
+  return data.content || "";
+}
+
+export async function saveWorkspaceFile(
+  workspaceName: string,
+  path: string,
+  content: string,
+  createOnly = false,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/arena/workspace/${encodeURIComponent(workspaceName)}/file`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, content, create_only: createOnly }),
+      signal,
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "保存失败" }));
+    throw new Error(err.detail || "保存失败");
+  }
+}
+
+export async function deleteWorkspaceFile(
+  workspaceName: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/arena/workspace/${encodeURIComponent(workspaceName)}/file?path=${encodeURIComponent(path)}`,
+    { method: "DELETE", signal },
+  );
+  if (!res.ok) throw new Error("删除文件失败");
+}

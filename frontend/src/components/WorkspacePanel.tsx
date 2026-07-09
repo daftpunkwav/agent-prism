@@ -13,6 +13,12 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import {
+  deleteWorkspaceFile,
+  listWorkspaceFiles,
+  readWorkspaceFile,
+  saveWorkspaceFile,
+} from "@/lib/api";
 
 interface WorkspacePanelProps {
   /** 工作空间名称（唯一标识） */
@@ -39,118 +45,116 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
   const [showNewFile, setShowNewFile] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // 当前 workspace 的 fetch 控制器，切换 workspace 时取消上一轮未完成的请求
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const flashToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
   };
 
+  // 切换 workspace 时取消上一轮 polling
+  useEffect(() => {
+    return () => {
+      fetchAbortRef.current?.abort();
+      fetchAbortRef.current = null;
+    };
+  }, [workspaceName]);
+
+  const newAbort = useCallback(() => {
+    fetchAbortRef.current?.abort();
+    const ac = new AbortController();
+    fetchAbortRef.current = ac;
+    return ac.signal;
+  }, []);
+
   const loadFiles = useCallback(async () => {
     if (!workspaceName) return;
     try {
-      const res = await fetch(`/api/arena/workspace/${encodeURIComponent(workspaceName)}/files`);
-      if (res.ok) {
-        const data = await res.json();
-        setFiles(data.files || []);
+      const files = await listWorkspaceFiles(workspaceName, newAbort());
+      setFiles(files);
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        // 静默：轮询失败不打扰用户
       }
-    } catch {
-      // 静默
     }
-  }, [workspaceName]);
+  }, [workspaceName, newAbort]);
 
-  const loadFile = useCallback(async (path: string) => {
-    if (!workspaceName) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/arena/workspace/${encodeURIComponent(workspaceName)}/file?path=${encodeURIComponent(path)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setContent(data.content || "");
-        setEditContent(data.content || "");
+  const loadFile = useCallback(
+    async (path: string) => {
+      if (!workspaceName) return;
+      setLoading(true);
+      try {
+        const text = await readWorkspaceFile(workspaceName, path, newAbort());
+        setContent(text);
+        setEditContent(text);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          setContent(`加载失败: ${(err as Error).message}`);
+        }
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setContent("加载失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [workspaceName]);
+    },
+    [workspaceName, newAbort],
+  );
 
   const saveFile = useCallback(async () => {
     if (!workspaceName || !selectedFile) return;
     setSaving(true);
     try {
-      const res = await fetch(
-        `/api/arena/workspace/${encodeURIComponent(workspaceName)}/file`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: selectedFile, content: editContent }),
-        }
-      );
-      if (res.ok) {
-        setContent(editContent);
-        setEditing(false);
-        flashToast("已保存");
-        loadFiles();
-      } else {
-        const err = await res.json();
-        flashToast(`保存失败: ${err.detail}`);
+      await saveWorkspaceFile(workspaceName, selectedFile, editContent, false, newAbort());
+      setContent(editContent);
+      setEditing(false);
+      flashToast("已保存");
+      loadFiles();
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        flashToast(`保存失败: ${(err as Error).message}`);
       }
-    } catch {
-      flashToast("保存失败");
     } finally {
       setSaving(false);
     }
-  }, [workspaceName, selectedFile, editContent, loadFiles]);
+  }, [workspaceName, selectedFile, editContent, loadFiles, newAbort]);
 
   const createFile = useCallback(async () => {
     if (!workspaceName || !newFileName.trim()) return;
     const path = newFileName.trim();
     try {
-      const res = await fetch(
-        `/api/arena/workspace/${encodeURIComponent(workspaceName)}/file`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path, content: "", create_only: true }),
-        }
-      );
-      if (res.ok) {
-        flashToast(`已创建: ${path}`);
-        setNewFileName("");
-        setShowNewFile(false);
-        await loadFiles();
-        setSelectedFile(path);
-        loadFile(path);
-      } else {
-        const err = await res.json();
-        flashToast(`创建失败: ${err.detail}`);
+      await saveWorkspaceFile(workspaceName, path, "", true, newAbort());
+      flashToast(`已创建: ${path}`);
+      setNewFileName("");
+      setShowNewFile(false);
+      await loadFiles();
+      setSelectedFile(path);
+      loadFile(path);
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        flashToast(`创建失败: ${(err as Error).message}`);
       }
-    } catch {
-      flashToast("创建失败");
     }
-  }, [workspaceName, newFileName, loadFiles, loadFile]);
+  }, [workspaceName, newFileName, loadFiles, loadFile, newAbort]);
 
-  const deleteFile = useCallback(async (path: string) => {
-    if (!workspaceName) return;
-    if (!confirm(`删除文件 ${path}？`)) return;
-    try {
-      const res = await fetch(
-        `/api/arena/workspace/${encodeURIComponent(workspaceName)}/file?path=${encodeURIComponent(path)}`,
-        { method: "DELETE" }
-      );
-      if (res.ok) {
+  const deleteFile = useCallback(
+    async (path: string) => {
+      if (!workspaceName) return;
+      if (!confirm(`删除文件 ${path}？`)) return;
+      try {
+        await deleteWorkspaceFile(workspaceName, path, newAbort());
         flashToast("已删除");
         if (selectedFile === path) {
           setSelectedFile(null);
           setContent("");
         }
         loadFiles();
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          flashToast(`删除失败: ${(err as Error).message}`);
+        }
       }
-    } catch {
-      flashToast("删除失败");
-    }
-  }, [workspaceName, selectedFile, loadFiles]);
+    },
+    [workspaceName, selectedFile, loadFiles, newAbort],
+  );
 
   useEffect(() => {
     if (!workspaceName) {
@@ -313,7 +317,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
                     <button
                       type="button"
                       className="btn-ghost !h-7 !px-2 text-[10px]"
-                      onClick={() => deleteFile(selectedFile)}
+                      onClick={() => selectedFile && deleteFile(selectedFile)}
                       title="删除"
                     >
                       <Trash2 className="h-3 w-3" />
