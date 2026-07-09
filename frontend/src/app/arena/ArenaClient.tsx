@@ -3,10 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
+  ChevronLeft,
+  ChevronRight,
   HelpCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   Send,
+  Square,
   X,
   Zap,
 } from "lucide-react";
@@ -19,6 +24,7 @@ import {
   ArenaEvent,
   ArenaMeta,
   DimensionId,
+  DimensionOption,
   TokenStats,
   fetchArenaMeta,
   streamArenaRun,
@@ -51,7 +57,36 @@ function metricsToTokenStats(m: NonNullable<ArenaEvent["metrics"]>): TokenStats 
   };
 }
 
-/** 生成对比报告 HTML */
+/** 维度按钮：方框化（选中实心，未选中描边）。 */
+function DimensionChip({
+  option,
+  selected,
+  onToggle,
+}: {
+  option: DimensionOption;
+  selected: boolean;
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(option.value)}
+      data-selected={selected}
+      className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors data-[selected=true]:bg-foreground data-[selected=true]:text-background data-[selected=true]:border-foreground data-[selected=false]:border-border data-[selected=false]:text-muted-foreground hover:text-foreground"
+    >
+      <span
+        aria-hidden
+        className={
+          "inline-block h-1.5 w-1.5 rounded-sm " +
+          (selected ? "bg-background" : "bg-muted-foreground/40")
+        }
+      />
+      {option.label}
+    </button>
+  );
+}
+
+/** 对比报告 */
 function ComparisonReport({ columns }: { columns: Record<string, ColumnState> }) {
   const cols = Object.values(columns).filter((c) => c.metrics);
   if (cols.length === 0) return null;
@@ -128,18 +163,115 @@ function ComparisonReport({ columns }: { columns: Record<string, ColumnState> })
   );
 }
 
+/** 列占位卡：run 尚未产生事件时显示。 */
+function ColumnPlaceholder({ name }: { name: string }) {
+  return (
+    <div className="column-card opacity-60">
+      <div className="column-header">
+        <span className="font-semibold text-sm">{name}</span>
+      </div>
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 mx-auto rounded-full border-2 border-border flex items-center justify-center">
+            <Zap className="h-5 w-5 text-muted-foreground/50" />
+          </div>
+          <p className="text-xs text-muted-foreground">等待运行</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 列运行卡：实时显示 thought/action/observation + 指标。 */
+function ColumnCard({
+  col,
+  index,
+  running,
+  showStop,
+  onStop,
+}: {
+  col: ColumnState;
+  index: number;
+  running: boolean;
+  showStop: boolean;
+  onStop: () => void;
+}) {
+  return (
+    <div className="column-card min-h-0" style={{ animationDelay: `${index * 80}ms` }}>
+      <div className="column-header">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={
+                "column-status-dot " +
+                (running && !col.metrics ? "running" : col.metrics ? "done" : "") +
+                " " +
+                (col.error ? "error" : "")
+              }
+            />
+            <span className="font-semibold text-sm">{col.label}</span>
+            {col.metrics && (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {col.metrics.success ? "OK" : "FAIL"} · {col.metrics.duration_ms}ms
+              </span>
+            )}
+          </div>
+          {col.tokenStats && (
+            <div className="mt-1.5">
+              <TokenStatsPanel stats={col.tokenStats} compact />
+            </div>
+          )}
+        </div>
+        {showStop && (
+          <button
+            type="button"
+            className="btn-ghost !h-7 !px-2 text-[10px] shrink-0"
+            onClick={onStop}
+          >
+            <Square className="h-3 w-3" />
+            停止
+          </button>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <TraceView events={col.events} running={running && !col.metrics} />
+      </div>
+      {col.tokenStats && !col.metrics && (
+        <div className="px-3 pb-2">
+          <TokenStatsPanel stats={col.tokenStats} />
+        </div>
+      )}
+      {col.metrics && (
+        <div className="border-t border-border px-3 py-2 font-mono text-[10px] text-muted-foreground flex gap-3">
+          <span>工具 {col.metrics.tool_calls}</span>
+          <span>步骤 {col.metrics.steps}</span>
+        </div>
+      )}
+      {col.error && (
+        <div className="border-t border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {col.error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ArenaClient() {
   const [meta, setMeta] = useState<ArenaMeta | null>(null);
   const [dimension, setDimension] = useState<DimensionId>("framework");
+  // 该维度下用户多选的子项 value 列表。空数组 = 使用维度默认全部。
+  const [selections, setSelections] = useState<string[]>([]);
   const [question, setQuestion] = useState("");
   const [running, setRunning] = useState(false);
   const [columns, setColumns] = useState<Record<string, ColumnState>>({});
   const [showPromptBanner, setShowPromptBanner] = useState(true);
+  const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
-  const abortRef = useRef<AbortController | null>(null);
   const [metaLoading, setMetaLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // 活跃 workspace 名称：使用第一列已完成/进行中的 label
+  // 活跃 workspace 名称：第一个已完成/进行中的 label
   const activeWorkspace = useMemo(() => {
     const cols = Object.values(columns);
     if (cols.length === 0) return null;
@@ -154,8 +286,34 @@ export function ArenaClient() {
       .finally(() => setMetaLoading(false));
   }, []);
 
-  const activeDim = meta?.dimensions.find((d) => d.id === dimension);
-  const columnCount = activeDim?.columns ?? 2;
+  // 当前维度元数据 + 可选项
+  const activeDim = useMemo(() => meta?.dimensions.find((d) => d.id === dimension) ?? null, [meta, dimension]);
+
+  // 当前激活的 selections（默认 = 该维度全部）
+  const activeSelections = useMemo(
+    () => (selections.length > 0 ? selections : activeDim?.options.map((o) => o.value) ?? []),
+    [selections, activeDim],
+  );
+
+  const columnCount = activeSelections.length || 2;
+
+  // 占位列标签：使用选项的 label
+  const placeholderLabels = useMemo(() => {
+    if (activeDim) {
+      return activeDim.options
+        .filter((o) => activeSelections.includes(o.value))
+        .map((o) => o.label);
+    }
+    return [];
+  }, [activeDim, activeSelections]);
+
+  const toggleSelection = useCallback((value: string) => {
+    setSelections((prev) => {
+      const base = prev.length > 0 ? prev : activeDim?.options.map((o) => o.value) ?? [];
+      const next = base.includes(value) ? base.filter((v) => v !== value) : [...base, value];
+      return next;
+    });
+  }, [activeDim]);
 
   const handleEvent = useCallback((event: ArenaEvent) => {
     const label = event.pipeline;
@@ -181,21 +339,6 @@ export function ArenaClient() {
     });
   }, []);
 
-  const runArena = async () => {
-    if (!question.trim() || running) return;
-    setRunning(true);
-    setColumns({});
-    abortRef.current = new AbortController();
-
-    try {
-      await streamArenaRun(question, dimension, handleEvent, abortRef.current.signal);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setRunning(false);
-    }
-  };
-
   const cancelRun = useCallback(() => {
     const ac = abortRef.current;
     // AbortController 仅可 abort 一次：重复调用会抛 InvalidStateError。
@@ -205,18 +348,81 @@ export function ArenaClient() {
     setRunning(false);
   }, []);
 
+  const runArena = async () => {
+    if (!question.trim() || running) return;
+    if (activeSelections.length < 2) {
+      setError("对比维度至少选择 2 个子项");
+      return;
+    }
+    setError(null);
+    setRunning(true);
+    // 关键：先按当前 selections 预占位列名（占位卡保留），再开始 stream
+    const placeholderCols: Record<string, ColumnState> = {};
+    for (const opt of activeDim?.options ?? []) {
+      if (activeSelections.includes(opt.value)) {
+        placeholderCols[opt.label] = { label: opt.label, events: [] };
+      }
+    }
+    setColumns(placeholderCols);
+    abortRef.current = new AbortController();
+
+    try {
+      await streamArenaRun(question, dimension, handleEvent, abortRef.current.signal, activeSelections);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  // 切换维度时清空选择与结果
   useEffect(() => {
+    setSelections([]);
     setColumns({});
+    setError(null);
   }, [dimension]);
 
   const columnList = useMemo(() => Object.values(columns), [columns]);
 
-  const placeholderLabels =
-    dimension === "framework"
-      ? ["LangChain", "LangGraph"]
-      : dimension === "prompt"
-        ? ["Zero-shot", "Few-shot", "CoT Prompt", "Structured"]
-        : Array.from({ length: columnCount }, (_, i) => `列 ${i + 1}`);
+  // 渲染列：已有 column 用实际状态，否则用占位
+  const renderCells = () => {
+    if (activeDim) {
+      const selectedOptions = activeDim.options.filter((o) => activeSelections.includes(o.value));
+      return selectedOptions.map((opt, i) => {
+        const col = columns[opt.label];
+        if (col) {
+          return (
+            <ColumnCard
+              key={opt.value}
+              col={col}
+              index={i}
+              running={running}
+              showStop={running && !col.metrics}
+              onStop={cancelRun}
+            />
+          );
+        }
+        return <ColumnPlaceholder key={opt.value} name={opt.label} />;
+      });
+    }
+    // meta 尚未加载：仍渲染之前的结果
+    if (columnList.length === 0 && !running) {
+      return placeholderLabels.slice(0, columnCount).map((name) => (
+        <ColumnPlaceholder key={name} name={name} />
+      ));
+    }
+    return columnList.map((col, i) => (
+      <ColumnCard
+        key={col.label}
+        col={col}
+        index={i}
+        running={running}
+        showStop={running && !col.metrics}
+        onStop={cancelRun}
+      />
+    ));
+  };
 
   if (metaLoading) {
     return (
@@ -230,61 +436,102 @@ export function ArenaClient() {
   }
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-8rem)]">
-      {/* ===== 左侧栏 ===== */}
-      <aside className="w-56 flex-shrink-0 space-y-4 overflow-y-auto hidden lg:block">
-        <div className="space-y-2">
-          <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-1">
-            对比维度
-          </p>
-          <div className="space-y-1">
-            {meta?.dimensions.map((d) => (
+    <div className="flex gap-3 min-h-[calc(100vh-8rem)]">
+      {/* ===== 左侧栏：维度 + 实验参数 ===== */}
+      {showLeftPanel && (
+        <aside className="w-64 flex-shrink-0 space-y-4 overflow-y-auto pr-1">
+          <div className="space-y-2">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-1">
+              对比维度
+            </p>
+            <div className="space-y-1">
+              {meta?.dimensions.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  className="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors data-[active=true]:bg-muted data-[active=false]:hover:bg-muted/50"
+                  data-active={dimension === d.id}
+                  onClick={() => setDimension(d.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={
+                        dimension === d.id
+                          ? "text-foreground font-semibold"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {d.label}
+                    </span>
+                    <span className="text-[10px] font-mono text-muted-foreground">
+                      {d.max_select}项
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 当前维度下可选项 */}
+          {activeDim && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                  参与对比
+                </p>
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  {activeSelections.length} / {activeDim.max_select}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {activeDim.options.map((opt) => (
+                  <DimensionChip
+                    key={opt.value}
+                    option={opt}
+                    selected={activeSelections.includes(opt.value)}
+                    onToggle={toggleSelection}
+                  />
+                ))}
+              </div>
+              {activeSelections.length < (activeDim.min_select ?? 2) && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 px-1">
+                  至少选择 {activeDim.min_select ?? 2} 项
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeDim && (
+            <div className="px-1">
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {activeDim.subtitle}
+              </p>
+            </div>
+          )}
+
+          {dimension === "prompt" && showPromptBanner && (
+            <div className="mx-1 flex items-start gap-2 rounded border border-border bg-card p-3 text-[11px]">
+              <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <p className="flex-1 leading-relaxed">
+                「CoT Prompt」只改 Prompt 文案。编排层变化见推理模式 → CoT+Tool。
+              </p>
               <button
-                key={d.id}
                 type="button"
-                className="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors"
-                data-active={dimension === d.id}
-                data-disabled={!d.mvp && dimension !== d.id}
-                disabled={!d.mvp && dimension !== d.id}
-                onClick={() => d.mvp && setDimension(d.id)}
-                title={!d.mvp ? "后续版本开放" : undefined}
+                className="btn-ghost !h-6 !px-1.5 shrink-0"
+                onClick={() => setShowPromptBanner(false)}
               >
-                <span className={dimension === d.id ? "text-foreground font-medium" : "text-muted-foreground"}>
-                  {d.label}
-                </span>
-                <span className="ml-1.5 text-[10px] font-mono text-muted-foreground">
-                  {d.columns}列
-                </span>
+                <X className="h-3 w-3" />
               </button>
-            ))}
-          </div>
-        </div>
+            </div>
+          )}
 
-        {activeDim && (
-          <div className="px-1">
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              {activeDim.subtitle}
-            </p>
-          </div>
-        )}
-
-        {dimension === "prompt" && showPromptBanner && (
-          <div className="mx-1 flex items-start gap-2 rounded border border-border bg-card p-3 text-[11px]">
-            <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <p className="flex-1 leading-relaxed">
-              「CoT Prompt」只改 Prompt 文案。编排层变化见推理模式 → CoT+Tool。
-            </p>
-            <button type="button" className="btn-ghost !h-6 !px-1.5 shrink-0" onClick={() => setShowPromptBanner(false)}>
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        )}
-
-        <ExperimentPanel dimension={dimension} columnCount={columnCount} />
-      </aside>
+          <ExperimentPanel dimension={dimension} columnCount={columnCount} />
+        </aside>
+      )}
 
       {/* ===== 中间：Arena 主区域 ===== */}
       <main className="flex-1 min-w-0 flex flex-col gap-4">
+        {/* 移动端维度切换 */}
         <div className="lg:hidden flex flex-wrap gap-1.5">
           {meta?.dimensions.map((d) => (
             <button
@@ -292,12 +539,10 @@ export function ArenaClient() {
               type="button"
               className="seg-tab text-xs"
               data-active={dimension === d.id}
-              data-disabled={!d.mvp && dimension !== d.id}
-              disabled={!d.mvp && dimension !== d.id}
-              onClick={() => d.mvp && setDimension(d.id)}
+              onClick={() => setDimension(d.id)}
             >
               {d.label}
-              <span className="ml-1 text-[10px] font-mono opacity-60">{d.columns}</span>
+              <span className="ml-1 text-[10px] font-mono opacity-60">{d.max_select}</span>
             </button>
           ))}
           {activeDim && (
@@ -311,76 +556,7 @@ export function ArenaClient() {
             gridTemplateColumns: `repeat(${Math.min(columnCount, 4)}, minmax(0, 1fr))`,
           }}
         >
-          {columnList.length === 0 && !running
-            ? placeholderLabels.slice(0, columnCount).map((name) => (
-                <div key={name} className="column-card opacity-60">
-                  <div className="column-header">
-                    <span className="font-semibold text-sm">{name}</span>
-                  </div>
-                  <div className="flex flex-1 items-center justify-center p-6">
-                    <div className="text-center space-y-3">
-                      <div className="w-10 h-10 mx-auto rounded-full border-2 border-border flex items-center justify-center">
-                        <Zap className="h-5 w-5 text-muted-foreground/50" />
-                      </div>
-                      <p className="text-xs text-muted-foreground">等待运行</p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            : columnList.map((col, i) => (
-                <div
-                  key={col.label}
-                  className="column-card min-h-0"
-                  style={{ animationDelay: `${i * 80}ms` }}
-                >
-                  <div className="column-header">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={"column-status-dot " + (running && !col.metrics ? "running" : col.metrics ? "done" : "") + " " + (col.error ? "error" : "")} />
-                        <span className="font-semibold text-sm">{col.label}</span>
-                        {col.metrics && (
-                          <span className="font-mono text-[10px] text-muted-foreground">
-                            {col.metrics.success ? "OK" : "FAIL"} · {col.metrics.duration_ms}ms
-                          </span>
-                        )}
-                      </div>
-                      {col.tokenStats && (
-                        <div className="mt-1.5">
-                          <TokenStatsPanel stats={col.tokenStats} compact />
-                        </div>
-                      )}
-                    </div>
-                    {running && !col.metrics && (
-                      <button
-                        type="button"
-                        className="btn-ghost !h-7 !px-2 text-[10px] shrink-0"
-                        onClick={cancelRun}
-                      >
-                        停止
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex-1 overflow-y-auto min-h-0">
-                    <TraceView events={col.events} running={running && !col.metrics} />
-                  </div>
-                  {col.tokenStats && !col.metrics && (
-                    <div className="px-3 pb-2">
-                      <TokenStatsPanel stats={col.tokenStats} />
-                    </div>
-                  )}
-                  {col.metrics && (
-                    <div className="border-t border-border px-3 py-2 font-mono text-[10px] text-muted-foreground flex gap-3">
-                      <span>工具 {col.metrics.tool_calls}</span>
-                      <span>步骤 {col.metrics.steps}</span>
-                    </div>
-                  )}
-                  {col.error && (
-                    <div className="border-t border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                      {col.error}
-                    </div>
-                  )}
-                </div>
-              ))}
+          {renderCells()}
         </div>
 
         {Object.values(columns).some((c) => c.metrics) && <ComparisonReport columns={columns} />}
@@ -402,6 +578,11 @@ export function ArenaClient() {
               </button>
             ))}
           </div>
+          {error && (
+            <p className="text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded px-3 py-2">
+              {error}
+            </p>
+          )}
           <div className="flex gap-3">
             <input
               className="form-input flex-1"
@@ -417,18 +598,15 @@ export function ArenaClient() {
               disabled={running}
             />
             {running ? (
-              <button
-                type="button"
-                className="btn-ghost shrink-0"
-                onClick={cancelRun}
-              >
+              <button type="button" className="btn-ghost shrink-0" onClick={cancelRun}>
+                <Square className="h-4 w-4" />
                 停止
               </button>
             ) : (
               <button
                 type="button"
                 className="btn-primary shrink-0"
-                disabled={!question.trim()}
+                disabled={!question.trim() || activeSelections.length < 2}
                 onClick={runArena}
               >
                 <Send className="h-4 w-4" />
@@ -449,18 +627,37 @@ export function ArenaClient() {
         </aside>
       )}
 
-      <button
-        type="button"
-        className="fixed right-4 top-20 z-40 btn-ghost !h-8 !w-8 !p-0 xl:hidden"
-        onClick={() => setShowRightPanel(!showRightPanel)}
-        title={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
-      >
-        {showRightPanel ? (
-          <PanelRightClose className="h-4 w-4" />
-        ) : (
+      {/* 折叠按钮 — 固定右上 */}
+      <div className="fixed right-4 top-20 z-40 flex flex-col gap-1">
+        <button
+          type="button"
+          className="btn-ghost !h-8 !w-8 !p-0"
+          onClick={() => setShowLeftPanel(!showLeftPanel)}
+          title={showLeftPanel ? "隐藏左侧维度栏" : "显示左侧维度栏"}
+        >
+          {showLeftPanel ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+        </button>
+        <button
+          type="button"
+          className="btn-ghost !h-8 !w-8 !p-0 xl:hidden"
+          onClick={() => setShowRightPanel(!showRightPanel)}
+          title={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
+        >
+          {showRightPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {/* 桌面端右栏展开按钮 — 当右栏隐藏时显示 */}
+      {!showRightPanel && (
+        <button
+          type="button"
+          className="fixed right-4 top-32 z-40 btn-ghost !h-8 !w-8 !p-0 hidden xl:flex"
+          onClick={() => setShowRightPanel(true)}
+          title="显示工作空间"
+        >
           <PanelRightOpen className="h-4 w-4" />
-        )}
-      </button>
+        </button>
+      )}
     </div>
   );
 }

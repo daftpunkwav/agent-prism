@@ -2,14 +2,23 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 export type DimensionId = "framework" | "prompt" | "reasoning" | "context" | "harness";
 
+export interface DimensionOption {
+  field: string;
+  value: string;
+  label: string;
+}
+
+export interface DimensionMeta {
+  id: DimensionId;
+  label: string;
+  subtitle: string;
+  options: DimensionOption[];
+  min_select: number;
+  max_select: number;
+}
+
 export interface ArenaMeta {
-  dimensions: Array<{
-    id: DimensionId;
-    label: string;
-    subtitle: string;
-    columns: number;
-    mvp: boolean;
-  }>;
+  dimensions: DimensionMeta[];
   frameworks: Array<{ id: string; name: string; status: string }>;
 }
 
@@ -103,11 +112,12 @@ export async function streamArenaRun(
   dimension: DimensionId,
   onEvent: (event: ArenaEvent) => void,
   signal?: AbortSignal,
+  selections?: string[],
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/api/arena/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify({ question, dimension }),
+    body: JSON.stringify({ question, dimension, selections: selections ?? [] }),
     signal,
   });
 
