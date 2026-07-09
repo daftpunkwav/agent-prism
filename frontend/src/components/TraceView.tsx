@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -49,7 +49,9 @@ export function TraceView({
   const tickRef = useRef<number>(0);
   const segmentsRef = useRef(segments);
   const runningRef = useRef(running);
-  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+  // 仅用于驱动打字机逐帧重渲，使用 setState 函数式 setter 避免额外 reducer
+  const [, setTick] = useState(0);
+  const forceUpdate = useCallback(() => setTick((x) => x + 1), []);
   const accentColor = COLUMN_COLORS[colorIndex % COLUMN_COLORS.length];
 
   segmentsRef.current = segments;
