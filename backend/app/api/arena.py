@@ -74,8 +74,8 @@ async def arena_run(request: ArenaRunRequest):
             async for event in _pool.stream_parallel(request):
                 yield {"event": "arena", "data": json.dumps(event.model_dump(), ensure_ascii=False)}
         except asyncio.CancelledError:
-            # 客户端断开连接时静默退出
-            pass
+            # 客户端断开 — runner 内部已取消所有 worker task，无需额外清理
+            raise
 
     return EventSourceResponse(event_generator())
 

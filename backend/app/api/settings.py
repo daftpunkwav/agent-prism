@@ -17,10 +17,11 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 def _mask_key(key: str) -> str:
+    """脱敏 API Key。短 Key 统一显示 ``<short>``，避免长度泄露。"""
     if not key:
         return ""
     if len(key) <= 8:
-        return "****"
+        return "<short>"
     return f"{key[:4]}...{key[-4:]}"
 
 
@@ -66,12 +67,24 @@ async def update_provider(body: ProviderConfigUpdate) -> ProviderConfigPublic:
 
 @router.post("/provider/test", response_model=ConnectionTestResult)
 async def test_provider(body: ProviderConfigUpdate | None = None) -> ConnectionTestResult:
+    """测试 Provider 连接。
+
+    按 ``cfg.api_format`` 分发：
+    - ``anthropic_messages``: ``anthropic.Anthropic``
+    - ``openai_chat``: ``openai.OpenAI`` Chat Completions
+    """
     cfg = ProviderConfig(**(body.model_dump() if body else load_provider_config().model_dump()))
     if body and not body.api_key:
         cfg.api_key = load_provider_config().api_key
     if not cfg.api_key:
         raise HTTPException(status_code=400, detail="请先填写 API Key")
 
+    if cfg.api_format == "openai_chat":
+        return await _test_openai(cfg)
+    return await _test_anthropic(cfg)
+
+
+async def _test_anthropic(cfg: ProviderConfig) -> ConnectionTestResult:
     try:
         client = anthropic.Anthropic(
             api_key=cfg.api_key,
@@ -98,7 +111,40 @@ async def test_provider(body: ProviderConfigUpdate | None = None) -> ConnectionT
             model=cfg.model,
         )
     except Exception as exc:  # noqa: BLE001
-        # 仅返回异常类型与简短消息，避免在响应中泄露完整 endpoint/堆栈
+        return ConnectionTestResult(
+            ok=False,
+            message=f"连接失败: {type(exc).__name__}",
+            model=cfg.model,
+        )
+
+
+async def _test_openai(cfg: ProviderConfig) -> ConnectionTestResult:
+    try:
+        # 延迟导入 openai — 避免强依赖（部分用户只用 Anthropic）
+        import openai
+
+        default_headers: dict[str, str] = {}
+        if cfg.auth_field and cfg.auth_field != "Authorization":
+            default_headers[cfg.auth_field] = cfg.api_key
+        client = openai.OpenAI(
+            api_key=cfg.api_key,
+            base_url=cfg.base_url.rstrip("/"),
+            default_headers=default_headers or None,
+        )
+        resp = client.chat.completions.create(
+            model=cfg.model,
+            max_tokens=32,
+            messages=[{"role": "user", "content": "ping"}],
+        )
+        snippet = ""
+        if resp.choices:
+            snippet = resp.choices[0].message.content or ""
+        return ConnectionTestResult(
+            ok=True,
+            message=f"连接成功: {snippet[:80] or 'ok'}",
+            model=cfg.model,
+        )
+    except Exception as exc:  # noqa: BLE001
         return ConnectionTestResult(
             ok=False,
             message=f"连接失败: {type(exc).__name__}",
