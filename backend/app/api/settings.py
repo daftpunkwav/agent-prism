@@ -92,4 +92,9 @@ async def test_provider(body: ProviderConfigUpdate | None = None) -> ConnectionT
             model=cfg.model,
         )
     except Exception as exc:  # noqa: BLE001
-        return ConnectionTestResult(ok=False, message=str(exc), model=cfg.model)
+        # 仅返回异常类型与简短消息，避免在响应中泄露完整 endpoint/堆栈
+        return ConnectionTestResult(
+            ok=False,
+            message=f"连接失败: {type(exc).__name__}",
+            model=cfg.model,
+        )
