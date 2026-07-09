@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
 from app.arena.harness import reflect_on_failure, verify_result
 from app.arena.prompts import build_messages
+from app.arena.reasoning import get_reasoning_description
 from app.arena.reasoning_graph import (
     build_cot_tool_graph,
     build_react_graph,
@@ -26,13 +27,6 @@ _GRAPH_BUILDERS = {
     "cot_tool": build_cot_tool_graph,
     "tot": build_tot_graph,
     "reflexion": build_reflexion_graph,
-}
-
-_MODE_LABELS = {
-    "react": "ReAct 循环",
-    "cot_tool": "CoT+Tool 推理→行动",
-    "tot": "Tree-of-Thought 多分支",
-    "reflexion": "Reflexion 反思重试",
 }
 
 
@@ -62,12 +56,12 @@ class LangGraphAdapter:
             tracker.seed_prompt(system, user)
             yield token_update_event(label, tracker)
 
-            mode_label = _MODE_LABELS.get(config.reasoning, "ReAct 循环")
+            mode_label = get_reasoning_description(config.reasoning) or "ReAct 循环"
             yield ArenaEvent(
                 type="thought",
                 pipeline=label,
                 step=0,
-                content=f"[LangGraph {mode_label}] 启动 · {config.prompt_profile}",
+                content=f"[LangGraph] {mode_label} · {config.prompt_profile}",
             )
 
             graph_builder = _GRAPH_BUILDERS.get(config.reasoning, build_react_graph)

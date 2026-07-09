@@ -235,19 +235,22 @@ def _reflexion_should_continue(state: AgentState) -> str:
 
 
 def build_reflexion_graph() -> StateGraph:
-    """构建 Reflexion 图：execute → reflect → (execute 或 END)"""
+    """构建 Reflexion 图：execute ↔ reflect 循环，重试到 max_steps 后退出。"""
     graph = StateGraph(AgentState)
     graph.add_node("execute", _reflexion_execute_node)
     graph.add_node("reflect", _reflexion_reflect_node)
     graph.add_edge("reflect", "execute")
+    # 统一使用条件边控制：进入 reflect 后再决定是回到 execute 还是结束
     graph.set_conditional_entry_point(
         lambda state: "reflect" if state["step_count"] > 0 else "execute",
-        {"reflect": "reflect", "execute": "execute"}
+        {"reflect": "reflect", "execute": "execute"},
     )
-    # 简化：execute → reflect → END/execute 循环
-    graph.add_conditional_edges("reflect", _reflexion_should_continue, {"execute": "execute", END: END})
+    graph.add_conditional_edges(
+        "reflect",
+        _reflexion_should_continue,
+        {"execute": "execute", END: END},
+    )
     graph.add_edge("execute", "reflect")
-    graph.set_entry_point("execute")
     return graph
 
 
