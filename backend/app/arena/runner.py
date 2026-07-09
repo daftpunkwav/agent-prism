@@ -39,7 +39,7 @@ class RunnerPool:
             yield ArenaEvent(
                 type="error",
                 pipeline="system",
-                message=f"维度「{request.dimension}」将在后续版本开放，MVP 支持 framework / prompt",
+                message=f"维度「{request.dimension}」未启用，当前 MVP 已支持 framework / prompt / reasoning / context / harness",
             )
             return
 
@@ -52,6 +52,9 @@ class RunnerPool:
                     request.question, cfg
                 ):
                     await queue.put(event)
+            except asyncio.CancelledError:
+                # 客户端断开 — 静默传播，由调用方吞掉
+                raise
             except Exception as exc:  # noqa: BLE001
                 await queue.put(
                     ArenaEvent(
