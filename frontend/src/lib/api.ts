@@ -85,8 +85,11 @@ export async function fetchArenaMeta(): Promise<ArenaMeta> {
   return res.json();
 }
 
-export async function fetchProvider(): Promise<ProviderConfig> {
-  const res = await fetch(`${API_BASE}/api/settings/provider`, { cache: "no-store" });
+export async function fetchProvider(options?: { signal?: AbortSignal }): Promise<ProviderConfig> {
+  const res = await fetch(`${API_BASE}/api/settings/provider`, {
+    cache: "no-store",
+    signal: options?.signal,
+  });
   if (!res.ok) throw new Error("无法加载 Provider 配置");
   return res.json();
 }
@@ -181,8 +184,8 @@ export interface ProjectCreate {
   workspace_names: string[];
 }
 
-export async function listProjects(): Promise<Project[]> {
-  const res = await fetch(`${API_BASE}/api/arena/projects`, { cache: "no-store" });
+export async function listProjects(signal?: AbortSignal): Promise<Project[]> {
+  const res = await fetch(`${API_BASE}/api/arena/projects`, { cache: "no-store", signal });
   if (!res.ok) throw new Error("加载项目失败");
   const data = await res.json();
   return data.projects || [];

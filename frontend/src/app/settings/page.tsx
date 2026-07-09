@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { CheckCircle2, ExternalLink, Eye, EyeOff, Loader2, Zap } from "lucide-react";
 import { ProviderConfig, fetchProvider, saveProvider, testProvider } from "@/lib/api";
 
@@ -27,9 +27,15 @@ export default function SettingsPage() {
     max_input_tokens: 120000,
     max_output_tokens: 2048,
   });
+  const abortRef = useRef<AbortController | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProvider()
+    // 组件卸载时取消 in-flight 请求，避免 setState on unmounted
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    fetchProvider({ signal: ac.signal })
       .then((cfg: ProviderConfig) => {
         setForm((f) => ({
           ...f,
@@ -48,7 +54,13 @@ export default function SettingsPage() {
           api_key: "",
         }));
       })
-      .finally(() => setLoading(false));
+      .catch((err: Error) => {
+        if (err.name !== "AbortError") setLoadError(err.message);
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setLoading(false);
+      });
+    return () => ac.abort();
   }, []);
 
   const flash = (msg: string) => {
@@ -82,9 +94,14 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-        加载配置…
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
+        <div className="flex items-center">
+          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          加载配置…
+        </div>
+        {loadError && (
+          <p className="text-xs text-destructive">{loadError}</p>
+        )}
       </div>
     );
   }

@@ -1,40 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { FolderOpen, Plus, Trash2, ChevronRight, Zap } from "lucide-react";
+import { FolderOpen, Plus, Trash2, Zap } from "lucide-react";
 import { listProjects, deleteProject, type Project } from "@/lib/api";
-import { useRouter } from "next/navigation";
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const router = useRouter();
-
-  const load = async () => {
-    try {
-      const data = await listProjects();
-      setProjects(data);
-    } catch {
-      // 静默
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    load();
+    // 卸载/重渲染时取消未完成请求，避免 setState on unmounted
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    (async () => {
+      try {
+        const data = await listProjects(ac.signal);
+        setProjects(data);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          setError((err as Error).message);
+        }
+      } finally {
+        if (!ac.signal.aborted) setLoading(false);
+      }
+    })();
+    return () => ac.abort();
   }, []);
 
   const onDelete = async (id: string) => {
     if (!confirm("确定删除此项目？")) return;
     setDeleting(id);
+    setError(null);
     try {
       await deleteProject(id);
       setProjects((prev) => prev.filter((p) => p.id !== id));
-    } catch {
-      // 静默
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setDeleting(null);
     }
@@ -64,6 +70,12 @@ export default function ProjectsPage() {
           新实验
         </Link>
       </div>
+
+      {error && (
+        <p className="text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded px-3 py-2">
+          {error}
+        </p>
+      )}
 
       {projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
