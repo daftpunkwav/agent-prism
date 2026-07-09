@@ -18,6 +18,13 @@ from app.arena.workspace import clear_current_workspace, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
 
+def _normalize_args(input_value: object) -> dict:
+    """统一将 LangChain 工具输入规范成 dict。"""
+    if isinstance(input_value, dict):
+        return input_value
+    return {"input": input_value}
+
+
 class LangChainAdapter:
     framework_id = "langchain"
     display_name = "LangChain"
@@ -31,7 +38,7 @@ class LangChainAdapter:
         tool_calls = 0
         tracker = TokenTracker.from_provider()
 
-        # 创建工作空间
+        # 每个运行实例独占一个工作空间
         ws_name = f"{label}_{int(started * 1000)}"
         ws = get_workspace_mgr().create(ws_name)
         set_current_workspace(ws_name)
@@ -39,7 +46,9 @@ class LangChainAdapter:
 
         try:
             llm = create_chat_model()
-            system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
+            system, user = build_messages(
+                question, config.prompt_profile, config.reasoning, config.harness
+            )
             tracker.seed_prompt(system, user)
             yield token_update_event(label, tracker)
 
@@ -51,10 +60,8 @@ class LangChainAdapter:
             )
 
             agent = create_agent(llm, ARENA_TOOLS, system_prompt=system)
-
-            buffer = ""
-
             messages = [SystemMessage(content=system), HumanMessage(content=user)]
+            buffer = ""
 
             async for event in agent.astream_events(
                 {"messages": messages},
@@ -64,8 +71,7 @@ class LangChainAdapter:
                 data = event.get("data", {})
 
                 if kind == "on_chat_model_stream":
-                    chunk = data.get("chunk")
-                    text = extract_chunk_text(chunk)
+                    text = extract_chunk_text(data.get("chunk"))
                     if text:
                         buffer += str(text)
                 elif kind == "on_chat_model_end":
@@ -90,9 +96,7 @@ class LangChainAdapter:
                         pipeline=label,
                         step=step,
                         tool=event.get("name", "tool"),
-                        args=data.get("input", {})
-                        if isinstance(data.get("input"), dict)
-                        else {"input": data.get("input")},
+                        args=_normalize_args(data.get("input")),
                     )
                 elif kind == "on_tool_end":
                     step += 1
