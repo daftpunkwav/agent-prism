@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from app.arena.workspace import WorkspaceManager
+from app.arena.workspace import Workspace, WorkspaceManager, get_current_workspace_name
 
 # 全局工作空间管理器（每个 Agent 运行独立创建 workspace）
 _workspace_mgr = WorkspaceManager()

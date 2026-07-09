@@ -5,7 +5,6 @@ import pytest
 from app.adapters.base import (
     AdapterNotFoundError,
     AdapterReservedError,
-    FrameworkAdapter,
     FrameworkAdapterRegistry,
 )
 
