@@ -3,20 +3,34 @@
 Tool 分为两类：
 1. 无状态工具（get_current_time, calculate）：无副作用，纯函数
 2. 工作空间工具（read_file, write_file 等）：操作 Agent 隔离工作空间
+
+安全说明：
+- ``calculate`` 仅做 AST 白名单 + 编译后计算，无内置函数可访问。
+- ``run_code`` 使用 ``multiprocessing.Process`` 真超时强制；内置白名单
+  只保留纯函数（不暴露 ``type``/``Exception``/``isinstance``/``True``/``False``/``None``），
+  切断 ``().__class__.__base__.__subclasses__()`` 反射链。
+- 文件工具均经 ``Workspace._normalize`` 拒绝向上遍历与控制字符。
 """
 
 from __future__ import annotations
 
 import ast
+import contextlib
 import io
+import logging
+import multiprocessing as _mp
 import sys
-import traceback as tb_mod
 from datetime import datetime, timezone
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from app.arena.workspace import Workspace, WorkspaceManager, get_current_workspace_name
+
+logger = logging.getLogger(__name__)
+
+# 单文件/单次工具调用的内容上限，避免 LLM 把 10MB 文本写回导致 SSE 卡顿
+_MAX_FILE_CONTENT_BYTES = 256 * 1024
 
 # 全局工作空间管理器（每个 Agent 运行独立创建 workspace）
 _workspace_mgr = WorkspaceManager()
@@ -42,6 +56,11 @@ def get_current_time(time_format: str = "iso") -> str:
 
 def _safe_calculate(expression: str) -> str:
     """计算简单数学表达式，仅支持 + - * / ** // % 和括号。数字仅限阿拉伯数字。"""
+    if not isinstance(expression, str):
+        return "错误: 表达式必须是字符串"
+    if len(expression) > 512:
+        return "错误: 表达式过长"
+
     try:
         tree = ast.parse(expression, mode="eval")
     except SyntaxError:
@@ -69,10 +88,53 @@ def _safe_calculate(expression: str) -> str:
             return "错误: 只能使用数字"
 
     try:
-        result = eval(compile(tree, "<expr>", "eval"), {"__builtins__": {}}, {})
+        # 显式空 __builtins__；空 globals 防止引用外部变量
+        result = eval(  # noqa: S307 — 已 AST 白名单
+            compile(tree, "<expr>", "eval"),
+            {"__builtins__": {}},
+            {},
+        )
         return str(result)
-    except Exception as exc:
-        return f"计算错误: {exc}"
+    except Exception:
+        # 不把内部异常文本回显给 LLM（避免泄漏路径/内部细节）
+        logger.exception("calculate 失败: %s", expression[:200])
+        return "错误: 计算失败"
+
+
+# ===== run_code 沙箱 AST 校验 =====
+
+# 严禁出现的 dunder 属性名 — 切断 ``().__class__.__mro__[-1].__subclasses__()``
+# 等反射链。注意：不区分大小写（Python 属性访问是大小写敏感的，但攻击者
+# 仍可通过 ``getattr(obj, "__class__")`` 绕过；因此 AST 黑名单 + getattr 检查双管齐下）。
+_FORBIDDEN_DUNDERS: frozenset[str] = frozenset({
+    "__class__",
+    "__bases__",
+    "__mro__",
+    "__subclasses__",
+    "__globals__",
+    "__builtins__",
+    "__import__",
+    "__getattribute__",
+    "__dict__",
+    "__init_subclass__",
+    "__subclasshook__",
+})
+
+
+def _validate_run_code_ast(tree: ast.AST) -> str | None:
+    """静态校验 run_code AST。返回 None 表示通过；返回错误消息表示拒绝。"""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute):
+            if node.attr in _FORBIDDEN_DUNDERS:
+                return f"错误: 禁止访问属性: {node.attr}"
+        if isinstance(node, ast.Call):
+            # ``getattr(obj, name)`` / ``setattr(...)`` 一律拒绝 — 任何 dunder 绕过
+            _forbidden = {"getattr", "setattr", "delattr", "vars", "globals", "locals", "compile", "eval", "exec", "open", "__import__"}
+            if isinstance(node.func, ast.Name) and node.func.id in _forbidden:
+                return f"错误: 禁止调用: {node.func.id}"
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            return "错误: 禁止 import"
+    return None
 
 
 @tool
@@ -99,13 +161,20 @@ class _CreateFileInput(BaseModel):
     content: str = Field(default="", description="初始内容（可选）")
 
 
+def _truncate_content(content: str) -> str:
+    """超过单文件上限时截断并追加提示，避免 LLM 写超大文件卡住 SSE。"""
+    if len(content) <= _MAX_FILE_CONTENT_BYTES:
+        return content
+    return content[:_MAX_FILE_CONTENT_BYTES] + f"\n\n...[已截断，原长 {len(content)} 字节]"
+
+
 @tool(args_schema=_WriteFileInput)
 def write_file(path: str, content: str) -> str:
     """在工作空间中写入文件（覆盖已有文件）。适用于创建完整文件。"""
     ws = _get_ws()
     if ws is None:
         return "错误: 未找到工作空间"
-    return ws.write_file(path, content)
+    return ws.write_file(path, _truncate_content(content))
 
 
 @tool(args_schema=_AppendFileInput)
@@ -114,7 +183,7 @@ def append_file(path: str, content: str) -> str:
     ws = _get_ws()
     if ws is None:
         return "错误: 未找到工作空间"
-    return ws.append_file(path, content)
+    return ws.append_file(path, _truncate_content(content))
 
 
 @tool(args_schema=_CreateFileInput)
@@ -123,7 +192,7 @@ def create_file(path: str, content: str = "") -> str:
     ws = _get_ws()
     if ws is None:
         return "错误: 未找到工作空间"
-    return ws.create_file(path, content)
+    return ws.create_file(path, _truncate_content(content))
 
 
 @tool
@@ -170,71 +239,129 @@ def delete_file(path: str) -> str:
 
 class _RunCodeInput(BaseModel):
     code: str = Field(description="要执行的 Python 代码")
-    timeout: int = Field(default=5, description="超时秒数（最大 10）")
+    timeout: int = Field(default=5, ge=1, le=10, description="超时秒数（1-10）")
 
 
-def _safe_run_code(code: str, timeout: int = 5) -> str:
-    """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
-    timeout = min(timeout, 10)
+def _deny_isinstance(*_args: object, **_kwargs: object) -> bool:
+    """isinstance 的沙箱替代：始终返回 False（拒绝反射元类链）。"""
+    return False
+
+
+# run_code 沙箱的内置白名单 — 严格只放纯函数与构造器，
+# 移除 type/Exception/True/False/None 以切断反射链。
+# ``isinstance`` 被替换为始终返回 False 的桩。
+_SANDBOX_BUILTINS: dict[str, object] = {
+    "print": print,
+    "len": len,
+    "range": range,
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "list": list,
+    "dict": dict,
+    "set": set,
+    "tuple": tuple,
+    "frozenset": frozenset,
+    "sum": sum,
+    "min": min,
+    "max": max,
+    "abs": abs,
+    "round": round,
+    "pow": pow,
+    "sorted": sorted,
+    "reversed": reversed,
+    "enumerate": enumerate,
+    "zip": zip,
+    "map": map,
+    "filter": filter,
+    "all": all,
+    "any": any,
+    "iter": iter,
+    "next": next,
+    "repr": repr,
+    "hex": hex,
+    "oct": oct,
+    "bin": bin,
+    "chr": chr,
+    "ord": ord,
+    "hash": hash,
+    "callable": callable,
+    "isinstance": _deny_isinstance,
+}
+
+
+def _run_code_subprocess(code: str, q: _mp.Queue[str]) -> None:  # pragma: no cover - 子进程路径
+    """子进程入口：执行用户代码，把 stdout/stderr 写入 Queue 后退出。"""
     captured = io.StringIO()
-    # 重定向到独立 StringIO，不污染全局 sys.stdout，
-    # 避免并发请求间 stdout 互相覆盖。
-    safe_ns = {
-        "__builtins__": {
-            # 支持 print(*objects, sep, end, file, flush) 全签名
-            "print": lambda *args, sep=" ", end="\n", file=None, flush=False: captured.write(sep.join(str(a) for a in args) + end),
-            "len": len,
-            "range": range,
-            "str": str,
-            "int": int,
-            "float": float,
-            "bool": bool,
-            "list": list,
-            "dict": dict,
-            "set": set,
-            "tuple": tuple,
-            "sum": sum,
-            "min": min,
-            "max": max,
-            "abs": abs,
-            "round": round,
-            "sorted": sorted,
-            "enumerate": enumerate,
-            "zip": zip,
-            "map": map,
-            "filter": filter,
-            "all": all,
-            "any": any,
-            "True": True,
-            "False": False,
-            "None": None,
-            "isinstance": isinstance,
-            "type": type,
-            "Exception": Exception,
-            "ValueError": ValueError,
-            "TypeError": TypeError,
-            "KeyError": KeyError,
-            "IndexError": IndexError,
-            "AttributeError": AttributeError,
-        }
-    }
+    safe_globals = {"__builtins__": _SANDBOX_BUILTINS}
+    safe_locals: dict[str, object] = {}
     old_stdout, old_stderr = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = captured, captured
     try:
         compiled = compile(code, "<run_code>", "exec")
-        exec(compiled, safe_ns, safe_ns)
-        output = captured.getvalue()
-        return output if output else "(代码执行成功，无输出)"
-    except Exception:
-        return f"执行错误:\n{tb_mod.format_exc()}"
+        exec(compiled, safe_globals, safe_locals)  # noqa: S102 — 沙箱已白名单
+        q.put(captured.getvalue() or "(代码执行成功，无输出)")
+    except BaseException as exc:  # noqa: BLE001
+        # 输出给 LLM 的错误信息：仅类型名 + 截断消息，不含 traceback 中的绝对路径
+        msg = str(exc)[:200] or type(exc).__name__
+        q.put(f"执行错误: {type(exc).__name__}: {msg}")
     finally:
-        sys.stdout, sys.stderr = old_stdout, old_stderr
+        with contextlib.suppress(Exception):
+            sys.stdout, sys.stderr = old_stdout, old_stderr
+
+
+def _safe_run_code(code: str, timeout: int = 5) -> str:
+    """在工作空间中执行 Python 代码并返回输出。
+
+    安全要点：
+    - 静态 AST 校验：禁止 dunder 属性访问、``getattr/setattr/...``、``import``
+    - 真超时：``multiprocessing.Process`` + ``terminate()``，避免 CPU 阻塞事件循环
+    - 内置白名单仅含纯函数；``isinstance`` 被替换为始终返回 False
+    - 不向 LLM 回显完整 traceback，避免路径/堆栈泄漏
+    """
+    if not isinstance(code, str):
+        return "错误: 代码必须是字符串"
+    if len(code) > 16 * 1024:
+        return "错误: 代码过长（>16KB）"
+    timeout = max(1, min(int(timeout), 10))
+
+    try:
+        tree = ast.parse(code, mode="exec")
+    except SyntaxError:
+        return "错误: 代码语法错误"
+
+    reject_reason = _validate_run_code_ast(tree)
+    if reject_reason is not None:
+        return reject_reason
+
+    ctx = _mp.get_context("spawn")
+    q: _mp.Queue[str] = ctx.Queue()  # type: ignore[assignment]
+    proc = ctx.Process(target=_run_code_subprocess, args=(code, q), daemon=True)
+    proc.start()
+    proc.join(timeout=timeout)
+
+    if proc.is_alive():
+        proc.terminate()
+        proc.join(timeout=2)
+        if proc.is_alive():
+            proc.kill()
+            proc.join(timeout=1)
+        return f"执行超时（>{timeout}s），已强制终止"
+
+    if proc.exitcode != 0:
+        return f"执行错误: 子进程退出码 {proc.exitcode}"
+
+    try:
+        return q.get_nowait()
+    except Exception:
+        return "(代码执行成功，无输出)"
 
 
 @tool(args_schema=_RunCodeInput)
 def run_code(code: str, timeout: int = 5) -> str:
     """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
-    return _safe_run_code(code, min(timeout, 10))
+    return _safe_run_code(code, timeout)
 
 
 # ===== 文本摘要工具 =====
@@ -253,7 +380,7 @@ def summarize_text(text: str, max_length: int = 200) -> str:
 
 
 def _get_ws() -> Workspace | None:
-    """获取当前 Agent 运行的工作空间（通过线程本地变量）。"""
+    """获取当前 Agent 运行的工作空间（通过 ContextVar）。"""
     name = get_current_workspace_name()
     if name:
         return _workspace_mgr.get(name)

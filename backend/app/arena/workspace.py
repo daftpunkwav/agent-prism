@@ -33,7 +33,6 @@ class WorkspaceFile:
 
     path: str
     content: str = ""
-    created_at: str = ""
 
 
 @dataclass
@@ -42,15 +41,19 @@ class Workspace:
 
     name: str
     files: dict[str, WorkspaceFile] = field(default_factory=dict)
-    created_at: str = ""
 
     def _normalize(self, path: str) -> str:
-        """规范化路径，防止目录遍历。返回空串表示非法。"""
+        """规范化路径，防止目录遍历与控制字符注入。返回空串表示非法。"""
+        if not isinstance(path, str):
+            return ""
         path = path.strip()
         if not path or path.startswith("/") or path.startswith("\\"):
             return ""
+        # 拒绝空字节与其他控制字符 — Windows 上 normpath 会静默剥离 \x00
+        if any(ord(c) < 0x20 for c in path):
+            return ""
         normalized = os.path.normpath(path).replace("\\", "/")
-        # 拒绝向上遍历
+        # 拒绝向上遍历与单点
         if normalized in ("..", "../", ".") or normalized.startswith("../"):
             return ""
         # 移除可能的前导 ./
