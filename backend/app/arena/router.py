@@ -16,6 +16,38 @@ DEFAULT_BASE: dict = {
     "prompt_version": "v1.0.0",
 }
 
+# 每个维度下可选项的元组 (字段名, 取值, 显示标签)
+DIMENSION_OPTIONS: dict[DimensionId, list[tuple[str, str, str]]] = {
+    "framework": [
+        ("framework", "langchain", "LangChain"),
+        ("framework", "langgraph", "LangGraph"),
+    ],
+    "prompt": [
+        ("prompt_profile", "zero_shot", "Zero-shot"),
+        ("prompt_profile", "few_shot", "Few-shot"),
+        ("prompt_profile", "cot_prompt", "CoT Prompt"),
+        ("prompt_profile", "structured", "Structured"),
+    ],
+    "reasoning": [
+        ("reasoning", "react", "ReAct"),
+        ("reasoning", "cot_tool", "CoT+Tool"),
+        ("reasoning", "tot", "ToT"),
+        ("reasoning", "reflexion", "Reflexion"),
+    ],
+    "context": [
+        ("context", "sliding", "滑动窗口"),
+        ("context", "summary", "摘要压缩"),
+        ("context", "vector", "向量检索"),
+        ("context", "hybrid", "混合策略"),
+    ],
+    "harness": [
+        ("harness", "bare", "裸运行"),
+        ("harness", "verify", "验证循环"),
+        ("harness", "reflect", "反思循环"),
+        ("harness", "self_evolve", "自进化"),
+    ],
+}
+
 
 @lru_cache(maxsize=1)
 def _cached_provider() -> ProviderConfig:
@@ -34,46 +66,47 @@ def _base(**overrides) -> PipelineConfig:
     return PipelineConfig(**data)
 
 
-class DimensionRouter:
-    def route(self, dimension: DimensionId) -> list[PipelineConfig]:
-        if dimension == "framework":
-            return [
-                _base(framework="langchain", label="LangChain"),
-                _base(framework="langgraph", label="LangGraph"),
-            ]
-        if dimension == "prompt":
-            profiles: list[tuple[PromptProfile, str]] = [
-                ("zero_shot", "Zero-shot"),
-                ("few_shot", "Few-shot"),
-                ("cot_prompt", "CoT Prompt"),
-                ("structured", "Structured"),
-            ]
-            return [_base(prompt_profile=p, label=label) for p, label in profiles]
-        if dimension == "reasoning":
-            return [
-                _base(reasoning="react", label="ReAct"),
-                _base(reasoning="cot_tool", label="CoT+Tool"),
-                _base(reasoning="tot", label="ToT"),
-                _base(reasoning="reflexion", label="Reflexion"),
-            ]
-        if dimension == "context":
-            return [
-                _base(context="sliding", label="滑动窗口"),
-                _base(context="summary", label="摘要压缩"),
-                _base(context="vector", label="向量检索"),
-                _base(context="hybrid", label="混合策略"),
-            ]
-        if dimension == "harness":
-            return [
-                _base(harness="bare", label="裸运行"),
-                _base(harness="verify", label="验证循环"),
-                _base(harness="reflect", label="反思循环"),
-                _base(harness="self_evolve", label="自进化"),
-            ]
-        raise ValueError(f"未知维度: {dimension}")
+def list_dimension_options(dimension: DimensionId) -> list[dict[str, str]]:
+    """返回维度下所有可选项，供前端 checkbox 渲染。"""
+    return [
+        {"field": field, "value": value, "label": label}
+        for field, value, label in DIMENSION_OPTIONS.get(dimension, [])
+    ]
 
-    def column_count(self, dimension: DimensionId) -> int:
-        return len(self.route(dimension))
+
+class DimensionRouter:
+    def route(
+        self,
+        dimension: DimensionId,
+        selections: list[str] | None = None,
+    ) -> list[PipelineConfig]:
+        """根据维度 + 用户多选子项生成 PipelineConfig 列表。
+
+        selections: 该维度下用户选中的 value 列表；None/空 表示选全部。
+        至少返回 2 个 PipelineConfig，否则抛 ValueError。
+        """
+        options = DIMENSION_OPTIONS.get(dimension)
+        if options is None:
+            raise ValueError(f"未知维度: {dimension}")
+
+        chosen = selections if selections else [value for _, value, _ in options]
+        if len(chosen) < 2:
+            raise ValueError(f"维度「{dimension}」至少需选择 2 个对比项，当前 {len(chosen)} 个")
+
+        # 用 dict 保留用户传入顺序，便于稳定列序
+        by_value = {value: (field, label) for field, value, label in options}
+        configs: list[PipelineConfig] = []
+        for value in chosen:
+            if value not in by_value:
+                raise ValueError(f"维度「{dimension}」不支持的子项: {value}")
+            field, label = by_value[value]
+            configs.append(_base(**{field: value}, label=label))
+        return configs
+
+    def column_count(
+        self, dimension: DimensionId, selections: list[str] | None = None
+    ) -> int:
+        return len(self.route(dimension, selections))
 
     def is_mvp_ready(self, dimension: DimensionId) -> bool:
         """保留向后兼容：当前 MVP 已支持全部 5 个维度。"""
