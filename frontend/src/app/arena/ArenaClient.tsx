@@ -197,7 +197,11 @@ export function ArenaClient() {
   };
 
   const cancelRun = useCallback(() => {
-    abortRef.current?.abort();
+    const ac = abortRef.current;
+    // AbortController 仅可 abort 一次：重复调用会抛 InvalidStateError。
+    if (ac && !ac.signal.aborted) {
+      ac.abort();
+    }
     setRunning(false);
   }, []);
 
