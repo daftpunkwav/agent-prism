@@ -54,8 +54,11 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
   const pendingRef = useRef<ExperimentParams | null>(null);
 
   useEffect(() => {
-    fetchProvider()
+    // 组件卸载时取消 in-flight 请求，避免 setState on unmounted
+    const ac = new AbortController();
+    fetchProvider({ signal: ac.signal })
       .then((cfg) => {
+        if (ac.signal.aborted) return;
         setConfig(cfg);
         setPending({
           temperature: cfg.temperature,
@@ -65,7 +68,14 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
           max_tokens: cfg.max_output_tokens,
         });
       })
-      .finally(() => setLoading(false));
+      .catch((err: Error) => {
+        if (err.name === "AbortError") return;
+        setError(true);
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setLoading(false);
+      });
+    return () => ac.abort();
   }, []);
 
   // 仅在 columnCount 变化时重算预估（config 不参与 token 估算）
@@ -80,11 +90,11 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
     setSaving(true);
     setError(false);
     try {
+      // saveProvider 在 lib/api.ts 内部剥离 api_key — 调用方无需关心
       const saved = await saveProvider({
         ...config,
         ...params,
         max_output_tokens: params.max_tokens,
-        api_key: "",
       });
       setConfig(saved);
       setPending({
@@ -218,9 +228,7 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
           step={64}
           value={params.max_tokens}
           onChange={(e) => updateParam("max_tokens", clamp(parseInt(e.target.value, 10) || 0, 64, 128000))}
-          onMouseUp={flushParams}
-          onTouchEnd={flushParams}
-          onKeyUp={flushParams}
+          onPointerUp={flushParams}
           aria-label="Max Tokens"
           className="w-full h-1.5 appearance-none bg-border rounded-full cursor-pointer
             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
@@ -321,9 +329,7 @@ function ParamSlider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        onMouseUp={onCommit}
-        onTouchEnd={onCommit}
-        onKeyUp={onCommit}
+        onPointerUp={onCommit}
         aria-label={label}
         title={hint}
         className="w-full h-1.5 appearance-none bg-border rounded-full cursor-pointer

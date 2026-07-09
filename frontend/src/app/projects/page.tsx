@@ -127,6 +127,7 @@ export default function ProjectsPage() {
                     className="btn-ghost !h-8 !px-2 text-[10px]"
                     onClick={() => onDelete(project.id)}
                     disabled={deleting === project.id}
+                    aria-label={`删除项目 ${project.name}`}
                   >
                     {deleting === project.id ? (
                       <div className="h-3 w-3 border border-foreground/30 border-t-foreground rounded-full animate-spin" />

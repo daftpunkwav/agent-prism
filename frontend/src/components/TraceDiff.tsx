@@ -23,7 +23,8 @@ function alignTraces(columns: Array<{ label: string; events: ArenaEvent[] }>): A
   for (const col of columns) {
     for (const ev of col.events) {
       if (ev.type === "complete" || ev.type === "token_update" || ev.type === "error") continue;
-      const step = ev.step ?? 0;
+      // 判别联合：只对带 step 的事件类型读取 step
+      const step = "step" in ev ? (ev.step ?? 0) : 0;
       const text = getEventText(ev);
       const key = step;
 

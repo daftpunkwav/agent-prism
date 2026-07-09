@@ -25,6 +25,7 @@ import {
   ArenaMeta,
   DimensionId,
   DimensionOption,
+  PipelineMetrics,
   TokenStats,
   fetchArenaMeta,
   streamArenaRun,
@@ -33,8 +34,9 @@ import {
 type ColumnState = {
   label: string;
   events: ArenaEvent[];
-  metrics?: ArenaEvent["metrics"];
+  metrics?: PipelineMetrics;
   tokenStats?: TokenStats;
+  workspace?: string;
   error?: string;
 };
 
@@ -46,7 +48,7 @@ const TASK_TEMPLATES = [
   "获取当前时间，并计算距离午夜的分钟数",
 ];
 
-function metricsToTokenStats(m: NonNullable<ArenaEvent["metrics"]>): TokenStats {
+function metricsToTokenStats(m: PipelineMetrics): TokenStats {
   return {
     input_tokens: m.input_tokens,
     output_tokens: m.output_tokens,
@@ -264,14 +266,14 @@ export function ArenaClient() {
   const [mainTab, setMainTab] = useState<MainTab>("results");
   const abortRef = useRef<AbortController | null>(null);
 
-  // 活跃 workspace 名称：第一个已完成/进行中的 label
+  // 活跃 workspace 名称：直接从后端返回的 col.workspace 读取（后端在 complete
+  // / token_update 事件中带 workspace 字段），无需前端猜测后缀。
   const activeWorkspace = useMemo(() => {
     const cols = Object.values(columns);
     if (cols.length === 0) return null;
-    const completed = cols.find((c) => c.tokenStats);
-    if (completed) return `${completed.label}_`;
-    const first = cols[0];
-    return first ? `${first.label}_` : null;
+    const completed = cols.find((c) => c.workspace);
+    if (completed?.workspace) return completed.workspace;
+    return cols[0]?.workspace ?? null;
   }, [columns]);
 
   useEffect(() => {
@@ -287,6 +289,13 @@ export function ArenaClient() {
         if (!ac.signal.aborted) setMetaLoading(false);
       });
     return () => ac.abort();
+  }, []);
+
+  // 组件卸载时取消 in-flight Arena 运行，防止 setState on unmounted
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
   }, []);
 
   const activeDim = useMemo(
@@ -327,19 +336,24 @@ export function ArenaClient() {
       const col = prev[label] ?? { label, events: [] };
       const next = { ...col };
 
-      if (event.type === "token_update" && event.token_stats) {
-        next.tokenStats = event.token_stats as TokenStats;
+      if (event.type === "token_update") {
+        next.tokenStats = { ...event.token_stats };
+        if (event.workspace) next.workspace = event.workspace;
+      } else if (event.type === "complete") {
+        if (event.metrics) {
+          next.metrics = event.metrics;
+          next.tokenStats = event.token_stats
+            ? { ...event.token_stats }
+            : metricsToTokenStats(event.metrics);
+        }
+        if (event.workspace) next.workspace = event.workspace;
+        // complete 事件不追加到 events 列表（避免 TraceView 渲染空 segment）
+      } else if (event.type === "error") {
+        next.error = event.message || "运行错误";
+        next.events = [...col.events, event];
       } else {
         next.events = [...col.events, event];
       }
-
-      if (event.type === "complete" && event.metrics) {
-        next.metrics = event.metrics;
-        next.tokenStats = event.token_stats
-          ? ({ ...event.token_stats } as TokenStats)
-          : metricsToTokenStats(event.metrics);
-      }
-      if (event.type === "error") next.error = event.message;
 
       return { ...prev, [label]: next };
     });
@@ -563,6 +577,7 @@ export function ArenaClient() {
                   type="button"
                   className="btn-ghost !h-6 !px-1.5 shrink-0"
                   onClick={() => setShowPromptBanner(false)}
+                  aria-label="关闭提示"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -576,7 +591,11 @@ export function ArenaClient() {
         {/* ===== 中间：Tab 切换 + 内容（独立滚动） ===== */}
         <main className="flex-1 min-w-0 flex flex-col min-h-0">
           {/* Tab 栏 */}
-          <div className="flex items-center gap-1 border-b border-border mb-3 shrink-0">
+          <div
+            role="tablist"
+            aria-label="Arena 视图切换"
+            className="flex items-center gap-1 border-b border-border mb-3 shrink-0"
+          >
             <MainTabButton
               active={mainTab === "results"}
               onClick={() => setMainTab("results")}
@@ -590,6 +609,7 @@ export function ArenaClient() {
               icon={<BarChart3 className="h-3.5 w-3.5" />}
               label="对比报告"
               disabled={!hasMetrics}
+              disabledReason="至少有一条 Pipeline 完成后才能查看报告"
               badge={hasMetrics ? columnList.filter((c) => c.metrics).length : null}
             />
             <MainTabButton
@@ -598,6 +618,7 @@ export function ArenaClient() {
               icon={<GitCompare className="h-3.5 w-3.5" />}
               label="Trace 对比"
               disabled={!allCompleted}
+              disabledReason="所有 Pipeline 完成后才能对比"
             />
           </div>
 
@@ -664,7 +685,12 @@ export function ArenaClient() {
             disabled={running}
           />
           {running ? (
-            <button type="button" className="btn-ghost shrink-0" onClick={cancelRun}>
+            <button
+              type="button"
+              className="btn-ghost shrink-0"
+              onClick={cancelRun}
+              aria-label="停止 Arena 运行"
+            >
               <Square className="h-4 w-4" />
               停止
             </button>
@@ -673,6 +699,13 @@ export function ArenaClient() {
               type="button"
               className="btn-primary shrink-0"
               disabled={!question.trim() || activeSelections.length < 2}
+              title={
+                !question.trim()
+                  ? "请输入问题"
+                  : activeSelections.length < 2
+                    ? "至少选择 2 个对比项"
+                    : undefined
+              }
               onClick={runArena}
             >
               <Send className="h-4 w-4" />
@@ -688,21 +721,22 @@ export function ArenaClient() {
           type="button"
           className="btn-ghost !h-8 !w-8 !p-0"
           onClick={() => setShowLeftPanel(!showLeftPanel)}
+          aria-label={showLeftPanel ? "隐藏左侧维度栏" : "显示左侧维度栏"}
+          aria-expanded={showLeftPanel}
           title={showLeftPanel ? "隐藏左侧维度栏" : "显示左侧维度栏"}
         >
           {showLeftPanel ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
         </button>
-        {/* 右侧栏按钮：移动端展开 + 桌面端展开 */}
-        {(!showRightPanel || true) && (
-          <button
-            type="button"
-            className="btn-ghost !h-8 !w-8 !p-0"
-            onClick={() => setShowRightPanel(!showRightPanel)}
-            title={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
-          >
-            {showRightPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-          </button>
-        )}
+        <button
+          type="button"
+          className="btn-ghost !h-8 !w-8 !p-0"
+          onClick={() => setShowRightPanel(!showRightPanel)}
+          aria-label={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
+          aria-expanded={showRightPanel}
+          title={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
+        >
+          {showRightPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+        </button>
       </div>
     </div>
   );
@@ -714,6 +748,7 @@ function MainTabButton({
   icon,
   label,
   disabled,
+  disabledReason,
   badge,
 }: {
   active: boolean;
@@ -721,13 +756,18 @@ function MainTabButton({
   icon: React.ReactNode;
   label: string;
   disabled?: boolean;
+  disabledReason?: string;
   badge?: number | string | null;
 }) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
+      aria-disabled={disabled}
       onClick={onClick}
       disabled={disabled}
+      title={disabled ? disabledReason : undefined}
       className="relative inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors data-[active=true]:text-foreground data-[active=false]:text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
       data-active={active}
     >

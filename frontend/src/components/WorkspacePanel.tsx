@@ -45,47 +45,69 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
   const [showNewFile, setShowNewFile] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // 当前 workspace 的 fetch 控制器，切换 workspace 时取消上一轮未完成的请求
-  const fetchAbortRef = useRef<AbortController | null>(null);
+  // 文件列表轮询与单文件读取各用一个 AbortController，互不干扰
+  const listAbortRef = useRef<AbortController | null>(null);
+  const readAbortRef = useRef<AbortController | null>(null);
+  // toast 定时器 — unmount 时清除，避免 setState on unmounted
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flashToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 2500);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
   };
 
-  // 切换 workspace 时取消上一轮 polling
+  // 卸载时取消所有 in-flight 请求 + toast 定时器
   useEffect(() => {
     return () => {
-      fetchAbortRef.current?.abort();
-      fetchAbortRef.current = null;
+      listAbortRef.current?.abort();
+      readAbortRef.current?.abort();
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // 切换 workspace 时取消上一轮 polling 与文件读取
+  useEffect(() => {
+    return () => {
+      listAbortRef.current?.abort();
+      listAbortRef.current = null;
+      readAbortRef.current?.abort();
+      readAbortRef.current = null;
     };
   }, [workspaceName]);
 
-  const newAbort = useCallback(() => {
-    fetchAbortRef.current?.abort();
+  const newListAbort = useCallback(() => {
+    listAbortRef.current?.abort();
     const ac = new AbortController();
-    fetchAbortRef.current = ac;
+    listAbortRef.current = ac;
+    return ac.signal;
+  }, []);
+
+  const newReadAbort = useCallback(() => {
+    readAbortRef.current?.abort();
+    const ac = new AbortController();
+    readAbortRef.current = ac;
     return ac.signal;
   }, []);
 
   const loadFiles = useCallback(async () => {
     if (!workspaceName) return;
     try {
-      const files = await listWorkspaceFiles(workspaceName, newAbort());
+      const files = await listWorkspaceFiles(workspaceName, newListAbort());
       setFiles(files);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         // 静默：轮询失败不打扰用户
       }
     }
-  }, [workspaceName, newAbort]);
+  }, [workspaceName, newListAbort]);
 
   const loadFile = useCallback(
     async (path: string) => {
       if (!workspaceName) return;
       setLoading(true);
       try {
-        const text = await readWorkspaceFile(workspaceName, path, newAbort());
+        const text = await readWorkspaceFile(workspaceName, path, newReadAbort());
         setContent(text);
         setEditContent(text);
       } catch (err) {
@@ -96,14 +118,14 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
         setLoading(false);
       }
     },
-    [workspaceName, newAbort],
+    [workspaceName, newReadAbort],
   );
 
   const saveFile = useCallback(async () => {
     if (!workspaceName || !selectedFile) return;
     setSaving(true);
     try {
-      await saveWorkspaceFile(workspaceName, selectedFile, editContent, false, newAbort());
+      await saveWorkspaceFile(workspaceName, selectedFile, editContent, false, newReadAbort());
       setContent(editContent);
       setEditing(false);
       flashToast("已保存");
@@ -115,13 +137,13 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
     } finally {
       setSaving(false);
     }
-  }, [workspaceName, selectedFile, editContent, loadFiles, newAbort]);
+  }, [workspaceName, selectedFile, editContent, loadFiles, newReadAbort]);
 
   const createFile = useCallback(async () => {
     if (!workspaceName || !newFileName.trim()) return;
     const path = newFileName.trim();
     try {
-      await saveWorkspaceFile(workspaceName, path, "", true, newAbort());
+      await saveWorkspaceFile(workspaceName, path, "", true, newReadAbort());
       flashToast(`已创建: ${path}`);
       setNewFileName("");
       setShowNewFile(false);
@@ -133,14 +155,14 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
         flashToast(`创建失败: ${(err as Error).message}`);
       }
     }
-  }, [workspaceName, newFileName, loadFiles, loadFile, newAbort]);
+  }, [workspaceName, newFileName, loadFiles, loadFile, newReadAbort]);
 
   const deleteFile = useCallback(
     async (path: string) => {
       if (!workspaceName) return;
       if (!confirm(`删除文件 ${path}？`)) return;
       try {
-        await deleteWorkspaceFile(workspaceName, path, newAbort());
+        await deleteWorkspaceFile(workspaceName, path, newReadAbort());
         flashToast("已删除");
         if (selectedFile === path) {
           setSelectedFile(null);
@@ -153,7 +175,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
         }
       }
     },
-    [workspaceName, selectedFile, loadFiles, newAbort],
+    [workspaceName, selectedFile, loadFiles, newReadAbort],
   );
 
   useEffect(() => {
@@ -211,6 +233,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
               type="button"
               className="text-muted-foreground hover:text-foreground p-0.5"
               onClick={() => setShowNewFile(!showNewFile)}
+              aria-label="新建文件"
               title="新建文件"
             >
               <Plus className="h-3 w-3" />
@@ -219,6 +242,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
               type="button"
               className="text-muted-foreground hover:text-foreground p-0.5"
               onClick={loadFiles}
+              aria-label="刷新文件列表"
               title="刷新"
             >
               <RefreshCw className="h-3 w-3" />
@@ -308,8 +332,10 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
                       onClick={() => {
                         setEditContent(content);
                         setEditing(true);
-                        setTimeout(() => textareaRef.current?.focus(), 50);
+                        // requestAnimationFrame 等 DOM 更新后再 focus
+                        requestAnimationFrame(() => textareaRef.current?.focus());
                       }}
+                      aria-label="编辑文件"
                       title="编辑"
                     >
                       <Edit3 className="h-3 w-3" />
@@ -318,6 +344,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
                       type="button"
                       className="btn-ghost !h-7 !px-2 text-[10px]"
                       onClick={() => selectedFile && deleteFile(selectedFile)}
+                      aria-label="删除文件"
                       title="删除"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -328,6 +355,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
                   type="button"
                   className="btn-ghost !h-7 !px-2 text-[10px]"
                   onClick={() => setSelectedFile(null)}
+                  aria-label="关闭文件"
                   title="关闭"
                 >
                   <X className="h-3 w-3" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -31,7 +31,8 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
   const segs: DisplaySegment[] = [];
   // 用 `${type}:${step}` 作 key，thought_delta 同 step 累积到既有段
   for (const ev of events) {
-    const step = ev.step ?? 0;
+    // 判别联合：只有带 step 的事件类型才能取 step
+    const step = "step" in ev ? (ev.step ?? 0) : 0;
     const key = `${ev.type}:${step}`;
     if (ev.type === "thought") {
       segs.push({
@@ -124,16 +125,14 @@ export function TraceView({
   colorIndex?: number;
 }) {
   const accentColor = COLUMN_COLORS[colorIndex % COLUMN_COLORS.length] ?? "var(--chart-1)";
-  const segments = mergeEvents(events);
+  // 用 useMemo 缓存 — events 引用未变时（父组件其它 state 更新）不重算
+  const segments = useMemo(() => mergeEvents(events), [events]);
 
   // 实时跟随:若有未完成 thought,容器自动滚到底部
   const containerRef = useRef<HTMLDivElement | null>(null);
-  // 用 state 触发滚动 — 增量累积导致 segments 引用变化时会更新
-  const [tick, setTick] = useState(0);
 
-  // 当 segments 变化且有未完成段,触发 tick + 滚到底部
+  // 当 segments 变化且有未完成段,触发滚到底部
   useEffect(() => {
-    setTick((x) => x + 1);
     const c = containerRef.current;
     if (!c) return;
     const hasStreaming = segments.some((s) => !s.completed);

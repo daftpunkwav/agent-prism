@@ -28,7 +28,14 @@ export default function SettingsPage() {
     max_output_tokens: 2048,
   });
   const abortRef = useRef<AbortController | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     // 组件卸载时取消 in-flight 请求，避免 setState on unmounted
@@ -65,7 +72,8 @@ export default function SettingsPage() {
 
   const flash = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3200);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3200);
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -160,11 +168,14 @@ export default function SettingsPage() {
               placeholder="留空则保持已保存的 Key"
               value={form.api_key}
               onChange={(e) => setForm({ ...form, api_key: e.target.value })}
+              autoComplete="off"
             />
             <button
               type="button"
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
               onClick={() => setShowKey(!showKey)}
+              aria-label={showKey ? "隐藏 API Key" : "显示 API Key"}
+              aria-pressed={showKey}
             >
               {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
