@@ -10,7 +10,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.adapters.common import get_workspace_mgr
 from app.arena.project import get_project_manager
-from app.arena.router import DimensionRouter, list_dimension_options
+from app.arena.router import list_dimension_options
 from app.arena.runner import RunnerPool, build_registry
 from app.models import ArenaRunRequest, ProjectCreate
 

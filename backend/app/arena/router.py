@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from app.config import ProviderConfig, load_provider_config
-from app.models import DimensionId, PipelineConfig, PromptProfile
+from app.models import DimensionId, PipelineConfig
 
 DEFAULT_BASE: dict = {
     "framework": "langgraph",
