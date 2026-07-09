@@ -8,10 +8,6 @@ import json
 from fastapi import APIRouter, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 
-from app.adapters.base import FrameworkAdapterRegistry
-from app.adapters.common import get_workspace_mgr
-from app.arena.project import get_project_manager
-from app.arena.router import DimensionRouter
 from app.arena.runner import RunnerPool, build_registry
 from app.arena.workspace import WorkspaceManager
 from app.models import ArenaRunRequest, ProjectCreate
@@ -25,7 +21,7 @@ _ws_mgr: WorkspaceManager = get_workspace_mgr()
 
 @router.get("/meta")
 async def arena_meta():
-    registry: FrameworkAdapterRegistry = build_registry()
+    # 复用 RunnerPool 中的 registry，避免每个请求都重建适配器实例。
     return {
         "dimensions": [
             {
@@ -64,7 +60,7 @@ async def arena_meta():
                 "mvp": True,
             },
         ],
-        "frameworks": registry.list_available() + registry.list_reserved(),
+        "frameworks": _pool.registry.list_available() + _pool.registry.list_reserved(),
     }
 
 
