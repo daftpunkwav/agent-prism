@@ -81,10 +81,7 @@ def _base(**overrides) -> PipelineConfig:
 
 def list_dimension_options(dimension: DimensionId) -> list[dict[str, str]]:
     """返回维度下所有可选项，供前端 checkbox 渲染。"""
-    return [
-        {"field": field, "value": value, "label": label}
-        for field, value, label in DIMENSION_OPTIONS.get(dimension, [])
-    ]
+    return [{"field": field, "value": value, "label": label} for field, value, label in DIMENSION_OPTIONS.get(dimension, [])]
 
 
 class DimensionRouter:
@@ -115,9 +112,7 @@ class DimensionRouter:
             configs.append(_base(**{field: value}, label=label))
         return configs
 
-    def column_count(
-        self, dimension: DimensionId, selections: list[str] | None = None
-    ) -> int:
+    def column_count(self, dimension: DimensionId, selections: list[str] | None = None) -> int:
         return len(self.route(dimension, selections))
 
     def is_mvp_ready(self, dimension: DimensionId) -> bool:

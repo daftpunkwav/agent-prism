@@ -79,8 +79,11 @@ export interface ArenaEvent {
   token_stats?: TokenStats;
 }
 
-export async function fetchArenaMeta(): Promise<ArenaMeta> {
-  const res = await fetch(`${API_BASE}/api/arena/meta`, { cache: "no-store" });
+export async function fetchArenaMeta(options?: { signal?: AbortSignal }): Promise<ArenaMeta> {
+  const res = await fetch(`${API_BASE}/api/arena/meta`, {
+    cache: "no-store",
+    signal: options?.signal,
+  });
   if (!res.ok) throw new Error("无法加载 Arena 元数据");
   return res.json();
 }

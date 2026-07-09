@@ -182,9 +182,7 @@ def _safe_run_code(code: str, timeout: int = 5) -> str:
     safe_ns = {
         "__builtins__": {
             # 支持 print(*objects, sep, end, file, flush) 全签名
-            "print": lambda *args, sep=" ", end="\n", file=None, flush=False: (
-                captured.write(sep.join(str(a) for a in args) + end)
-            ),
+            "print": lambda *args, sep=" ", end="\n", file=None, flush=False: captured.write(sep.join(str(a) for a in args) + end),
             "len": len,
             "range": range,
             "str": str,
