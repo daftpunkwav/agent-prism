@@ -52,9 +52,7 @@ class LangGraphAdapter:
         # Harness Runner — 真正跑 verify/reflect/self_evolve 循环
         harness_runner = HarnessRunner(level=config.harness)
         try:
-            system, user = build_messages(
-                question, config.prompt_profile, config.reasoning, config.harness
-            )
+            system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
             tracker.seed_prompt(system, user)
             yield token_update_event(label, tracker)
 
@@ -171,10 +169,7 @@ class LangGraphAdapter:
                     last_msg = messages_list[-1]
                     answer = getattr(last_msg, "content", str(last_msg))
                     if isinstance(answer, list):
-                        answer = " ".join(
-                            b.get("thinking", b.get("text", "")) if isinstance(b, dict) else str(b)
-                            for b in answer
-                        )
+                        answer = " ".join(b.get("thinking", b.get("text", "")) if isinstance(b, dict) else str(b) for b in answer)
                     answer_text = str(answer)[:2000]
                     passed, reason = verify_result(question, answer_text)
                     yield ArenaEvent(

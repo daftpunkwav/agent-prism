@@ -4,13 +4,21 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.arena.llm import create_chat_model
+from app.arena.types import HarnessLevel
 
-HarnessLevel = Literal["bare", "verify", "reflect", "self_evolve"]
+__all__ = [
+    "HarnessLevel",
+    "verify_result",
+    "reflect_on_failure",
+    "propose_harness_edit",
+    "HarnessRunner",
+    "apply_harness_level",
+    "get_harness_description",
+]
 
 # 去除 LLM 输出中常见的 ```json ... ``` 或 ``` ... ``` 代码块包裹
 _JSON_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)

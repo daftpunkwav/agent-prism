@@ -7,6 +7,8 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from app.adapters.common import get_workspace_mgr
 from app.models import Project, ProjectCreate
 
@@ -17,10 +19,9 @@ PROJECTS_FILE = DATA_DIR / "projects.json"
 
 
 def _generate_project_id() -> str:
-    """生成唯一项目 ID；同毫秒创建多个项目时追加纳秒避免冲突。"""
+    """生成唯一项目 ID；同毫秒创建多个项目时追加微秒避免冲突。"""
     now = datetime.now(timezone.utc)
-    base = f"proj_{now.strftime('%Y%m%d_%H%M%S')}_{now.microsecond:06d}"
-    return base
+    return f"proj_{now.strftime('%Y%m%d_%H%M%S')}_{now.microsecond:06d}"
 
 
 class ProjectManager:
@@ -39,7 +40,7 @@ class ProjectManager:
         for p in data:
             try:
                 self._projects[p["id"]] = Project(**p)
-            except Exception as exc:  # noqa: BLE001
+            except (ValidationError, KeyError, TypeError) as exc:
                 logger.warning("跳过无效项目记录 %s: %s", p.get("id"), exc)
 
     def _save(self) -> None:

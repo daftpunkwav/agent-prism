@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from app.arena.types import DimensionId
 from app.config import ProviderConfig, load_provider_config
-from app.models import DimensionId, PipelineConfig
+from app.models import PipelineConfig
 
+# 流水线默认值（控制变量法的基线）
 DEFAULT_BASE: dict = {
     "framework": "langgraph",
     "reasoning": "react",
@@ -48,11 +50,22 @@ DIMENSION_OPTIONS: dict[DimensionId, list[tuple[str, str, str]]] = {
     ],
 }
 
+# 支持的维度集合（用于 API 校验）
+SUPPORTED_DIMENSIONS: frozenset[DimensionId] = frozenset(DIMENSION_OPTIONS.keys())
+
 
 @lru_cache(maxsize=1)
 def _cached_provider() -> ProviderConfig:
-    """单次请求内复用 provider 配置，避免每列重建 PipelineConfig 时重复读 JSON。"""
+    """单次请求内复用 provider 配置，避免每列重建 PipelineConfig 时重复读 JSON。
+
+    Provider 设置更新时应调用 :func:`_invalidate_provider_cache`。
+    """
     return load_provider_config()
+
+
+def invalidate_provider_cache() -> None:
+    """Provider 配置更新后显式失效缓存。供 settings API 调用。"""
+    _cached_provider.cache_clear()
 
 
 def _base(**overrides) -> PipelineConfig:
@@ -68,10 +81,7 @@ def _base(**overrides) -> PipelineConfig:
 
 def list_dimension_options(dimension: DimensionId) -> list[dict[str, str]]:
     """返回维度下所有可选项，供前端 checkbox 渲染。"""
-    return [
-        {"field": field, "value": value, "label": label}
-        for field, value, label in DIMENSION_OPTIONS.get(dimension, [])
-    ]
+    return [{"field": field, "value": value, "label": label} for field, value, label in DIMENSION_OPTIONS.get(dimension, [])]
 
 
 class DimensionRouter:
@@ -93,7 +103,6 @@ class DimensionRouter:
         if len(chosen) < 2:
             raise ValueError(f"维度「{dimension}」至少需选择 2 个对比项，当前 {len(chosen)} 个")
 
-        # 用 dict 保留用户传入顺序，便于稳定列序
         by_value = {value: (field, label) for field, value, label in options}
         configs: list[PipelineConfig] = []
         for value in chosen:
@@ -103,11 +112,9 @@ class DimensionRouter:
             configs.append(_base(**{field: value}, label=label))
         return configs
 
-    def column_count(
-        self, dimension: DimensionId, selections: list[str] | None = None
-    ) -> int:
+    def column_count(self, dimension: DimensionId, selections: list[str] | None = None) -> int:
         return len(self.route(dimension, selections))
 
     def is_mvp_ready(self, dimension: DimensionId) -> bool:
-        """保留向后兼容：当前 MVP 已支持全部 5 个维度。"""
-        return dimension in ("framework", "prompt", "reasoning", "context", "harness")
+        """兼容保留：所有 5 个维度在 MVP 中均已支持。"""
+        return dimension in SUPPORTED_DIMENSIONS

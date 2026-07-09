@@ -40,18 +40,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # 请求体大小限制中间件（防止超大请求）
-MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10MB
-
-
 @app.middleware("http")
 async def limit_request_size(request: Request, call_next):
+    max_bytes = app_settings.max_request_size
     content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > MAX_REQUEST_SIZE:
+    if content_length and int(content_length) > max_bytes:
         logger.warning("拒绝超大请求: %s (%s bytes)", request.url.path, content_length)
         return JSONResponse(
             status_code=413,
-            content={"detail": f"请求体超过最大限制 ({MAX_REQUEST_SIZE // 1024 // 1024}MB)"},
+            content={"detail": f"请求体超过最大限制 ({max_bytes // 1024 // 1024}MB)"},
         )
     return await call_next(request)
 

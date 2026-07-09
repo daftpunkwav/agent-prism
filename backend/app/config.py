@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 from functools import cached_property
 from pathlib import Path
-from typing import Literal
 
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.arena.types import ApiFormat
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 PROVIDER_CONFIG_PATH = DATA_DIR / "provider_config.json"
@@ -25,11 +26,15 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://api.stepfun.com/step_plan"
     llm_model: str = "step-3.7-flash"
-    llm_api_format: Literal["anthropic_messages", "openai_chat"] = "anthropic_messages"
+    llm_api_format: ApiFormat = "anthropic_messages"
     llm_temperature: float = 0.0
     backend_host: str = "127.0.0.1"
+    # 默认 8000；若 8000 被占用可通过环境变量或启动参数覆盖
     backend_port: int = 8000
-    cors_origins: str = "http://localhost:3000"
+    # CORS 允许的前端 origin，逗号分隔
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # 请求体大小上限（字节），超过返回 413
+    max_request_size: int = 10 * 1024 * 1024
 
     @cached_property
     def cors_origin_list(self) -> list[str]:
@@ -48,7 +53,7 @@ class ProviderConfig(BaseModel):
     api_key: str = ""
     base_url: str = "https://api.stepfun.com/step_plan"
     use_full_url: bool = True
-    api_format: Literal["anthropic_messages", "openai_chat"] = "anthropic_messages"
+    api_format: ApiFormat = "anthropic_messages"
     auth_field: str = "ANTHROPIC_AUTH_TOKEN"
     model: str = "step-3.7-flash"
     temperature: float = 0.0

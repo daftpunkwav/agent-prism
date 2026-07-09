@@ -2,26 +2,32 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-DimensionId = Literal["framework", "prompt", "reasoning", "context", "harness"]
-PromptProfile = Literal["zero_shot", "few_shot", "cot_prompt", "structured"]
+from app.arena.types import (
+    ApiFormat,
+    DimensionId,
+    EventType,
+    HarnessLevel,
+    PromptProfile,
+)
 
-# EventType 增加 "thinking" 用于解析 Anthropic extended thinking 块
-EventType = Literal[
-    "thought",
-    "thought_delta",
-    "thought_end",
-    "action",
-    "observation",
-    "verify",
-    "reflect",
-    "complete",
-    "error",
-    "token_update",
-    "thinking",
+__all__ = [
+    "DimensionId",
+    "PromptProfile",
+    "EventType",
+    "PipelineConfig",
+    "ArenaRunRequest",
+    "PipelineMetrics",
+    "ArenaEvent",
+    "ProviderConfigPublic",
+    "ProviderConfigUpdate",
+    "ConnectionTestResult",
+    "Project",
+    "ProjectCreate",
+    "WorkspaceFileUpsert",
 ]
 
 
@@ -29,7 +35,7 @@ class PipelineConfig(BaseModel):
     framework: str = "langgraph"
     reasoning: str = "react"
     context: str = "sliding"
-    harness: str = "bare"
+    harness: HarnessLevel = "bare"
     prompt_profile: PromptProfile = "zero_shot"
     model_id: str = "step-3.7-flash"
     temperature: float = 0.0
@@ -104,7 +110,7 @@ class ProviderConfigUpdate(BaseModel):
     api_key: str = ""
     base_url: str = ""
     use_full_url: bool = True
-    api_format: Literal["anthropic_messages", "openai_chat"] = "anthropic_messages"
+    api_format: ApiFormat = "anthropic_messages"
     auth_field: str = "ANTHROPIC_AUTH_TOKEN"
     model: str = "step-3.7-flash"
     temperature: float = 0.0
@@ -132,7 +138,8 @@ class Project(BaseModel):
     dimension: str
     created_at: str
     results: list[dict] = Field(default_factory=list)
-    workspace_files: dict[str, str] = Field(default_factory=dict)
+    # workspace_files: {workspace_name: {file_path: content}} — 嵌套映射
+    workspace_files: dict[str, dict[str, str]] = Field(default_factory=dict)
     metrics_summary: dict[str, dict] = Field(default_factory=dict)
 
 
@@ -142,3 +149,11 @@ class ProjectCreate(BaseModel):
     dimension: str
     pipeline_labels: list[str]
     workspace_names: list[str] = Field(default_factory=list)
+
+
+class WorkspaceFileUpsert(BaseModel):
+    """工作空间文件保存请求体。"""
+
+    path: str = Field(min_length=1)
+    content: str = ""
+    create_only: bool = False

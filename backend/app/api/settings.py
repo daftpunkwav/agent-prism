@@ -5,6 +5,7 @@ from __future__ import annotations
 import anthropic
 from fastapi import APIRouter, HTTPException
 
+from app.arena.router import invalidate_provider_cache
 from app.config import ProviderConfig, load_provider_config, save_provider_config
 from app.models import (
     ConnectionTestResult,
@@ -58,6 +59,8 @@ async def update_provider(body: ProviderConfigUpdate) -> ProviderConfigPublic:
         data["api_key"] = current.api_key
     config = ProviderConfig(**data)
     save_provider_config(config)
+    # Provider 配置更新后，失效 router 缓存以避免使用旧 model/temperature
+    invalidate_provider_cache()
     return _to_public(config)
 
 

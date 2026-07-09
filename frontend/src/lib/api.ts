@@ -79,14 +79,20 @@ export interface ArenaEvent {
   token_stats?: TokenStats;
 }
 
-export async function fetchArenaMeta(): Promise<ArenaMeta> {
-  const res = await fetch(`${API_BASE}/api/arena/meta`, { cache: "no-store" });
+export async function fetchArenaMeta(options?: { signal?: AbortSignal }): Promise<ArenaMeta> {
+  const res = await fetch(`${API_BASE}/api/arena/meta`, {
+    cache: "no-store",
+    signal: options?.signal,
+  });
   if (!res.ok) throw new Error("无法加载 Arena 元数据");
   return res.json();
 }
 
-export async function fetchProvider(): Promise<ProviderConfig> {
-  const res = await fetch(`${API_BASE}/api/settings/provider`, { cache: "no-store" });
+export async function fetchProvider(options?: { signal?: AbortSignal }): Promise<ProviderConfig> {
+  const res = await fetch(`${API_BASE}/api/settings/provider`, {
+    cache: "no-store",
+    signal: options?.signal,
+  });
   if (!res.ok) throw new Error("无法加载 Provider 配置");
   return res.json();
 }
@@ -181,8 +187,8 @@ export interface ProjectCreate {
   workspace_names: string[];
 }
 
-export async function listProjects(): Promise<Project[]> {
-  const res = await fetch(`${API_BASE}/api/arena/projects`, { cache: "no-store" });
+export async function listProjects(signal?: AbortSignal): Promise<Project[]> {
+  const res = await fetch(`${API_BASE}/api/arena/projects`, { cache: "no-store", signal });
   if (!res.ok) throw new Error("加载项目失败");
   const data = await res.json();
   return data.projects || [];
@@ -203,4 +209,69 @@ export async function deleteProject(projectId: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("删除项目失败");
+}
+
+// ===== Workspace API =====
+
+export interface WorkspaceFileEntry {
+  path: string;
+  size: number;
+}
+
+export async function listWorkspaceFiles(workspaceName: string, signal?: AbortSignal): Promise<WorkspaceFileEntry[]> {
+  const res = await fetch(
+    `${API_BASE}/api/arena/workspace/${encodeURIComponent(workspaceName)}/files`,
+    { signal },
+  );
+  if (!res.ok) throw new Error("加载文件列表失败");
+  const data = await res.json();
+  return data.files || [];
+}
+
+export async function readWorkspaceFile(
+  workspaceName: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await fetch(
+    `${API_BASE}/api/arena/workspace/${encodeURIComponent(workspaceName)}/file?path=${encodeURIComponent(path)}`,
+    { signal },
+  );
+  if (!res.ok) throw new Error("读取文件失败");
+  const data = await res.json();
+  return data.content || "";
+}
+
+export async function saveWorkspaceFile(
+  workspaceName: string,
+  path: string,
+  content: string,
+  createOnly = false,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/arena/workspace/${encodeURIComponent(workspaceName)}/file`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, content, create_only: createOnly }),
+      signal,
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "保存失败" }));
+    throw new Error(err.detail || "保存失败");
+  }
+}
+
+export async function deleteWorkspaceFile(
+  workspaceName: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/arena/workspace/${encodeURIComponent(workspaceName)}/file?path=${encodeURIComponent(path)}`,
+    { method: "DELETE", signal },
+  );
+  if (!res.ok) throw new Error("删除文件失败");
 }

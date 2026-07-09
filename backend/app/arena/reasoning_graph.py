@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
 from app.arena.agent_state import AgentState
 from app.arena.llm import create_chat_model
 from app.arena.tools import ARENA_TOOLS
-
-ReasoningMode = Literal["react", "cot_tool", "tot", "reflexion"]
+from app.arena.types import ReasoningMode
 
 
 def _create_llm():

@@ -12,7 +12,7 @@ from app.adapters.common import get_workspace_mgr
 from app.arena.project import get_project_manager
 from app.arena.router import list_dimension_options
 from app.arena.runner import RunnerPool, build_registry
-from app.models import ArenaRunRequest, ProjectCreate
+from app.models import ArenaRunRequest, ProjectCreate, WorkspaceFileUpsert
 
 router = APIRouter(prefix="/api/arena", tags=["arena"])
 
@@ -107,22 +107,18 @@ async def workspace_file(workspace_name: str, path: str = Query(...)):
 
 
 @router.put("/workspace/{workspace_name}/file")
-async def workspace_save_file(workspace_name: str, body: dict):
+async def workspace_save_file(workspace_name: str, body: WorkspaceFileUpsert):
     """保存/创建工作空间中的文件"""
     ws = _ws_mgr.get(workspace_name)
     if ws is None:
         raise HTTPException(status_code=404, detail="工作空间不存在")
-    path = body.get("path", "").strip()
-    content = body.get("content", "")
-    if not path:
-        raise HTTPException(status_code=400, detail="文件路径不能为空")
-    if body.get("create_only"):
-        result = ws.create_file(path, content)
+    if body.create_only:
+        result = ws.create_file(body.path, body.content)
     else:
-        result = ws.write_file(path, content)
+        result = ws.write_file(body.path, body.content)
     if result.startswith("错误:"):
         raise HTTPException(status_code=400, detail=result)
-    return {"path": path, "message": result}
+    return {"path": body.path, "message": result}
 
 
 @router.delete("/workspace/{workspace_name}/file")
