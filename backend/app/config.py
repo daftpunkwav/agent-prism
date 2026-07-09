@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.arena.types import ApiFormat
+from app.storage import _atomic_write_json
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 PROVIDER_CONFIG_PATH = DATA_DIR / "provider_config.json"
@@ -82,8 +83,5 @@ def load_provider_config() -> ProviderConfig:
 
 
 def save_provider_config(config: ProviderConfig) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    PROVIDER_CONFIG_PATH.write_text(
-        config.model_dump_json(indent=2),
-        encoding="utf-8",
-    )
+    """原子写入 provider_config.json；旧版本备份到 provider_config.json.bak。"""
+    _atomic_write_json(PROVIDER_CONFIG_PATH, json.loads(config.model_dump_json()))
