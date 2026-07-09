@@ -109,6 +109,15 @@ cd frontend && npx tsc --noEmit
 
 详见 [CLAUDE.md](./CLAUDE.md)。
 
+## 最近改进
+
+- **后端现代化**:`@app.on_event("startup")` 迁移到 FastAPI `lifespan` 上下文管理器
+- **适配器修复**:LangGraph 适配器消除 list-of-1 闭包 hack,使用 `on_chain_end` 正确捕获最终 state 做 Harness 验证
+- **沙箱安全**:`run_code` 工具 stdout 重定向改为独立 StringIO,消除并发请求间的输出污染
+- **API 安全**:连接测试错误响应仅返回异常类型,避免泄露内部 endpoint/堆栈
+- **前端优化**:ExperimentPanel 温度调节改为 release 时保存,避免拖动每次触发 PUT 请求
+- **API 一致性**:Arena `/meta` 复用 RunnerPool 中的注册表,避免每请求重建适配器实例
+
 ## 路线图
 
 - [x] Phase 1: 双框架对比 + SSE 流式输出
