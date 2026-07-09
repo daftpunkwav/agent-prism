@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     backend_port: int = 8000
     # CORS 允许的前端 origin，逗号分隔
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # 请求体大小上限（字节），超过返回 413
+    max_request_size: int = 10 * 1024 * 1024
 
     @cached_property
     def cors_origin_list(self) -> list[str]:
