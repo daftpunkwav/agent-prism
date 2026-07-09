@@ -53,8 +53,6 @@ class LangGraphAdapter:
         set_current_workspace(ws_name)
         ws.write_file("README.md", f"# {label} Agent 工作空间\n\n问题: {question}\n")
 
-        harness_runner = None  # 当前未启用 harness retry,保留供未来
-
         step = 0
         tool_calls = 0
         try:

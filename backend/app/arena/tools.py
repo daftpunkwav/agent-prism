@@ -209,7 +209,6 @@ def summarize_text(text: str, max_length: int = 200) -> str:
     """简单文本摘要：截断到指定长度并标记。适用于上下文压缩。"""
     if len(text) <= max_length:
         return text
-    # 尝试在句号/换行处截断
     truncated = text[:max_length]
     last_period = max(truncated.rfind("。"), truncated.rfind("\n"), truncated.rfind(". "))
     if last_period > max_length * 0.6:
