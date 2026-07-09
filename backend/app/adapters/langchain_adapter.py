@@ -1,4 +1,4 @@
-"""LangChain 框架适配器 — create_agent 链式 Tool Calling。"""
+"""LangChain 框架适配器 — create_agent 链式 Tool Calling + 实时流式。"""
 
 from __future__ import annotations
 
@@ -35,6 +35,7 @@ class LangChainAdapter:
         step = 0
         tool_calls = 0
         tracker = TokenTracker.from_provider()
+        streaming_step: int | None = None
 
         # 每个运行实例独占一个工作空间
         ws_name = f"{label}_{int(started * 1000)}"
@@ -44,7 +45,9 @@ class LangChainAdapter:
 
         try:
             llm = create_chat_model()
-            system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
+            system, user = build_messages(
+                question, config.prompt_profile, config.reasoning, config.harness
+            )
             tracker.seed_prompt(system, user)
             yield token_update_event(label, tracker)
 
@@ -57,7 +60,6 @@ class LangChainAdapter:
 
             agent = create_agent(llm, ARENA_TOOLS, system_prompt=system)
             messages = [SystemMessage(content=system), HumanMessage(content=user)]
-            buffer = ""
 
             async for event in agent.astream_events(
                 {"messages": messages},
@@ -69,22 +71,37 @@ class LangChainAdapter:
                 if kind == "on_chat_model_stream":
                     text = extract_chunk_text(data.get("chunk"))
                     if text:
-                        buffer += str(text)
-                elif kind == "on_chat_model_end":
-                    if buffer.strip():
-                        step += 1
+                        if streaming_step is None:
+                            step += 1
+                            streaming_step = step
                         yield ArenaEvent(
-                            type="thought",
+                            type="thought_delta",
                             pipeline=label,
-                            step=step,
-                            content=buffer.strip(),
+                            step=streaming_step,
+                            content=text,
                         )
-                    buffer = ""
+                elif kind == "on_chat_model_end":
                     usage = extract_usage(data)
                     if usage["input_tokens"] or usage["output_tokens"]:
                         tracker.add_usage(usage)
                         yield token_update_event(label, tracker)
+                    if streaming_step is not None:
+                        yield ArenaEvent(
+                            type="thought_end",
+                            pipeline=label,
+                            step=streaming_step,
+                            content="",
+                        )
+                        streaming_step = None
                 elif kind == "on_tool_start":
+                    if streaming_step is not None:
+                        yield ArenaEvent(
+                            type="thought_end",
+                            pipeline=label,
+                            step=streaming_step,
+                            content="",
+                        )
+                        streaming_step = None
                     tool_calls += 1
                     step += 1
                     yield ArenaEvent(

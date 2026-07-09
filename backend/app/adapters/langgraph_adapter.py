@@ -1,4 +1,4 @@
-"""LangGraph 框架适配器 — 真实推理模式图结构。"""
+"""LangGraph 框架适配器 — 真实推理模式图结构 + 实时流式 token 输出。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
-from app.arena.harness import reflect_on_failure, verify_result
+from app.arena.harness import HarnessRunner, reflect_on_failure, verify_result
 from app.arena.prompts import build_messages
 from app.arena.reasoning import get_reasoning_description
 from app.arena.reasoning_graph import (
@@ -39,7 +39,7 @@ class LangGraphAdapter:
         started = time.perf_counter()
         tracker = TokenTracker.from_provider()
 
-        # 创建工作空间
+        # 每个运行实例独占一个工作空间
         ws_name = f"{label}_{int(started * 1000)}"
         ws = get_workspace_mgr().create(ws_name)
         set_current_workspace(ws_name)
@@ -47,8 +47,14 @@ class LangGraphAdapter:
 
         step = 0
         tool_calls = 0
+        # 在后端也保留当前正在流式输出的 step，便于 tool_start 正确递增
+        streaming_step: int | None = None
+        # Harness Runner — 真正跑 verify/reflect/self_evolve 循环
+        harness_runner = HarnessRunner(level=config.harness)
         try:
-            system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
+            system, user = build_messages(
+                question, config.prompt_profile, config.reasoning, config.harness
+            )
             tracker.seed_prompt(system, user)
             yield token_update_event(label, tracker)
 
@@ -75,9 +81,7 @@ class LangGraphAdapter:
                 "reflections": [],
             }
 
-            # 逐事件发出并维护计数器;
-            # final_state 用于获取 LLM 真实最后输出以做 Harness 验证。
-            buffer = ""
+            # 逐事件发出；thought 实时 delta 流式输出。
             final_state: dict | None = None
 
             async for event in graph.astream_events(initial_state, version="v2"):
@@ -88,22 +92,40 @@ class LangGraphAdapter:
                 if kind == "on_chat_model_stream":
                     text = extract_chunk_text(data.get("chunk"))
                     if text:
-                        buffer += str(text)
-                elif kind == "on_chat_model_end":
-                    if buffer.strip():
-                        step += 1
+                        # 实时流式输出：首个 token 决定 step，后续 delta 同 step 累积
+                        if streaming_step is None:
+                            step += 1
+                            streaming_step = step
                         yield ArenaEvent(
-                            type="thought",
+                            type="thought_delta",
                             pipeline=label,
-                            step=step,
-                            content=buffer.strip(),
+                            step=streaming_step,
+                            content=text,
                         )
-                    buffer = ""
+                elif kind == "on_chat_model_end":
                     usage = extract_usage(data)
                     if usage["input_tokens"] or usage["output_tokens"]:
                         tracker.add_usage(usage)
                         yield token_update_event(label, tracker)
+                    # 标记流结束，TraceView 会切到完整 Markdown 渲染
+                    if streaming_step is not None:
+                        yield ArenaEvent(
+                            type="thought_end",
+                            pipeline=label,
+                            step=streaming_step,
+                            content="",
+                        )
+                    streaming_step = None
                 elif kind == "on_tool_start":
+                    # 若在流式输出中插入了 tool_start，应先关流式段避免 UI 重叠
+                    if streaming_step is not None:
+                        yield ArenaEvent(
+                            type="thought_end",
+                            pipeline=label,
+                            step=streaming_step,
+                            content="",
+                        )
+                        streaming_step = None
                     tool_calls += 1
                     step += 1
                     tool_name = data.get("name", node_name)
@@ -125,6 +147,14 @@ class LangGraphAdapter:
                         result=str(output),
                     )
                 elif kind == "on_node_start" and node_name not in ("agent", "execute"):
+                    if streaming_step is not None:
+                        yield ArenaEvent(
+                            type="thought_end",
+                            pipeline=label,
+                            step=streaming_step,
+                            content="",
+                        )
+                        streaming_step = None
                     yield ArenaEvent(
                         type="thought",
                         pipeline=label,
@@ -132,7 +162,6 @@ class LangGraphAdapter:
                         content=f"[阶段: {node_name}]",
                     )
                 elif kind == "on_chain_end" and isinstance(data.get("output"), dict):
-                    # LangGraph 节点结束后返回的 state 增量,记下最后一次即最终 state。
                     final_state = data["output"]
 
             # Harness 验证/反思（非 bare 时）
@@ -142,8 +171,10 @@ class LangGraphAdapter:
                     last_msg = messages_list[-1]
                     answer = getattr(last_msg, "content", str(last_msg))
                     if isinstance(answer, list):
-                        # 处理 extended thinking 的 content blocks
-                        answer = " ".join(b.get("thinking", b.get("text", "")) if isinstance(b, dict) else str(b) for b in answer)
+                        answer = " ".join(
+                            b.get("thinking", b.get("text", "")) if isinstance(b, dict) else str(b)
+                            for b in answer
+                        )
                     answer_text = str(answer)[:2000]
                     passed, reason = verify_result(question, answer_text)
                     yield ArenaEvent(
