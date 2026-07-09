@@ -12,7 +12,6 @@ import {
   ArenaMeta,
   DimensionId,
   TokenStats,
-  ProviderConfig,
   createProject,
   fetchArenaMeta,
   streamArenaRun,
@@ -133,7 +132,6 @@ export default function ArenaPage() {
   const [columns, setColumns] = useState<Record<string, ColumnState>>({});
   const [showPromptBanner, setShowPromptBanner] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
-  const [providerCfg, setProviderCfg] = useState<ProviderConfig | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [metaLoading, setMetaLoading] = useState(true);
 
@@ -213,31 +211,6 @@ export default function ArenaPage() {
       : dimension === "prompt"
         ? ["Zero-shot", "Few-shot", "CoT Prompt", "Structured"]
         : Array.from({ length: columnCount }, (_, i) => `列 ${i + 1}`);
-
-  const handleConfigChange = useCallback((cfg: {
-    model: string;
-    temperature: number;
-    contextWindow: number;
-    maxInputTokens: number;
-    maxOutputTokens: number;
-  }) => {
-    setProviderCfg({
-      provider_name: "",
-      notes: "",
-      website_url: "",
-      api_key_set: false,
-      api_key_preview: "",
-      base_url: "",
-      use_full_url: true,
-      api_format: "anthropic_messages",
-      auth_field: "ANTHROPIC_AUTH_TOKEN",
-      model: cfg.model,
-      temperature: cfg.temperature,
-      context_window: cfg.contextWindow,
-      max_input_tokens: cfg.maxInputTokens,
-      max_output_tokens: cfg.maxOutputTokens,
-    } as ProviderConfig);
-  }, []);
 
   if (metaLoading) {
     return (
