@@ -61,7 +61,8 @@ class LangGraphAdapter:
             )
 
             graph_builder = _GRAPH_BUILDERS.get(config.reasoning, build_react_graph)
-            graph = graph_builder().compile()
+            # 提高 LangGraph 默认递归限制（默认 25）；同时 max_steps 控制业务循环
+            graph = graph_builder().compile().with_config({"recursion_limit": 50})
 
             initial_state = {
                 "messages": [
