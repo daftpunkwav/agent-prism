@@ -1,9 +1,6 @@
 """沙箱安全回归测试 — 验证 run_code 沙箱无法逃逸。"""
 
-import pytest
-
 from app.arena.tools import _safe_calculate, _safe_run_code
-
 
 # ===== run_code 沙箱逃逸测试 =====
 
