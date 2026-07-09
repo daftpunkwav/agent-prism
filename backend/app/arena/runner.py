@@ -25,7 +25,7 @@ class RunnerPool:
         self.router = DimensionRouter()
 
     def configs_for(self, request: ArenaRunRequest) -> list[PipelineConfig]:
-        configs = self.router.route(request.dimension)
+        configs = self.router.route(request.dimension, request.selections)
         if request.temperature is not None:
             configs = [c.model_copy(update={"temperature": request.temperature}) for c in configs]
         return configs

@@ -10,10 +10,37 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.adapters.common import get_workspace_mgr
 from app.arena.project import get_project_manager
+from app.arena.router import DimensionRouter, list_dimension_options
 from app.arena.runner import RunnerPool, build_registry
 from app.models import ArenaRunRequest, ProjectCreate
 
-router = APIRouter(prefix="/api/arena", tags=["arena"])
+_DIMENSION_META: list[dict] = [
+    {
+        "id": "framework",
+        "label": "框架",
+        "subtitle": "编排实现不同，Prompt / 推理 / 上下文 / Harness 保持一致",
+    },
+    {
+        "id": "prompt",
+        "label": "提示词",
+        "subtitle": "仅切换 Prompt 模板，LangGraph + ReAct 编排不变",
+    },
+    {
+        "id": "reasoning",
+        "label": "推理模式",
+        "subtitle": "仅切换推理图节点，Prompt 基线保持一致",
+    },
+    {
+        "id": "context",
+        "label": "上下文",
+        "subtitle": "仅切换 Memory 策略，需使用多轮任务模板",
+    },
+    {
+        "id": "harness",
+        "label": "Harness",
+        "subtitle": "仅切换验证 / 反思循环，其余配置保持一致",
+    },
+]
 
 _pool = RunnerPool(build_registry())
 _ws_mgr = get_workspace_mgr()
@@ -21,45 +48,19 @@ _ws_mgr = get_workspace_mgr()
 
 @router.get("/meta")
 async def arena_meta():
-    # 复用 RunnerPool 中的 registry，避免每个请求都重建适配器实例。
+    dimensions = []
+    for meta in _DIMENSION_META:
+        options = list_dimension_options(meta["id"])
+        dimensions.append(
+            {
+                **meta,
+                "options": options,
+                "min_select": 2,
+                "max_select": len(options),
+            }
+        )
     return {
-        "dimensions": [
-            {
-                "id": "framework",
-                "label": "框架",
-                "subtitle": "编排实现不同，Prompt / 推理 / 上下文 / Harness 保持一致",
-                "columns": 2,
-                "mvp": True,
-            },
-            {
-                "id": "prompt",
-                "label": "提示词",
-                "subtitle": "仅切换 Prompt 模板，LangGraph + ReAct 编排不变",
-                "columns": 4,
-                "mvp": True,
-            },
-            {
-                "id": "reasoning",
-                "label": "推理模式",
-                "subtitle": "仅切换推理图节点，Prompt 基线保持一致",
-                "columns": 4,
-                "mvp": True,
-            },
-            {
-                "id": "context",
-                "label": "上下文",
-                "subtitle": "仅切换 Memory 策略，需使用多轮任务模板",
-                "columns": 4,
-                "mvp": True,
-            },
-            {
-                "id": "harness",
-                "label": "Harness",
-                "subtitle": "仅切换验证 / 反思循环，其余配置保持一致",
-                "columns": 4,
-                "mvp": True,
-            },
-        ],
+        "dimensions": dimensions,
         "frameworks": _pool.registry.list_available() + _pool.registry.list_reserved(),
     }
 

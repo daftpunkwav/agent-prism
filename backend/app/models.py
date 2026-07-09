@@ -38,6 +38,8 @@ class PipelineConfig(BaseModel):
 class ArenaRunRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     dimension: DimensionId = "framework"
+    # 该维度下用户选中的子项 value 列表；空 = 全选，但至少 2 项（router 校验）
+    selections: list[str] = Field(default_factory=list)
     temperature: float | None = None
 
 
