@@ -35,15 +35,17 @@ class RunnerPool:
     async def stream_parallel(
         self, request: ArenaRunRequest
     ) -> AsyncIterator[ArenaEvent]:
-        if not self.router.is_mvp_ready(request.dimension):
+        try:
+            configs = self.configs_for(request)
+        except ValueError as exc:
+            # 维度名未知或不支持 — 单一错误事件后退出
             yield ArenaEvent(
                 type="error",
                 pipeline="system",
-                message=f"维度「{request.dimension}」未启用，当前 MVP 已支持 framework / prompt / reasoning / context / harness",
+                message=str(exc),
             )
             return
 
-        configs = self.configs_for(request)
         queue: asyncio.Queue[ArenaEvent | None] = asyncio.Queue()
 
         async def worker(cfg: PipelineConfig) -> None:

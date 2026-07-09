@@ -9,14 +9,13 @@ from fastapi import APIRouter, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 
 from app.arena.runner import RunnerPool, build_registry
-from app.arena.workspace import WorkspaceManager
+from app.arena.workspace import get_workspace_mgr
 from app.models import ArenaRunRequest, ProjectCreate
 
 router = APIRouter(prefix="/api/arena", tags=["arena"])
 
 _pool = RunnerPool(build_registry())
-_router = DimensionRouter()
-_ws_mgr: WorkspaceManager = get_workspace_mgr()
+_ws_mgr = get_workspace_mgr()
 
 
 @router.get("/meta")

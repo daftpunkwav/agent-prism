@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from app.config import load_provider_config
+from functools import lru_cache
+
+from app.config import ProviderConfig, load_provider_config
 from app.models import DimensionId, PipelineConfig, PromptProfile
 
 DEFAULT_BASE: dict = {
@@ -15,8 +17,14 @@ DEFAULT_BASE: dict = {
 }
 
 
+@lru_cache(maxsize=1)
+def _cached_provider() -> ProviderConfig:
+    """单次请求内复用 provider 配置，避免每列重建 PipelineConfig 时重复读 JSON。"""
+    return load_provider_config()
+
+
 def _base(**overrides) -> PipelineConfig:
-    provider = load_provider_config()
+    provider = _cached_provider()
     data = {
         **DEFAULT_BASE,
         "model_id": provider.model,
@@ -70,4 +78,5 @@ class DimensionRouter:
         return len(self.route(dimension))
 
     def is_mvp_ready(self, dimension: DimensionId) -> bool:
+        """保留向后兼容：当前 MVP 已支持全部 5 个维度。"""
         return dimension in ("framework", "prompt", "reasoning", "context", "harness")
