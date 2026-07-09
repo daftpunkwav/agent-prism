@@ -2,6 +2,8 @@
 
 import logging
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +20,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="AgentPrism", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """应用生命周期：替代已废弃的 on_event 装饰器。"""
+    logger.info("AgentPrism 启动完成")
+    logger.info("Provider: %s, Model: %s", app_settings.llm_provider_name, app_settings.llm_model)
+    yield
+    logger.info("AgentPrism 关闭")
+
+
+app = FastAPI(title="AgentPrism", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,9 +63,3 @@ app.include_router(arena.router)
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "agentprism"}
-
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("AgentPrism 启动完成")
-    logger.info("Provider: %s, Model: %s", app_settings.llm_provider_name, app_settings.llm_model)
