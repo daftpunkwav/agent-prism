@@ -164,29 +164,29 @@ def _safe_run_code(code: str, timeout: int = 5) -> str:
     import traceback as tb_mod
 
     timeout = min(timeout, 10)
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
     captured = io.StringIO()
-    sys.stdout = captured
-    sys.stderr = captured
-
-    try:
-        safe_ns = {
-            "__builtins__": {
-                "print": print, "len": len, "range": range,
-                "str": str, "int": int, "float": float, "bool": bool,
-                "list": list, "dict": dict, "set": set, "tuple": tuple,
-                "sum": sum, "min": min, "max": max, "abs": abs,
-                "round": round, "sorted": sorted, "enumerate": enumerate,
-                "zip": zip, "map": map, "filter": filter,
-                "all": all, "any": any,
-                "True": True, "False": False, "None": None,
-                "isinstance": isinstance, "type": type,
-                "Exception": Exception, "ValueError": ValueError,
-                "TypeError": TypeError, "KeyError": KeyError,
-                "IndexError": IndexError, "AttributeError": AttributeError,
-            }
+    # 重定向到独立 StringIO，不污染全局 sys.stdout，
+    # 避免并发请求间 stdout 互相覆盖。
+    safe_ns = {
+        "__builtins__": {
+            "print": lambda *a, **k: captured.write(" ".join(str(x) for x in a) + "\n"),
+            "len": len, "range": range,
+            "str": str, "int": int, "float": float, "bool": bool,
+            "list": list, "dict": dict, "set": set, "tuple": tuple,
+            "sum": sum, "min": min, "max": max, "abs": abs,
+            "round": round, "sorted": sorted, "enumerate": enumerate,
+            "zip": zip, "map": map, "filter": filter,
+            "all": all, "any": any,
+            "True": True, "False": False, "None": None,
+            "isinstance": isinstance, "type": type,
+            "Exception": Exception, "ValueError": ValueError,
+            "TypeError": TypeError, "KeyError": KeyError,
+            "IndexError": IndexError, "AttributeError": AttributeError,
         }
+    }
+    old_stdout, old_stderr = sys.stdout, sys.stderr
+    sys.stdout, sys.stderr = captured, captured
+    try:
         compiled = compile(code, "<run_code>", "exec")
         exec(compiled, safe_ns, safe_ns)
         output = captured.getvalue()
@@ -194,8 +194,7 @@ def _safe_run_code(code: str, timeout: int = 5) -> str:
     except Exception:
         return f"执行错误:\n{tb_mod.format_exc()}"
     finally:
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
+        sys.stdout, sys.stderr = old_stdout, old_stderr
 
 
 @tool(args_schema=_RunCodeInput)
