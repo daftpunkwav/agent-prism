@@ -73,6 +73,22 @@ async def test_provider(body: ProviderConfigUpdate | None = None) -> ConnectionT
         raise HTTPException(status_code=400, detail="请先填写 API Key")
 
     try:
+        if cfg.api_format == "openai_chat":
+            from openai import OpenAI
+            client = OpenAI(api_key=cfg.api_key, base_url=cfg.base_url.rstrip("/"))
+            resp = client.chat.completions.create(
+                model=cfg.model,
+                max_tokens=32,
+                messages=[{"role": "user", "content": "ping"}],
+            )
+            snippet = resp.choices[0].message.content or "ok"
+            return ConnectionTestResult(
+                ok=True,
+                message=f"连接成功: {snippet[:80]}",
+                model=cfg.model,
+            )
+
+        # 默认 anthropic_messages
         client = anthropic.Anthropic(
             api_key=cfg.api_key,
             base_url=cfg.base_url.rstrip("/"),

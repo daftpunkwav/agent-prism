@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import AsyncIterator
 
@@ -17,12 +18,19 @@ from app.arena.tools import ARENA_TOOLS
 from app.arena.workspace import clear_current_workspace, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
+logger = logging.getLogger(__name__)
+
 
 def _normalize_args(input_value: object) -> dict:
     """统一将 LangChain 工具输入规范成 dict。"""
     if isinstance(input_value, dict):
         return input_value
     return {"input": input_value}
+
+
+def _sanitize_error(exc: Exception) -> str:
+    """脱敏异常消息，仅保留类型名，避免泄露 API key / endpoint 等敏感信息。"""
+    return f"{type(exc).__name__}"
 
 
 class LangChainAdapter:
@@ -132,10 +140,11 @@ class LangChainAdapter:
                 token_stats=tracker.as_dict(),
             )
         except Exception as exc:  # noqa: BLE001
+            logger.exception("Pipeline %s 失败", label)
             yield ArenaEvent(
                 type="error",
                 pipeline=label,
-                message=str(exc),
+                message=_sanitize_error(exc),
             )
             yield ArenaEvent(
                 type="complete",

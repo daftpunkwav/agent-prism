@@ -33,7 +33,11 @@ class RunnerPool:
             configs = [c.model_copy(update={"temperature": request.temperature}) for c in configs]
         return configs
 
-    async def stream_parallel(self, request: ArenaRunRequest) -> AsyncIterator[ArenaEvent]:
+    async def stream_parallel(
+        self,
+        request: ArenaRunRequest,
+        on_cancel: AsyncIterator[None] | None = None,
+    ) -> AsyncIterator[ArenaEvent]:
         try:
             configs = self.configs_for(request)
         except ValueError as exc:
@@ -52,7 +56,7 @@ class RunnerPool:
                 async for event in self.registry.get(cfg.framework).run(request.question, cfg):
                     await queue.put(event)
             except asyncio.CancelledError:
-                # 客户端断开 — 静默传播，由调用方吞掉
+                # 客户端断开 — 静默传播
                 raise
             except AdapterReservedError as exc:
                 await queue.put(
@@ -77,11 +81,24 @@ class RunnerPool:
 
         workers = [asyncio.create_task(worker(c)) for c in configs]
         finished = 0
-        while finished < len(workers):
-            item = await queue.get()
-            if item is None:
-                finished += 1
-                continue
-            yield item
-
-        await asyncio.gather(*workers, return_exceptions=True)
+        try:
+            while finished < len(workers):
+                item = await queue.get()
+                if item is None:
+                    finished += 1
+                    continue
+                yield item
+        except asyncio.CancelledError:
+            # 客户端断开 — 取消所有 worker 并等待它们结束
+            for w in workers:
+                if not w.done():
+                    w.cancel()
+            # 等待所有 worker 完成清理
+            await asyncio.gather(*workers, return_exceptions=True)
+            raise
+        finally:
+            # 确保所有 worker 都被取消
+            for w in workers:
+                if not w.done():
+                    w.cancel()
+            await asyncio.gather(*workers, return_exceptions=True)

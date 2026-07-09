@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import AsyncIterator
 
@@ -22,12 +23,19 @@ from app.arena.token_utils import TokenTracker, extract_usage
 from app.arena.workspace import clear_current_workspace, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
+logger = logging.getLogger(__name__)
+
 _GRAPH_BUILDERS = {
     "react": build_react_graph,
     "cot_tool": build_cot_tool_graph,
     "tot": build_tot_graph,
     "reflexion": build_reflexion_graph,
 }
+
+
+def _sanitize_error(exc: Exception) -> str:
+    """脱敏异常消息，仅保留类型名。"""
+    return f"{type(exc).__name__}"
 
 
 class LangGraphAdapter:
@@ -202,10 +210,11 @@ class LangGraphAdapter:
                 token_stats=tracker.as_dict(),
             )
         except Exception as exc:  # noqa: BLE001
+            logger.exception("Pipeline %s 失败", label)
             yield ArenaEvent(
                 type="error",
                 pipeline=label,
-                message=str(exc),
+                message=_sanitize_error(exc),
             )
             yield ArenaEvent(
                 type="complete",
