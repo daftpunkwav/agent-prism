@@ -80,12 +80,14 @@ class ProjectManager:
             # 直接精确匹配，避免前缀模糊查找导致同 label 多次跑时互相覆盖。
             ws = ws_mgr.get(ws_name)
             if ws:
-                results.append({
-                    "label": ws_name,
-                    "workspace": ws_name,
-                    "file_count": len(ws.files),
-                    "files": list(ws.files.keys()),
-                })
+                results.append(
+                    {
+                        "label": ws_name,
+                        "workspace": ws_name,
+                        "file_count": len(ws.files),
+                        "files": list(ws.files.keys()),
+                    }
+                )
 
         project = Project(
             id=_generate_project_id(),

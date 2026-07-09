@@ -24,6 +24,7 @@ def _bind_tools(llm):
 
 # ===== ReAct 模式 =====
 
+
 def _react_node(state: AgentState) -> dict:
     """ReAct: 标准 Thought → Action → Observation 循环"""
     llm = _create_llm()
@@ -50,10 +51,8 @@ def _react_tool_node(state: AgentState) -> dict:
             tc_count += 1
 
     from langchain_core.messages import ToolMessage
-    tool_messages = [
-        ToolMessage(content=str(r), tool_call_id=call["id"])
-        for call, r in zip(tool_calls, results)
-    ]
+
+    tool_messages = [ToolMessage(content=str(r), tool_call_id=call["id"]) for call, r in zip(tool_calls, results)]
     return {
         "messages": tool_messages,
         "tool_calls": tc_count,
@@ -80,23 +79,18 @@ def build_react_graph() -> StateGraph:
     graph.add_node("tools", _react_tool_node)
     graph.add_edge("tools", "agent")
     graph.set_entry_point("agent")
-    graph.add_conditional_edges(
-        "agent",
-        _react_should_continue,
-        {"tools": "tools", END: END}
-    )
+    graph.add_conditional_edges("agent", _react_should_continue, {"tools": "tools", END: END})
     return graph
 
 
 # ===== CoT+Tool 模式 =====
 
+
 def _cot_think_node(state: AgentState) -> dict:
     """CoT+Tool: 先完整推理，再统一调用工具"""
     llm = _create_llm()
     # 强制 LLM 先输出推理链，不调用工具
-    think_prompt = state["messages"] + [
-        SystemMessage(content="\n\n[阶段1: 推理]\n请先完整分析问题，列出所有需要的步骤和工具。不要调用工具，只输出推理过程。")
-    ]
+    think_prompt = state["messages"] + [SystemMessage(content="\n\n[阶段1: 推理]\n请先完整分析问题，列出所有需要的步骤和工具。不要调用工具，只输出推理过程。")]
     response = llm.invoke(think_prompt)
     return {
         "messages": [response],
@@ -108,9 +102,7 @@ def _cot_act_node(state: AgentState) -> dict:
     """CoT+Tool: 根据推理结果统一执行工具"""
     llm = _create_llm()
     llm_with_tools = _bind_tools(llm)
-    act_prompt = state["messages"] + [
-        SystemMessage(content="\n\n[阶段2: 行动]\n基于上述推理，现在执行所需的工具调用。")
-    ]
+    act_prompt = state["messages"] + [SystemMessage(content="\n\n[阶段2: 行动]\n基于上述推理，现在执行所需的工具调用。")]
     response = llm_with_tools.invoke(act_prompt)
     return {"messages": [response], "step_count": state["step_count"] + 1}
 
@@ -142,13 +134,12 @@ def build_cot_tool_graph() -> StateGraph:
 
 # ===== ToT 模式 =====
 
+
 def _tot_generate_node(state: AgentState) -> dict:
     """ToT: 生成多个候选方案"""
     llm = _create_llm()
     llm_with_tools = _bind_tools(llm)
-    gen_prompt = state["messages"] + [
-        SystemMessage(content="\n\n[ToT: 生成候选]\n请生成 2-3 个不同的解决方案思路，分别评估每个方案的优劣。")
-    ]
+    gen_prompt = state["messages"] + [SystemMessage(content="\n\n[ToT: 生成候选]\n请生成 2-3 个不同的解决方案思路，分别评估每个方案的优劣。")]
     response = llm_with_tools.invoke(gen_prompt)
     return {
         "messages": [response],
@@ -159,9 +150,7 @@ def _tot_generate_node(state: AgentState) -> dict:
 def _tot_evaluate_node(state: AgentState) -> dict:
     """ToT: 评估并选择最优方案"""
     llm = _create_llm()
-    eval_prompt = state["messages"] + [
-        SystemMessage(content="\n\n[ToT: 评估选择]\n评估以上方案，选择最优的一个，然后执行。")
-    ]
+    eval_prompt = state["messages"] + [SystemMessage(content="\n\n[ToT: 评估选择]\n评估以上方案，选择最优的一个，然后执行。")]
     response = llm_with_tools.invoke(eval_prompt)
     return {
         "messages": [response],
@@ -197,6 +186,7 @@ def build_tot_graph() -> StateGraph:
 
 # ===== Reflexion 模式 =====
 
+
 def _reflexion_execute_node(state: AgentState) -> dict:
     """Reflexion: 执行任务"""
     llm = _create_llm()
@@ -214,7 +204,7 @@ def _reflexion_reflect_node(state: AgentState) -> dict:
     last_response = state["messages"][-1].content
     reflect_prompt = [
         SystemMessage(content="\n\n[Reflexion: 反思]\n评估以上回答的质量：\n1. 是否准确回答了问题？\n2. 是否有遗漏？\n3. 如何改进？\n\n输出反思结论。"),
-        HumanMessage(content=f"回答内容：\n{last_response}")
+        HumanMessage(content=f"回答内容：\n{last_response}"),
     ]
     response = llm.invoke(reflect_prompt)
     return {
@@ -255,6 +245,7 @@ def build_reflexion_graph() -> StateGraph:
 
 
 # ===== 图构建器入口 =====
+
 
 def build_reasoning_graph(mode: ReasoningMode) -> StateGraph:
     """根据推理模式构建对应的 LangGraph 图"""

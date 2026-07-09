@@ -1,6 +1,5 @@
 """RAG 向量检索的单元测试。"""
 
-
 from app.arena.rag import ContextRetriever, SimpleVectorStore, chunk_text
 
 
@@ -27,11 +26,13 @@ def test_simple_vector_store_add_and_query():
 
 def test_simple_vector_store_relevance():
     vs = SimpleVectorStore()
-    vs.add_documents([
-        "Python 是编程语言",
-        "Java 是编程语言",
-        "猫是宠物",
-    ])
+    vs.add_documents(
+        [
+            "Python 是编程语言",
+            "Java 是编程语言",
+            "猫是宠物",
+        ]
+    )
     results = vs.query("Python 编程")
     assert len(results) > 0
     assert "Python" in results[0]["content"]

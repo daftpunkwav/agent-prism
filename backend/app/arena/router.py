@@ -48,9 +48,7 @@ class DimensionRouter:
                 ("cot_prompt", "CoT Prompt"),
                 ("structured", "Structured"),
             ]
-            return [
-                _base(prompt_profile=p, label=label) for p, label in profiles
-            ]
+            return [_base(prompt_profile=p, label=label) for p, label in profiles]
         if dimension == "reasoning":
             return [
                 _base(reasoning="react", label="ReAct"),

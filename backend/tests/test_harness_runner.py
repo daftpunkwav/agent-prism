@@ -1,6 +1,5 @@
 """Harness 引擎的单元测试。"""
 
-
 from app.arena.harness import (
     HarnessRunner,
     apply_harness_level,

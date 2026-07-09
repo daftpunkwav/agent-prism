@@ -29,9 +29,7 @@ class LangChainAdapter:
     framework_id = "langchain"
     display_name = "LangChain"
 
-    async def run(
-        self, question: str, config: PipelineConfig
-    ) -> AsyncIterator[ArenaEvent]:
+    async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
         label = config.label or self.display_name
         started = time.perf_counter()
         step = 0
@@ -46,9 +44,7 @@ class LangChainAdapter:
 
         try:
             llm = create_chat_model()
-            system, user = build_messages(
-                question, config.prompt_profile, config.reasoning, config.harness
-            )
+            system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
             tracker.seed_prompt(system, user)
             yield token_update_event(label, tracker)
 

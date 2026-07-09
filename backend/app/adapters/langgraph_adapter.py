@@ -34,9 +34,7 @@ class LangGraphAdapter:
     framework_id = "langgraph"
     display_name = "LangGraph"
 
-    async def run(
-        self, question: str, config: PipelineConfig
-    ) -> AsyncIterator[ArenaEvent]:
+    async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
         label = config.label or self.display_name
         started = time.perf_counter()
         tracker = TokenTracker.from_provider()
@@ -50,9 +48,7 @@ class LangGraphAdapter:
         step = 0
         tool_calls = 0
         try:
-            system, user = build_messages(
-                question, config.prompt_profile, config.reasoning, config.harness
-            )
+            system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
             tracker.seed_prompt(system, user)
             yield token_update_event(label, tracker)
 
@@ -96,8 +92,10 @@ class LangGraphAdapter:
                     if buffer.strip():
                         step += 1
                         yield ArenaEvent(
-                            type="thought", pipeline=label,
-                            step=step, content=buffer.strip(),
+                            type="thought",
+                            pipeline=label,
+                            step=step,
+                            content=buffer.strip(),
                         )
                     buffer = ""
                     usage = extract_usage(data)
@@ -110,21 +108,27 @@ class LangGraphAdapter:
                     tool_name = data.get("name", node_name)
                     tool_input = data.get("input", {})
                     yield ArenaEvent(
-                        type="action", pipeline=label,
-                        step=step, tool=tool_name,
+                        type="action",
+                        pipeline=label,
+                        step=step,
+                        tool=tool_name,
                         args=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
                     )
                 elif kind == "on_tool_end":
                     step += 1
                     output = data.get("output", "")
                     yield ArenaEvent(
-                        type="observation", pipeline=label,
-                        step=step, result=str(output),
+                        type="observation",
+                        pipeline=label,
+                        step=step,
+                        result=str(output),
                     )
                 elif kind == "on_node_start" and node_name not in ("agent", "execute"):
                     yield ArenaEvent(
-                        type="thought", pipeline=label,
-                        step=step, content=f"[阶段: {node_name}]",
+                        type="thought",
+                        pipeline=label,
+                        step=step,
+                        content=f"[阶段: {node_name}]",
                     )
                 elif kind == "on_chain_end" and isinstance(data.get("output"), dict):
                     # LangGraph 节点结束后返回的 state 增量,记下最后一次即最终 state。
@@ -138,14 +142,12 @@ class LangGraphAdapter:
                     answer = getattr(last_msg, "content", str(last_msg))
                     if isinstance(answer, list):
                         # 处理 extended thinking 的 content blocks
-                        answer = " ".join(
-                            b.get("thinking", b.get("text", "")) if isinstance(b, dict) else str(b)
-                            for b in answer
-                        )
+                        answer = " ".join(b.get("thinking", b.get("text", "")) if isinstance(b, dict) else str(b) for b in answer)
                     answer_text = str(answer)[:2000]
                     passed, reason = verify_result(question, answer_text)
                     yield ArenaEvent(
-                        type="verify", pipeline=label,
+                        type="verify",
+                        pipeline=label,
                         step=step + 1,
                         content=f"[{config.harness}] 验证: {reason}",
                         passed=passed,
@@ -153,7 +155,8 @@ class LangGraphAdapter:
                     if not passed:
                         insight = reflect_on_failure(question, answer_text, reason)
                         yield ArenaEvent(
-                            type="reflect", pipeline=label,
+                            type="reflect",
+                            pipeline=label,
                             step=step + 2,
                             content=f"[反思] {insight}",
                         )

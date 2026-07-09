@@ -25,6 +25,7 @@ def get_current_workspace_name() -> str | None:
 @dataclass
 class WorkspaceFile:
     """工作空间中的文件。"""
+
     path: str
     content: str = ""
     created_at: str = ""
@@ -61,7 +62,7 @@ class Workspace:
         results: list[str] = []
         for path in self.files:
             if path.startswith(prefix):
-                rel = path[len(prefix):]
+                rel = path[len(prefix) :]
                 # 只返回直接子项
                 if "/" not in rel and rel:
                     results.append(rel)

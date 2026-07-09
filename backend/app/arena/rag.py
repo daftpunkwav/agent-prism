@@ -68,11 +68,13 @@ class SimpleVectorStore:
         all_tokens = [self._tokenize(doc) for doc in documents]
         self._compute_idf(all_tokens)
         for i, (doc, tokens) in enumerate(zip(documents, all_tokens)):
-            self.chunks.append({
-                "content": doc,
-                "embedding": self._embed(tokens),
-                "metadata": metadata[i] if metadata else {},
-            })
+            self.chunks.append(
+                {
+                    "content": doc,
+                    "embedding": self._embed(tokens),
+                    "metadata": metadata[i] if metadata else {},
+                }
+            )
 
     def query(self, text: str, top_k: int = 3) -> list[dict]:
         """检索 top_k 相关文档。"""
@@ -141,14 +143,11 @@ class ContextRetriever:
         # 索引到向量库
         chunks = chunk_text(content)
         for chunk in chunks:
-            self.vector_store.add_documents(
-                [chunk],
-                [{"role": role, "index": len(self._window) - 1}]
-            )
+            self.vector_store.add_documents([chunk], [{"role": role, "index": len(self._window) - 1}])
         # 保持窗口大小
         if len(self._window) > self._window_size * 2:
             overflow = self._window[: -self._window_size]
-            self._window = self._window[-self._window_size:]
+            self._window = self._window[-self._window_size :]
             # 更新摘要
             if not self._summary:
                 self._summary = self._build_summary(overflow)
@@ -169,13 +168,13 @@ class ContextRetriever:
     def get_context(self, current_query: str | None = None) -> list[dict]:
         """获取当前策略下的上下文。"""
         if self.strategy == "sliding":
-            return self._window[-self._window_size:]
+            return self._window[-self._window_size :]
 
         if self.strategy == "summary":
             result = []
             if self._summary:
                 result.append({"role": "system", "content": f"[上下文摘要]\n{self._summary}"})
-            result.extend(self._window[-self._window_size:])
+            result.extend(self._window[-self._window_size :])
             return result
 
         if self.strategy == "vector":
@@ -198,10 +197,10 @@ class ContextRetriever:
                 relevant = self.vector_store.query(current_query, top_k=2)
                 if relevant:
                     result.append({"role": "system", "content": "[相关历史]\n" + "\n".join(c["content"][:80] for c in relevant)})
-            result.extend(self._window[-self._window_size:])
+            result.extend(self._window[-self._window_size :])
             return result
 
-        return self._window[-self._window_size:]
+        return self._window[-self._window_size :]
 
     def reset(self) -> None:
         self._window = []

@@ -87,10 +87,7 @@ async def workspace_files(workspace_name: str):
     files = ws.list_files()
     return {
         "workspace": workspace_name,
-        "files": [
-            {"path": f, "size": len(ws.files[f].content)}
-            for f in files
-        ],
+        "files": [{"path": f, "size": len(ws.files[f].content)} for f in files],
     }
 
 

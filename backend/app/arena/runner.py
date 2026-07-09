@@ -27,14 +27,10 @@ class RunnerPool:
     def configs_for(self, request: ArenaRunRequest) -> list[PipelineConfig]:
         configs = self.router.route(request.dimension)
         if request.temperature is not None:
-            configs = [
-                c.model_copy(update={"temperature": request.temperature}) for c in configs
-            ]
+            configs = [c.model_copy(update={"temperature": request.temperature}) for c in configs]
         return configs
 
-    async def stream_parallel(
-        self, request: ArenaRunRequest
-    ) -> AsyncIterator[ArenaEvent]:
+    async def stream_parallel(self, request: ArenaRunRequest) -> AsyncIterator[ArenaEvent]:
         try:
             configs = self.configs_for(request)
         except ValueError as exc:
@@ -50,9 +46,7 @@ class RunnerPool:
 
         async def worker(cfg: PipelineConfig) -> None:
             try:
-                async for event in self.registry.get(cfg.framework).run(
-                    request.question, cfg
-                ):
+                async for event in self.registry.get(cfg.framework).run(request.question, cfg):
                     await queue.put(event)
             except asyncio.CancelledError:
                 # 客户端断开 — 静默传播，由调用方吞掉

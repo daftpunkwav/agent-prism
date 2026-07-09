@@ -22,16 +22,8 @@ def extract_usage(data: dict) -> dict[str, int]:
         resp_meta = getattr(output, "response_metadata", None) or {}
         usage = resp_meta.get("usage", resp_meta.get("token_usage", {}))
 
-    input_tokens = int(
-        usage.get("input_tokens")
-        or usage.get("prompt_tokens")
-        or 0
-    )
-    output_tokens = int(
-        usage.get("output_tokens")
-        or usage.get("completion_tokens")
-        or 0
-    )
+    input_tokens = int(usage.get("input_tokens") or usage.get("prompt_tokens") or 0)
+    output_tokens = int(usage.get("output_tokens") or usage.get("completion_tokens") or 0)
     return {"input_tokens": input_tokens, "output_tokens": output_tokens}
 
 

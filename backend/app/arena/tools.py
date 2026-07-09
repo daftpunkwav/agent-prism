@@ -28,6 +28,7 @@ def get_workspace_mgr() -> WorkspaceManager:
 
 # ===== 无状态工具 =====
 
+
 @tool
 def get_current_time(format: str = "iso") -> str:
     """获取当前 UTC 时间。format 可选: iso（默认）、readable、timestamp。"""
@@ -47,9 +48,19 @@ def _safe_calculate(expression: str) -> str:
         return "错误: 表达式语法错误"
 
     ALLOWED_NODES = (
-        ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant,
-        ast.Add, ast.Sub, ast.Mult, ast.Div,
-        ast.Pow, ast.FloorDiv, ast.Mod, ast.USub, ast.UAdd,
+        ast.Expression,
+        ast.BinOp,
+        ast.UnaryOp,
+        ast.Constant,
+        ast.Add,
+        ast.Sub,
+        ast.Mult,
+        ast.Div,
+        ast.Pow,
+        ast.FloorDiv,
+        ast.Mod,
+        ast.USub,
+        ast.UAdd,
     )
     for node in ast.walk(tree):
         if not isinstance(node, ALLOWED_NODES):
@@ -71,6 +82,7 @@ def calculate(expression: str) -> str:
 
 
 # ===== 工作空间工具 =====
+
 
 class _WriteFileInput(BaseModel):
     path: str = Field(description="文件路径，如 main.py、src/utils.py")
@@ -155,6 +167,7 @@ def delete_file(path: str) -> str:
 
 # ===== 代码执行工具 =====
 
+
 class _RunCodeInput(BaseModel):
     code: str = Field(description="要执行的 Python 代码")
     timeout: int = Field(default=5, description="超时秒数（最大 10）")
@@ -169,18 +182,39 @@ def _safe_run_code(code: str, timeout: int = 5) -> str:
     safe_ns = {
         "__builtins__": {
             "print": lambda *a, **k: captured.write(" ".join(str(x) for x in a) + "\n"),
-            "len": len, "range": range,
-            "str": str, "int": int, "float": float, "bool": bool,
-            "list": list, "dict": dict, "set": set, "tuple": tuple,
-            "sum": sum, "min": min, "max": max, "abs": abs,
-            "round": round, "sorted": sorted, "enumerate": enumerate,
-            "zip": zip, "map": map, "filter": filter,
-            "all": all, "any": any,
-            "True": True, "False": False, "None": None,
-            "isinstance": isinstance, "type": type,
-            "Exception": Exception, "ValueError": ValueError,
-            "TypeError": TypeError, "KeyError": KeyError,
-            "IndexError": IndexError, "AttributeError": AttributeError,
+            "len": len,
+            "range": range,
+            "str": str,
+            "int": int,
+            "float": float,
+            "bool": bool,
+            "list": list,
+            "dict": dict,
+            "set": set,
+            "tuple": tuple,
+            "sum": sum,
+            "min": min,
+            "max": max,
+            "abs": abs,
+            "round": round,
+            "sorted": sorted,
+            "enumerate": enumerate,
+            "zip": zip,
+            "map": map,
+            "filter": filter,
+            "all": all,
+            "any": any,
+            "True": True,
+            "False": False,
+            "None": None,
+            "isinstance": isinstance,
+            "type": type,
+            "Exception": Exception,
+            "ValueError": ValueError,
+            "TypeError": TypeError,
+            "KeyError": KeyError,
+            "IndexError": IndexError,
+            "AttributeError": AttributeError,
         }
     }
     old_stdout, old_stderr = sys.stdout, sys.stderr
@@ -203,6 +237,7 @@ def run_code(code: str, timeout: int = 5) -> str:
 
 
 # ===== 文本摘要工具 =====
+
 
 @tool
 def summarize_text(text: str, max_length: int = 200) -> str:

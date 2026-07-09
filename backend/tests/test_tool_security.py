@@ -1,9 +1,9 @@
 """工具安全的单元测试。"""
 
-
 from app.arena.tools import _safe_calculate, _safe_run_code
 
 # ===== calculate 安全测试 =====
+
 
 def test_calculate_basic_arithmetic():
     assert _safe_calculate("2 + 3") == "5"
@@ -49,6 +49,7 @@ def test_calculate_rejects_multiline():
 
 
 # ===== run_code 安全测试 =====
+
 
 def test_run_code_basic_print():
     result = _safe_run_code("print('hello')")

@@ -1,6 +1,5 @@
 """推理模式图构建器的单元测试。"""
 
-
 from app.arena.reasoning_graph import (
     build_cot_tool_graph,
     build_react_graph,

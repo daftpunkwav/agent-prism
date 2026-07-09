@@ -27,7 +27,7 @@ class ContextManager:
 
     def get_messages(self) -> list[dict]:
         if self.strategy == "sliding":
-            return self._messages[-self.window_size:]
+            return self._messages[-self.window_size :]
         if self.strategy == "summary":
             return self._apply_summary()
         if self.strategy == "hybrid":
@@ -42,9 +42,9 @@ class ContextManager:
         if len(self._messages) <= self.window_size:
             return list(self._messages)
         # 保留最近 N 条，旧消息用摘要替代
-        recent = self._messages[-self.window_size:]
+        recent = self._messages[-self.window_size :]
         if not self._summary:
-            old = self._messages[:-self.window_size]
+            old = self._messages[: -self.window_size]
             self._summary = self._summarize(old)
         if self._summary:
             return [{"role": "system", "content": f"[上下文摘要]\n{self._summary}"}] + recent
@@ -55,8 +55,8 @@ class ContextManager:
         # 保留最近 window_size 条，超出部分滚动摘要
         if len(self._messages) <= self.window_size:
             return list(self._messages)
-        recent = self._messages[-self.window_size:]
-        overflow = self._messages[:-self.window_size]
+        recent = self._messages[-self.window_size :]
+        overflow = self._messages[: -self.window_size]
         new_summary = self._summarize(overflow)
         if self._summary:
             new_summary = self._summary + "\n" + new_summary

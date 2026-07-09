@@ -23,6 +23,7 @@ def _strip_json_fence(text: str) -> str:
 
 # ===== 验证器 =====
 
+
 def verify_result(
     question: str,
     answer: str,
@@ -32,14 +33,16 @@ def verify_result(
     """验证 LLM 输出质量。返回 (是否通过, 原因)。"""
     llm = model or create_chat_model()
     prompt = [
-        SystemMessage(content="""你是答案质量验证器。评估以下回答是否准确、完整地回答了用户问题。
+        SystemMessage(
+            content="""你是答案质量验证器。评估以下回答是否准确、完整地回答了用户问题。
 
 判断标准：
 1. 是否直接回答了问题
 2. 是否有事实错误
 3. 是否遗漏关键信息
 
-输出 JSON：{"passed": true/false, "reason": "..."}"""),
+输出 JSON：{"passed": true/false, "reason": "..."}"""
+        ),
         HumanMessage(content=f"问题：{question}\n\n回答：{answer[:2000]}\n\n工具调用次数：{tool_calls}"),
     ]
     try:
@@ -52,6 +55,7 @@ def verify_result(
 
 # ===== 反思器 =====
 
+
 def reflect_on_failure(
     question: str,
     answer: str,
@@ -61,10 +65,12 @@ def reflect_on_failure(
     """反思失败原因，生成改进建议。"""
     llm = model or create_chat_model()
     prompt = [
-        SystemMessage(content="""你是 Agent 性能反思器。分析为什么回答没有通过验证，提出具体的改进策略。
+        SystemMessage(
+            content="""你是 Agent 性能反思器。分析为什么回答没有通过验证，提出具体的改进策略。
 
 输出格式（JSON）：
-{"insight": "...", "strategy": "...", "prompt_adjustment": "..."}"""),
+{"insight": "...", "strategy": "...", "prompt_adjustment": "..."}"""
+        ),
         HumanMessage(content=f"问题：{question}\n\n回答：{answer[:2000]}\n\n验证未通过原因：{verification_reason}"),
     ]
     try:
@@ -77,6 +83,7 @@ def reflect_on_failure(
 
 # ===== 自进化 =====
 
+
 def propose_harness_edit(
     question: str,
     answer: str,
@@ -87,12 +94,14 @@ def propose_harness_edit(
     """提出 Harness 配置修改建议。"""
     llm = model or create_chat_model()
     prompt = [
-        SystemMessage(content="""你是 Harness 自进化引擎。基于反思结果，提出具体的 Harness 配置修改。
+        SystemMessage(
+            content="""你是 Harness 自进化引擎。基于反思结果，提出具体的 Harness 配置修改。
 
 可修改项：system prompt 补充、温度调整建议、工具选择建议。
 
 输出 JSON：
-{"prompt_additions": ["..."], "temperature_suggestion": 0.0, "tools_to_add": ["..."], "reasoning": "..."}"""),
+{"prompt_additions": ["..."], "temperature_suggestion": 0.0, "tools_to_add": ["..."], "reasoning": "..."}"""
+        ),
         HumanMessage(content=f"问题：{question}\n\n当前 system prompt：{current_prompt[:500]}\n\n反思：{reflection}"),
     ]
     try:
@@ -103,6 +112,7 @@ def propose_harness_edit(
 
 
 # ===== Harness 循环执行器 =====
+
 
 class HarnessRunner:
     """根据 Harness 级别包装图执行。"""
@@ -152,12 +162,14 @@ class HarnessRunner:
 
             # 验证
             passed, reason = verify_result(question, answer, tool_calls)
-            emitter_callback({
-                "type": "verify",
-                "pipeline": "harness",
-                "passed": passed,
-                "reason": f"[{self.level}] 验证 #{self.attempts}: {reason}",
-            })
+            emitter_callback(
+                {
+                    "type": "verify",
+                    "pipeline": "harness",
+                    "passed": passed,
+                    "reason": f"[{self.level}] 验证 #{self.attempts}: {reason}",
+                }
+            )
 
             if passed:
                 break
@@ -169,33 +181,32 @@ class HarnessRunner:
             if self.level in ("reflect", "self_evolve"):
                 insight = reflect_on_failure(question, answer, reason)
                 self.reflections.append(insight)
-                emitter_callback({
-                    "type": "reflect",
-                    "pipeline": "harness",
-                    "insight": f"[反思] {insight}",
-                })
+                emitter_callback(
+                    {
+                        "type": "reflect",
+                        "pipeline": "harness",
+                        "insight": f"[反思] {insight}",
+                    }
+                )
 
                 # 自进化：提出配置修改
                 if self.level == "self_evolve":
-                    system_msg = next(
-                        (m.content for m in messages if isinstance(m, SystemMessage)),
-                        ""
-                    )
+                    system_msg = next((m.content for m in messages if isinstance(m, SystemMessage)), "")
                     edit = propose_harness_edit(question, answer, insight, system_msg)
                     self.harness_edits.append(edit)
-                    emitter_callback({
-                        "type": "harness_edit",
-                        "pipeline": "harness",
-                        "change": json.dumps(edit, ensure_ascii=False)[:200],
-                    })
+                    emitter_callback(
+                        {
+                            "type": "harness_edit",
+                            "pipeline": "harness",
+                            "change": json.dumps(edit, ensure_ascii=False)[:200],
+                        }
+                    )
 
                     # 应用 prompt 修改到下一轮
                     if edit.get("prompt_additions"):
                         additions = " ".join(edit["prompt_additions"])
                         new_system = system_msg + f"\n\n[Harness 自进化 #{self.attempts}]\n{additions}"
-                        state["messages"] = [
-                            SystemMessage(content=new_system)
-                        ] + [m for m in messages if isinstance(m, HumanMessage)]
+                        state["messages"] = [SystemMessage(content=new_system)] + [m for m in messages if isinstance(m, HumanMessage)]
 
         return last_result or {}
 

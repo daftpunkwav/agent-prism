@@ -31,9 +31,7 @@ class FrameworkAdapter(Protocol):
     framework_id: str
     display_name: str
 
-    async def run(
-        self, question: str, config: PipelineConfig
-    ) -> AsyncIterator[ArenaEvent]:
+    async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
         """流式运行并产出 ArenaEvent。"""
         ...
 
@@ -96,16 +94,10 @@ class FrameworkAdapterRegistry:
             return None
 
     def list_available(self) -> list[dict[str, str]]:
-        return [
-            {"id": a.framework_id, "name": a.display_name, "status": "available"}
-            for a in self._adapters.values()
-        ]
+        return [{"id": a.framework_id, "name": a.display_name, "status": "available"} for a in self._adapters.values()]
 
     def list_reserved(self) -> list[dict[str, str]]:
-        return [
-            {"id": fid, "name": label.split(" — ")[0], "status": "reserved"}
-            for fid, label in self._reserved.items()
-        ]
+        return [{"id": fid, "name": label.split(" — ")[0], "status": "reserved"} for fid, label in self._reserved.items()]
 
     def add_change_listener(self, listener) -> None:
         """注册变更监听器。"""

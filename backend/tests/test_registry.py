@@ -12,9 +12,7 @@ class _FakeAdapter:
     framework_id = "fake"
     display_name = "Fake"
 
-    async def run(
-        self, question: str, config: PipelineConfig
-    ) -> AsyncIterator[ArenaEvent]:  # pragma: no cover - 仅用于类型
+    async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:  # pragma: no cover - 仅用于类型
         yield ArenaEvent(type="complete", pipeline="Fake")
 
 

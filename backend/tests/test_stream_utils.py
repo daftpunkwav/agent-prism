@@ -26,9 +26,7 @@ def test_list_of_text_dict_blocks():
 
 
 def test_list_of_object_blocks_with_text_attr():
-    chunk = SimpleNamespace(
-        content=[SimpleNamespace(text="foo"), SimpleNamespace(text="bar")]
-    )
+    chunk = SimpleNamespace(content=[SimpleNamespace(text="foo"), SimpleNamespace(text="bar")])
     assert extract_chunk_text(chunk) == "foobar"
 
 
