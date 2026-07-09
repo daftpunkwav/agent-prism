@@ -1,25 +1,30 @@
-"""Agent 工作空间 — 每个 Agent 运行实例的隔离文件系统。"""
+"""Agent 工作空间 — 每个 Agent 运行实例的隔离文件系统。
+
+使用 contextvars.ContextVar 而非 threading.local：
+asyncio 任务可能在不同线程间调度，threading.local 会在 await 时丢失上下文；
+contextvars 是 Python 异步栈感知的官方方案。
+"""
 
 from __future__ import annotations
 
 import os
-import threading
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 
-# 线程本地存储当前运行的工作空间名称
-_thread_local = threading.local()
+# 上下文变量：当前请求/任务的工作空间名称
+_current_workspace: ContextVar[str | None] = ContextVar("current_workspace", default=None)
 
 
 def set_current_workspace(name: str) -> None:
-    _thread_local.workspace_name = name
+    _current_workspace.set(name)
 
 
 def clear_current_workspace() -> None:
-    _thread_local.workspace_name = ""
+    _current_workspace.set(None)
 
 
 def get_current_workspace_name() -> str | None:
-    return getattr(_thread_local, "workspace_name", None)
+    return _current_workspace.get()
 
 
 @dataclass
@@ -40,20 +45,18 @@ class Workspace:
     created_at: str = ""
 
     def _normalize(self, path: str) -> str:
-        """规范化路径，防止目录遍历。"""
-        # 拒绝绝对路径
+        """规范化路径，防止目录遍历。返回空串表示非法。"""
         path = path.strip()
         if not path or path.startswith("/") or path.startswith("\\"):
             return ""
-        # 规范化
-        path = os.path.normpath(path).replace("\\", "/")
+        normalized = os.path.normpath(path).replace("\\", "/")
         # 拒绝向上遍历
-        if path in ("..", "../", ".") or path.startswith("../"):
+        if normalized in ("..", "../", ".") or normalized.startswith("../"):
             return ""
         # 移除可能的前导 ./
-        if path.startswith("./"):
-            path = path[2:]
-        return path
+        if normalized.startswith("./"):
+            normalized = normalized[2:]
+        return normalized
 
     def list_files(self, dir_path: str = "") -> list[str]:
         """列出目录下的文件。"""

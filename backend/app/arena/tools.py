@@ -30,12 +30,12 @@ def get_workspace_mgr() -> WorkspaceManager:
 
 
 @tool
-def get_current_time(format: str = "iso") -> str:
-    """获取当前 UTC 时间。format 可选: iso（默认）、readable、timestamp。"""
+def get_current_time(time_format: str = "iso") -> str:
+    """获取当前 UTC 时间。time_format 可选: iso（默认）、readable、timestamp。"""
     now = datetime.now(timezone.utc)
-    if format == "readable":
+    if time_format == "readable":
         return now.strftime("%Y-%m-%d %H:%M:%S UTC")
-    if format == "timestamp":
+    if time_format == "timestamp":
         return str(int(now.timestamp()))
     return now.isoformat()
 
@@ -181,7 +181,10 @@ def _safe_run_code(code: str, timeout: int = 5) -> str:
     # 避免并发请求间 stdout 互相覆盖。
     safe_ns = {
         "__builtins__": {
-            "print": lambda *a, **k: captured.write(" ".join(str(x) for x in a) + "\n"),
+            # 支持 print(*objects, sep, end, file, flush) 全签名
+            "print": lambda *args, sep=" ", end="\n", file=None, flush=False: (
+                captured.write(sep.join(str(a) for a in args) + end)
+            ),
             "len": len,
             "range": range,
             "str": str,
