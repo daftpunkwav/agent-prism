@@ -79,6 +79,9 @@ class ArenaEvent(BaseModel):
     metrics: PipelineMetrics | None = None
     message: str = ""
     token_stats: dict[str, int | float] | None = None
+    # 工作空间名称（仅在 complete / token_update 等终结事件携带）
+    # 前端用它直接打开对应 Agent 的工作空间侧栏
+    workspace: str = ""
 
 
 class ProviderConfigPublic(BaseModel):

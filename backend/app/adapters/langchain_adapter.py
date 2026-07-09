@@ -130,6 +130,7 @@ class LangChainAdapter:
                     steps=step,
                 ),
                 token_stats=tracker.as_dict(),
+                workspace=ws_name,
             )
         except Exception as exc:  # noqa: BLE001
             yield ArenaEvent(
@@ -148,6 +149,9 @@ class LangChainAdapter:
                     steps=step,
                 ),
                 token_stats=tracker.as_dict(),
+                workspace=ws_name,
             )
         finally:
             clear_current_workspace()
+            # 释放内存中的 workspace，避免长会话累积
+            get_workspace_mgr().remove(ws_name)

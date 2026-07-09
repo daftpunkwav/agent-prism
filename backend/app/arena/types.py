@@ -31,6 +31,7 @@ EventType = Literal[
     "observation",
     "verify",
     "reflect",
+    "harness_edit",
     "complete",
     "error",
     "token_update",

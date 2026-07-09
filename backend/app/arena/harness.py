@@ -20,13 +20,56 @@ __all__ = [
     "get_harness_description",
 ]
 
-# 去除 LLM 输出中常见的 ```json ... ``` 或 ``` ... ``` 代码块包裹
-_JSON_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
+# 去除 LLM 输出中常见的 ```json ... ``` 或 ``` ... ``` 代码块包裹 — 容忍前后空白
+_JSON_FENCE = re.compile(r"```(?:json|JSON)?\s*\n?(.*?)\n?\s*```", re.DOTALL)
 
 
 def _strip_json_fence(text: str) -> str:
-    """去除 LLM 返回的 markdown code fence，便于后续 json.loads 解析。"""
-    return _JSON_FENCE.sub("", text).strip()
+    """去除 LLM 返回的 markdown code fence，便于后续 json.loads 解析。
+
+    优先匹配首个 ```` ```json ... ``` ```` 块；若不存在则去掉所有行首 ```` ``` ```` 标记。
+    """
+    match = _JSON_FENCE.search(text)
+    if match:
+        return match.group(1).strip()
+    # 退化路径：去掉所有 fence-like 行
+    cleaned = re.sub(r"^```(?:json|JSON)?\s*$", "", text, flags=re.MULTILINE)
+    return cleaned.strip()
+
+
+# 自进化 prompt_additions 的注入防护：剥离可能覆盖系统指令的危险 token，
+# 并限制总长度避免上下文爆炸
+_INJECTION_PATTERNS = [
+    re.compile(r"ignore\s+(?:all\s+)?previous\s+instructions", re.IGNORECASE),
+    re.compile(r"disregard\s+(?:the\s+)?system\s+prompt", re.IGNORECASE),
+    re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
+    re.compile(r"<\|.*?\|>"),  # Anthropic/OpenAI 特殊 token
+    re.compile(r"\[INST\]|\[/INST\]", re.IGNORECASE),  # Llama 风格
+]
+_MAX_ADDITION_CHARS = 1000
+
+
+def _sanitize_prompt_additions(additions: list[str] | None) -> str:
+    """清洗 LLM 建议的 prompt 追加内容，防止 prompt injection。"""
+    if not additions:
+        return ""
+    cleaned: list[str] = []
+    for raw in additions:
+        if not isinstance(raw, str):
+            continue
+        text = raw.strip()
+        if not text:
+            continue
+        # 剥离危险模式
+        for pat in _INJECTION_PATTERNS:
+            text = pat.sub("[已过滤]", text)
+        # 限制单条长度
+        text = text[:500]
+        cleaned.append(text)
+        if sum(len(c) for c in cleaned) >= _MAX_ADDITION_CHARS:
+            break
+    joined = " ".join(cleaned)[:_MAX_ADDITION_CHARS]
+    return joined
 
 
 # ===== 验证器 =====
@@ -151,8 +194,10 @@ class HarnessRunner:
         """带验证/反思/自进化的运行。"""
         state = dict(initial_state)
         last_result = None
+        # max_retries = 最大额外重试次数；首次运行 = 第 1 次，最多 total = max_retries+1 次
+        total_runs = self.max_retries + 1
 
-        while self.attempts <= self.max_retries:
+        while self.attempts < total_runs:
             self.attempts += 1
 
             # 运行图
@@ -182,7 +227,7 @@ class HarnessRunner:
             if passed:
                 break
 
-            if self.attempts >= self.max_retries:
+            if self.attempts >= total_runs:
                 break
 
             # 反思（reflect / self_evolve）
@@ -210,11 +255,13 @@ class HarnessRunner:
                         }
                     )
 
-                    # 应用 prompt 修改到下一轮
-                    if edit.get("prompt_additions"):
-                        additions = " ".join(edit["prompt_additions"])
+                    # 应用 prompt 修改到下一轮（经过 sanitize 防注入）
+                    additions = _sanitize_prompt_additions(edit.get("prompt_additions"))
+                    if additions:
                         new_system = system_msg + f"\n\n[Harness 自进化 #{self.attempts}]\n{additions}"
-                        state["messages"] = [SystemMessage(content=new_system)] + [m for m in messages if isinstance(m, HumanMessage)]
+                        state["messages"] = [SystemMessage(content=new_system)] + [
+                            m for m in messages if isinstance(m, HumanMessage)
+                        ]
 
         return last_result or {}
 
