@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from app.arena.harness import apply_harness_level
-from app.arena.reasoning import apply_reasoning_mode
+from app.arena.harness import HarnessLevel, apply_harness_level
+from app.arena.reasoning import ReasoningMode, apply_reasoning_mode
 from app.models import PromptProfile
 
 BASE_SYSTEM = """你是 AgentPrism Arena 中的实验 Agent，使用 ReAct 模式完成任务。
 可用工具：get_current_time（获取当前时间）、calculate（计算简单数学表达式）、write_file/create_file/read_file/list_files（文件操作）、run_code（代码执行）。
 回答要简洁准确。需要工具时先说明理由再调用。"""
-
-BASE_USER_TEMPLATE = "{question}"
 
 PROFILES: dict[PromptProfile, dict[str, str]] = {
     "zero_shot": {
@@ -43,18 +41,15 @@ Q: 计算 12*8 → Thought: 需要计算 → Action: calculate(12*8) → 回答 
 def build_messages(
     question: str,
     profile: PromptProfile,
-    reasoning: str = "react",
-    harness: str = "bare",
+    reasoning: ReasoningMode = "react",
+    harness: HarnessLevel = "bare",
 ) -> tuple[str, str]:
     """构建 system + user prompt，集成推理模式和 Harness 级别。"""
     cfg = PROFILES[profile]
     system = cfg["system"]
-    user = BASE_USER_TEMPLATE.format(question=question.strip()) + cfg["user_suffix"]
+    user = question.strip() + cfg["user_suffix"]
 
-    # 应用推理模式
     system, user = apply_reasoning_mode(system, user, reasoning)
-
-    # 应用 Harness 级别
     system, user = apply_harness_level(system, user, harness)
 
     return system, user

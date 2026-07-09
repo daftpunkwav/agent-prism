@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -10,6 +11,14 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.arena.llm import create_chat_model
 
 HarnessLevel = Literal["bare", "verify", "reflect", "self_evolve"]
+
+# 去除 LLM 输出中常见的 ```json ... ``` 或 ``` ... ``` 代码块包裹
+_JSON_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
+
+
+def _strip_json_fence(text: str) -> str:
+    """去除 LLM 返回的 markdown code fence，便于后续 json.loads 解析。"""
+    return _JSON_FENCE.sub("", text).strip()
 
 
 # ===== 验证器 =====
@@ -35,14 +44,7 @@ def verify_result(
     ]
     try:
         response = llm.invoke(prompt)
-        text = response.content.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        result = json.loads(text.strip())
+        result = json.loads(_strip_json_fence(response.content))
         return result.get("passed", False), result.get("reason", "无法解析验证结果")
     except Exception:
         return True, "验证解析失败，默认通过"
@@ -67,14 +69,7 @@ def reflect_on_failure(
     ]
     try:
         response = llm.invoke(prompt)
-        text = response.content.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        result = json.loads(text.strip())
+        result = json.loads(_strip_json_fence(response.content))
         return result.get("strategy", result.get("insight", "继续尝试"))
     except Exception:
         return "反思解析失败，使用原始策略重试"
@@ -102,14 +97,7 @@ def propose_harness_edit(
     ]
     try:
         response = llm.invoke(prompt)
-        text = response.content.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        return json.loads(text.strip())
+        return json.loads(_strip_json_fence(response.content))
     except Exception:
         return {"prompt_additions": [], "reasoning": "自进化解析失败"}
 
