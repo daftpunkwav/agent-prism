@@ -8,8 +8,8 @@ import json
 from fastapi import APIRouter, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 
+from app.adapters.common import get_workspace_mgr
 from app.arena.runner import RunnerPool, build_registry
-from app.arena.workspace import get_workspace_mgr
 from app.models import ArenaRunRequest, ProjectCreate
 
 router = APIRouter(prefix="/api/arena", tags=["arena"])
