@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 
 DimensionId = Literal["framework", "prompt", "reasoning", "context", "harness"]
 PromptProfile = Literal["zero_shot", "few_shot", "cot_prompt", "structured"]
+
+# EventType 增加 "thinking" 用于解析 Anthropic extended thinking 块
 EventType = Literal[
     "thought",
     "action",
@@ -17,7 +19,7 @@ EventType = Literal[
     "complete",
     "error",
     "token_update",
-    "thinking",      # extended thinking 块（Anthropic extended thinking）
+    "thinking",
 ]
 
 

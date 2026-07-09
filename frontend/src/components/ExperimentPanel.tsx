@@ -109,9 +109,9 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
             pendingTempRef.current = v;
             setConfig({ ...config, temperature: v });
           }}
-          onMouseUp={flushTemperature}
-          onTouchEnd={flushTemperature}
-          onKeyUp={flushTemperature}
+          // 拖动/键盘/触屏释放时统一提交 — 避免 onKeyUp 在长按方向键时反复触发
+          onPointerUp={flushTemperature}
+          aria-label="Temperature 调节"
           className="w-full h-1.5 appearance-none bg-border rounded-full cursor-pointer
             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
             [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground

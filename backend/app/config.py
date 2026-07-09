@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+from functools import cached_property
 from pathlib import Path
 from typing import Literal
 
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -29,7 +31,7 @@ class Settings(BaseSettings):
     backend_port: int = 8000
     cors_origins: str = "http://localhost:3000"
 
-    @property
+    @cached_property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
@@ -37,8 +39,8 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-class ProviderConfig(BaseSettings):
-    """用户可在 Settings 页面覆盖的运行时 Provider 配置。"""
+class ProviderConfig(BaseModel):
+    """用户在 Settings 页面配置的运行时 Provider 设置。仅从 JSON 加载，不读 env。"""
 
     provider_name: str = "StepFun"
     notes: str = ""
