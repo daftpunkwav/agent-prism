@@ -3,14 +3,24 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
 from app.adapters.common import get_workspace_mgr
 from app.models import Project, ProjectCreate
 
+logger = logging.getLogger(__name__)
+
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 PROJECTS_FILE = DATA_DIR / "projects.json"
+
+
+def _generate_project_id() -> str:
+    """生成唯一项目 ID；同毫秒创建多个项目时追加纳秒避免冲突。"""
+    now = datetime.now(timezone.utc)
+    base = f"proj_{now.strftime('%Y%m%d_%H%M%S')}_{now.microsecond:06d}"
+    return base
 
 
 class ProjectManager:
@@ -19,21 +29,30 @@ class ProjectManager:
         self._load()
 
     def _load(self) -> None:
-        if PROJECTS_FILE.exists():
+        if not PROJECTS_FILE.exists():
+            return
+        try:
+            data = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            logger.warning("解析 %s 失败: %s", PROJECTS_FILE, exc)
+            return
+        for p in data:
             try:
-                data = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
-                for p in data:
-                    self._projects[p["id"]] = Project(**p)
-            except Exception:
-                pass
+                self._projects[p["id"]] = Project(**p)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("跳过无效项目记录 %s: %s", p.get("id"), exc)
 
     def _save(self) -> None:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        projects = [p.model_dump() for p in self._projects.values()]
-        PROJECTS_FILE.write_text(
-            json.dumps(projects, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        try:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            projects = [p.model_dump() for p in self._projects.values()]
+            PROJECTS_FILE.write_text(
+                json.dumps(projects, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            # 写失败不应让上层 API 500，但需记录以便排障
+            logger.error("保存 %s 失败: %s", PROJECTS_FILE, exc)
 
     def list_projects(self) -> list[Project]:
         return sorted(self._projects.values(), key=lambda p: p.created_at, reverse=True)
@@ -56,19 +75,20 @@ class ProjectManager:
 
         all_files = workspace_files or ws_data
         results = []
-        for label in create.pipeline_labels:
-            ws = ws_mgr.get(f"{label}_")
+        for ws_name in create.workspace_names:
+            # workspace_names 是 adapter 生成的完整名称（含毫秒时间戳），
+            # 直接精确匹配，避免前缀模糊查找导致同 label 多次跑时互相覆盖。
+            ws = ws_mgr.get(ws_name)
             if ws:
-                file_count = len(ws.files)
                 results.append({
-                    "label": label,
-                    "workspace": f"{label}_",
-                    "file_count": file_count,
+                    "label": ws_name,
+                    "workspace": ws_name,
+                    "file_count": len(ws.files),
                     "files": list(ws.files.keys()),
                 })
 
         project = Project(
-            id=f"proj_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
+            id=_generate_project_id(),
             name=create.name,
             question=create.question,
             dimension=create.dimension,
