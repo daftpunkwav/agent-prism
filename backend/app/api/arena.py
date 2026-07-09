@@ -14,6 +14,8 @@ from app.arena.router import DimensionRouter, list_dimension_options
 from app.arena.runner import RunnerPool, build_registry
 from app.models import ArenaRunRequest, ProjectCreate
 
+router = APIRouter(prefix="/api/arena", tags=["arena"])
+
 _DIMENSION_META: list[dict] = [
     {
         "id": "framework",
