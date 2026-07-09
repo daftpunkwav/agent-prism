@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 
-from app.adapters.base import FrameworkAdapterRegistry
+from app.adapters.base import AdapterReservedError, FrameworkAdapterRegistry
 from app.adapters.langchain_adapter import LangChainAdapter
 from app.adapters.langgraph_adapter import LangGraphAdapter
 from app.arena.router import DimensionRouter
 from app.models import ArenaEvent, ArenaRunRequest, PipelineConfig
+
+logger = logging.getLogger(__name__)
 
 
 def build_registry() -> FrameworkAdapterRegistry:
@@ -51,12 +54,22 @@ class RunnerPool:
             except asyncio.CancelledError:
                 # 客户端断开 — 静默传播，由调用方吞掉
                 raise
-            except Exception as exc:  # noqa: BLE001
+            except AdapterReservedError as exc:
                 await queue.put(
                     ArenaEvent(
                         type="error",
                         pipeline=cfg.label,
-                        message=str(exc),
+                        message=f"框架「{exc.framework_id}」尚未实现",
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("Pipeline %s 失败", cfg.label)
+                # 仅暴露异常类型名而非详细消息，避免泄露 provider 内部细节
+                await queue.put(
+                    ArenaEvent(
+                        type="error",
+                        pipeline=cfg.label,
+                        message=f"{type(exc).__name__}: {str(exc)[:200]}",
                     )
                 )
             finally:

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from app.arena.types import ContextStrategy
 
-ContextStrategy = Literal["sliding", "summary", "vector", "hybrid"]
+__all__ = ["ContextStrategy", "ContextManager"]
 
 
 class ContextManager:

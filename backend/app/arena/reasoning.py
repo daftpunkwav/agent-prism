@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from app.arena.types import ReasoningMode
 
-ReasoningMode = Literal["react", "cot_tool", "tot", "reflexion"]
+__all__ = [
+    "ReasoningMode",
+    "REASONING_PROMPTS",
+    "apply_reasoning_mode",
+    "get_reasoning_description",
+]
 
 
 REASONING_PROMPTS: dict[ReasoningMode, dict[str, str]] = {
