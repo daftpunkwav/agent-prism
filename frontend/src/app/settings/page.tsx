@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, ExternalLink, Eye, EyeOff, Loader2, Zap } from "lucide-react";
 import { ProviderConfig, fetchProvider, saveProvider, testProvider } from "@/lib/api";
 
@@ -28,6 +28,7 @@ export default function SettingsPage() {
     max_output_tokens: 2048,
   });
   const abortRef = useRef<AbortController | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,10 +64,18 @@ export default function SettingsPage() {
     return () => ac.abort();
   }, []);
 
-  const flash = (msg: string) => {
+  const flash = useCallback((msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(msg);
-    setTimeout(() => setToast(null), 3200);
-  };
+    toastTimerRef.current = setTimeout(() => setToast(null), 3200);
+  }, []);
+
+  // 卸载时清理 toast 定时器
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -146,6 +155,7 @@ export default function SettingsPage() {
               target="_blank"
               rel="noreferrer"
               className="btn-ghost shrink-0"
+              aria-label="打开官网链接"
             >
               <ExternalLink className="h-4 w-4" />
             </a>
@@ -165,6 +175,7 @@ export default function SettingsPage() {
               type="button"
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
               onClick={() => setShowKey(!showKey)}
+              aria-label={showKey ? "隐藏 API Key" : "显示 API Key"}
             >
               {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>

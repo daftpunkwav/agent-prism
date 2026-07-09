@@ -27,6 +27,7 @@ export function ThemeToggle() {
       style={{ height: 34, width: 34, padding: 0 }}
       onClick={toggle}
       aria-label="切换主题"
+      aria-pressed={theme === "dark"}
       title={theme === "dark" ? "切换到浅色" : "切换到深色"}
     >
       {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
