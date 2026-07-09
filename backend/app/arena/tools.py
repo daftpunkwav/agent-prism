@@ -10,8 +10,9 @@ from __future__ import annotations
 import ast
 import io
 import sys
-import traceback as tb_mod
+import threading
 from datetime import datetime, timezone
+from typing import Any
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
@@ -64,15 +65,15 @@ def _safe_calculate(expression: str) -> str:
     )
     for node in ast.walk(tree):
         if not isinstance(node, ALLOWED_NODES):
-            return f"错误: 不允许的语法元素: {type(node).__name__}"
+            return "错误: 不允许的语法元素"
         if isinstance(node, ast.Constant) and not isinstance(node.value, (int, float)):
             return "错误: 只能使用数字"
 
     try:
         result = eval(compile(tree, "<expr>", "eval"), {"__builtins__": {}}, {})
         return str(result)
-    except Exception as exc:
-        return f"计算错误: {exc}"
+    except Exception:
+        return "计算错误: 表达式无法求值"
 
 
 @tool
@@ -173,62 +174,83 @@ class _RunCodeInput(BaseModel):
     timeout: int = Field(default=5, description="超时秒数（最大 10）")
 
 
-def _safe_run_code(code: str, timeout: int = 5) -> str:
-    """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
-    timeout = min(timeout, 10)
-    captured = io.StringIO()
-    # 重定向到独立 StringIO，不污染全局 sys.stdout，
-    # 避免并发请求间 stdout 互相覆盖。
-    safe_ns = {
-        "__builtins__": {
-            # 支持 print(*objects, sep, end, file, flush) 全签名
-            "print": lambda *args, sep=" ", end="\n", file=None, flush=False: captured.write(sep.join(str(a) for a in args) + end),
-            "len": len,
-            "range": range,
-            "str": str,
-            "int": int,
-            "float": float,
-            "bool": bool,
-            "list": list,
-            "dict": dict,
-            "set": set,
-            "tuple": tuple,
-            "sum": sum,
-            "min": min,
-            "max": max,
-            "abs": abs,
-            "round": round,
-            "sorted": sorted,
-            "enumerate": enumerate,
-            "zip": zip,
-            "map": map,
-            "filter": filter,
-            "all": all,
-            "any": any,
-            "True": True,
-            "False": False,
-            "None": None,
-            "isinstance": isinstance,
-            "type": type,
-            "Exception": Exception,
-            "ValueError": ValueError,
-            "TypeError": TypeError,
-            "KeyError": KeyError,
-            "IndexError": IndexError,
-            "AttributeError": AttributeError,
-        }
-    }
+# 沙箱允许的安全内置函数白名单
+_SAFE_BUILTINS: dict[str, Any] = {
+    "print": lambda *args, sep=" ", end="\n", file=None, flush=False: sys.stdout.write(  # type: ignore[no-any-return]
+        sep.join(str(a) for a in args) + end
+    ),
+    "len": len,
+    "range": range,
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "list": list,
+    "dict": dict,
+    "set": set,
+    "tuple": tuple,
+    "sum": sum,
+    "min": min,
+    "max": max,
+    "abs": abs,
+    "round": round,
+    "sorted": sorted,
+    "enumerate": enumerate,
+    "zip": zip,
+    "map": map,
+    "filter": filter,
+    "all": all,
+    "any": any,
+    "isinstance": isinstance,
+}
+
+
+def _execute_in_namespace(code: str, safe_ns: dict[str, Any], captured: io.StringIO) -> str | None:
+    """在安全命名空间中执行代码。返回错误信息，成功则返回 None。"""
     old_stdout, old_stderr = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = captured, captured
     try:
         compiled = compile(code, "<run_code>", "exec")
         exec(compiled, safe_ns, safe_ns)
-        output = captured.getvalue()
-        return output if output else "(代码执行成功，无输出)"
-    except Exception:
-        return f"执行错误:\n{tb_mod.format_exc()}"
+        return None
+    except SyntaxError:
+        return "执行错误: 语法错误"
+    except NameError as exc:
+        return f"执行错误: {exc}"
+    except TypeError as exc:
+        return f"执行错误: {exc}"
+    except ValueError as exc:
+        return f"执行错误: {exc}"
+    except Exception as exc:  # noqa: BLE001
+        return f"执行错误: {type(exc).__name__}"
     finally:
         sys.stdout, sys.stderr = old_stdout, old_stderr
+
+
+def _safe_run_code(code: str, timeout: int = 5) -> str:
+    """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
+    timeout = min(timeout, 10)
+    captured = io.StringIO()
+    safe_ns: dict[str, Any] = {"__builtins__": _SAFE_BUILTINS}
+
+    result_holder: list[str | None] = [None]
+
+    def _target() -> None:
+        result_holder[0] = _execute_in_namespace(code, safe_ns, captured)
+
+    thread = threading.Thread(target=_target, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout)
+
+    if thread.is_alive():
+        return "错误: 代码执行超时（已终止）"
+
+    error = result_holder[0]
+    if error:
+        return error
+
+    output = captured.getvalue()
+    return output if output else "(代码执行成功，无输出)"
 
 
 @tool(args_schema=_RunCodeInput)

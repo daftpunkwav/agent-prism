@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from functools import cached_property
 from pathlib import Path
 
@@ -13,6 +15,31 @@ from app.arena.types import ApiFormat
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 PROVIDER_CONFIG_PATH = DATA_DIR / "provider_config.json"
+
+
+def _atomic_write_json(path: Path, payload: str) -> bool:
+    """原子写入 JSON：先写 .tmp，再 rename，旧文件备份为 .bak。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(payload)
+        # 先备份旧文件
+        bak_path = path.with_suffix(path.suffix + ".bak")
+        if path.exists():
+            try:
+                path.replace(bak_path)
+            except OSError:
+                pass
+        os.replace(tmp_path, str(path))
+        return True
+    except OSError:
+        # 清理临时文件
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        return False
 
 
 class Settings(BaseSettings):
@@ -81,9 +108,7 @@ def load_provider_config() -> ProviderConfig:
     )
 
 
-def save_provider_config(config: ProviderConfig) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    PROVIDER_CONFIG_PATH.write_text(
-        config.model_dump_json(indent=2),
-        encoding="utf-8",
-    )
+def save_provider_config(config: ProviderConfig) -> bool:
+    """保存 Provider 配置到 JSON 文件（原子写入 + .bak 备份）。返回是否成功。"""
+    json_str = config.model_dump_json(indent=2)
+    return _atomic_write_json(PROVIDER_CONFIG_PATH, json_str)
