@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.arena.llm import create_chat_model
 from app.arena.types import HarnessLevel
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "HarnessLevel",
@@ -23,10 +26,33 @@ __all__ = [
 # 去除 LLM 输出中常见的 ```json ... ``` 或 ``` ... ``` 代码块包裹
 _JSON_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
+# 提示注入模式：检测 LLM 是否试图篡改系统指令
+_INJECTION_PATTERNS = re.compile(
+    r"(?i)(ignore\s+(all\s+)?previous\s+instructions?|"
+    r"you\s+are\s+now\s+|"
+    r"disregard\s+|"
+    r"override\s+(your\s+)?(system\s+)?(prompt|instructions?)|"
+    r"new\s+instructions?\s*:)"
+)
+
 
 def _strip_json_fence(text: str) -> str:
     """去除 LLM 返回的 markdown code fence，便于后续 json.loads 解析。"""
     return _JSON_FENCE.sub("", text).strip()
+
+
+def _sanitize_for_json(text: str) -> str:
+    """清理 LLM 输出中可能的提示注入内容，保留有效 JSON。"""
+    # 移除 JSON 外的注入文本
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        return _strip_json_fence(match.group())
+    return _strip_json_fence(text)
+
+
+def _detect_injection(text: str) -> bool:
+    """检测文本中是否包含提示注入模式。"""
+    return bool(_INJECTION_PATTERNS.search(text))
 
 
 # ===== 验证器 =====
@@ -39,6 +65,10 @@ def verify_result(
     model=None,
 ) -> tuple[bool, str]:
     """验证 LLM 输出质量。返回 (是否通过, 原因)。"""
+    # 检测提示注入
+    if _detect_injection(answer):
+        return False, "检测到可能的提示注入"
+
     llm = model or create_chat_model()
     prompt = [
         SystemMessage(
@@ -55,7 +85,8 @@ def verify_result(
     ]
     try:
         response = llm.invoke(prompt)
-        result = json.loads(_strip_json_fence(response.content))
+        cleaned = _sanitize_for_json(response.content)
+        result = json.loads(cleaned)
         return result.get("passed", False), result.get("reason", "无法解析验证结果")
     except Exception:
         return True, "验证解析失败，默认通过"
@@ -83,7 +114,8 @@ def reflect_on_failure(
     ]
     try:
         response = llm.invoke(prompt)
-        result = json.loads(_strip_json_fence(response.content))
+        cleaned = _sanitize_for_json(response.content)
+        result = json.loads(cleaned)
         return result.get("strategy", result.get("insight", "继续尝试"))
     except Exception:
         return "反思解析失败，使用原始策略重试"
@@ -114,7 +146,8 @@ def propose_harness_edit(
     ]
     try:
         response = llm.invoke(prompt)
-        return json.loads(_strip_json_fence(response.content))
+        cleaned = _sanitize_for_json(response.content)
+        return json.loads(cleaned)
     except Exception:
         return {"prompt_additions": [], "reasoning": "自进化解析失败"}
 
@@ -152,7 +185,7 @@ class HarnessRunner:
         state = dict(initial_state)
         last_result = None
 
-        while self.attempts <= self.max_retries:
+        while self.attempts < self.max_retries:
             self.attempts += 1
 
             # 运行图
@@ -199,7 +232,9 @@ class HarnessRunner:
 
                 # 自进化：提出配置修改
                 if self.level == "self_evolve":
-                    system_msg = next((m.content for m in messages if isinstance(m, SystemMessage)), "")
+                    system_msg = next(
+                        (m.content for m in messages if isinstance(m, SystemMessage)), ""
+                    )
                     edit = propose_harness_edit(question, answer, insight, system_msg)
                     self.harness_edits.append(edit)
                     emitter_callback(
@@ -214,7 +249,9 @@ class HarnessRunner:
                     if edit.get("prompt_additions"):
                         additions = " ".join(edit["prompt_additions"])
                         new_system = system_msg + f"\n\n[Harness 自进化 #{self.attempts}]\n{additions}"
-                        state["messages"] = [SystemMessage(content=new_system)] + [m for m in messages if isinstance(m, HumanMessage)]
+                        state["messages"] = [
+                            SystemMessage(content=new_system)
+                        ] + [m for m in messages if isinstance(m, HumanMessage)]
 
         return last_result or {}
 

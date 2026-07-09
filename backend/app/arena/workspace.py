@@ -27,13 +27,21 @@ def get_current_workspace_name() -> str | None:
     return _current_workspace.get()
 
 
+# 控制字符集合（含空字节 \x00）
+_CONTROL_CHARS = set(chr(c) for c in range(0, 32)) | {"\x7f"}
+
+
+def _has_control_chars(s: str) -> bool:
+    """检查字符串是否包含控制字符。"""
+    return any(c in _CONTROL_CHARS for c in s)
+
+
 @dataclass
 class WorkspaceFile:
     """工作空间中的文件。"""
 
     path: str
     content: str = ""
-    created_at: str = ""
 
 
 @dataclass
@@ -48,6 +56,9 @@ class Workspace:
         """规范化路径，防止目录遍历。返回空串表示非法。"""
         path = path.strip()
         if not path or path.startswith("/") or path.startswith("\\"):
+            return ""
+        # 拒绝包含控制字符的路径
+        if _has_control_chars(path):
             return ""
         normalized = os.path.normpath(path).replace("\\", "/")
         # 拒绝向上遍历

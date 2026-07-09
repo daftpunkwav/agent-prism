@@ -28,6 +28,7 @@ __all__ = [
     "Project",
     "ProjectCreate",
     "WorkspaceFileUpsert",
+    "PipelineRunResult",
 ]
 
 
@@ -47,7 +48,7 @@ class ArenaRunRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     dimension: DimensionId = "framework"
     # 该维度下用户选中的子项 value 列表；空 = 全选，但至少 2 项（router 校验）
-    selections: list[str] = Field(default_factory=list)
+    selections: list[str] = Field(default_factory=list, max_length=20)
     temperature: float | None = None
 
 
@@ -69,6 +70,8 @@ class PipelineMetrics(BaseModel):
 class ArenaEvent(BaseModel):
     type: EventType
     pipeline: str
+    # 工作空间名称（仅 complete/token_update 阶段填写，供前端定位文件）
+    workspace: str = ""
     content: str = ""
     tool: str = ""
     args: dict[str, Any] = Field(default_factory=dict)
@@ -104,10 +107,13 @@ class ProviderConfigPublic(BaseModel):
 
 
 class ProviderConfigUpdate(BaseModel):
+    """Provider 配置更新请求体。api_key 留空 = 保持已保存的值。"""
+
     provider_name: str = "StepFun"
     notes: str = ""
     website_url: str = ""
-    api_key: str = ""
+    # 空字符串表示"不更新 API Key"（后端保留旧值）
+    api_key: str = Field(default="", max_length=256)
     base_url: str = ""
     use_full_url: bool = True
     api_format: ApiFormat = "anthropic_messages"
@@ -131,29 +137,39 @@ class ConnectionTestResult(BaseModel):
 # ===== 项目管理模型 =====
 
 
+class PipelineRunResult(BaseModel):
+    """单条 Pipeline 运行结果。"""
+
+    label: str
+    workspace: str
+    file_count: int = 0
+    files: list[str] = Field(default_factory=list)
+
+
 class Project(BaseModel):
     id: str
     name: str
     question: str
     dimension: str
     created_at: str
-    results: list[dict] = Field(default_factory=list)
-    # workspace_files: {workspace_name: {file_path: content}} — 嵌套映射
+    # Pipeline 运行结果列表
+    results: list[PipelineRunResult] = Field(default_factory=list)
+    # workspace_files: {workspace_name: {file_path: content}}
     workspace_files: dict[str, dict[str, str]] = Field(default_factory=dict)
     metrics_summary: dict[str, dict] = Field(default_factory=dict)
 
 
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    question: str
-    dimension: str
-    pipeline_labels: list[str]
+    question: str = Field(min_length=1, max_length=8000)
+    dimension: str = Field(min_length=1, max_length=50)
+    pipeline_labels: list[str] = Field(default_factory=list, max_length=10)
     workspace_names: list[str] = Field(default_factory=list)
 
 
 class WorkspaceFileUpsert(BaseModel):
     """工作空间文件保存请求体。"""
 
-    path: str = Field(min_length=1)
+    path: str = Field(min_length=1, max_length=500)
     content: str = ""
     create_only: bool = False
