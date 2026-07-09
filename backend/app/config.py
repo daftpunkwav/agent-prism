@@ -52,6 +52,9 @@ class ProviderConfig(BaseModel):
     auth_field: str = "ANTHROPIC_AUTH_TOKEN"
     model: str = "step-3.7-flash"
     temperature: float = 0.0
+    top_p: float = 1.0
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
     context_window: int = 128_000
     max_input_tokens: int = 120_000
     max_output_tokens: int = 2048
