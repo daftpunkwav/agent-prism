@@ -12,6 +12,8 @@ PromptProfile = Literal["zero_shot", "few_shot", "cot_prompt", "structured"]
 # EventType 增加 "thinking" 用于解析 Anthropic extended thinking 块
 EventType = Literal[
     "thought",
+    "thought_delta",
+    "thought_end",
     "action",
     "observation",
     "verify",
