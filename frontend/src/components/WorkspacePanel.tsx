@@ -270,6 +270,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
               node={node}
               depth={0}
               expanded={expandedDirs.has(node.path)}
+              expandedDirs={expandedDirs}
               onToggle={toggleDir}
               onSelect={setSelectedFile}
               selectedPath={selectedFile}
@@ -383,12 +384,13 @@ interface TreeNodeProps {
   node: FileTreeNode;
   depth: number;
   expanded: boolean;
+  expandedDirs: Set<string>;
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
   selectedPath: string | null;
 }
 
-function TreeNode({ node, depth, expanded, onToggle, onSelect, selectedPath }: TreeNodeProps) {
+function TreeNode({ node, depth, expanded, expandedDirs, onToggle, onSelect, selectedPath }: TreeNodeProps) {
   const isDir = node.children.length > 0;
   const paddingLeft = depth * 12 + 6;
 
@@ -416,7 +418,8 @@ function TreeNode({ node, depth, expanded, onToggle, onSelect, selectedPath }: T
                 key={child.path}
                 node={child}
                 depth={depth + 1}
-                expanded={false}
+                expanded={expandedDirs.has(child.path)}
+                expandedDirs={expandedDirs}
                 onToggle={onToggle}
                 onSelect={onSelect}
                 selectedPath={selectedPath}

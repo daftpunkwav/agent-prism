@@ -29,35 +29,42 @@ interface DisplaySegment {
 /** 将 events 增量归并为 segments。支持 thought_delta 实时累积。 */
 function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
   const segs: DisplaySegment[] = [];
-  // 用 `${type}:${step}` 作 key，thought_delta 同 step 累积到既有段
-  for (const ev of events) {
+  // 用 Map 维护每个 (type, step) 最新的段索引，避免 O(n) 扫描
+  const segIndex = new Map<string, number>();
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i]!;
     const step = ev.step ?? 0;
     const key = `${ev.type}:${step}`;
     if (ev.type === "thought") {
-      segs.push({
+      const s: DisplaySegment = {
         id: `t:${ev.type}:${segs.length}`,
         kind: "thought",
         step,
         text: ev.content || "",
         completed: true,
-      });
+      };
+      segs.push(s);
+      segIndex.set(key, segs.length - 1);
     } else if (ev.type === "thought_delta") {
-      // 找最近一个同 step 的 thought，未完成则追加
-      const tail = [...segs].reverse().find((s) => s.kind === "thought" && s.step === step && !s.completed);
-      if (tail) {
-        tail.text += ev.content || "";
+      const idx = segIndex.get(key);
+      if (idx !== undefined && segs[idx]!.kind === "thought" && !segs[idx]!.completed) {
+        segs[idx]!.text += ev.content || "";
       } else {
-        segs.push({
+        const s: DisplaySegment = {
           id: `t:${ev.type}:${segs.length}`,
           kind: "thought",
           step,
           text: ev.content || "",
           completed: false,
-        });
+        };
+        segs.push(s);
+        segIndex.set(key, segs.length - 1);
       }
     } else if (ev.type === "thought_end") {
-      const tail = [...segs].reverse().find((s) => s.kind === "thought" && s.step === step && !s.completed);
-      if (tail) tail.completed = true;
+      const idx = segIndex.get(key);
+      if (idx !== undefined && segs[idx]!.kind === "thought" && !segs[idx]!.completed) {
+        segs[idx]!.completed = true;
+      }
     } else if (ev.type === "action") {
       segs.push({
         id: key + ":" + segs.length,
