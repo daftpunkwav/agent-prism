@@ -8,6 +8,9 @@ Tool 分为两类：
 from __future__ import annotations
 
 import ast
+import io
+import sys
+import traceback as tb_mod
 from datetime import datetime, timezone
 
 from langchain_core.tools import tool
@@ -159,10 +162,6 @@ class _RunCodeInput(BaseModel):
 
 def _safe_run_code(code: str, timeout: int = 5) -> str:
     """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
-    import io
-    import sys
-    import traceback as tb_mod
-
     timeout = min(timeout, 10)
     captured = io.StringIO()
     # 重定向到独立 StringIO，不污染全局 sys.stdout，
