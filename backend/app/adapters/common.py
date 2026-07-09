@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from app.arena.token_utils import TokenTracker
 from app.arena.workspace import WorkspaceManager
-from app.models import ArenaEvent
+from app.models import ArenaEvent, PipelineMetrics
 
 # 全局工作空间管理器（单例）
 _workspace_mgr = WorkspaceManager()

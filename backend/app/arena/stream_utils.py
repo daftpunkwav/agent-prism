@@ -8,6 +8,24 @@ def extract_chunk_text(chunk) -> str:
     if chunk is None:
         return ""
 
+    # 0. dict chunk — 部分 provider(如某些 OpenAI 兼容)的 chunk 是 dict
+    if isinstance(chunk, dict):
+        # OpenAI Chat: {"choices": [{"delta": {"content": "..."}}]}
+        choices = chunk.get("choices")
+        if isinstance(choices, list) and choices:
+            delta = choices[0].get("delta", {})
+            content = delta.get("content") if isinstance(delta, dict) else None
+            if isinstance(content, str):
+                return content
+        # 兜底：若 dict 中有 text/content 字段
+        for key in ("text", "content"):
+            val = chunk.get(key)
+            if isinstance(val, str) and val:
+                return val
+            if isinstance(val, list):
+                return _extract_from_content(val)
+        return ""
+
     # 1. 优先从 .content 属性提取
     content = getattr(chunk, "content", None)
     if content is not None:
