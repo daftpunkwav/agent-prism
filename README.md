@@ -111,12 +111,24 @@ cd frontend && npx tsc --noEmit
 
 ## 最近改进
 
-- **后端现代化**:`@app.on_event("startup")` 迁移到 FastAPI `lifespan` 上下文管理器
-- **适配器修复**:LangGraph 适配器消除 list-of-1 闭包 hack,使用 `on_chain_end` 正确捕获最终 state 做 Harness 验证
-- **沙箱安全**:`run_code` 工具 stdout 重定向改为独立 StringIO,消除并发请求间的输出污染
+### 后端
+- **FastAPI 现代化**:`@app.on_event("startup")` 迁移到 `lifespan` 上下文管理器
+- **适配器修复**:LangGraph 适配器用 `on_chain_end` 正确捕获最终 state,消除 list-of-1 闭包 hack;复用 `get_reasoning_description` 而非硬编码
+- **沙箱安全**:`run_code` 工具 stdout 重定向改为独立 StringIO,消除并发请求间输出污染
 - **API 安全**:连接测试错误响应仅返回异常类型,避免泄露内部 endpoint/堆栈
-- **前端优化**:ExperimentPanel 温度调节改为 release 时保存,避免拖动每次触发 PUT 请求
-- **API 一致性**:Arena `/meta` 复用 RunnerPool 中的注册表,避免每请求重建适配器实例
+- **API 一致性**:Arena `/meta` 复用 RunnerPool 中的注册表;`is_mvp_ready` 失效检查替换为 `route()` 的 ValueError 透传
+- **类型严谨**:`prompts.py` `build_messages` 参数类型升级为 `ReasoningMode` / `HarnessLevel` Literal
+- **去重**:`harness.py` 提取 `_strip_json_fence` 工具函数替代 3 处硬编码 markdown fence
+- **性能**:DimensionRouter 用 `lru_cache` 缓存 provider 配置,避免每列重复读 JSON
+
+### 项目管理
+- **Bug 修复**:`create_from_run` 之前用 `f"{label}_"` 模糊前缀匹配 workspace,同 label 多次跑会覆盖;改用 `workspace_names` 精确匹配
+- **错误处理**:`_save` 写文件失败不再让 API 500,改为记录日志
+- **ID 唯一**:`_generate_project_id` 添加微秒时间戳,避免同毫秒并发创建冲突
+
+### 前端
+- **API 一致性**:ExperimentPanel 温度调节改 `onPointerUp` 统一提交(替代 `onMouseUp/TouchEnd/KeyUp` 三件套,后者在长按方向键时会反复触发 PUT)
+- **渲染优化**:TraceView 用 `useState` setter 替代 `useReducer` 作渲染触发器
 
 ## 路线图
 
