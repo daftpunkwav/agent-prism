@@ -31,12 +31,14 @@ def _react_node(state: AgentState) -> dict:
 
 
 def _react_tool_node(state: AgentState) -> dict:
-    """执行工具调用"""
+    """执行工具调用。未知工具也写入 ToolMessage，保证与 tool_calls 1:1 对齐。"""
 
     last_msg = state["messages"][-1]
     tool_calls = last_msg.tool_calls if hasattr(last_msg, "tool_calls") else []
 
-    results = []
+    from langchain_core.messages import ToolMessage
+
+    tool_messages = []
     tc_count = state.get("tool_calls", 0)
     for call in tool_calls:
         tool_name = call["name"]
@@ -44,12 +46,16 @@ def _react_tool_node(state: AgentState) -> dict:
         tool_func = next((t for t in ARENA_TOOLS if t.name == tool_name), None)
         if tool_func:
             result = tool_func.invoke(tool_args)
-            results.append(result)
             tc_count += 1
+            tool_messages.append(ToolMessage(content=str(result), tool_call_id=call["id"]))
+        else:
+            tool_messages.append(
+                ToolMessage(
+                    content=f"错误: 未知工具 «{tool_name}»",
+                    tool_call_id=call["id"],
+                )
+            )
 
-    from langchain_core.messages import ToolMessage
-
-    tool_messages = [ToolMessage(content=str(r), tool_call_id=call["id"]) for call, r in zip(tool_calls, results)]
     return {
         "messages": tool_messages,
         "tool_calls": tc_count,
@@ -147,6 +153,7 @@ def _tot_generate_node(state: AgentState) -> dict:
 def _tot_evaluate_node(state: AgentState) -> dict:
     """ToT: 评估并选择最优方案"""
     llm = _create_llm()
+    llm_with_tools = _bind_tools(llm)
     eval_prompt = state["messages"] + [SystemMessage(content="\n\n[ToT: 评估选择]\n评估以上方案，选择最优的一个，然后执行。")]
     response = llm_with_tools.invoke(eval_prompt)
     return {
@@ -222,22 +229,20 @@ def _reflexion_should_continue(state: AgentState) -> str:
 
 
 def build_reflexion_graph() -> StateGraph:
-    """构建 Reflexion 图：execute ↔ reflect 循环，重试到 max_steps 后退出。"""
+    """构建 Reflexion 图：execute → reflect → (条件) execute | END。
+
+    仅用条件边控制 reflect 后是否重试，避免无条件边与条件边冲突成死环。
+    """
     graph = StateGraph(AgentState)
     graph.add_node("execute", _reflexion_execute_node)
     graph.add_node("reflect", _reflexion_reflect_node)
-    graph.add_edge("reflect", "execute")
-    # 统一使用条件边控制：进入 reflect 后再决定是回到 execute 还是结束
-    graph.set_conditional_entry_point(
-        lambda state: "reflect" if state["step_count"] > 0 else "execute",
-        {"reflect": "reflect", "execute": "execute"},
-    )
+    graph.set_entry_point("execute")
+    graph.add_edge("execute", "reflect")
     graph.add_conditional_edges(
         "reflect",
         _reflexion_should_continue,
         {"execute": "execute", END: END},
     )
-    graph.add_edge("execute", "reflect")
     return graph
 
 
