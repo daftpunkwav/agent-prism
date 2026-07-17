@@ -71,6 +71,25 @@ class TestSandboxEscape:
         result = _safe_run_code("print('test')")
         assert "test" in result
 
+    def test_no_dunder_class_escape(self):
+        """禁止 (1).__class__.__mro__ 类反射逃逸。"""
+        result = _safe_run_code("print((1).__class__.__mro__)")
+        assert "错误" in result
+
+    def test_no_subclasses_escape(self):
+        """禁止 __subclasses__ 逃逸路径。"""
+        result = _safe_run_code(
+            "print((1).__class__.__bases__[0].__subclasses__())"
+        )
+        assert "错误" in result
+
+    def test_no_dunder_globals_attr(self):
+        """禁止通过函数属性访问 __globals__。"""
+        result = _safe_run_code(
+            "def f():\n    pass\nprint(f.__globals__)"
+        )
+        assert "错误" in result
+
 
 # ===== calculate 安全测试 =====
 

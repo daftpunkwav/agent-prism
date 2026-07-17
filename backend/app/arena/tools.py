@@ -205,6 +205,50 @@ _SAFE_BUILTINS: dict[str, Any] = {
 }
 
 
+def _ast_security_check(code: str) -> str | None:
+    """静态检查代码 AST，拒绝 dunder 属性访问等逃逸路径。返回错误信息或 None。"""
+    try:
+        tree = ast.parse(code, mode="exec")
+    except SyntaxError:
+        return "执行错误: 语法错误"
+
+    for node in ast.walk(tree):
+        # 禁止 __class__ / __subclasses__ / __globals__ 等反射逃逸
+        if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+            return f"错误: 不允许访问属性 «{node.attr}»"
+        # 禁止 import / from import
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            return "错误: 不允许 import"
+        # 禁止动态 import 常见调用名（即便出现在字符串调用中）
+        if isinstance(node, ast.Name) and node.id in {
+            "__import__",
+            "getattr",
+            "setattr",
+            "delattr",
+            "globals",
+            "locals",
+            "vars",
+            "eval",
+            "exec",
+            "compile",
+            "open",
+            "breakpoint",
+            "help",
+            "input",
+            "memoryview",
+            "bytearray",
+            "bytes",
+            "object",
+            "super",
+            "classmethod",
+            "staticmethod",
+            "property",
+            "type",
+        }:
+            return f"错误: 不允许使用 «{node.id}»"
+    return None
+
+
 def _execute_in_namespace(code: str, safe_ns: dict[str, Any], captured: io.StringIO) -> str | None:
     """在安全命名空间中执行代码。返回错误信息，成功则返回 None。"""
     old_stdout, old_stderr = sys.stdout, sys.stderr
@@ -230,6 +274,12 @@ def _execute_in_namespace(code: str, safe_ns: dict[str, Any], captured: io.Strin
 def _safe_run_code(code: str, timeout: int = 5) -> str:
     """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
     timeout = min(timeout, 10)
+
+    # 先做 AST 静态校验，阻断常见逃逸
+    security_err = _ast_security_check(code)
+    if security_err:
+        return security_err
+
     captured = io.StringIO()
     safe_ns: dict[str, Any] = {"__builtins__": _SAFE_BUILTINS}
 
@@ -243,7 +293,8 @@ def _safe_run_code(code: str, timeout: int = 5) -> str:
     thread.join(timeout=timeout)
 
     if thread.is_alive():
-        return "错误: 代码执行超时（已终止）"
+        # daemon 线程无法强制终止，文案不得声称「已终止」
+        return "错误: 代码执行超时（后台线程可能仍在运行，无法强制终止）"
 
     error = result_holder[0]
     if error:
@@ -275,7 +326,7 @@ def summarize_text(text: str, max_length: int = 200) -> str:
 
 
 def _get_ws() -> Workspace | None:
-    """获取当前 Agent 运行的工作空间（通过线程本地变量）。"""
+    """获取当前 Agent 运行的工作空间（通过 contextvars.ContextVar）。"""
     name = get_current_workspace_name()
     if name:
         return _workspace_mgr.get(name)
