@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
-from app.arena.harness import reflect_on_failure, verify_result
+from app.arena.harness import HarnessRunner
 from app.arena.llm import clear_pipeline_llm_overrides, set_pipeline_llm_overrides
 from app.arena.prompts import build_messages
 from app.arena.reasoning import get_reasoning_description
@@ -74,7 +74,10 @@ class LangGraphAdapter:
                 type="thought",
                 pipeline=label,
                 step=0,
-                content=f"[LangGraph] {mode_label} · {config.prompt_profile} · context={config.context}",
+                content=(
+                    f"[LangGraph] {mode_label} · {config.prompt_profile} · "
+                    f"context={config.context} · harness={config.harness}"
+                ),
             )
 
             graph_builder = _GRAPH_BUILDERS.get(config.reasoning, build_react_graph)
@@ -92,10 +95,32 @@ class LangGraphAdapter:
                 "reflections": [],
             }
 
-            # 逐事件发出；thought 实时 delta 流式输出。
-            final_state: dict | None = None
+            # 通过 HarnessRunner 接入验证/反思/自进化循环（bare 仅单次流式）
+            harness_runner = HarnessRunner(level=config.harness)
 
-            async for event in graph.astream_events(initial_state, version="v2"):
+            async for event in harness_runner.stream_events(question, graph, initial_state):
+                # Harness 控制事件（verify / reflect / harness_edit）
+                if isinstance(event, dict) and event.get("_harness"):
+                    if streaming_step is not None:
+                        yield ArenaEvent(
+                            type="thought_end",
+                            pipeline=label,
+                            step=streaming_step,
+                            content="",
+                        )
+                        streaming_step = None
+                    step += 1
+                    ev_type = event.get("type") or "verify"
+                    yield ArenaEvent(
+                        type=ev_type,  # type: ignore[arg-type]
+                        pipeline=label,
+                        step=step,
+                        content=str(event.get("content") or ""),
+                        passed=event.get("passed"),
+                        workspace=ws_name,
+                    )
+                    continue
+
                 kind = event.get("event", "")
                 data = event.get("data", {})
                 node_name = event.get("name", "")
@@ -172,35 +197,6 @@ class LangGraphAdapter:
                         step=step,
                         content=f"[阶段: {node_name}]",
                     )
-                elif kind == "on_chain_end" and isinstance(data.get("output"), dict):
-                    final_state = data["output"]
-
-            # Harness 验证/反思（非 bare 时）
-            if config.harness != "bare" and final_state:
-                messages_list = final_state.get("messages", [])
-                if messages_list:
-                    last_msg = messages_list[-1]
-                    answer = getattr(last_msg, "content", str(last_msg))
-                    if isinstance(answer, list):
-                        answer = " ".join(b.get("thinking", b.get("text", "")) if isinstance(b, dict) else str(b) for b in answer)
-                    answer_text = str(answer)[:2000]
-                    # tool_calls 使用运行期计数，满足 verify_result 签名
-                    passed, reason = verify_result(question, answer_text, tool_calls)
-                    yield ArenaEvent(
-                        type="verify",
-                        pipeline=label,
-                        step=step + 1,
-                        content=f"[{config.harness}] 验证: {reason}",
-                        passed=passed,
-                    )
-                    if not passed:
-                        insight = reflect_on_failure(question, answer_text, reason)
-                        yield ArenaEvent(
-                            type="reflect",
-                            pipeline=label,
-                            step=step + 2,
-                            content=f"[反思] {insight}",
-                        )
 
             duration_ms = int((time.perf_counter() - started) * 1000)
             yield ArenaEvent(
