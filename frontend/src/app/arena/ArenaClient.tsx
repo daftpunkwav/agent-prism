@@ -36,6 +36,8 @@ type ColumnState = {
   metrics?: ArenaEvent["metrics"];
   tokenStats?: TokenStats;
   error?: string;
+  /** 后端实际工作空间名（来自 complete/token_update 事件） */
+  workspace?: string;
 };
 
 type MainTab = "results" | "report" | "diff";
@@ -264,14 +266,20 @@ export function ArenaClient() {
   const [mainTab, setMainTab] = useState<MainTab>("results");
   const abortRef = useRef<AbortController | null>(null);
 
-  // 活跃 workspace 名称：第一个已完成/进行中的 label
+  // 活跃 workspace：优先取事件中的真实名称，禁止猜测前缀
   const activeWorkspace = useMemo(() => {
     const cols = Object.values(columns);
     if (cols.length === 0) return null;
-    const completed = cols.find((c) => c.tokenStats);
-    if (completed) return `${completed.label}_`;
-    const first = cols[0];
-    return first ? `${first.label}_` : null;
+    const withWs = cols.find((c) => c.workspace);
+    if (withWs?.workspace) return withWs.workspace;
+    // 从事件里回退查找
+    for (const col of cols) {
+      for (let i = col.events.length - 1; i >= 0; i--) {
+        const ws = col.events[i]?.workspace;
+        if (ws) return ws;
+      }
+    }
+    return null;
   }, [columns]);
 
   useEffect(() => {
@@ -326,6 +334,10 @@ export function ArenaClient() {
     setColumns((prev) => {
       const col = prev[label] ?? { label, events: [] };
       const next = { ...col };
+
+      if (event.workspace) {
+        next.workspace = event.workspace;
+      }
 
       if (event.type === "token_update" && event.token_stats) {
         next.tokenStats = event.token_stats as TokenStats;
