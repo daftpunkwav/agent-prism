@@ -90,6 +90,12 @@ class TestSandboxEscape:
         )
         assert "错误" in result
 
+    def test_timeout_kills_process(self):
+        """死循环超时后应强制终止子进程，而非只返回文案。"""
+        result = _safe_run_code("while True:\n    pass", timeout=1)
+        assert "超时" in result
+        assert "已终止" in result
+
 
 # ===== calculate 安全测试 =====
 

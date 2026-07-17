@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import ast
 import io
+import logging
+import multiprocessing as mp
 import sys
 import threading
 from datetime import datetime, timezone
@@ -18,6 +20,13 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from app.arena.workspace import Workspace, WorkspaceManager, get_current_workspace_name
+
+logger = logging.getLogger(__name__)
+
+# 限制同时运行的沙箱子进程数，防止资源耗尽
+_RUN_CODE_SEM = threading.Semaphore(4)
+# 子进程 join 后额外等待 terminate/kill 的秒数
+_PROCESS_KILL_GRACE = 1.0
 
 # 全局工作空间管理器（每个 Agent 运行独立创建 workspace）
 _workspace_mgr = WorkspaceManager()
@@ -174,35 +183,40 @@ class _RunCodeInput(BaseModel):
     timeout: int = Field(default=5, description="超时秒数（最大 10）")
 
 
-# 沙箱允许的安全内置函数白名单
-_SAFE_BUILTINS: dict[str, Any] = {
-    "print": lambda *args, sep=" ", end="\n", file=None, flush=False: sys.stdout.write(  # type: ignore[no-any-return]
-        sep.join(str(a) for a in args) + end
-    ),
-    "len": len,
-    "range": range,
-    "str": str,
-    "int": int,
-    "float": float,
-    "bool": bool,
-    "list": list,
-    "dict": dict,
-    "set": set,
-    "tuple": tuple,
-    "sum": sum,
-    "min": min,
-    "max": max,
-    "abs": abs,
-    "round": round,
-    "sorted": sorted,
-    "enumerate": enumerate,
-    "zip": zip,
-    "map": map,
-    "filter": filter,
-    "all": all,
-    "any": any,
-    "isinstance": isinstance,
-}
+def _make_safe_builtins() -> dict[str, Any]:
+    """构造沙箱允许的安全内置函数白名单（在子进程内重建，避免 pickle 问题）。"""
+    return {
+        "print": lambda *args, sep=" ", end="\n", file=None, flush=False: sys.stdout.write(  # type: ignore[no-any-return]
+            sep.join(str(a) for a in args) + end
+        ),
+        "len": len,
+        "range": range,
+        "str": str,
+        "int": int,
+        "float": float,
+        "bool": bool,
+        "list": list,
+        "dict": dict,
+        "set": set,
+        "tuple": tuple,
+        "sum": sum,
+        "min": min,
+        "max": max,
+        "abs": abs,
+        "round": round,
+        "sorted": sorted,
+        "enumerate": enumerate,
+        "zip": zip,
+        "map": map,
+        "filter": filter,
+        "all": all,
+        "any": any,
+        "isinstance": isinstance,
+    }
+
+
+# 兼容旧测试/调用方：模块级白名单（与子进程内一致）
+_SAFE_BUILTINS: dict[str, Any] = _make_safe_builtins()
 
 
 def _ast_security_check(code: str) -> str | None:
@@ -271,42 +285,100 @@ def _execute_in_namespace(code: str, safe_ns: dict[str, Any], captured: io.Strin
         sys.stdout, sys.stderr = old_stdout, old_stderr
 
 
-def _safe_run_code(code: str, timeout: int = 5) -> str:
-    """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
-    timeout = min(timeout, 10)
+def _sandbox_worker(code: str, result_queue: Any) -> None:
+    """子进程入口：执行受限代码并把结果放入队列。
 
-    # 先做 AST 静态校验，阻断常见逃逸
+    必须为模块顶层函数，以便 Windows spawn 模式可 pickle。
+    """
+    try:
+        captured = io.StringIO()
+        safe_ns: dict[str, Any] = {"__builtins__": _make_safe_builtins()}
+        err = _execute_in_namespace(code, safe_ns, captured)
+        if err:
+            result_queue.put(("error", err))
+        else:
+            output = captured.getvalue()
+            result_queue.put(("ok", output if output else "(代码执行成功，无输出)"))
+    except Exception as exc:  # noqa: BLE001
+        try:
+            result_queue.put(("error", f"执行错误: {type(exc).__name__}"))
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _terminate_process(proc: mp.Process) -> None:
+    """尽量强制终止子进程：terminate → join → kill。"""
+    if not proc.is_alive():
+        return
+    try:
+        proc.terminate()
+    except Exception:  # noqa: BLE001
+        logger.debug("terminate 子进程失败", exc_info=True)
+    proc.join(timeout=_PROCESS_KILL_GRACE)
+    if proc.is_alive():
+        try:
+            proc.kill()
+        except Exception:  # noqa: BLE001
+            logger.debug("kill 子进程失败", exc_info=True)
+        proc.join(timeout=_PROCESS_KILL_GRACE)
+
+
+def _safe_run_code(code: str, timeout: int = 5) -> str:
+    """在独立进程中执行 Python 代码并返回输出。
+
+    沙箱限制：无网络/文件系统/子进程/反射；超时后 terminate/kill 子进程。
+    """
+    timeout = min(max(int(timeout), 1), 10)
+
+    # 先做 AST 静态校验，阻断常见逃逸（无需启动子进程）
     security_err = _ast_security_check(code)
     if security_err:
         return security_err
 
-    captured = io.StringIO()
-    safe_ns: dict[str, Any] = {"__builtins__": _SAFE_BUILTINS}
+    acquired = _RUN_CODE_SEM.acquire(timeout=timeout + 2)
+    if not acquired:
+        return "错误: 沙箱繁忙，请稍后重试"
 
-    result_holder: list[str | None] = [None]
+    ctx = mp.get_context("spawn")
+    result_queue: mp.Queue = ctx.Queue(maxsize=1)
+    proc = ctx.Process(target=_sandbox_worker, args=(code, result_queue), daemon=True)
+    try:
+        proc.start()
+        proc.join(timeout=timeout)
 
-    def _target() -> None:
-        result_holder[0] = _execute_in_namespace(code, safe_ns, captured)
+        if proc.is_alive():
+            _terminate_process(proc)
+            return "错误: 代码执行超时（进程已终止）"
 
-    thread = threading.Thread(target=_target, daemon=True)
-    thread.start()
-    thread.join(timeout=timeout)
+        # 子进程已退出：读取结果
+        try:
+            # 短超时避免队列永久阻塞
+            status, payload = result_queue.get(timeout=0.5)
+        except Exception:  # noqa: BLE001
+            exitcode = proc.exitcode
+            if exitcode not in (0, None):
+                return f"错误: 子进程异常退出 (code={exitcode})"
+            return "错误: 未收到执行结果"
 
-    if thread.is_alive():
-        # daemon 线程无法强制终止，文案不得声称「已终止」
-        return "错误: 代码执行超时（后台线程可能仍在运行，无法强制终止）"
-
-    error = result_holder[0]
-    if error:
-        return error
-
-    output = captured.getvalue()
-    return output if output else "(代码执行成功，无输出)"
+        if status == "ok":
+            return str(payload)
+        return str(payload)
+    finally:
+        # 清理队列底层资源
+        try:
+            result_queue.close()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            if proc.is_alive():
+                _terminate_process(proc)
+        finally:
+            _RUN_CODE_SEM.release()
 
 
 @tool(args_schema=_RunCodeInput)
 def run_code(code: str, timeout: int = 5) -> str:
-    """在工作空间中执行 Python 代码并返回输出。沙箱限制：无网络/文件系统/子进程/反射。"""
+    """在独立进程沙箱中执行 Python 代码并返回输出。超时将强制终止进程。"""
     return _safe_run_code(code, min(timeout, 10))
 
 
