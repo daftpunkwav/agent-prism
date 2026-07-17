@@ -30,38 +30,42 @@ interface DisplaySegment {
 function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
   const segs: DisplaySegment[] = [];
   // 用 Map 维护每个 (type, step) 最新的段索引，避免 O(n) 扫描
+  // thought / thought_delta / thought_end 共用 thought:N 稳定 key
   const segIndex = new Map<string, number>();
   for (let i = 0; i < events.length; i++) {
     const ev = events[i]!;
     const step = ev.step ?? 0;
     const key = `${ev.type}:${step}`;
     if (ev.type === "thought") {
+      const thoughtKey = `thought:${step}`;
       const s: DisplaySegment = {
-        id: `t:${ev.type}:${segs.length}`,
+        id: `t:thought:${segs.length}`,
         kind: "thought",
         step,
         text: ev.content || "",
         completed: true,
       };
       segs.push(s);
-      segIndex.set(key, segs.length - 1);
+      segIndex.set(thoughtKey, segs.length - 1);
     } else if (ev.type === "thought_delta") {
-      const idx = segIndex.get(key);
+      const thoughtKey = `thought:${step}`;
+      const idx = segIndex.get(thoughtKey);
       if (idx !== undefined && segs[idx]!.kind === "thought" && !segs[idx]!.completed) {
         segs[idx]!.text += ev.content || "";
       } else {
         const s: DisplaySegment = {
-          id: `t:${ev.type}:${segs.length}`,
+          id: `t:thought:${segs.length}`,
           kind: "thought",
           step,
           text: ev.content || "",
           completed: false,
         };
         segs.push(s);
-        segIndex.set(key, segs.length - 1);
+        segIndex.set(thoughtKey, segs.length - 1);
       }
     } else if (ev.type === "thought_end") {
-      const idx = segIndex.get(key);
+      const thoughtKey = `thought:${step}`;
+      const idx = segIndex.get(thoughtKey);
       if (idx !== undefined && segs[idx]!.kind === "thought" && !segs[idx]!.completed) {
         segs[idx]!.completed = true;
       }
