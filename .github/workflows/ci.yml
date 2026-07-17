@@ -22,10 +22,9 @@ jobs:
           pip install -e ".[dev]"
       - name: Run ruff
         working-directory: backend
-        run: ruff check app/ tests/
-      - name: Run tests
-        working-directory: backend
-        run: pytest tests/ -v
+        run: ruff check app/
+      - name: Run tests (repo root tests/)
+        run: PYTHONPATH=backend pytest tests/ -v
 
   frontend-build:
     name: Frontend Build
