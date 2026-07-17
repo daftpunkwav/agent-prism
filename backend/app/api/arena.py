@@ -85,10 +85,12 @@ async def arena_run(request: ArenaRunRequest):
 
 @router.get("/workspace/{workspace_name}/files")
 async def workspace_files(workspace_name: str):
+    """列出工作空间全部文件（递归），路径为完整相对路径，便于前端 buildTree。"""
     ws = _ws_mgr.get(workspace_name)
     if ws is None:
         raise HTTPException(status_code=404, detail="工作空间不存在")
-    files = ws.list_files()
+    # 返回全部 path（含嵌套），跳过目录占位 .gitkeep 亦可保留以便树形展示
+    files = sorted(ws.files.keys())
     return {
         "workspace": workspace_name,
         "files": [{"path": f, "size": len(ws.files[f].content)} for f in files],

@@ -69,17 +69,28 @@ class Workspace:
             normalized = normalized[2:]
         return normalized
 
-    def list_files(self, dir_path: str = "") -> list[str]:
-        """列出目录下的文件。"""
+    def list_files(self, dir_path: str = "", *, recursive: bool = False) -> list[str]:
+        """列出目录下的文件。
+
+        recursive=False：仅直接子项（相对 dir_path 的 basename）。
+        recursive=True：返回该目录下全部文件的相对路径（根目录时为完整 path）。
+        """
         dir_path = self._normalize(dir_path)
         prefix = f"{dir_path}/" if dir_path else ""
         results: list[str] = []
         for path in self.files:
-            if path.startswith(prefix):
+            if prefix:
+                if not path.startswith(prefix):
+                    continue
                 rel = path[len(prefix) :]
-                # 只返回直接子项
-                if "/" not in rel and rel:
-                    results.append(rel)
+            else:
+                rel = path
+            if not rel:
+                continue
+            if recursive:
+                results.append(path if not prefix else rel)
+            elif "/" not in rel:
+                results.append(rel)
         return sorted(results)
 
     def read_file(self, path: str) -> str:
