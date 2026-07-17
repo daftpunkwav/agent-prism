@@ -9,7 +9,8 @@ from collections.abc import AsyncIterator
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
-from app.arena.harness import HarnessRunner, reflect_on_failure, verify_result
+from app.arena.harness import reflect_on_failure, verify_result
+from app.arena.llm import clear_pipeline_llm_overrides, set_pipeline_llm_overrides
 from app.arena.prompts import build_messages
 from app.arena.reasoning import get_reasoning_description
 from app.arena.reasoning_graph import (
@@ -57,19 +58,23 @@ class LangGraphAdapter:
         tool_calls = 0
         # 在后端也保留当前正在流式输出的 step，便于 tool_start 正确递增
         streaming_step: int | None = None
-        # Harness Runner — 真正跑 verify/reflect/self_evolve 循环
-        harness_runner = HarnessRunner(level=config.harness)
         try:
-            system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
+            set_pipeline_llm_overrides(
+                temperature=config.temperature,
+                model=config.model_id or None,
+            )
+            system, user = build_messages(
+                question, config.prompt_profile, config.reasoning, config.harness, config.context
+            )
             tracker.seed_prompt(system, user)
-            yield token_update_event(label, tracker)
+            yield token_update_event(label, tracker, workspace=ws_name)
 
             mode_label = get_reasoning_description(config.reasoning) or "ReAct 循环"
             yield ArenaEvent(
                 type="thought",
                 pipeline=label,
                 step=0,
-                content=f"[LangGraph] {mode_label} · {config.prompt_profile}",
+                content=f"[LangGraph] {mode_label} · {config.prompt_profile} · context={config.context}",
             )
 
             graph_builder = _GRAPH_BUILDERS.get(config.reasoning, build_react_graph)
@@ -112,7 +117,7 @@ class LangGraphAdapter:
                     usage = extract_usage(data)
                     if usage["input_tokens"] or usage["output_tokens"]:
                         tracker.add_usage(usage)
-                        yield token_update_event(label, tracker)
+                        yield token_update_event(label, tracker, workspace=ws_name)
                     # 标记流结束，TraceView 会切到完整 Markdown 渲染
                     if streaming_step is not None:
                         yield ArenaEvent(
@@ -179,7 +184,8 @@ class LangGraphAdapter:
                     if isinstance(answer, list):
                         answer = " ".join(b.get("thinking", b.get("text", "")) if isinstance(b, dict) else str(b) for b in answer)
                     answer_text = str(answer)[:2000]
-                    passed, reason = verify_result(question, answer_text)
+                    # tool_calls 使用运行期计数，满足 verify_result 签名
+                    passed, reason = verify_result(question, answer_text, tool_calls)
                     yield ArenaEvent(
                         type="verify",
                         pipeline=label,
@@ -200,6 +206,7 @@ class LangGraphAdapter:
             yield ArenaEvent(
                 type="complete",
                 pipeline=label,
+                workspace=ws_name,
                 metrics=build_metrics(
                     tracker,
                     success=True,
@@ -214,11 +221,13 @@ class LangGraphAdapter:
             yield ArenaEvent(
                 type="error",
                 pipeline=label,
+                workspace=ws_name,
                 message=_sanitize_error(exc),
             )
             yield ArenaEvent(
                 type="complete",
                 pipeline=label,
+                workspace=ws_name,
                 metrics=build_metrics(
                     tracker,
                     success=False,
@@ -229,4 +238,5 @@ class LangGraphAdapter:
                 token_stats=tracker.as_dict(),
             )
         finally:
+            clear_pipeline_llm_overrides()
             clear_current_workspace()

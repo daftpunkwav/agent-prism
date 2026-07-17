@@ -10,7 +10,11 @@ from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
-from app.arena.llm import create_chat_model
+from app.arena.llm import (
+    clear_pipeline_llm_overrides,
+    create_chat_model,
+    set_pipeline_llm_overrides,
+)
 from app.arena.prompts import build_messages
 from app.arena.stream_utils import extract_chunk_text
 from app.arena.token_utils import TokenTracker, extract_usage
@@ -52,16 +56,28 @@ class LangChainAdapter:
         ws.write_file("README.md", f"# {label} Agent 工作空间\n\n问题: {question}\n")
 
         try:
-            llm = create_chat_model()
-            system, user = build_messages(question, config.prompt_profile, config.reasoning, config.harness)
+            set_pipeline_llm_overrides(
+                temperature=config.temperature,
+                model=config.model_id or None,
+            )
+            llm = create_chat_model(
+                temperature=config.temperature,
+                model=config.model_id or None,
+            )
+            system, user = build_messages(
+                question, config.prompt_profile, config.reasoning, config.harness, config.context
+            )
             tracker.seed_prompt(system, user)
-            yield token_update_event(label, tracker)
+            yield token_update_event(label, tracker, workspace=ws_name)
 
             yield ArenaEvent(
                 type="thought",
                 pipeline=label,
                 step=step,
-                content=f"[LangChain create_agent] 初始化 Tool Calling · {config.prompt_profile}",
+                content=(
+                    f"[LangChain create_agent] 初始化 Tool Calling · "
+                    f"{config.prompt_profile} · context={config.context}"
+                ),
             )
 
             agent = create_agent(llm, ARENA_TOOLS, system_prompt=system)
@@ -90,7 +106,7 @@ class LangChainAdapter:
                     usage = extract_usage(data)
                     if usage["input_tokens"] or usage["output_tokens"]:
                         tracker.add_usage(usage)
-                        yield token_update_event(label, tracker)
+                        yield token_update_event(label, tracker, workspace=ws_name)
                     if streaming_step is not None:
                         yield ArenaEvent(
                             type="thought_end",
@@ -130,6 +146,7 @@ class LangChainAdapter:
             yield ArenaEvent(
                 type="complete",
                 pipeline=label,
+                workspace=ws_name,
                 metrics=build_metrics(
                     tracker,
                     success=True,
@@ -144,11 +161,13 @@ class LangChainAdapter:
             yield ArenaEvent(
                 type="error",
                 pipeline=label,
+                workspace=ws_name,
                 message=_sanitize_error(exc),
             )
             yield ArenaEvent(
                 type="complete",
                 pipeline=label,
+                workspace=ws_name,
                 metrics=build_metrics(
                     tracker,
                     success=False,
@@ -159,4 +178,5 @@ class LangChainAdapter:
                 token_stats=tracker.as_dict(),
             )
         finally:
+            clear_pipeline_llm_overrides()
             clear_current_workspace()

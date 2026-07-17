@@ -15,10 +15,11 @@ __all__ = [
 ]
 
 
-def token_update_event(label: str, tracker: TokenTracker) -> ArenaEvent:
+def token_update_event(label: str, tracker: TokenTracker, workspace: str = "") -> ArenaEvent:
     return ArenaEvent(
         type="token_update",
         pipeline=label,
+        workspace=workspace,
         token_stats=tracker.as_dict(),
     )
 
