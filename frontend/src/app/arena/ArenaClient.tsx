@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
+  FolderPlus,
   GitCompare,
   HelpCircle,
+  Loader2,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -26,6 +28,7 @@ import {
   DimensionId,
   DimensionOption,
   TokenStats,
+  createProject,
   fetchArenaMeta,
   streamArenaRun,
 } from "@/lib/api";
@@ -265,6 +268,10 @@ export function ArenaClient() {
   const [error, setError] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>("results");
   const abortRef = useRef<AbortController | null>(null);
+  // 保存为项目
+  const [projectName, setProjectName] = useState("");
+  const [savingProject, setSavingProject] = useState(false);
+  const [saveProjectMsg, setSaveProjectMsg] = useState<string | null>(null);
 
   // 活跃 workspace：优先取事件中的真实名称，禁止猜测前缀
   const activeWorkspace = useMemo(() => {
@@ -399,12 +406,45 @@ export function ArenaClient() {
     setColumns({});
     setError(null);
     setMainTab("results");
+    setProjectName("");
+    setSaveProjectMsg(null);
   }, [dimension]);
 
   const columnList = useMemo(() => Object.values(columns), [columns]);
 
   const hasMetrics = columnList.some((c) => c.metrics);
   const allCompleted = columnList.length >= 2 && columnList.every((c) => c.metrics);
+
+  const saveAsProject = useCallback(async () => {
+    if (!allCompleted || savingProject) return;
+    const workspaceNames = columnList
+      .map((c) => c.workspace)
+      .filter((w): w is string => Boolean(w));
+    if (workspaceNames.length === 0) {
+      setSaveProjectMsg("没有可用的工作空间名称，无法保存");
+      return;
+    }
+    const name =
+      projectName.trim() ||
+      `Arena ${dimension} · ${new Date().toLocaleString("zh-CN", { hour12: false })}`;
+    setSavingProject(true);
+    setSaveProjectMsg(null);
+    try {
+      const { project } = await createProject({
+        name,
+        question: question.trim(),
+        dimension,
+        pipeline_labels: columnList.map((c) => c.label),
+        workspace_names: workspaceNames,
+      });
+      setSaveProjectMsg(`已保存项目「${project.name}」`);
+      setProjectName("");
+    } catch (err) {
+      setSaveProjectMsg(err instanceof Error ? err.message : "保存项目失败");
+    } finally {
+      setSavingProject(false);
+    }
+  }, [allCompleted, savingProject, columnList, projectName, dimension, question]);
 
   // 输出结果 Tab：列占位 + 实际运行卡
   const renderResultsTab = () => {
@@ -617,7 +657,58 @@ export function ArenaClient() {
           {/* Tab 内容区（独立滚动） */}
           <div className="flex-1 min-h-0 overflow-y-auto pr-1">
             {mainTab === "results" && renderResultsTab()}
-            {mainTab === "report" && hasMetrics && <ComparisonReport columns={columns} />}
+            {mainTab === "report" && hasMetrics && (
+              <div className="space-y-4">
+                <ComparisonReport columns={columns} />
+                {allCompleted && (
+                  <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <FolderPlus className="h-4 w-4 text-foreground/70" />
+                      <h3 className="text-sm font-semibold">保存为项目</h3>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      将本次实验的工作空间文件与对比结果写入项目列表，可在「项目」页查看。
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        className="form-input flex-1"
+                        placeholder="项目名称（可留空自动生成）"
+                        value={projectName}
+                        onChange={(e) => setProjectName(e.target.value)}
+                        disabled={savingProject}
+                        maxLength={100}
+                        aria-label="项目名称"
+                      />
+                      <button
+                        type="button"
+                        className="btn-primary shrink-0"
+                        disabled={savingProject || !question.trim()}
+                        onClick={saveAsProject}
+                      >
+                        {savingProject ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FolderPlus className="h-4 w-4" />
+                        )}
+                        {savingProject ? "保存中…" : "创建项目"}
+                      </button>
+                    </div>
+                    {saveProjectMsg && (
+                      <p
+                        className={
+                          "text-xs " +
+                          (saveProjectMsg.startsWith("已保存")
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-destructive")
+                        }
+                      >
+                        {saveProjectMsg}
+                      </p>
+                    )}
+                  </section>
+                )}
+              </div>
+            )}
             {mainTab === "report" && !hasMetrics && (
               <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
                 暂无完成的对比数据
