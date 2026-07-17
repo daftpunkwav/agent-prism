@@ -16,29 +16,75 @@ interface AlignedRow {
 }
 
 function alignTraces(columns: Array<{ label: string; events: ArenaEvent[] }>): AlignedRow[] {
-  /** 按 step 对齐各列的事件。*/
+  /** 按 step 对齐各列的事件。先合并 thought_delta 为完整文本。*/
   const rows: Map<number, AlignedRow> = new Map();
   const labels = columns.map((c) => c.label);
 
   for (const col of columns) {
+    // 按 step 累积 thought_delta，再按顺序对齐
+    const thoughtByStep = new Map<number, string>();
     for (const ev of col.events) {
-      if (ev.type === "complete" || ev.type === "token_update" || ev.type === "error") continue;
-      const step = ev.step ?? 0;
-      const text = getEventText(ev);
-      const key = step;
+      if (ev.type === "thought_delta") {
+        const step = ev.step ?? 0;
+        thoughtByStep.set(step, (thoughtByStep.get(step) || "") + (ev.content || ""));
+      } else if (ev.type === "thought" && ev.content) {
+        const step = ev.step ?? 0;
+        // 完整 thought 优先覆盖（若无 delta）
+        if (!thoughtByStep.has(step)) {
+          thoughtByStep.set(step, ev.content);
+        }
+      }
+    }
 
-      if (!rows.has(key)) {
-        rows.set(key, {
+    const seenThoughtSteps = new Set<number>();
+    for (const ev of col.events) {
+      if (
+        ev.type === "complete" ||
+        ev.type === "token_update" ||
+        ev.type === "error" ||
+        ev.type === "thought_end"
+      ) {
+        continue;
+      }
+      const step = ev.step ?? 0;
+
+      // thought_delta：每个 step 只写一次合并后的全文
+      if (ev.type === "thought_delta") {
+        if (seenThoughtSteps.has(step)) continue;
+        seenThoughtSteps.add(step);
+        const text = thoughtByStep.get(step) || "";
+        if (!rows.has(step)) {
+          rows.set(step, {
+            step,
+            type: "thought",
+            contents: {},
+            differences: new Set(),
+          });
+        }
+        const row = rows.get(step)!;
+        row.contents[col.label] = text;
+        if (row.type !== "thought") row.differences.add("type");
+        continue;
+      }
+
+      if (ev.type === "thought") {
+        if (seenThoughtSteps.has(step)) continue;
+        seenThoughtSteps.add(step);
+      }
+
+      const text = getEventText(ev);
+      if (!rows.has(step)) {
+        rows.set(step, {
           step,
-          type: ev.type,
+          type: ev.type === "thought" ? "thought" : ev.type,
           contents: {},
           differences: new Set(),
         });
       }
-      const row = rows.get(key)!;
+      const row = rows.get(step)!;
       row.contents[col.label] = text;
       // 类型不一致视为差异
-      if (row.type !== ev.type) {
+      if (row.type !== (ev.type === "thought" ? "thought" : ev.type)) {
         row.differences.add("type");
       }
     }
