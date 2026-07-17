@@ -7,12 +7,22 @@ contextvars 是 Python 异步栈感知的官方方案。
 
 from __future__ import annotations
 
+import logging
 import os
+import threading
+import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 # 上下文变量：当前请求/任务的工作空间名称
 _current_workspace: ContextVar[str | None] = ContextVar("current_workspace", default=None)
+
+# 默认：最多保留 32 个工作空间；空闲超过 1 小时回收
+DEFAULT_MAX_WORKSPACES = 32
+DEFAULT_TTL_SECONDS = 3600.0
 
 
 def set_current_workspace(name: str) -> None:
@@ -161,22 +171,93 @@ class Workspace:
 
 
 class WorkspaceManager:
-    """管理所有运行实例的工作空间。"""
+    """管理所有运行实例的工作空间。
 
-    def __init__(self) -> None:
+    策略：
+    - **TTL**：超过 ``ttl_seconds`` 未访问则回收
+    - **LRU 上限**：数量超过 ``max_workspaces`` 时淘汰最久未访问项
+    - 线程安全：create/get/remove/cleanup 均持锁
+    """
+
+    def __init__(
+        self,
+        max_workspaces: int = DEFAULT_MAX_WORKSPACES,
+        ttl_seconds: float = DEFAULT_TTL_SECONDS,
+    ) -> None:
         self._workspaces: dict[str, Workspace] = {}
+        self._last_access: dict[str, float] = {}
+        self._max_workspaces = max(1, int(max_workspaces))
+        # 允许测试用亚秒 TTL；生产默认 3600
+        self._ttl_seconds = max(0.05, float(ttl_seconds))
+        self._lock = threading.RLock()
 
     def create(self, name: str) -> Workspace:
-        """创建新工作空间。"""
-        ws = Workspace(name=name)
-        self._workspaces[name] = ws
-        return ws
+        """创建新工作空间（同名覆盖）。会先按 TTL/容量回收。"""
+        with self._lock:
+            self._evict_expired_unlocked()
+            if name not in self._workspaces and len(self._workspaces) >= self._max_workspaces:
+                self._evict_lru_unlocked(need=1)
+            now = time.monotonic()
+            ws = Workspace(
+                name=name,
+                created_at=datetime.now(timezone.utc).isoformat(),
+            )
+            self._workspaces[name] = ws
+            self._last_access[name] = now
+            return ws
 
     def get(self, name: str) -> Workspace | None:
-        return self._workspaces.get(name)
+        """获取工作空间；命中时刷新访问时间。过期项返回 None。"""
+        with self._lock:
+            self._evict_expired_unlocked()
+            ws = self._workspaces.get(name)
+            if ws is not None:
+                self._last_access[name] = time.monotonic()
+            return ws
 
     def remove(self, name: str) -> None:
-        self._workspaces.pop(name, None)
+        with self._lock:
+            self._workspaces.pop(name, None)
+            self._last_access.pop(name, None)
 
     def cleanup(self) -> None:
-        self._workspaces.clear()
+        """清空全部工作空间。"""
+        with self._lock:
+            self._workspaces.clear()
+            self._last_access.clear()
+
+    def cleanup_expired(self) -> int:
+        """主动清理过期工作空间，返回删除数量。"""
+        with self._lock:
+            return self._evict_expired_unlocked()
+
+    def count(self) -> int:
+        with self._lock:
+            return len(self._workspaces)
+
+    def _evict_expired_unlocked(self) -> int:
+        """删除超过 TTL 未访问的工作空间。调用方须持锁。"""
+        now = time.monotonic()
+        expired = [
+            name
+            for name, ts in self._last_access.items()
+            if now - ts > self._ttl_seconds
+        ]
+        for name in expired:
+            self._workspaces.pop(name, None)
+            self._last_access.pop(name, None)
+        if expired:
+            logger.info("Workspace TTL 回收 %d 个: %s", len(expired), ", ".join(expired[:5]))
+        return len(expired)
+
+    def _evict_lru_unlocked(self, need: int = 1) -> int:
+        """按最久未访问淘汰，直到腾出 need 个名额。调用方须持锁。"""
+        removed = 0
+        while removed < need and self._workspaces:
+            # 最久未访问优先
+            oldest = min(self._last_access.items(), key=lambda kv: kv[1])[0]
+            self._workspaces.pop(oldest, None)
+            self._last_access.pop(oldest, None)
+            removed += 1
+            logger.info("Workspace LRU 淘汰: %s", oldest)
+        return removed
