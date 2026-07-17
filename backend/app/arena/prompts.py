@@ -38,18 +38,61 @@ Q: 计算 12*8 → Thought: 需要计算 → Action: calculate(12*8) → 回答 
 }
 
 
+_CONTEXT_HINTS: dict[str, str] = {
+    "sliding": "\n[上下文策略: 滑动窗口] 优先使用最近对话，丢弃过旧轮次。",
+    "summary": "\n[上下文策略: 摘要压缩] 对过旧轮次做摘要后再回答。",
+    "vector": "\n[上下文策略: 向量检索] 优先检索工作空间与历史中的相关片段再作答。",
+    "hybrid": "\n[上下文策略: 混合] 结合滑动窗口与摘要/检索。",
+}
+
+
 def build_messages(
     question: str,
     profile: PromptProfile,
     reasoning: ReasoningMode = "react",
     harness: HarnessLevel = "bare",
+    context: str = "sliding",
 ) -> tuple[str, str]:
-    """构建 system + user prompt，集成推理模式和 Harness 级别。"""
+    """构建 system + user prompt，集成推理模式、Harness 与上下文策略。"""
     cfg = PROFILES[profile]
     system = cfg["system"]
     user = question.strip() + cfg["user_suffix"]
 
     system, user = apply_reasoning_mode(system, user, reasoning)
     system, user = apply_harness_level(system, user, harness)
+
+    # 将上下文策略注入 system，使「上下文」维度配置在执行路径上可观测
+    hint = _CONTEXT_HINTS.get(context)
+    if hint:
+        system = system + hint
+        if context == "vector":
+            # 轻量 RAG：若工作空间有文件，把相关片段附加到 user
+            try:
+                from app.arena.rag import SimpleVectorStore
+                from app.arena.tools import get_workspace_mgr
+                from app.arena.workspace import get_current_workspace_name
+
+                ws_name = get_current_workspace_name()
+                ws = get_workspace_mgr().get(ws_name) if ws_name else None
+                if ws and ws.files:
+                    store = SimpleVectorStore()
+                    docs = [
+                        f"{path}\n{f.content}"
+                        for path, f in ws.files.items()
+                        if f.content and not path.endswith(".gitkeep")
+                    ]
+                    if docs:
+                        store.add_documents(docs)
+                        hits = store.query(question, top_k=3)
+                        if hits:
+                            snippets = [h["content"] for h in hits if h.get("content")]
+                            if snippets:
+                                user = (
+                                    user
+                                    + "\n\n[检索到的相关上下文]\n"
+                                    + "\n---\n".join(snippets)
+                                )
+            except Exception:  # noqa: BLE001
+                pass
 
     return system, user
