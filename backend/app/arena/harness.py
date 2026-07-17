@@ -156,105 +156,165 @@ def propose_harness_edit(
 # ===== Harness 循环执行器 =====
 
 
+def _normalize_content(content: object) -> str:
+    """将消息 content 规范为字符串。"""
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, dict):
+                parts.append(str(block.get("thinking") or block.get("text") or block))
+            else:
+                parts.append(str(block))
+        return " ".join(parts)
+    return str(content) if content is not None else ""
+
+
+def _extract_answer_and_tool_calls(state: dict) -> tuple[str, int, list]:
+    """从图最终状态提取答案文本、工具调用次数与 messages。"""
+    messages = state.get("messages") or []
+    tool_calls = int(state.get("tool_calls") or 0)
+    if not messages:
+        return "", tool_calls, messages
+    last_msg = messages[-1]
+    answer = _normalize_content(getattr(last_msg, "content", str(last_msg)))
+    return answer[:2000], tool_calls, messages
+
+
+def _pick_final_state(event: dict, current: dict | None) -> dict | None:
+    """从 astream_events 中挑选更完整的图输出状态。"""
+    if event.get("event") != "on_chain_end":
+        return current
+    data = event.get("data") or {}
+    out = data.get("output")
+    if not isinstance(out, dict):
+        return current
+    # 优先保留带 messages 的状态
+    if "messages" in out:
+        return out
+    if current is None:
+        return out
+    return current
+
+
 class HarnessRunner:
-    """根据 Harness 级别包装图执行。"""
+    """根据 Harness 级别包装图执行，并通过 stream_events 接入适配器主路径。"""
 
     def __init__(self, level: HarnessLevel = "bare"):
         self.level = level
-        self.max_retries = {"verify": 2, "reflect": 2, "self_evolve": 2}.get(level, 0)
+        # bare 只跑 1 次；其余级别默认最多 2 次（含首次）
+        self.max_retries = {"bare": 1, "verify": 2, "reflect": 2, "self_evolve": 2}.get(level, 1)
         self.attempts = 0
         self.reflections: list[str] = []
         self.harness_edits: list[dict] = []
+        self.final_state: dict = {}
 
-    async def execute(self, question: str, graph, initial_state: dict, emitter_callback) -> dict:
-        """执行带 Harness 的图运行。"""
+    async def stream_events(self, question: str, graph, initial_state: dict):
+        """流式产出图事件与 Harness 控制事件。
+
+        - 普通 LangGraph astream_events 字典原样 yield
+        - Harness 事件带 ``_harness: True``，字段含 type/passed/content 等
+        """
         if self.level == "bare":
-            return await self._run_once(graph, initial_state, emitter_callback)
+            final_state: dict | None = None
+            async for event in graph.astream_events(initial_state, version="v2"):
+                final_state = _pick_final_state(event, final_state)
+                yield event
+            self.final_state = final_state or {}
+            self.attempts = 1
+            return
 
-        return await self._run_with_harness(question, graph, initial_state, emitter_callback)
-
-    async def _run_once(self, graph, initial_state: dict, emitter_callback) -> dict:
-        """单次运行（裸运行）。"""
-        final_state = None
-        async for event in graph.astream_events(initial_state, version="v2"):
-            emitter_callback(event)
-            final_state = event
-        return final_state or {}
-
-    async def _run_with_harness(self, question: str, graph, initial_state: dict, emitter_callback) -> dict:
-        """带验证/反思/自进化的运行。"""
         state = dict(initial_state)
-        last_result = None
+        # 保留原始 system / human，便于重试时重建
+        base_messages = list(initial_state.get("messages") or [])
 
         while self.attempts < self.max_retries:
             self.attempts += 1
+            final_state = None
+            async for event in graph.astream_events(state, version="v2"):
+                final_state = _pick_final_state(event, final_state)
+                yield event
 
-            # 运行图
-            result = await self._run_once(graph, state, emitter_callback)
-            last_result = result
-
-            # 提取最终答案
-            messages = result.get("messages", state.get("messages", []))
-            if not messages:
-                break
-
-            last_msg = messages[-1]
-            answer = getattr(last_msg, "content", str(last_msg))
-            tool_calls = result.get("tool_calls", 0)
-
-            # 验证
-            passed, reason = verify_result(question, answer, tool_calls)
-            emitter_callback(
-                {
+            self.final_state = final_state or {}
+            answer, tool_calls, messages = _extract_answer_and_tool_calls(self.final_state)
+            if not answer and not messages:
+                yield {
+                    "_harness": True,
                     "type": "verify",
-                    "pipeline": "harness",
-                    "passed": passed,
-                    "reason": f"[{self.level}] 验证 #{self.attempts}: {reason}",
+                    "passed": False,
+                    "content": f"[{self.level}] 验证 #{self.attempts}: 无有效输出",
                 }
-            )
-
-            if passed:
                 break
 
-            if self.attempts >= self.max_retries:
+            passed, reason = verify_result(question, answer, tool_calls)
+            yield {
+                "_harness": True,
+                "type": "verify",
+                "passed": passed,
+                "content": f"[{self.level}] 验证 #{self.attempts}: {reason}",
+            }
+
+            if passed or self.attempts >= self.max_retries:
                 break
 
-            # 反思（reflect / self_evolve）
-            if self.level in ("reflect", "self_evolve"):
-                insight = reflect_on_failure(question, answer, reason)
-                self.reflections.append(insight)
-                emitter_callback(
-                    {
-                        "type": "reflect",
-                        "pipeline": "harness",
-                        "insight": f"[反思] {insight}",
-                    }
-                )
+            # verify：直接重跑，不改 prompt
+            if self.level == "verify":
+                state = {
+                    **dict(initial_state),
+                    "messages": list(base_messages),
+                    "step_count": 0,
+                    "tool_calls": 0,
+                    "reflections": list(state.get("reflections") or []),
+                }
+                continue
 
-                # 自进化：提出配置修改
-                if self.level == "self_evolve":
-                    system_msg = next(
-                        (m.content for m in messages if isinstance(m, SystemMessage)), ""
-                    )
-                    edit = propose_harness_edit(question, answer, insight, system_msg)
-                    self.harness_edits.append(edit)
-                    emitter_callback(
-                        {
-                            "type": "harness_edit",
-                            "pipeline": "harness",
-                            "change": json.dumps(edit, ensure_ascii=False)[:200],
-                        }
-                    )
+            # reflect / self_evolve：反思后带着策略重试
+            insight = reflect_on_failure(question, answer, reason)
+            self.reflections.append(insight)
+            yield {
+                "_harness": True,
+                "type": "reflect",
+                "passed": None,
+                "content": f"[反思 #{self.attempts}] {insight}",
+            }
 
-                    # 应用 prompt 修改到下一轮
-                    if edit.get("prompt_additions"):
-                        additions = " ".join(edit["prompt_additions"])
-                        new_system = system_msg + f"\n\n[Harness 自进化 #{self.attempts}]\n{additions}"
-                        state["messages"] = [
-                            SystemMessage(content=new_system)
-                        ] + [m for m in messages if isinstance(m, HumanMessage)]
+            system_msg = ""
+            human_msgs: list = []
+            for m in base_messages:
+                if isinstance(m, SystemMessage):
+                    system_msg = m.content if isinstance(m.content, str) else _normalize_content(m.content)
+                elif isinstance(m, HumanMessage):
+                    human_msgs.append(m)
 
-        return last_result or {}
+            if self.level == "self_evolve":
+                edit = propose_harness_edit(question, answer, insight, system_msg)
+                self.harness_edits.append(edit)
+                yield {
+                    "_harness": True,
+                    "type": "harness_edit",
+                    "passed": None,
+                    "content": f"[自进化 #{self.attempts}] {json.dumps(edit, ensure_ascii=False)[:300]}",
+                }
+                if edit.get("prompt_additions"):
+                    additions = " ".join(str(a) for a in edit["prompt_additions"])
+                    system_msg = system_msg + f"\n\n[Harness 自进化 #{self.attempts}]\n{additions}"
+
+            # 将反思策略注入 system，下一轮重新开跑
+            system_msg = system_msg + f"\n\n[上一轮反思]\n{insight}"
+            state = {
+                **dict(initial_state),
+                "messages": [SystemMessage(content=system_msg), *human_msgs],
+                "step_count": 0,
+                "tool_calls": 0,
+                "reflections": list(self.reflections),
+            }
+
+    async def execute(self, question: str, graph, initial_state: dict, emitter_callback) -> dict:
+        """兼容旧接口：通过 callback 转发事件，返回最终状态。"""
+        async for event in self.stream_events(question, graph, initial_state):
+            maybe = emitter_callback(event)
+            if hasattr(maybe, "__await__"):
+                await maybe
+        return self.final_state
 
 
 def apply_harness_level(
