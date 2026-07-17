@@ -89,7 +89,8 @@ def verify_result(
         result = json.loads(cleaned)
         return result.get("passed", False), result.get("reason", "无法解析验证结果")
     except Exception:
-        return True, "验证解析失败，默认通过"
+        # 验证器自身故障时不得静默放行，避免削弱 Harness 对比意义
+        return False, "验证解析失败，视为未通过"
 
 
 # ===== 反思器 =====
