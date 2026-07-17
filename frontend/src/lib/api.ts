@@ -57,6 +57,8 @@ export interface TokenStats {
 export interface ArenaEvent {
   type: string;
   pipeline: string;
+  /** 工作空间名称（complete/token_update 等携带，供 WorkspacePanel 定位） */
+  workspace?: string;
   content?: string;
   tool?: string;
   args?: Record<string, unknown>;
@@ -103,13 +105,16 @@ export async function fetchProvider(options?: { signal?: AbortSignal }): Promise
 }
 
 export async function saveProvider(body: Record<string, unknown>): Promise<ProviderConfig> {
-  // 不发送 api_key 字段，避免在请求体中传输（后端 keep-existing 逻辑）
-  const { api_key: _ak, ...rest } = body as Record<string, unknown> & { api_key?: string };
-  void _ak;
+  // 仅当 api_key 为空时省略该字段，让后端保留已保存的 Key；非空则必须发送（BYOK）
+  const payload = { ...body };
+  const key = payload.api_key;
+  if (typeof key !== "string" || !key.trim()) {
+    delete payload.api_key;
+  }
   const res = await fetch(`${API_BASE}/api/settings/provider`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(rest),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("保存失败");
   return res.json();
