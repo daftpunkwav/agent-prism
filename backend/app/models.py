@@ -19,6 +19,7 @@ __all__ = [
     "PromptProfile",
     "EventType",
     "PipelineConfig",
+    "BaselineOverrides",
     "ArenaRunRequest",
     "PipelineMetrics",
     "ArenaEvent",
@@ -44,12 +45,24 @@ class PipelineConfig(BaseModel):
     label: str = ""
 
 
+class BaselineOverrides(BaseModel):
+    """控制变量基线覆盖 — 仅影响非当前对比维度的固定字段。"""
+
+    framework: str | None = None
+    reasoning: str | None = None
+    context: str | None = None
+    harness: HarnessLevel | None = None
+    prompt_profile: PromptProfile | None = None
+
+
 class ArenaRunRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     dimension: DimensionId = "framework"
     # 该维度下用户选中的子项 value 列表；空 = 全选，但至少 2 项（router 校验）
     selections: list[str] = Field(default_factory=list, max_length=20)
     temperature: float | None = None
+    # 非对比维的基线覆盖（如框架对比时改用 tot 推理）
+    baseline: BaselineOverrides | None = None
 
 
 class PipelineMetrics(BaseModel):

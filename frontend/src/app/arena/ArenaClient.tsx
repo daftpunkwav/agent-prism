@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
+  Check,
   FolderPlus,
   GitCompare,
   HelpCircle,
@@ -25,13 +26,24 @@ import { WorkspacePanel } from "@/components/WorkspacePanel";
 import {
   ArenaEvent,
   ArenaMeta,
+  BaselineOverrides,
   DimensionId,
   DimensionOption,
   TokenStats,
   createProject,
   fetchArenaMeta,
+  isAbortError,
   streamArenaRun,
 } from "@/lib/api";
+
+/** 对比维度 → PipelineConfig 字段（与后端 DIMENSION_FIELD 对齐） */
+const DIMENSION_FIELD: Record<DimensionId, keyof BaselineOverrides> = {
+  framework: "framework",
+  prompt: "prompt_profile",
+  reasoning: "reasoning",
+  context: "context",
+  harness: "harness",
+};
 
 type ColumnState = {
   label: string;
@@ -45,10 +57,58 @@ type ColumnState = {
 
 type MainTab = "results" | "report" | "diff";
 
-const TASK_TEMPLATES = [
-  "现在几点？",
-  "计算 (128 + 64) * 2",
-  "获取当前时间，并计算距离午夜的分钟数",
+const TASK_TEMPLATES: Array<{ id: string; label: string; question: string }> = [
+  { id: "time", label: "时间", question: "现在几点？" },
+  { id: "calc", label: "计算", question: "计算 (128 + 64) * 2 / 8 + 15" },
+  {
+    id: "multi-time",
+    label: "多步·时间",
+    question: "获取当前时间，并计算距离午夜的分钟数",
+  },
+  {
+    id: "multi-factorial",
+    label: "多步·阶乘",
+    question: "先用代码计算 17 的阶乘，再把结果写入 result.txt",
+  },
+  {
+    id: "files",
+    label: "文件读写",
+    question: "创建 notes.md，写入三条今日待办，再读取并列出工作空间文件",
+  },
+  {
+    id: "code-file",
+    label: "代码+文件",
+    question:
+      "写一个 hello.py（打印 Hello AgentPrism），用 run_code 执行它，把输出追加到 log.txt",
+  },
+  {
+    id: "primes",
+    label: "素数统计",
+    question: "用代码找出 1 到 100 中所有素数，并统计个数",
+  },
+  {
+    id: "fibonacci",
+    label: "斐波那契",
+    question: "用代码生成斐波那契数列前 20 项，写入 fib.txt",
+  },
+  {
+    id: "summarize",
+    label: "文本摘要",
+    question:
+      "将下面文字摘要到 80 字以内：Agent 对比实验需要在相同任务下并行观察框架、提示词、推理模式与上下文策略的差异，才能量化延迟、Token 与工具调用次数。",
+  },
+  {
+    id: "pipeline",
+    label: "综合编排",
+    question:
+      "获取当前时间 → 计算本小时还剩多少分钟 → 把结论写入 report.md → 再摘要该文件内容",
+  },
+  {
+    id: "plan",
+    label: "实验规划",
+    question:
+      "规划一个三步实验：对比 LangChain 与 LangGraph 在工具调用上的差异；每步写清目标、工具与成功标准",
+  },
 ];
 
 function metricsToTokenStats(m: NonNullable<ArenaEvent["metrics"]>): TokenStats {
@@ -64,30 +124,30 @@ function metricsToTokenStats(m: NonNullable<ArenaEvent["metrics"]>): TokenStats 
   };
 }
 
-function DimensionChip({
+function LaneTile({
   option,
   selected,
   onToggle,
+  lane,
 }: {
   option: DimensionOption;
   selected: boolean;
   onToggle: (value: string) => void;
+  lane: number;
 }) {
   return (
     <button
       type="button"
       onClick={() => onToggle(option.value)}
       data-selected={selected}
-      className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors data-[selected=true]:bg-foreground data-[selected=true]:text-background data-[selected=true]:border-foreground data-[selected=false]:border-border data-[selected=false]:text-muted-foreground hover:text-foreground"
+      data-lane={lane % 4}
+      className="lane-tile"
+      aria-pressed={selected}
     >
-      <span
-        aria-hidden
-        className={
-          "inline-block h-1.5 w-1.5 rounded-sm " +
-          (selected ? "bg-background" : "bg-muted-foreground/40")
-        }
-      />
-      {option.label}
+      <span className="lane-tile-check" aria-hidden>
+        <Check className="h-2.5 w-2.5" strokeWidth={3} />
+      </span>
+      <span className="truncate">{option.label}</span>
     </button>
   );
 }
@@ -96,92 +156,114 @@ function ComparisonReport({ columns }: { columns: Record<string, ColumnState> })
   const cols = Object.values(columns).filter((c) => c.metrics);
   if (cols.length === 0) return null;
 
-  const sorted = [...cols].sort((a, b) => (a.metrics!.duration_ms) - (b.metrics!.duration_ms));
+  const sorted = [...cols].sort((a, b) => a.metrics!.duration_ms - b.metrics!.duration_ms);
   const fastest = sorted[0];
-  const lowestToken = [...cols].sort((a, b) => a.metrics!.total_tokens - b.metrics!.total_tokens)[0];
-  // 安全访问：filter 后 length >= 1，但 TS noUncheckedIndexedAccess 仍需断言
+  const lowestToken = [...cols].sort(
+    (a, b) => a.metrics!.total_tokens - b.metrics!.total_tokens,
+  )[0];
   if (!fastest?.metrics || !lowestToken?.metrics) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 fade-in">
       <div className="flex items-center gap-2">
-        <BarChart3 className="h-4 w-4 text-foreground/70" />
-        <h3 className="text-sm font-semibold">对比报告</h3>
+        <BarChart3 className="h-4 w-4 text-primary" />
+        <h3 className="page-title text-base">对比报告</h3>
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-xs">
+      <div className="data-table-wrap">
+        <table>
           <thead>
-            <tr className="border-b border-border bg-muted/30">
-              <th className="text-left py-2 px-3 font-medium text-muted-foreground">Agent</th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">耗时</th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">Token</th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">工具</th>
-              <th className="text-right py-2 px-3 font-medium text-muted-foreground">步骤</th>
-              <th className="text-center py-2 px-3 font-medium text-muted-foreground">状态</th>
+            <tr>
+              <th>Agent</th>
+              <th className="!text-right">耗时</th>
+              <th className="!text-right">Token</th>
+              <th className="!text-right">工具</th>
+              <th className="!text-right">步骤</th>
+              <th className="!text-center">状态</th>
             </tr>
           </thead>
           <tbody>
-            {cols.map((col) => (
-              <tr key={col.label} className="border-b border-border/50 last:border-0">
-                <td className="py-2.5 px-3 font-medium">{col.label}</td>
-                <td className={`py-2.5 px-3 text-right font-mono ${col.metrics!.duration_ms === fastest.metrics!.duration_ms ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
-                  {col.metrics!.duration_ms}ms
-                  {col.metrics!.duration_ms === fastest.metrics!.duration_ms && " ⚡"}
-                </td>
-                <td className={`py-2.5 px-3 text-right font-mono ${col.metrics!.total_tokens === lowestToken.metrics!.total_tokens ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
-                  {col.metrics!.total_tokens.toLocaleString()}
-                  {col.metrics!.total_tokens === lowestToken.metrics!.total_tokens && " 💰"}
-                </td>
-                <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">
-                  {col.metrics!.tool_calls}
-                </td>
-                <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">
-                  {col.metrics!.steps}
-                </td>
-                <td className="py-2.5 px-3 text-center">
-                  {col.metrics!.success ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                      成功
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-destructive">
-                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                      失败
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {cols.map((col) => {
+              const isFastest = col.metrics!.duration_ms === fastest.metrics!.duration_ms;
+              const isLowest = col.metrics!.total_tokens === lowestToken.metrics!.total_tokens;
+              return (
+                <tr key={col.label}>
+                  <td className="font-medium">{col.label}</td>
+                  <td
+                    className={
+                      "text-right font-mono " +
+                      (isFastest ? "metric-best" : "text-muted-foreground")
+                    }
+                  >
+                    {col.metrics!.duration_ms}ms
+                    {isFastest && <span className="metric-best-mark">最快</span>}
+                  </td>
+                  <td
+                    className={
+                      "text-right font-mono " +
+                      (isLowest ? "metric-best" : "text-muted-foreground")
+                    }
+                  >
+                    {col.metrics!.total_tokens.toLocaleString()}
+                    {isLowest && <span className="metric-best-mark">最省</span>}
+                  </td>
+                  <td className="text-right font-mono text-muted-foreground">
+                    {col.metrics!.tool_calls}
+                  </td>
+                  <td className="text-right font-mono text-muted-foreground">
+                    {col.metrics!.steps}
+                  </td>
+                  <td className="text-center">
+                    {col.metrics!.success ? (
+                      <span className="inline-flex items-center gap-1.5 text-success">
+                        <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                        成功
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-destructive">
+                        <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                        失败
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      <div className="text-[11px] text-muted-foreground space-y-1">
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-muted-foreground">
         <p>
-          ⚡ 最快: <span className="font-medium text-foreground">{fastest.label}</span>（{fastest.metrics!.duration_ms}ms）
+          最快：
+          <span className="font-medium text-foreground"> {fastest.label}</span>
+          <span className="font-mono"> · {fastest.metrics!.duration_ms}ms</span>
         </p>
         <p>
-          💰 最省 Token: <span className="font-medium text-foreground">{lowestToken.label}</span>（{lowestToken.metrics!.total_tokens.toLocaleString()} tokens）
+          最省 Token：
+          <span className="font-medium text-foreground"> {lowestToken.label}</span>
+          <span className="font-mono">
+            {" "}
+            · {lowestToken.metrics!.total_tokens.toLocaleString()}
+          </span>
         </p>
       </div>
     </div>
   );
 }
 
-function ColumnPlaceholder({ name }: { name: string }) {
+function ColumnPlaceholder({ name, lane }: { name: string; lane: number }) {
   return (
-    <div className="column-card opacity-60 h-full">
+    <div className="column-card opacity-70 h-full" data-lane={lane % 4}>
       <div className="column-header">
         <span className="font-semibold text-sm">{name}</span>
       </div>
       <div className="flex flex-1 items-center justify-center p-6">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 mx-auto rounded-full border-2 border-border flex items-center justify-center">
-            <Zap className="h-5 w-5 text-muted-foreground/50" />
+        <div className="empty-state !py-6">
+          <div className="empty-state-icon">
+            <Zap className="h-5 w-5" />
           </div>
-          <p className="text-xs text-muted-foreground">等待运行</p>
+          <p className="text-xs">等待运行</p>
         </div>
       </div>
     </div>
@@ -193,14 +275,16 @@ function ColumnCard({
   running,
   showStop,
   onStop,
+  lane,
 }: {
   col: ColumnState;
   running: boolean;
   showStop: boolean;
   onStop: () => void;
+  lane: number;
 }) {
   return (
-    <div className="column-card h-full min-h-0 flex flex-col">
+    <div className="column-card h-full min-h-0 flex flex-col" data-lane={lane % 4}>
       <div className="column-header shrink-0">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -237,7 +321,7 @@ function ColumnCard({
         )}
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
-        <TraceView events={col.events} running={running && !col.metrics} />
+        <TraceView events={col.events} running={running && !col.metrics} colorIndex={lane} />
       </div>
       {col.metrics && (
         <div className="border-t border-border px-3 py-2 font-mono text-[10px] text-muted-foreground flex gap-3 shrink-0">
@@ -258,28 +342,26 @@ export function ArenaClient() {
   const [meta, setMeta] = useState<ArenaMeta | null>(null);
   const [dimension, setDimension] = useState<DimensionId>("framework");
   const [selections, setSelections] = useState<string[]>([]);
+  const [baseline, setBaseline] = useState<BaselineOverrides>({});
   const [question, setQuestion] = useState("");
   const [running, setRunning] = useState(false);
   const [columns, setColumns] = useState<Record<string, ColumnState>>({});
   const [showPromptBanner, setShowPromptBanner] = useState(true);
-  const [showLeftPanel, setShowLeftPanel] = useState(true);
+  const [showLeftPanel, setShowLeftPanel] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [metaLoading, setMetaLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>("results");
   const abortRef = useRef<AbortController | null>(null);
-  // 保存为项目
   const [projectName, setProjectName] = useState("");
   const [savingProject, setSavingProject] = useState(false);
   const [saveProjectMsg, setSaveProjectMsg] = useState<string | null>(null);
 
-  // 活跃 workspace：优先取事件中的真实名称，禁止猜测前缀
   const activeWorkspace = useMemo(() => {
     const cols = Object.values(columns);
     if (cols.length === 0) return null;
     const withWs = cols.find((c) => c.workspace);
     if (withWs?.workspace) return withWs.workspace;
-    // 从事件里回退查找
     for (const col of cols) {
       for (let i = col.events.length - 1; i >= 0; i--) {
         const ws = col.events[i]?.workspace;
@@ -292,7 +374,19 @@ export function ArenaClient() {
   useEffect(() => {
     const ac = new AbortController();
     fetchArenaMeta({ signal: ac.signal })
-      .then(setMeta)
+      .then((m) => {
+        setMeta(m);
+        if (m.baseline_defaults) {
+          const d = m.baseline_defaults;
+          setBaseline({
+            framework: d.framework,
+            reasoning: d.reasoning,
+            context: d.context,
+            harness: d.harness,
+            prompt_profile: d.prompt_profile,
+          });
+        }
+      })
       .catch((err: Error) => {
         if (err.name !== "AbortError") {
           setError(`加载 Arena 配置失败: ${err.message}`);
@@ -303,6 +397,18 @@ export function ArenaClient() {
       });
     return () => ac.abort();
   }, []);
+
+  const baselinePayload = useMemo(() => {
+    const locked = DIMENSION_FIELD[dimension];
+    const out: BaselineOverrides = {};
+    (Object.keys(baseline) as Array<keyof BaselineOverrides>).forEach((key) => {
+      const val = baseline[key];
+      if (key !== locked && typeof val === "string" && val) {
+        out[key] = val;
+      }
+    });
+    return out;
+  }, [baseline, dimension]);
 
   const activeDim = useMemo(
     () => meta?.dimensions.find((d) => d.id === dimension) ?? null,
@@ -381,7 +487,6 @@ export function ArenaClient() {
     setError(null);
     setRunning(true);
     setMainTab("results");
-    // 按当前 selections 预占位列名（占位卡保留）
     const placeholderCols: Record<string, ColumnState> = {};
     for (const opt of activeDim?.options ?? []) {
       if (activeSelections.includes(opt.value)) {
@@ -391,9 +496,18 @@ export function ArenaClient() {
     setColumns(placeholderCols);
     abortRef.current = new AbortController();
 
+    const signal = abortRef.current.signal;
     try {
-      await streamArenaRun(question, dimension, handleEvent, abortRef.current.signal, activeSelections);
+      await streamArenaRun(
+        question,
+        dimension,
+        handleEvent,
+        signal,
+        activeSelections,
+        baselinePayload,
+      );
     } catch (err) {
+      if (isAbortError(err) || signal.aborted) return;
       console.error(err);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -446,25 +560,24 @@ export function ArenaClient() {
     }
   }, [allCompleted, savingProject, columnList, projectName, dimension, question]);
 
-  // 输出结果 Tab：列占位 + 实际运行卡
   const renderResultsTab = () => {
     if (activeDim) {
-      const selectedOptions = activeDim.options.filter((o) => activeSelections.includes(o.value));
+      const selectedOptions = activeDim.options.filter((o) =>
+        activeSelections.includes(o.value),
+      );
       if (selectedOptions.length === 0) {
         return (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            请选择至少 2 个对比项
+          <div className="empty-state h-full">
+            <div className="empty-state-icon">
+              <Zap className="h-5 w-5" />
+            </div>
+            <p className="text-sm">请选择至少 2 个对比项</p>
           </div>
         );
       }
       return (
-        <div
-          className="grid gap-3 h-full min-h-0"
-          style={{
-            gridTemplateColumns: `repeat(${Math.min(columnCount, 4)}, minmax(0, 1fr))`,
-          }}
-        >
-          {selectedOptions.map((opt) => {
+        <div className="arena-columns" data-count={Math.min(selectedOptions.length, 4)}>
+          {selectedOptions.map((opt, idx) => {
             const col = columns[opt.label];
             return col ? (
               <ColumnCard
@@ -473,9 +586,10 @@ export function ArenaClient() {
                 running={running}
                 showStop={running && !col.metrics}
                 onStop={cancelRun}
+                lane={idx}
               />
             ) : (
-              <ColumnPlaceholder key={opt.value} name={opt.label} />
+              <ColumnPlaceholder key={opt.value} name={opt.label} lane={idx} />
             );
           })}
         </div>
@@ -483,34 +597,29 @@ export function ArenaClient() {
     }
     if (columnList.length === 0 && !running) {
       return (
-        <div className="grid gap-3 h-full min-h-0 grid-cols-2">
-          {placeholderLabels.slice(0, columnCount).map((name) => (
-            <ColumnPlaceholder key={name} name={name} />
+        <div className="arena-columns" data-count={Math.min(columnCount, 4)}>
+          {placeholderLabels.slice(0, columnCount).map((name, idx) => (
+            <ColumnPlaceholder key={name} name={name} lane={idx} />
           ))}
         </div>
       );
     }
     return (
-      <div
-        className="grid gap-3 h-full min-h-0"
-        style={{
-          gridTemplateColumns: `repeat(${Math.min(columnList.length, 4)}, minmax(0, 1fr))`,
-        }}
-      >
-        {columnList.map((col) => (
+      <div className="arena-columns" data-count={Math.min(columnList.length, 4)}>
+        {columnList.map((col, idx) => (
           <ColumnCard
             key={col.label}
             col={col}
             running={running}
             showStop={running && !col.metrics}
             onStop={cancelRun}
+            lane={idx}
           />
         ))}
       </div>
     );
   };
 
-  // 自动在全部完成后切到对比 Tab（仅一次）
   const reportVisitedRef = useRef(false);
   useEffect(() => {
     if (allCompleted && !reportVisitedRef.current) {
@@ -522,9 +631,9 @@ export function ArenaClient() {
 
   if (metaLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="space-y-4 text-center">
-          <div className="w-12 h-12 mx-auto rounded-xl border-2 border-foreground/20 border-t-foreground animate-spin" />
+      <div className="arena-shell items-center justify-center">
+        <div className="space-y-4 text-center fade-in">
+          <div className="loading-prism mx-auto" aria-hidden />
           <p className="text-sm text-muted-foreground">加载 Arena 配置…</p>
         </div>
       </div>
@@ -532,104 +641,260 @@ export function ArenaClient() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] overflow-hidden">
-      <div className="flex gap-3 flex-1 min-h-0">
-        {/* ===== 左侧栏：维度 + 实验参数（独立滚动） ===== */}
-        {showLeftPanel && (
-          <aside className="w-64 flex-shrink-0 overflow-y-auto pr-1 space-y-4">
-            <div className="space-y-2">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-1">
-                对比维度
-              </p>
-              <div className="space-y-1">
-                {meta?.dimensions.map((d) => (
+    <div className="arena-shell">
+      <div className="arena-chrome">
+        <section className="arena-setup">
+          <div className="arena-setup-head">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="eyebrow shrink-0">对比维度</p>
+                {activeDim && (
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    {activeDim.label}
+                  </span>
+                )}
+              </div>
+              <div className="dim-rail" role="tablist" aria-label="对比维度">
+                {meta?.dimensions.map((d, i) => (
                   <button
                     key={d.id}
                     type="button"
-                    className="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors data-[active=true]:bg-muted data-[active=false]:hover:bg-muted/50"
+                    role="tab"
+                    aria-selected={dimension === d.id}
+                    className="dim-rail-item"
                     data-active={dimension === d.id}
                     onClick={() => setDimension(d.id)}
                   >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={
-                          dimension === d.id
-                            ? "text-foreground font-semibold"
-                            : "text-muted-foreground"
-                        }
-                      >
-                        {d.label}
-                      </span>
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {d.max_select}项
-                      </span>
-                    </div>
+                    <span className="dim-rail-index">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="dim-rail-label">{d.label}</span>
                   </button>
                 ))}
               </div>
+              {activeDim?.subtitle && (
+                <p className="arena-subtitle">{activeDim.subtitle}</p>
+              )}
             </div>
 
-            {activeDim && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                    参与对比
-                  </p>
-                  <span className="text-[10px] font-mono text-muted-foreground">
-                    {activeSelections.length} / {activeDim.max_select}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {activeDim.options.map((opt) => (
-                    <DimensionChip
-                      key={opt.value}
-                      option={opt}
-                      selected={activeSelections.includes(opt.value)}
-                      onToggle={toggleSelection}
-                    />
-                  ))}
-                </div>
-                {activeSelections.length < (activeDim.min_select ?? 2) && (
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400 px-1">
-                    至少选择 {activeDim.min_select ?? 2} 项
-                  </p>
+            <div className="arena-setup-tools">
+              <button
+                type="button"
+                className="btn-ghost !h-8 !w-8 !p-0"
+                onClick={() => setShowLeftPanel((v) => !v)}
+                title={showLeftPanel ? "关闭实验参数" : "实验参数"}
+                aria-label={showLeftPanel ? "关闭实验参数" : "打开实验参数"}
+                aria-pressed={showLeftPanel}
+              >
+                {showLeftPanel ? (
+                  <PanelLeftClose className="h-4 w-4" />
+                ) : (
+                  <PanelLeftOpen className="h-4 w-4" />
                 )}
-              </div>
-            )}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost !h-8 !w-8 !p-0"
+                onClick={() => setShowRightPanel((v) => !v)}
+                title={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
+                aria-label={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
+                aria-pressed={showRightPanel}
+              >
+                {showRightPanel ? (
+                  <PanelRightClose className="h-4 w-4" />
+                ) : (
+                  <PanelRightOpen className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
 
-            {activeDim && (
-              <div className="px-1">
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  {activeDim.subtitle}
-                </p>
+          {activeDim && (
+            <div className="lane-row">
+              <div className="lane-row-meta">
+                <p className="eyebrow">参与对比</p>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {activeSelections.length} / {activeDim.max_select}
+                  {activeSelections.length < (activeDim.min_select ?? 2) && (
+                    <span className="text-warning">
+                      {" "}
+                      · 至少 {activeDim.min_select ?? 2} 项
+                    </span>
+                  )}
+                </span>
               </div>
-            )}
-
-            {dimension === "prompt" && showPromptBanner && (
-              <div className="mx-1 flex items-start gap-2 rounded border border-border bg-card p-3 text-[11px]">
-                <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <p className="flex-1 leading-relaxed">
-                  「CoT Prompt」只改 Prompt 文案。编排层变化见推理模式 → CoT+Tool。
-                </p>
-                <button
-                  type="button"
-                  className="btn-ghost !h-6 !px-1.5 shrink-0"
-                  onClick={() => setShowPromptBanner(false)}
-                  aria-label="关闭提示"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+              <div className="lane-pick">
+                {activeDim.options.map((opt, idx) => (
+                  <LaneTile
+                    key={opt.value}
+                    option={opt}
+                    selected={activeSelections.includes(opt.value)}
+                    onToggle={toggleSelection}
+                    lane={idx}
+                  />
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            <ExperimentPanel dimension={dimension} columnCount={columnCount} />
+          {meta?.baseline_fields && meta.baseline_fields.length > 0 && (
+            <div className="baseline-row">
+              <div className="lane-row-meta">
+                <p className="eyebrow">控制变量基线</p>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  非对比维可改 · 当前维锁定
+                </span>
+              </div>
+              <div className="baseline-pick">
+                {meta.baseline_fields.map((field) => {
+                  const locked = field.dimension === dimension;
+                  const value =
+                    baseline[field.field as keyof BaselineOverrides] ?? field.default;
+                  return (
+                    <label
+                      key={field.field}
+                      className="baseline-field"
+                      data-locked={locked}
+                      title={locked ? "当前对比维，由上方子项决定" : undefined}
+                    >
+                      <span className="baseline-field-label">{field.label}</span>
+                      <select
+                        className="baseline-select"
+                        disabled={locked || running}
+                        value={value}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setBaseline((prev) => ({
+                            ...prev,
+                            [field.field]: next,
+                          }));
+                        }}
+                        aria-label={`基线 ${field.label}`}
+                      >
+                        {field.options.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {dimension === "prompt" && showPromptBanner && (
+            <div className="flex items-start gap-2 rounded-[var(--radius-sm)] border border-border bg-muted/20 px-3 py-2 text-[11px]">
+              <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+              <p className="flex-1 leading-relaxed text-muted-foreground">
+                「CoT Prompt」只改 Prompt 文案。编排层变化见推理模式 → CoT+Tool。
+              </p>
+              <button
+                type="button"
+                className="btn-ghost !h-6 !px-1.5 shrink-0"
+                onClick={() => setShowPromptBanner(false)}
+                aria-label="关闭提示"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="composer-bar">
+          {error && (
+            <p className="text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded-[var(--radius-sm)] px-3 py-1.5">
+              {error}
+            </p>
+          )}
+          <div className="composer-templates">
+            {TASK_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className="btn-ghost text-[11px]"
+                title={t.question}
+                onClick={() => setQuestion(t.question)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="composer-row">
+            <input
+              className="form-input"
+              placeholder="输入问题，折射出多条 Agent 管线…"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  runArena();
+                }
+              }}
+              disabled={running}
+              aria-label="实验问题"
+            />
+            {running ? (
+              <button type="button" className="btn-ghost composer-run" onClick={cancelRun}>
+                <Square className="h-4 w-4" />
+                停止
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!question.trim() || activeSelections.length < 2}
+                onClick={runArena}
+              >
+                <Send className="h-4 w-4" />
+                运行
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="arena-body">
+        {showLeftPanel && (
+          <button
+            type="button"
+            className="arena-backdrop"
+            aria-label="关闭实验参数"
+            onClick={() => setShowLeftPanel(false)}
+          />
+        )}
+        {!showLeftPanel && showRightPanel && (
+          <button
+            type="button"
+            className="arena-backdrop xl:hidden"
+            aria-label="关闭工作空间"
+            onClick={() => setShowRightPanel(false)}
+          />
+        )}
+
+        {showLeftPanel && (
+          <aside className="arena-drawer" data-side="left" aria-label="实验参数">
+            <div className="arena-drawer-head">
+              <p className="eyebrow">实验参数</p>
+              <button
+                type="button"
+                className="btn-ghost !h-7 !w-7 !p-0"
+                onClick={() => setShowLeftPanel(false)}
+                aria-label="关闭实验参数"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="arena-drawer-body">
+              <ExperimentPanel dimension={dimension} columnCount={columnCount} />
+            </div>
           </aside>
         )}
 
-        {/* ===== 中间：Tab 切换 + 内容（独立滚动） ===== */}
-        <main className="flex-1 min-w-0 flex flex-col min-h-0">
-          {/* Tab 栏 */}
-          <div className="flex items-center gap-1 border-b border-border mb-3 shrink-0">
+        <main className="arena-stage">
+          <div className="arena-stage-tabs">
             <MainTabButton
               active={mainTab === "results"}
               onClick={() => setMainTab("results")}
@@ -654,159 +919,112 @@ export function ArenaClient() {
             />
           </div>
 
-          {/* Tab 内容区（独立滚动） */}
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-            {mainTab === "results" && renderResultsTab()}
-            {mainTab === "report" && hasMetrics && (
-              <div className="space-y-4">
-                <ComparisonReport columns={columns} />
-                {allCompleted && (
-                  <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <FolderPlus className="h-4 w-4 text-foreground/70" />
-                      <h3 className="text-sm font-semibold">保存为项目</h3>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      将本次实验的工作空间文件与对比结果写入项目列表，可在「项目」页查看。
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        className="form-input flex-1"
-                        placeholder="项目名称（可留空自动生成）"
-                        value={projectName}
-                        onChange={(e) => setProjectName(e.target.value)}
-                        disabled={savingProject}
-                        maxLength={100}
-                        aria-label="项目名称"
-                      />
-                      <button
-                        type="button"
-                        className="btn-primary shrink-0"
-                        disabled={savingProject || !question.trim()}
-                        onClick={saveAsProject}
-                      >
-                        {savingProject ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <FolderPlus className="h-4 w-4" />
+          <div className="arena-stage-body">
+            {mainTab === "results" ? (
+              renderResultsTab()
+            ) : (
+              <div className="arena-stage-scroll">
+                {mainTab === "report" && hasMetrics && (
+                  <div className="space-y-4">
+                    <ComparisonReport columns={columns} />
+                    {allCompleted && (
+                      <section className="panel-surface !shadow-none p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <FolderPlus className="h-4 w-4 text-primary" />
+                          <h3 className="text-sm font-semibold">保存为项目</h3>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          将本次实验的工作空间文件与对比结果写入项目列表，可在「项目」页查看。
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            className="form-input flex-1"
+                            placeholder="项目名称（可留空自动生成）"
+                            value={projectName}
+                            onChange={(e) => setProjectName(e.target.value)}
+                            disabled={savingProject}
+                            maxLength={100}
+                            aria-label="项目名称"
+                          />
+                          <button
+                            type="button"
+                            className="btn-primary shrink-0"
+                            disabled={savingProject || !question.trim()}
+                            onClick={saveAsProject}
+                          >
+                            {savingProject ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <FolderPlus className="h-4 w-4" />
+                            )}
+                            {savingProject ? "保存中…" : "创建项目"}
+                          </button>
+                        </div>
+                        {saveProjectMsg && (
+                          <p
+                            className={
+                              "text-xs " +
+                              (saveProjectMsg.startsWith("已保存")
+                                ? "text-success"
+                                : "text-destructive")
+                            }
+                          >
+                            {saveProjectMsg}
+                          </p>
                         )}
-                        {savingProject ? "保存中…" : "创建项目"}
-                      </button>
-                    </div>
-                    {saveProjectMsg && (
-                      <p
-                        className={
-                          "text-xs " +
-                          (saveProjectMsg.startsWith("已保存")
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-destructive")
-                        }
-                      >
-                        {saveProjectMsg}
-                      </p>
+                      </section>
                     )}
-                  </section>
+                  </div>
                 )}
-              </div>
-            )}
-            {mainTab === "report" && !hasMetrics && (
-              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                暂无完成的对比数据
-              </div>
-            )}
-            {mainTab === "diff" && allCompleted && <TraceDiff columns={columnList} />}
-            {mainTab === "diff" && !allCompleted && (
-              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                等待所有 Agent 完成后显示
+                {mainTab === "report" && !hasMetrics && (
+                  <div className="empty-state h-full min-h-[12rem]">
+                    <div className="empty-state-icon">
+                      <BarChart3 className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm">暂无完成的对比数据</p>
+                    <p className="text-xs text-muted-foreground">
+                      运行实验后，指标会汇总到这里
+                    </p>
+                  </div>
+                )}
+                {mainTab === "diff" && allCompleted && <TraceDiff columns={columnList} />}
+                {mainTab === "diff" && !allCompleted && (
+                  <div className="empty-state h-full min-h-[12rem]">
+                    <div className="empty-state-icon">
+                      <GitCompare className="h-5 w-5" />
+                    </div>
+                    <p className="text-sm">等待所有 Agent 完成</p>
+                    <p className="text-xs text-muted-foreground">
+                      全部结束后可对齐对比 Trace
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </main>
 
-        {/* ===== 右侧栏：工作空间（独立滚动） ===== */}
         {showRightPanel && (
-          <aside className="w-72 flex-shrink-0 rounded-lg border border-border bg-card overflow-hidden hidden xl:flex flex-col">
-            <WorkspacePanel
-              workspaceName={activeWorkspace}
-              pollInterval={running ? 1500 : 5000}
-            />
+          <aside className="arena-workspace" data-open="true" aria-label="工作空间">
+            <div className="arena-drawer-head xl:hidden">
+              <p className="eyebrow">工作空间</p>
+              <button
+                type="button"
+                className="btn-ghost !h-7 !w-7 !p-0"
+                onClick={() => setShowRightPanel(false)}
+                aria-label="关闭工作空间"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+              <WorkspacePanel
+                workspaceName={activeWorkspace}
+                pollInterval={running ? 1500 : 5000}
+              />
+            </div>
           </aside>
         )}
-      </div>
-
-      {/* ===== 底部：输入区（固定不滚动） ===== */}
-      <section className="shrink-0 mt-3 rounded-lg border border-border bg-card/95 backdrop-blur-sm p-3 space-y-2">
-        {error && (
-          <p className="text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded px-3 py-1.5">
-            {error}
-          </p>
-        )}
-        <div className="flex flex-wrap gap-1.5">
-          {TASK_TEMPLATES.map((t) => (
-            <button
-              key={t}
-              type="button"
-              className="btn-ghost text-[11px] transition-all hover:scale-[1.02]"
-              onClick={() => setQuestion(t)}
-            >
-              {t.length > 24 ? `${t.slice(0, 24)}…` : t}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-3">
-          <input
-            className="form-input flex-1"
-            placeholder="输入你的问题…"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                runArena();
-              }
-            }}
-            disabled={running}
-          />
-          {running ? (
-            <button type="button" className="btn-ghost shrink-0" onClick={cancelRun}>
-              <Square className="h-4 w-4" />
-              停止
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn-primary shrink-0"
-              disabled={!question.trim() || activeSelections.length < 2}
-              onClick={runArena}
-            >
-              <Send className="h-4 w-4" />
-              发送
-            </button>
-          )}
-        </div>
-      </section>
-
-      {/* 折叠按钮：左侧栏 */}
-      <div className="fixed right-4 top-20 z-40 flex flex-col gap-1">
-        <button
-          type="button"
-          className="btn-ghost !h-8 !w-8 !p-0"
-          onClick={() => setShowLeftPanel(!showLeftPanel)}
-          title={showLeftPanel ? "隐藏左侧维度栏" : "显示左侧维度栏"}
-          aria-label={showLeftPanel ? "隐藏左侧维度栏" : "显示左侧维度栏"}
-        >
-          {showLeftPanel ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
-        </button>
-        {/* 右侧栏按钮 */}
-        <button
-          type="button"
-          className="btn-ghost !h-8 !w-8 !p-0"
-          onClick={() => setShowRightPanel(!showRightPanel)}
-          title={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
-          aria-label={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
-        >
-          {showRightPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-        </button>
       </div>
     </div>
   );
@@ -832,19 +1050,12 @@ function MainTabButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="relative inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors data-[active=true]:text-foreground data-[active=false]:text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
+      className="main-tab"
       data-active={active}
     >
       {icon}
       {label}
-      {badge != null && (
-        <span className="ml-1 inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded-full bg-muted text-[10px] font-mono">
-          {badge}
-        </span>
-      )}
-      {active && (
-        <span className="absolute left-0 right-0 -bottom-px h-px bg-foreground" />
-      )}
+      {badge != null && <span className="main-tab-badge">{badge}</span>}
     </button>
   );
 }

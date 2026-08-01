@@ -10,7 +10,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.adapters.common import get_workspace_mgr
 from app.arena.project import get_project_manager
-from app.arena.router import list_dimension_options
+from app.arena.router import DEFAULT_BASE, list_baseline_fields, list_dimension_options
 from app.arena.runner import RunnerPool, build_registry
 from app.models import ArenaRunRequest, ProjectCreate, WorkspaceFileUpsert
 
@@ -20,27 +20,27 @@ _DIMENSION_META: list[dict] = [
     {
         "id": "framework",
         "label": "框架",
-        "subtitle": "编排实现不同，Prompt / 推理 / 上下文 / Harness 保持一致",
+        "subtitle": "编排实现不同，Prompt / 推理 / 上下文 / Harness 保持一致（可用基线覆盖）",
     },
     {
         "id": "prompt",
         "label": "提示词",
-        "subtitle": "仅切换 Prompt 模板，LangGraph + ReAct 编排不变",
+        "subtitle": "仅切换 Prompt 模板，其余维由基线固定",
     },
     {
         "id": "reasoning",
         "label": "推理模式",
-        "subtitle": "仅切换推理图节点，Prompt 基线保持一致",
+        "subtitle": "仅切换推理图节点，其余维由基线固定",
     },
     {
         "id": "context",
         "label": "上下文",
-        "subtitle": "仅切换 Memory 策略，需使用多轮任务模板",
+        "subtitle": "仅切换 Memory 策略；滑动/摘要/向量在 LLM 调用前真实裁剪",
     },
     {
         "id": "harness",
         "label": "Harness",
-        "subtitle": "仅切换验证 / 反思循环，其余配置保持一致",
+        "subtitle": "仅切换验证 / 反思循环，其余维由基线固定",
     },
 ]
 
@@ -64,6 +64,8 @@ async def arena_meta():
     return {
         "dimensions": dimensions,
         "frameworks": _pool.registry.list_available() + _pool.registry.list_reserved(),
+        "baseline_defaults": dict(DEFAULT_BASE),
+        "baseline_fields": list_baseline_fields(),
     }
 
 

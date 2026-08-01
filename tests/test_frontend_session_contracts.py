@@ -35,6 +35,9 @@ def test_traceview_uses_stable_thought_key():
     assert "thought:${step}" in src or "thought:`" in src or 'thought:${step}' in src
     # delta 与 end 都应使用 thoughtKey
     assert src.count("thoughtKey") >= 3
+    # thinking 与最终答案分离
+    assert 'ev.type === "thinking"' in src or "ev.type === 'thinking'" in src
+    assert "内心推理" in src
 
 
 def test_arena_client_save_project_and_real_workspace():
@@ -46,6 +49,16 @@ def test_arena_client_save_project_and_real_workspace():
     assert "${completed.label}_" not in src
     assert "${first.label}_" not in src
     assert "c.workspace" in src or "col.workspace" in src
+
+
+def test_arena_client_has_baseline_controls():
+    src = ARENA_CLIENT.read_text(encoding="utf-8")
+    assert "控制变量基线" in src
+    assert "baselinePayload" in src
+    assert "baseline_fields" in src
+    api = API_TS.read_text(encoding="utf-8")
+    assert "BaselineOverrides" in api
+    assert "body.baseline" in api
 
 
 def test_thought_merge_key_contract():

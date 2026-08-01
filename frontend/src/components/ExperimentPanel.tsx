@@ -132,16 +132,17 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
 
   return (
     <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-2">实验参数</p>
+      </div>
       {/* 模型卡片：名称 + 提供商 + 上下文窗口 */}
-      <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+      <div className="rounded-[var(--radius-sm)] border border-border bg-muted/30 p-3 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-            模型
-          </span>
+          <span className="eyebrow">模型</span>
           {saving && <span className="text-[10px] text-muted-foreground">保存中…</span>}
           {error && <span className="text-[10px] text-destructive">保存失败</span>}
         </div>
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 flex items-center justify-center min-h-[2.25rem]">
+        <div className="rounded-[var(--radius-sm)] border border-border bg-card px-3 py-2 flex items-center justify-center min-h-[2.25rem]">
           <span className="font-mono text-sm font-medium text-foreground text-center break-all">
             {config.model}
           </span>
@@ -222,9 +223,9 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
           onTouchEnd={flushParams}
           onKeyUp={flushParams}
           aria-label="Max Tokens"
-          className="w-full h-1.5 appearance-none bg-border rounded-full cursor-pointer
-            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground
+          className="w-full h-1.5 appearance-none bg-border rounded cursor-pointer
+            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5
+            [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-primary
             [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background"
         />
         <div className="flex justify-between text-[10px] text-muted-foreground">
@@ -234,7 +235,7 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
       </div>
 
       {/* 预估 Token */}
-      <div className="rounded border border-border bg-muted/20 p-3 space-y-2">
+      <div className="rounded-[var(--radius-sm)] border border-border bg-muted/20 p-3 space-y-2">
         <button
           type="button"
           className="flex items-center gap-1.5 w-full text-left"
@@ -264,21 +265,18 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
             <span className="text-muted-foreground">预估输入占比</span>
             <span className="font-mono">{inputPct}%</span>
           </div>
-          <div className="h-1.5 rounded-full bg-border overflow-hidden">
-            <div
-              className="h-full bg-foreground/60 transition-all duration-300"
-              style={{ width: `${inputPct}%` }}
-            />
+          <div className="token-bar">
+            <div className="token-bar-fill" style={{ width: `${inputPct}%` }} />
           </div>
         </div>
       </div>
 
       {/* 维度说明 */}
-      <div className="rounded border border-border bg-card p-3">
-        <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5">
-          当前维度
+      <div className="rounded-[var(--radius-sm)] border border-border bg-card/60 p-3">
+        <p className="eyebrow mb-1.5">当前维度</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {DIMENSION_DESCRIPTIONS[dimension] ?? ""}
         </p>
-        <p className="text-xs">{DIMENSION_DESCRIPTIONS[dimension] ?? ""}</p>
       </div>
     </div>
   );
@@ -326,9 +324,9 @@ function ParamSlider({
         onKeyUp={onCommit}
         aria-label={label}
         title={hint}
-        className="w-full h-1.5 appearance-none bg-border rounded-full cursor-pointer
-          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-          [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground
+        className="w-full h-1.5 appearance-none bg-border rounded cursor-pointer
+          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5
+          [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-primary
           [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background"
       />
     </div>

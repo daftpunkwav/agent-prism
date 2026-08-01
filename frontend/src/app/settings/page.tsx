@@ -32,7 +32,6 @@ export default function SettingsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 组件卸载时取消 in-flight 请求，避免 setState on unmounted
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -70,7 +69,6 @@ export default function SettingsPage() {
     toastTimerRef.current = setTimeout(() => setToast(null), 3200);
   }, []);
 
-  // 卸载时清理 toast 定时器
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -103,29 +101,25 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
-        <div className="flex items-center">
-          <Loader2 className="h-5 w-5 animate-spin mr-2" />
-          加载配置…
-        </div>
-        {loadError && (
-          <p className="text-xs text-destructive">{loadError}</p>
-        )}
+      <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
+        <div className="loading-prism" aria-hidden />
+        <p className="text-sm">加载配置…</p>
+        {loadError && <p className="text-xs text-destructive">{loadError}</p>}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6 fade-in">
       <div>
         <p className="eyebrow mb-2">BYOK</p>
-        <h1 className="text-2xl font-semibold">Provider 配置</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="page-title text-3xl">Provider 配置</h1>
+        <p className="mt-2 text-sm text-muted-foreground max-w-xl leading-relaxed">
           自带 API Key 运行 Arena 实验。Key 仅保存在本地，不会上传到远程。
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-5 rounded-[var(--radius)] border border-border bg-card p-6">
+      <form onSubmit={onSubmit} className="panel-surface p-6 space-y-5">
         <Field label="供应商名称">
           <input
             className="form-input"
@@ -154,7 +148,7 @@ export default function SettingsPage() {
               href={form.website_url}
               target="_blank"
               rel="noreferrer"
-              className="btn-ghost shrink-0"
+              className="btn-ghost shrink-0 !h-11 !w-11 !p-0"
               aria-label="打开官网链接"
             >
               <ExternalLink className="h-4 w-4" />
@@ -173,7 +167,7 @@ export default function SettingsPage() {
             />
             <button
               type="button"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               onClick={() => setShowKey(!showKey)}
               aria-label={showKey ? "隐藏 API Key" : "显示 API Key"}
             >
@@ -193,12 +187,13 @@ export default function SettingsPage() {
               type="checkbox"
               checked={form.use_full_url}
               onChange={(e) => setForm({ ...form, use_full_url: e.target.checked })}
+              className="accent-[var(--primary)]"
             />
             完整 URL
           </label>
         </Field>
 
-        <details className="rounded-[calc(var(--radius)-6px)] border border-border p-4">
+        <details className="rounded-[var(--radius-sm)] border border-border bg-muted/20 p-4">
           <summary className="cursor-pointer text-sm font-medium">高级选项</summary>
           <div className="mt-4 space-y-4">
             <Field label="API 格式">
@@ -223,9 +218,9 @@ export default function SettingsPage() {
           </div>
         </details>
 
-        <div className="rounded border border-border p-4 space-y-4">
+        <div className="rounded-[var(--radius-sm)] border border-border bg-muted/15 p-4 space-y-4">
           <p className="eyebrow">模型映射</p>
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <Field label="实际请求模型">
               <input
                 className="form-input font-mono text-sm"
@@ -245,15 +240,18 @@ export default function SettingsPage() {
               />
             </Field>
           </div>
-          <p className="eyebrow pt-2">上下文窗口</p>
-          <div className="grid grid-cols-3 gap-3 text-sm">
+          <div className="spectrum-line-soft my-1" aria-hidden />
+          <p className="eyebrow">上下文窗口</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <Field label="上下文窗口 (tokens)">
               <input
                 className="form-input font-mono text-sm"
                 type="number"
                 min="1024"
                 value={form.context_window}
-                onChange={(e) => setForm({ ...form, context_window: parseInt(e.target.value, 10) || 0 })}
+                onChange={(e) =>
+                  setForm({ ...form, context_window: parseInt(e.target.value, 10) || 0 })
+                }
               />
             </Field>
             <Field label="最大输入 (tokens)">
@@ -262,7 +260,9 @@ export default function SettingsPage() {
                 type="number"
                 min="256"
                 value={form.max_input_tokens}
-                onChange={(e) => setForm({ ...form, max_input_tokens: parseInt(e.target.value, 10) || 0 })}
+                onChange={(e) =>
+                  setForm({ ...form, max_input_tokens: parseInt(e.target.value, 10) || 0 })
+                }
               />
             </Field>
             <Field label="最大输出 (tokens)">
@@ -271,33 +271,36 @@ export default function SettingsPage() {
                 type="number"
                 min="64"
                 value={form.max_output_tokens}
-                onChange={(e) => setForm({ ...form, max_output_tokens: parseInt(e.target.value, 10) || 0 })}
+                onChange={(e) =>
+                  setForm({ ...form, max_output_tokens: parseInt(e.target.value, 10) || 0 })
+                }
               />
             </Field>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             上下文占比 = (输入 + 输出) / 上下文窗口；输入占比 = 输入 / 最大输入。
           </p>
         </div>
 
         {testResult && (
           <div
-            className={`rounded border p-3 text-sm ${
-              testResult.ok
-                ? "border-foreground/30 bg-muted text-foreground"
-                : "border-destructive/40 bg-destructive/10 text-destructive"
-            }`}
+            className={
+              "rounded-[var(--radius-sm)] border p-3 text-sm " +
+              (testResult.ok
+                ? "border-success/35 bg-success/10 text-foreground"
+                : "border-destructive/40 bg-destructive/10 text-destructive")
+            }
           >
             {testResult.message}
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2 pt-2">
+        <div className="flex flex-wrap gap-2 pt-1">
           <button type="submit" className="btn-primary" disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             保存配置
           </button>
-          <button type="button" className="btn-ghost" onClick={onTest} disabled={testing}>
+          <button type="button" className="btn-ghost !h-11" onClick={onTest} disabled={testing}>
             {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
             管理与测试
           </button>
@@ -305,7 +308,7 @@ export default function SettingsPage() {
       </form>
 
       {toast && (
-        <div className="fixed bottom-6 right-6 rounded-[calc(var(--radius)-6px)] border border-border bg-card px-4 py-3 text-sm shadow-lg">
+        <div className="fixed bottom-6 right-6 panel-surface px-4 py-3 text-sm z-50 fade-in">
           {toast}
         </div>
       )}

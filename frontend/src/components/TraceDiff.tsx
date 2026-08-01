@@ -122,12 +122,12 @@ function getEventText(ev: ArenaEvent): string {
 }
 
 function getTypeIcon(type: string) {
-  if (type === "thought") return <Lightbulb className="h-3 w-3" />;
-  if (type === "action") return <Zap className="h-3 w-3" />;
-  if (type === "observation") return <ArrowLeftRight className="h-3 w-3" />;
-  if (type === "verify") return <Zap className="h-3 w-3 text-amber-500" />;
-  if (type === "reflect") return <Lightbulb className="h-3 w-3 text-purple-500" />;
-  if (type === "harness_edit") return <Plus className="h-3 w-3 text-green-500" />;
+  if (type === "thought") return <Lightbulb className="h-3 w-3 text-spectrum-1" />;
+  if (type === "action") return <Zap className="h-3 w-3 text-spectrum-2" />;
+  if (type === "observation") return <ArrowLeftRight className="h-3 w-3 text-spectrum-3" />;
+  if (type === "verify") return <Zap className="h-3 w-3 text-warning" />;
+  if (type === "reflect") return <Lightbulb className="h-3 w-3 text-spectrum-3" />;
+  if (type === "harness_edit") return <Plus className="h-3 w-3 text-success" />;
   return null;
 }
 
@@ -141,50 +141,47 @@ export function TraceDiff({ columns }: TraceDiffProps) {
   }
 
   return (
-    <section className="rounded-lg border border-border bg-card overflow-hidden">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+    <section className="data-table-wrap fade-in">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-          <h3 className="font-semibold text-sm">Trace 对比</h3>
+          <ArrowLeftRight className="h-4 w-4 text-primary" />
+          <h3 className="page-title text-sm">Trace 对比</h3>
           {diffCount > 0 && (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-warning/10 text-warning border border-warning/30">
               {diffCount} 处差异
             </span>
           )}
         </div>
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-[10px] text-muted-foreground font-mono">
           按步骤对齐 · 高亮决策差异
         </span>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="bg-muted/30 border-b border-border">
+          <thead>
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground w-16">
-                Step
-              </th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground w-24">
-                类型
-              </th>
-              {labels.map((label) => (
-                <th
-                  key={label}
-                  className="px-3 py-2 text-left font-medium text-muted-foreground min-w-[180px]"
-                >
-                  {label}
+              <th className="!w-16">Step</th>
+              <th className="!w-24">类型</th>
+              {labels.map((label, idx) => (
+                <th key={label} className="min-w-[180px]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className="w-1.5 h-1.5 rounded-sm"
+                      style={{ background: `var(--spectrum-${(idx % 4) + 1})` }}
+                    />
+                    {label}
+                  </span>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {alignedRows.map((row) => (
-              <tr key={row.step} className="border-b border-border hover:bg-muted/20">
-                <td className="px-3 py-2 font-mono text-muted-foreground align-top">
-                  {row.step}
-                </td>
-                <td className="px-3 py-2 text-muted-foreground align-top">
-                  <span className="inline-flex items-center gap-1 text-[10px]">
+              <tr key={row.step} className="hover:bg-muted/20">
+                <td className="font-mono text-muted-foreground align-top">{row.step}</td>
+                <td className="text-muted-foreground align-top">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider">
                     {getTypeIcon(row.type)}
                     {row.type}
                   </span>
@@ -195,9 +192,10 @@ export function TraceDiff({ columns }: TraceDiffProps) {
                   return (
                     <td
                       key={label}
-                      className={`px-3 py-2 align-top ${
-                        isDiff ? "bg-amber-500/5 border-l-2 border-amber-500" : ""
-                      }`}
+                      className={
+                        "align-top " +
+                        (isDiff ? "bg-warning/5 border-l-2 border-warning" : "")
+                      }
                     >
                       {text ? (
                         <div className="space-y-1">
@@ -205,7 +203,7 @@ export function TraceDiff({ columns }: TraceDiffProps) {
                             {text.length > 300 ? text.slice(0, 300) + "…" : text}
                           </p>
                           {isDiff && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-700 dark:text-amber-400">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-warning">
                               <AlertTriangle className="h-2.5 w-2.5" />
                               差异
                             </span>

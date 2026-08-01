@@ -203,8 +203,11 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
 
   if (!workspaceName) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-muted-foreground p-4 text-center">
-        运行 Arena 后，每个 Agent 的工作空间将在此显示
+      <div className="empty-state h-full !py-8 px-4">
+        <div className="empty-state-icon">
+          <FolderOpen className="h-5 w-5" />
+        </div>
+        <p className="text-xs leading-relaxed">运行实验后，Agent 工作空间会显示在这里</p>
       </div>
     );
   }
@@ -213,14 +216,12 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
     <div className="flex flex-col h-full">
       {/* 文件树 */}
       <div className="border-b border-border overflow-y-auto max-h-40 flex-shrink-0">
-        <div className="sticky top-0 bg-card border-b border-border px-2 py-1.5 flex items-center justify-between">
-          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-            文件
-          </span>
+        <div className="sticky top-0 bg-[color-mix(in_srgb,var(--card)_92%,var(--muted))] border-b border-border px-2.5 py-2 flex items-center justify-between">
+          <span className="eyebrow">工作空间</span>
           <div className="flex items-center gap-0.5">
             <button
               type="button"
-              className="text-muted-foreground hover:text-foreground p-0.5"
+              className="text-muted-foreground hover:text-foreground p-1 rounded-[var(--radius-sm)] hover:bg-muted/60"
               onClick={() => setShowNewFile(!showNewFile)}
               title="新建文件"
             >
@@ -228,7 +229,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
             </button>
             <button
               type="button"
-              className="text-muted-foreground hover:text-foreground p-0.5"
+              className="text-muted-foreground hover:text-foreground p-1 rounded-[var(--radius-sm)] hover:bg-muted/60"
               onClick={loadFiles}
               title="刷新"
             >
@@ -408,7 +409,7 @@ function TreeNode({ node, depth, expanded, expandedDirs, onToggle, onSelect, sel
           ) : (
             <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           )}
-          <FolderOpen className="h-3 w-3 text-blue-500 flex-shrink-0" />
+          <FolderOpen className="h-3 w-3 text-primary flex-shrink-0" />
           <span className="truncate">{node.name}</span>
         </button>
         {expanded && (

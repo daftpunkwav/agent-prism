@@ -1,71 +1,86 @@
-"""流式 chunk 文本提取。"""
+"""流式 chunk 文本提取 — 区分 thinking 与可见回答。"""
 
 from __future__ import annotations
 
 
 def extract_chunk_text(chunk) -> str:
-    """从多种 chunk 格式提取纯文本。"""
-    if chunk is None:
-        return ""
+    """兼容旧接口：合并 thinking + 可见文本（不推荐用于主回答展示）。"""
+    thinking, text = extract_chunk_parts(chunk)
+    return f"{thinking}{text}"
 
-    # 0. dict chunk — 部分 provider(如某些 OpenAI 兼容)的 chunk 是 dict
+
+def extract_chunk_parts(chunk) -> tuple[str, str]:
+    """从 chunk 分离 (thinking_text, visible_text)。
+
+    Provider（如 StepFun / Anthropic extended thinking）常把内心独白放在
+    ``thinking`` 块；若并入主回答，UI 会把跑偏的独白当成最终答案。
+    """
+    if chunk is None:
+        return "", ""
+
     if isinstance(chunk, dict):
-        # OpenAI Chat: {"choices": [{"delta": {"content": "..."}}]}
         choices = chunk.get("choices")
         if isinstance(choices, list) and choices:
             delta = choices[0].get("delta", {})
-            content = delta.get("content") if isinstance(delta, dict) else None
-            if isinstance(content, str):
-                return content
-        # 兜底：若 dict 中有 text/content 字段
+            if isinstance(delta, dict):
+                content = delta.get("content")
+                if isinstance(content, str):
+                    return "", content
+                if isinstance(content, list):
+                    return _parts_from_content(content)
+                # 部分兼容接口把 reasoning 放在 delta.reasoning
+                reasoning = delta.get("reasoning") or delta.get("reasoning_content")
+                if isinstance(reasoning, str) and reasoning:
+                    return reasoning, ""
         for key in ("text", "content"):
             val = chunk.get(key)
             if isinstance(val, str) and val:
-                return val
+                return "", val
             if isinstance(val, list):
-                return _extract_from_content(val)
-        return ""
+                return _parts_from_content(val)
+        return "", ""
 
-    # 1. 优先从 .content 属性提取
     content = getattr(chunk, "content", None)
     if content is not None:
-        return _extract_from_content(content)
+        return _parts_from_content(content)
 
-    # 2. 回退：尝试 .text 属性（部分 provider 直接返回字符串）
     text = getattr(chunk, "text", None)
     if isinstance(text, str) and text:
-        return text
+        return "", text
 
-    # 3. 最后兜底：str() 转换
-    return str(chunk) if chunk else ""
+    return "", str(chunk) if chunk else ""
 
 
-def _extract_from_content(content) -> str:
-    """递归提取 content 中的文本块。"""
+def _parts_from_content(content) -> tuple[str, str]:
     if isinstance(content, str):
-        return content
-
+        return "", content
     if not isinstance(content, list):
-        return str(content) if content else ""
+        return "", str(content) if content else ""
 
-    parts: list[str] = []
+    thinking_parts: list[str] = []
+    text_parts: list[str] = []
     for block in content:
         if isinstance(block, str):
-            parts.append(block)
+            text_parts.append(block)
             continue
         if isinstance(block, dict):
             block_type = block.get("type", "")
-            if block_type in ("text",):
-                parts.append(str(block.get("text", "")))
-            elif block_type in ("thinking", "reasoning", "redacted_thinking"):
-                # extended thinking 的内容块也计入推理文本
-                parts.append(str(block.get("thinking", block.get("text", ""))))
-        else:
-            text = getattr(block, "text", None)
-            thinking = getattr(block, "thinking", None)
-            if thinking:
-                parts.append(str(thinking))
-            elif text:
-                parts.append(str(text))
-
-    return "".join(parts)
+            if block_type in ("thinking", "reasoning", "redacted_thinking"):
+                thinking_parts.append(str(block.get("thinking", block.get("text", ""))))
+            elif block_type in ("text",):
+                text_parts.append(str(block.get("text", "")))
+            elif block_type in ("tool_use", "tool_call", "input_json_delta"):
+                continue
+            else:
+                # 未知块：若有 text 则归可见，否则忽略
+                if block.get("text"):
+                    text_parts.append(str(block["text"]))
+            continue
+        thinking = getattr(block, "thinking", None)
+        text = getattr(block, "text", None)
+        btype = getattr(block, "type", None)
+        if thinking or btype in ("thinking", "reasoning"):
+            thinking_parts.append(str(thinking or ""))
+        elif text:
+            text_parts.append(str(text))
+    return "".join(thinking_parts), "".join(text_parts)

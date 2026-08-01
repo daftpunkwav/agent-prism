@@ -7,24 +7,25 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV = [
   { href: "/arena", label: "Arena", icon: Zap },
-  { href: "/projects", label: "Projects", icon: FolderOpen },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/projects", label: "项目", icon: FolderOpen },
+  { href: "/settings", label: "设置", icon: Settings },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isArena = pathname.startsWith("/arena");
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-50 border-b border-border bg-background">
-        <div className="mx-auto flex h-14 max-w-[1680px] items-center justify-between px-4 md:px-8">
-          <Link href="/arena" className="flex items-center gap-2.5 font-semibold">
-            <span className="flex h-7 w-7 items-center justify-center rounded border border-border text-xs font-mono">
+    <div className={isArena ? "h-dvh flex flex-col overflow-hidden" : "min-h-screen flex flex-col"}>
+      <header className="shell-header shrink-0 z-50">
+        <div className="mx-auto flex h-14 max-w-[1680px] items-center justify-between px-4 md:px-6">
+          <Link href="/arena" className="flex items-center gap-2.5 group min-w-0">
+            <span className="brand-mark text-[10px] font-mono font-semibold tracking-tight text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
               AP
             </span>
-            <span>AgentPrism</span>
+            <span className="brand-wordmark truncate">AgentPrism</span>
           </Link>
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             {NAV.map(({ href, label, icon: Icon }) => {
               const active = pathname.startsWith(href);
               return (
@@ -36,16 +37,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   aria-current={active ? "page" : undefined}
                 >
                   <Icon className="h-3.5 w-3.5" />
-                  {label}
+                  <span className="hidden sm:inline">{label}</span>
                 </Link>
               );
             })}
-            <span className="mx-1 h-4 w-px bg-border" />
+            <span className="mx-1 h-4 w-px bg-border" aria-hidden />
             <ThemeToggle />
           </nav>
         </div>
+        <div className="spectrum-line" aria-hidden />
       </header>
-      <main className="mx-auto w-full max-w-[1680px] flex-1 px-4 py-6 md:px-8">{children}</main>
+      <main
+        className={
+          isArena
+            ? "flex-1 min-h-0 overflow-hidden w-full max-w-[1680px] mx-auto"
+            : "mx-auto w-full max-w-[1680px] flex-1 px-4 py-8 md:px-8"
+        }
+      >
+        {children}
+      </main>
     </div>
   );
 }

@@ -31,7 +31,7 @@ def test_tot_graph_has_correct_nodes():
     assert "generate" in nodes
     assert "evaluate" in nodes
     assert "execute" in nodes
-    assert "tools" in nodes
+    assert "tools" not in nodes
 
 
 def test_reflexion_graph_has_correct_nodes():
@@ -39,6 +39,7 @@ def test_reflexion_graph_has_correct_nodes():
     nodes = list(graph.nodes.keys())
     assert "execute" in nodes
     assert "reflect" in nodes
+    assert "tools" in nodes
 
 
 def test_all_modes_build_successfully():

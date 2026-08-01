@@ -19,7 +19,7 @@ from app.arena.reasoning_graph import (
     build_reflexion_graph,
     build_tot_graph,
 )
-from app.arena.stream_utils import extract_chunk_text
+from app.arena.stream_utils import extract_chunk_parts
 from app.arena.token_utils import TokenTracker, extract_usage
 from app.arena.workspace import clear_current_workspace, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
@@ -58,6 +58,7 @@ class LangGraphAdapter:
         tool_calls = 0
         # 在后端也保留当前正在流式输出的 step，便于 tool_start 正确递增
         streaming_step: int | None = None
+        thinking_step: int | None = None
         try:
             set_pipeline_llm_overrides(
                 temperature=config.temperature,
@@ -76,7 +77,7 @@ class LangGraphAdapter:
                 step=0,
                 content=(
                     f"[LangGraph] {mode_label} · {config.prompt_profile} · "
-                    f"context={config.context} · harness={config.harness}"
+                    f"context={config.context}(真实裁剪) · harness={config.harness}"
                 ),
             )
 
@@ -93,6 +94,7 @@ class LangGraphAdapter:
                 "max_steps": 10,
                 "tool_calls": 0,
                 "reflections": [],
+                "context_strategy": config.context,
             }
 
             # 通过 HarnessRunner 接入验证/反思/自进化循环（bare 仅单次流式）
@@ -109,6 +111,7 @@ class LangGraphAdapter:
                             content="",
                         )
                         streaming_step = None
+                    thinking_step = None
                     step += 1
                     ev_type = event.get("type") or "verify"
                     yield ArenaEvent(
@@ -126,9 +129,18 @@ class LangGraphAdapter:
                 node_name = event.get("name", "")
 
                 if kind == "on_chat_model_stream":
-                    text = extract_chunk_text(data.get("chunk"))
+                    thinking, text = extract_chunk_parts(data.get("chunk"))
+                    if thinking:
+                        if thinking_step is None:
+                            step += 1
+                            thinking_step = step
+                        yield ArenaEvent(
+                            type="thinking",
+                            pipeline=label,
+                            step=thinking_step,
+                            content=thinking,
+                        )
                     if text:
-                        # 实时流式输出：首个 token 决定 step，后续 delta 同 step 累积
                         if streaming_step is None:
                             step += 1
                             streaming_step = step
@@ -143,7 +155,6 @@ class LangGraphAdapter:
                     if usage["input_tokens"] or usage["output_tokens"]:
                         tracker.add_usage(usage)
                         yield token_update_event(label, tracker, workspace=ws_name)
-                    # 标记流结束，TraceView 会切到完整 Markdown 渲染
                     if streaming_step is not None:
                         yield ArenaEvent(
                             type="thought_end",
@@ -152,8 +163,8 @@ class LangGraphAdapter:
                             content="",
                         )
                     streaming_step = None
+                    thinking_step = None
                 elif kind == "on_tool_start":
-                    # 若在流式输出中插入了 tool_start，应先关流式段避免 UI 重叠
                     if streaming_step is not None:
                         yield ArenaEvent(
                             type="thought_end",
@@ -162,6 +173,7 @@ class LangGraphAdapter:
                             content="",
                         )
                         streaming_step = None
+                    thinking_step = None
                     tool_calls += 1
                     step += 1
                     tool_name = data.get("name", node_name)
@@ -191,6 +203,7 @@ class LangGraphAdapter:
                             content="",
                         )
                         streaming_step = None
+                    thinking_step = None
                     yield ArenaEvent(
                         type="thought",
                         pipeline=label,

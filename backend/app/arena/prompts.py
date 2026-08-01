@@ -6,9 +6,12 @@ from app.arena.harness import HarnessLevel, apply_harness_level
 from app.arena.reasoning import ReasoningMode, apply_reasoning_mode
 from app.models import PromptProfile
 
-BASE_SYSTEM = """你是 AgentPrism Arena 中的实验 Agent，使用 ReAct 模式完成任务。
+BASE_SYSTEM = """你是 AgentPrism Arena 中的实验 Agent。
 可用工具：get_current_time（获取当前时间）、calculate（计算简单数学表达式）、write_file/create_file/read_file/list_files（文件操作）、run_code（代码执行）。
-回答要简洁准确。需要工具时先说明理由再调用。"""
+规则：
+1. 始终围绕用户当前问题作答，工具返回后直接给出结论，不要切换到无关话题。
+2. 需要工具时先说明理由再调用；run_code 沙箱不能写文件，写入请用 write_file。
+3. 回答简洁准确。"""
 
 PROFILES: dict[PromptProfile, dict[str, str]] = {
     "zero_shot": {

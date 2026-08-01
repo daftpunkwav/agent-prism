@@ -67,11 +67,9 @@ def test_react_tool_node_unknown_tool_still_emits_toolmessage():
 def test_reflexion_graph_no_unconditional_reflect_to_execute():
     """reflect 不得有无条件边到 execute（仅条件边）。"""
     g = build_reflexion_graph()
-    # 编译后检查：条件边映射应含 execute 与 END
     assert "reflect" in g.nodes
     assert "execute" in g.nodes
-    # 无条件边集合：LangGraph StateGraph 用 edges / branches
-    # 直接测 should_continue 逻辑
+    assert "tools" in g.nodes
     assert _reflexion_should_continue(
         {"step_count": 1, "max_steps": 10, "reflections": ["需要改进回答"]}
     ) == "execute"
@@ -87,3 +85,11 @@ def test_reflexion_graph_no_unconditional_reflect_to_execute():
         )
         == END
     )
+
+
+def test_tot_should_continue_routes_to_execute():
+    from app.arena.reasoning_graph import _tot_should_continue
+
+    last = SimpleNamespace(tool_calls=[{"name": "x", "args": {}, "id": "1"}])
+    assert _tot_should_continue({"messages": [last]}) == "execute"
+    assert _tot_should_continue({"messages": [SimpleNamespace(tool_calls=[])]}) == END

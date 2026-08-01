@@ -17,10 +17,34 @@ export interface DimensionMeta {
   max_select: number;
 }
 
+export interface BaselineFieldOption {
+  value: string;
+  label: string;
+}
+
+export interface BaselineField {
+  dimension: DimensionId;
+  field: string;
+  label: string;
+  default: string;
+  options: BaselineFieldOption[];
+}
+
 export interface ArenaMeta {
   dimensions: DimensionMeta[];
   frameworks: Array<{ id: string; name: string; status: string }>;
+  baseline_defaults?: Record<string, string>;
+  baseline_fields?: BaselineField[];
 }
+
+/** 控制变量基线覆盖（不含当前对比维） */
+export type BaselineOverrides = Partial<{
+  framework: string;
+  reasoning: string;
+  context: string;
+  harness: string;
+  prompt_profile: string;
+}>;
 
 export interface ProviderConfig {
   provider_name: string;
@@ -129,19 +153,44 @@ export async function testProvider(body: Record<string, unknown>) {
   return res.json();
 }
 
+/** 判断是否为用户主动取消（fetch / ReadableStream abort）。 */
+export function isAbortError(err: unknown): boolean {
+  if (err == null || typeof err !== "object") return false;
+  const name = "name" in err ? String((err as { name: unknown }).name) : "";
+  if (name === "AbortError") return true;
+  // Chromium：BodyStreamBuffer was aborted
+  const message = "message" in err ? String((err as { message: unknown }).message) : "";
+  return /aborted|BodyStreamBuffer/i.test(message);
+}
+
 export async function streamArenaRun(
   question: string,
   dimension: DimensionId,
   onEvent: (event: ArenaEvent) => void,
   signal?: AbortSignal,
   selections?: string[],
+  baseline?: BaselineOverrides,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/arena/run`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify({ question, dimension, selections: selections ?? [] }),
-    signal,
-  });
+  let res: Response;
+  try {
+    const body: Record<string, unknown> = {
+      question,
+      dimension,
+      selections: selections ?? [],
+    };
+    if (baseline && Object.keys(baseline).length > 0) {
+      body.baseline = baseline;
+    }
+    res = await fetch(`${API_BASE}/api/arena/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (err) {
+    if (isAbortError(err) || signal?.aborted) return;
+    throw err;
+  }
 
   if (!res.ok || !res.body) {
     const text = await res.text();
@@ -182,8 +231,16 @@ export async function streamArenaRun(
       }
     }
     if (buffer.trim()) flush(buffer);
+  } catch (err) {
+    // 用户点「停止」会 abort BodyStream；属预期路径，静默结束
+    if (isAbortError(err) || signal?.aborted) return;
+    throw err;
   } finally {
-    reader.releaseLock();
+    try {
+      reader.releaseLock();
+    } catch {
+      // 已因 abort 释放时忽略
+    }
   }
 }
 

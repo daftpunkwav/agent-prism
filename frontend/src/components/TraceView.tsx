@@ -13,7 +13,7 @@ import {
 import { ArenaEvent } from "@/lib/api";
 
 /** 把所有事件归并成"显示段":每段有稳定 id + 文本 + 状态。 */
-type SegmentKind = "thought" | "action" | "observation" | "error" | "verify" | "reflect";
+type SegmentKind = "thought" | "thinking" | "action" | "observation" | "error" | "verify" | "reflect";
 
 interface DisplaySegment {
   id: string;
@@ -69,6 +69,23 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
       if (idx !== undefined && segs[idx]!.kind === "thought" && !segs[idx]!.completed) {
         segs[idx]!.completed = true;
       }
+    } else if (ev.type === "thinking") {
+      // 模型内心独白：与可见回答分离，避免把跑偏 thinking 当成最终答案
+      const thinkKey = `thinking:${step}`;
+      const idx = segIndex.get(thinkKey);
+      if (idx !== undefined && segs[idx]!.kind === "thinking") {
+        segs[idx]!.text += ev.content || "";
+      } else {
+        const s: DisplaySegment = {
+          id: `t:thinking:${segs.length}`,
+          kind: "thinking",
+          step,
+          text: ev.content || "",
+          completed: true,
+        };
+        segs.push(s);
+        segIndex.set(thinkKey, segs.length - 1);
+      }
     } else if (ev.type === "action") {
       segs.push({
         id: key + ":" + segs.length,
@@ -117,12 +134,12 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
   return segs;
 }
 
-/** 每列分配一个稳定的颜色索引 */
+/** 每列分配一个稳定的光谱色 */
 const COLUMN_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
+  "var(--spectrum-1)",
+  "var(--spectrum-2)",
+  "var(--spectrum-3)",
+  "var(--spectrum-4)",
 ];
 
 export function TraceView({
@@ -154,12 +171,19 @@ export function TraceView({
   }, [segments]);
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-2.5 p-3">
+    <div
+      ref={containerRef}
+      className="flex flex-col gap-2.5 p-3"
+      style={{ ["--lane" as string]: accentColor }}
+    >
       {segments.map((seg) => renderSegment(seg, accentColor))}
 
       {running && segments.length === 0 && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
-          <div className="h-3.5 w-3.5 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
+          <div
+            className="h-3.5 w-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"
+            aria-hidden
+          />
           连接模型中…
         </div>
       )}
@@ -168,6 +192,23 @@ export function TraceView({
 }
 
 function renderSegment(seg: DisplaySegment, accentColor: string) {
+  if (seg.kind === "thinking") {
+    return (
+      <details
+        key={seg.id}
+        className="trace-seg trace-thinking"
+        style={{ borderLeftColor: "var(--muted-foreground)" }}
+      >
+        <summary className="trace-tag cursor-pointer select-none text-muted-foreground">
+          内心推理 · Step {seg.step}
+          <span className="ml-1 font-normal opacity-70">（默认折叠，不计入最终答案）</span>
+        </summary>
+        <pre className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed text-muted-foreground">
+          {seg.text}
+        </pre>
+      </details>
+    );
+  }
   if (seg.kind === "thought") {
     const streaming = !seg.completed;
     return (
