@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   BarChart3,
   Check,
@@ -49,6 +50,8 @@ const DIMENSION_FIELD: Record<DimensionId, keyof BaselineOverrides> = {
   context: "context",
   harness: "harness",
 };
+
+const DIMENSION_IDS: DimensionId[] = ["framework", "prompt", "reasoning", "context", "harness"];
 
 type ColumnState = {
   label: string;
@@ -424,6 +427,7 @@ function ColumnCard({
 }
 
 export function ArenaClient() {
+  const searchParams = useSearchParams();
   const [meta, setMeta] = useState<ArenaMeta | null>(null);
   const [dimension, setDimension] = useState<DimensionId>("framework");
   const [selections, setSelections] = useState<string[]>([]);
@@ -506,6 +510,38 @@ export function ArenaClient() {
     },
     [],
   );
+
+  // URL 参数预填（学习路径「开始这一步」跳转入口）：
+  //   /arena?template=<id>      → 应用可判分模板（优先）
+  //   /arena?q=<question>&dimension=<id>&selections=a,b,c → 直接预填
+  const urlPrefilledRef = useRef(false);
+  useEffect(() => {
+    if (urlPrefilledRef.current || metaLoading) return;
+    const tid = searchParams.get("template");
+    // 带 template 参数但模板尚未加载完 → 等 templates 变化后重跑
+    if (tid && templates.length === 0) return;
+    urlPrefilledRef.current = true;
+    const t = tid ? templates.find((x) => x.id === tid) : undefined;
+    if (t) {
+      applyTemplate(t);
+      return;
+    }
+    const q = searchParams.get("q");
+    if (q) setQuestion(q);
+    const dim = searchParams.get("dimension");
+    if (dim && (DIMENSION_IDS as readonly string[]).includes(dim)) {
+      setDimension(dim as DimensionId);
+    }
+    const sel = searchParams.get("selections");
+    if (sel) {
+      setSelections(
+        sel
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+    }
+  }, [searchParams, metaLoading, templates, applyTemplate]);
 
   const baselinePayload = useMemo(() => {
     const locked = DIMENSION_FIELD[dimension];

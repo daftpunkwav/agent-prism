@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderOpen, Settings, Zap } from "lucide-react";
+import { Compass, FolderOpen, Settings, Zap } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV = [
   { href: "/arena", label: "Arena", icon: Zap },
+  { href: "/learn", label: "学习路径", icon: Compass },
   { href: "/projects", label: "项目", icon: FolderOpen },
   { href: "/settings", label: "设置", icon: Settings },
 ];
