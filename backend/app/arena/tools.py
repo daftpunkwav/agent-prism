@@ -466,10 +466,14 @@ def summarize_text(text: str, max_length: int = 200) -> str:
 
 
 def _get_ws() -> Workspace | None:
-    """获取当前 Agent 运行的工作空间（通过 ContextVar）。"""
+    """获取当前 Agent 运行的工作空间（通过 ContextVar）。
+
+    经 ``get_workspace_mgr`` 取管理器，保证测试注入的 override
+    （``set_workspace_mgr_override``）对工具层同样生效。
+    """
     name = get_current_workspace_name()
     if name:
-        return _workspace_mgr.get(name)
+        return get_workspace_mgr().get(name)
     return None
 
 

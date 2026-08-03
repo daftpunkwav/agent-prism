@@ -214,3 +214,39 @@ def test_workspace_rejects_null_byte():
         ws.write_file("foo\x00.txt", "x")
     with pytest.raises(WorkspaceError):
         ws.write_file("bar\x07.py", "x")
+
+
+def test_tool_uses_workspace_override():
+    """注入独立 WorkspaceManager 后，工具函数必须读写该实例而非全局单例。
+
+    注：直接调用 ``write_file.func``（StructuredTool 的原始函数）而非
+    ``.invoke()`` — invoke 经线程池执行，contextvars 不跨线程传播；
+    真实 pipeline 中工具在异步任务栈内调用，ContextVar 正常继承。
+    """
+    from app.arena.tools import (
+        get_workspace_mgr,
+        read_file,
+        set_workspace_mgr_override,
+        write_file,
+    )
+    from app.arena.workspace import (
+        WorkspaceManager,
+        clear_current_workspace,
+        set_current_workspace,
+    )
+
+    iso = WorkspaceManager()
+    set_workspace_mgr_override(iso)
+    # 与真实 pipeline 一致：先在工作空间管理器创建实例，再设置当前工作空间名
+    iso.create("ovr_ws")
+    set_current_workspace("ovr_ws")
+    try:
+        assert get_workspace_mgr() is iso
+        assert write_file.func(path="a.txt", content="v1").startswith("已写入")
+        # 写入落在注入实例；全局单例中不应存在
+        assert iso.get("ovr_ws") is not None
+        assert iso.get("ovr_ws").read_file("a.txt") == "v1"
+        assert read_file.func(path="a.txt") == "v1"
+    finally:
+        set_workspace_mgr_override(None)
+        clear_current_workspace()
