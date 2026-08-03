@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from collections.abc import AsyncIterator
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -44,8 +45,8 @@ class LangGraphAdapter:
         started = time.perf_counter()
         tracker = TokenTracker.from_provider()
 
-        # 每个运行实例独占一个工作空间
-        ws_name = f"{label}_{int(started * 1000)}"
+        # 每个运行实例独占一个工作空间（时间戳 + uuid 后缀，避免同毫秒碰撞覆盖）
+        ws_name = f"{label}_{int(started * 1000)}_{uuid.uuid4().hex[:6]}"
         ws = get_workspace_mgr().create(ws_name)
         set_current_workspace(ws_name)
         ws.write_file("README.md", f"# {label} Agent 工作空间\n\n问题: {question}\n")

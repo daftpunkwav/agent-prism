@@ -36,9 +36,14 @@ def test_unknown_dimension_raises(router):
         router.route("nonexistent")  # type: ignore[arg-type]
 
 
-def test_all_dimensions_are_mvp_ready(router):
-    assert router.is_mvp_ready("framework") is True
-    assert router.is_mvp_ready("prompt") is True
-    assert router.is_mvp_ready("reasoning") is True
-    assert router.is_mvp_ready("context") is True
-    assert router.is_mvp_ready("harness") is True
+def test_duplicate_selections_deduplicated(router):
+    """重复 selections 应去重，避免产生重复 pipeline（双倍 LLM 成本）。"""
+    configs = router.route("framework", selections=["langchain", "langchain", "langgraph"])
+    assert [c.framework for c in configs] == ["langchain", "langgraph"]
+
+
+def test_all_dimensions_route_successfully(router):
+    """所有 5 个维度均能 route 出 ≥2 条 pipeline。"""
+    for dim in ("framework", "prompt", "reasoning", "context", "harness"):
+        configs = router.route(dim)  # type: ignore[arg-type]
+        assert len(configs) >= 2

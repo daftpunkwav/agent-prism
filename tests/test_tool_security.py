@@ -174,6 +174,32 @@ def test_calculate_rejects_non_string():
     assert "字符串" in _safe_calculate(None)  # type: ignore[arg-type]
 
 
+def test_calculate_rejects_huge_power():
+    """防 CPU DoS：大指数幂运算必须在 AST 层拦截。"""
+    assert "过大" in _safe_calculate("2 ** 300000000")
+    assert "过大" in _safe_calculate("9 ** 999999999")
+
+
+def test_calculate_rejects_huge_constant():
+    """超大数值常量同样拦截。"""
+    assert "过大" in _safe_calculate("10" * 30)
+    assert "过大" in _safe_calculate("99999999999999999999")
+
+
+def test_calculate_allows_reasonable_power():
+    """正常幂运算不受影响。"""
+    assert _safe_calculate("2 ** 8") == "256"
+    assert _safe_calculate("2 ** 1000").startswith("10715086")
+
+
+def test_run_code_large_output_truncated_not_timed_out():
+    """超大输出应在子进程端截断，而不是误报"执行超时"。"""
+    result = _safe_run_code("print('x' * 200000)", timeout=5)
+    assert "超时" not in result
+    assert "截断" in result
+    assert len(result) < 70 * 1024
+
+
 # ===== 工作空间路径校验增强 =====
 
 

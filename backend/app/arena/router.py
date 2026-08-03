@@ -164,7 +164,8 @@ class DimensionRouter:
         if options is None:
             raise ValueError(f"未知维度: {dimension}")
 
-        chosen = selections if selections else [value for _, value, _ in options]
+        # 去重保序：重复 selections 不应产生重复 pipeline（避免双倍 LLM 成本）
+        chosen = list(dict.fromkeys(selections)) if selections else [value for _, value, _ in options]
         if len(chosen) < 2:
             raise ValueError(f"维度「{dimension}」至少需选择 2 个对比项，当前 {len(chosen)} 个")
 
@@ -181,7 +182,3 @@ class DimensionRouter:
 
     def column_count(self, dimension: DimensionId, selections: list[str] | None = None) -> int:
         return len(self.route(dimension, selections))
-
-    def is_mvp_ready(self, dimension: DimensionId) -> bool:
-        """兼容保留：所有 5 个维度在 MVP 中均已支持。"""
-        return dimension in SUPPORTED_DIMENSIONS

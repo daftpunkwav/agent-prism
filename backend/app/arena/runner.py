@@ -88,12 +88,18 @@ class RunnerPool:
                 if not w.done():
                     w.cancel()
             # 等 worker 真正结束（带超时，防止 LLM 同步阻塞卡死）
-            await asyncio.gather(*workers, return_exceptions=True)
+            try:
+                await asyncio.wait_for(asyncio.gather(*workers, return_exceptions=True), timeout=5)
+            except asyncio.TimeoutError:
+                logger.warning("客户端断开后 worker 清理超时（仍有 %d 个未结束）", sum(1 for w in workers if not w.done()))
             raise
         finally:
             # 收尾：所有 worker 必须收尾（已结束 / 已取消）；若有残留也等待一次
             if workers:
-                await asyncio.gather(*workers, return_exceptions=True)
+                try:
+                    await asyncio.wait_for(asyncio.gather(*workers, return_exceptions=True), timeout=5)
+                except asyncio.TimeoutError:
+                    logger.warning("worker 收尾超时（仍有 %d 个未结束）", sum(1 for w in workers if not w.done()))
 
     async def _worker(
         self,

@@ -61,6 +61,32 @@ class Workspace:
     name: str
     files: dict[str, WorkspaceFile] = field(default_factory=dict)
     created_at: str = ""
+    # RAG 向量库缓存（惰性构建，文件变更时失效）— 类型为 SimpleVectorStore | None
+    _rag_cache: object | None = field(default=None, repr=False, compare=False)
+
+    def _invalidate_rag_cache(self) -> None:
+        """文件内容变化后清除向量检索缓存。"""
+        self._rag_cache = None
+
+    def rag_store(self):
+        """惰性获取 RAG 向量库；构建失败返回 None（调用方容错）。"""
+        if self._rag_cache is None:
+            try:
+                from app.arena.rag import SimpleVectorStore
+
+                store = SimpleVectorStore()
+                docs: list[str] = []
+                for path, f in self.files.items():
+                    if path.endswith(".gitkeep"):
+                        continue
+                    docs.append(f"{path}\n{f.content[:4000]}")
+                if docs:
+                    store.add_documents(docs)
+                self._rag_cache = store
+            except Exception:  # noqa: BLE001
+                logger.debug("RAG store 构建失败", exc_info=True)
+                self._rag_cache = None
+        return self._rag_cache
 
     def _normalize(self, path: str) -> str:
         """规范化路径，防止目录遍历与控制字符注入。返回空串表示非法。"""
@@ -123,6 +149,7 @@ class Workspace:
         if dir_name:
             self._ensure_dir(dir_name)
         self.files[path] = WorkspaceFile(path=path, content=content)
+        self._invalidate_rag_cache()
         return f"已写入: {path} ({len(content)} 字节)"
 
     def append_file(self, path: str, content: str) -> str:
@@ -132,6 +159,7 @@ class Workspace:
         if existing is None:
             return f"错误: 文件不存在: {path}（请先用 write_file 创建）"
         existing.content += content
+        self._invalidate_rag_cache()
         return f"已追加 {len(content)} 字节到: {path}"
 
     def create_file(self, path: str, content: str = "") -> str:
@@ -145,6 +173,7 @@ class Workspace:
         if dir_name:
             self._ensure_dir(dir_name)
         self.files[path] = WorkspaceFile(path=path, content=content)
+        self._invalidate_rag_cache()
         return f"已创建: {path}"
 
     def delete_file(self, path: str) -> str:
@@ -153,6 +182,7 @@ class Workspace:
         if path not in self.files:
             return f"错误: 文件不存在: {path}"
         del self.files[path]
+        self._invalidate_rag_cache()
         return f"已删除: {path}"
 
     def file_tree(self) -> str:
@@ -252,12 +282,29 @@ class WorkspaceManager:
             logger.info("Workspace TTL 回收 %d 个: %s", len(expired), ", ".join(expired[:5]))
         return len(expired)
 
+    # LRU 淘汰时视为"活跃中"的时间窗口 — 避免淘汰正在运行的 pipeline 工作空间
+    _LRU_ACTIVE_WINDOW = 300.0
+
     def _evict_lru_unlocked(self, need: int = 1) -> int:
-        """按最久未访问淘汰，直到腾出 need 个名额。调用方须持锁。"""
+        """按最久未访问淘汰，直到腾出 need 个名额。调用方须持锁。
+
+        优先淘汰最近 5 分钟未访问的项；若全部活跃则回退到最旧项，
+        保证容量上限始终可达成（不因全活跃而拒绝创建）。
+        """
         removed = 0
+        now = time.monotonic()
         while removed < need and self._workspaces:
-            # 最久未访问优先
-            oldest = min(self._last_access.items(), key=lambda kv: kv[1])[0]
+            # 候选 = 最近活跃窗口之外的最旧项
+            inactive = [
+                (name, ts)
+                for name, ts in self._last_access.items()
+                if now - ts > self._LRU_ACTIVE_WINDOW
+            ]
+            if inactive:
+                oldest = min(inactive, key=lambda kv: kv[1])[0]
+            else:
+                # 全部活跃 — 回退到全局最旧
+                oldest = min(self._last_access.items(), key=lambda kv: kv[1])[0]
             self._workspaces.pop(oldest, None)
             self._last_access.pop(oldest, None)
             removed += 1

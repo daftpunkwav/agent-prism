@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.arena.types import (
     ApiFormat,
@@ -178,8 +178,8 @@ class Project(BaseModel):
 class ProjectCreate(BaseModel):
     """项目创建请求。
 
-    ``pipeline_labels`` 与 ``workspace_names`` 必须一一对应（同 index 即同一管线）。
-    两者至少需要 1 个 — 通过 model_validator 校验一致性。
+    ``pipeline_labels`` 与 ``workspace_names`` 一一对应（同 index 即同一管线）。
+    两者至少需要 1 个；``workspace_names`` 留空时用 ``pipeline_labels`` 兜底。
     """
 
     name: str = Field(min_length=1, max_length=200)
@@ -187,6 +187,13 @@ class ProjectCreate(BaseModel):
     dimension: str = Field(max_length=50)
     pipeline_labels: list[str] = Field(min_length=1, max_length=16)
     workspace_names: list[str] = Field(default_factory=list, max_length=16)
+
+    @model_validator(mode="after")
+    def _validate_label_workspace_consistency(self) -> ProjectCreate:
+        """workspace_names 为空时回退到 pipeline_labels，保证两者都有内容。"""
+        if not self.workspace_names:
+            self.workspace_names = list(self.pipeline_labels)
+        return self
 
 
 class WorkspaceFileUpsert(BaseModel):

@@ -73,3 +73,30 @@ def test_remove_explicit():
     mgr.create("z")
     mgr.remove("z")
     assert mgr.get("z") is None
+
+
+def test_lru_prefers_evicting_inactive_workspace():
+    """LRU 淘汰应优先选最近活跃窗口之外的 workspace（保护运行中的 pipeline）。"""
+    mgr = WorkspaceManager(max_workspaces=3, ttl_seconds=3600)
+    mgr.create("active")
+    mgr.create("idle")
+    # 把 idle 的访问时间改为 1 小时前（模拟长期未访问），active 保持最近
+    past = __import__("time").monotonic() - 3600
+    mgr._last_access["idle"] = past  # type: ignore[attr-defined]
+    mgr.create("w3")  # 应淘汰 idle 而不是 active
+    assert mgr.get("active") is not None
+    assert mgr.get("idle") is None
+    assert mgr.get("w3") is not None
+
+
+def test_lru_all_active_falls_back_to_oldest():
+    """全部 workspace 都在活跃窗口内时，回退淘汰全局最旧（保证容量上限达成）。"""
+    mgr = WorkspaceManager(max_workspaces=2, ttl_seconds=3600)
+    mgr.create("w1")
+    __import__("time").sleep(0.02)
+    mgr.create("w2")
+    # 两者都在活跃窗口内 — 仍应能创建 w3（淘汰 w1，最旧）
+    mgr.create("w3")
+    assert mgr.get("w1") is None
+    assert mgr.get("w2") is not None
+    assert mgr.get("w3") is not None

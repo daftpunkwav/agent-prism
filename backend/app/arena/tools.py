@@ -35,6 +35,9 @@ _MAX_FILE_CONTENT_BYTES = 256 * 1024
 
 # 限制同时运行的沙箱子进程数，防止资源耗尽
 _RUN_CODE_SEM = threading.Semaphore(4)
+# run_code 子进程输出上限：32KB（远小于 multiprocessing 默认管道缓冲 64KB，
+# 截断 + 提示后缀也不会写满缓冲，避免父进程误判"执行超时"）
+_MAX_RUN_CODE_OUTPUT = 32 * 1024
 # 子进程 join 后额外等待 terminate/kill 的秒数
 _PROCESS_KILL_GRACE = 1.0
 
@@ -87,11 +90,21 @@ def _safe_calculate(expression: str) -> str:
         ast.USub,
         ast.UAdd,
     )
+    # 防 CPU DoS：幂运算指数与任何数值常量的大小上限
+    _MAX_POW_EXPONENT = 1_000_000
+    _MAX_CONSTANT_ABS = 10**15
     for node in ast.walk(tree):
         if not isinstance(node, ALLOWED_NODES):
             return "错误: 不允许的语法元素"
         if isinstance(node, ast.Constant) and not isinstance(node.value, (int, float)):
             return "错误: 只能使用数字"
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            if abs(node.value) > _MAX_CONSTANT_ABS:
+                return "错误: 数字过大"
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
+            # 指数必须是字面常量且不超过上限（阻断 2**300000000 这类大整数 DoS）
+            if not (isinstance(node.right, ast.Constant) and isinstance(node.right.value, int) and abs(node.right.value) <= _MAX_POW_EXPONENT):
+                return "错误: 幂指数过大或不合法"
 
     try:
         # 显式空 __builtins__；空 globals 防止引用外部变量
@@ -202,7 +215,11 @@ _SANDBOX_BUILTINS: dict[str, object] = {
 
 
 def _run_code_subprocess(code: str, q: _mp.Queue) -> None:  # pragma: no cover - 子进程路径
-    """子进程入口：执行用户代码，把 stdout/stderr 写入 Queue 后退出。"""
+    """子进程入口：执行用户代码，把 stdout/stderr 写入 Queue 后退出。
+
+    输出在子进程端截断到 ``_MAX_RUN_CODE_OUTPUT`` 字节——防止超大输出
+    写满 multiprocessing 管道缓冲导致父进程误判"执行超时"。
+    """
     captured = io.StringIO()
     safe_globals = {"__builtins__": _SANDBOX_BUILTINS}
     safe_locals: dict[str, object] = {}
@@ -211,7 +228,10 @@ def _run_code_subprocess(code: str, q: _mp.Queue) -> None:  # pragma: no cover -
     try:
         compiled = compile(code, "<run_code>", "exec")
         exec(compiled, safe_globals, safe_locals)  # noqa: S102 — 沙箱已白名单
-        q.put(captured.getvalue() or "(代码执行成功，无输出)")
+        raw = captured.getvalue()
+        if len(raw) > _MAX_RUN_CODE_OUTPUT:
+            raw = raw[:_MAX_RUN_CODE_OUTPUT] + f"\n...[输出截断，共 {len(raw)} 字节]"
+        q.put(raw or "(代码执行成功，无输出)")
     except BaseException as exc:  # noqa: BLE001
         # 输出给 LLM 的错误信息：仅类型名 + 截断消息，不含 traceback 中的绝对路径
         msg = str(exc)[:200] or type(exc).__name__
@@ -290,6 +310,11 @@ def _safe_run_code(code: str, timeout: int = 5) -> str:
             if proc.is_alive():
                 _terminate_process(proc)
         finally:
+            # 关闭 queue 的 feeder 线程，避免 Windows 下线程残留
+            with contextlib.suppress(Exception):
+                q.close()
+            with contextlib.suppress(Exception):
+                q.join_thread()
             _RUN_CODE_SEM.release()
 
 

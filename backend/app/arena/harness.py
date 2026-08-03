@@ -347,8 +347,10 @@ class HarnessRunner:
                     "content": f"[自进化 #{self.attempts}] {json.dumps(edit, ensure_ascii=False)[:300]}",
                 }
                 if edit.get("prompt_additions"):
-                    additions = " ".join(str(a) for a in edit["prompt_additions"])
-                    system_msg = system_msg + f"\n\n[Harness 自进化 #{self.attempts}]\n{additions}"
+                    # 关键安全点：LLM 建议的 prompt 追加必须先脱敏（防注入），再拼入下一轮 system
+                    additions = _sanitize_prompt_additions(edit.get("prompt_additions"))
+                    if additions:
+                        system_msg = system_msg + f"\n\n[Harness 自进化 #{self.attempts}]\n{additions}"
 
             # 将反思策略注入 system，下一轮重新开跑
             system_msg = system_msg + f"\n\n[上一轮反思]\n{insight}"
