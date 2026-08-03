@@ -189,6 +189,8 @@ export default function SettingsPage() {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   /** 模型详情展开：默认收起，只显示名称 + model id */
   const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({});
+  /** 接入点展开：默认收起，只显示供应商 / 格式 / 模型数 */
+  const [expandedConns, setExpandedConns] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState<string | null>(null);
   /** 按接入点 key 存放测连结果，显示在对应卡片内 */
   const [testResults, setTestResults] = useState<
@@ -376,14 +378,14 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-6 fade-in">
       <div>
         <p className="eyebrow mb-2">BYOK</p>
-        <h1 className="page-title text-3xl">Provider 配置</h1>
+        <h1 className="page-title text-3xl tracking-tight">Provider 配置</h1>
         <p className="mt-2 text-sm text-muted-foreground max-w-xl leading-relaxed">
           每个接入点固定请求地址与 API Key；其下可挂多个 model（显示名 / 上下文 /
           最大输出）。跨厂请新建接入点。解码参数在 Arena 基线统一设置。
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="panel-surface p-6 space-y-5">
+      <form onSubmit={onSubmit} className="panel-surface settings-panel p-6 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="eyebrow">LLM 接入点</p>
           <button
@@ -397,6 +399,7 @@ export default function SettingsPage() {
                 connections: [...f.connections, c],
                 default_endpoint_id: f.default_endpoint_id || c.models[0]?.id || "",
               }));
+              setExpandedConns((s) => ({ ...s, [c.key]: true }));
             }}
           >
             <Plus className="h-3.5 w-3.5" />
@@ -404,28 +407,63 @@ export default function SettingsPage() {
           </button>
         </div>
 
+        <div className="stagger-children space-y-4">
         {form.connections.map((c, ci) => {
           const showKey = !!showKeys[c.key];
           const hasDefault = c.models.some((m) => m.id === form.default_endpoint_id);
+          const connOpen = !!expandedConns[c.key];
+          const formatLab =
+            c.api_format === "openai_chat" ? "OpenAI Chat" : "Anthropic Messages";
+          let hostHint = c.base_url.replace(/^https?:\/\//, "").slice(0, 36) || "未填地址";
+          try {
+            hostHint = new URL(c.base_url).host;
+          } catch {
+            /* keep fallback */
+          }
           return (
             <div
               key={c.key}
               className={
-                "rounded-[var(--radius-sm)] border p-4 space-y-4 " +
+                "rounded-[var(--radius-sm)] border " +
                 (hasDefault ? "border-primary/50 bg-primary/5" : "border-border bg-muted/15")
               }
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium">
-                  接入点 {ci + 1}
-                  {c.provider_name ? (
-                    <span className="ml-2 text-muted-foreground font-normal">{c.provider_name}</span>
-                  ) : null}
-                  {hasDefault && (
-                    <span className="ml-2 text-[10px] text-primary font-mono">含默认模型</span>
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+                <button
+                  type="button"
+                  className="btn-ghost !h-7 !w-7 !p-0 shrink-0"
+                  aria-expanded={connOpen}
+                  aria-label={connOpen ? "收起接入点" : "展开接入点"}
+                  onClick={() =>
+                    setExpandedConns((s) => ({ ...s, [c.key]: !s[c.key] }))
+                  }
+                >
+                  {connOpen ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
                   )}
-                </p>
-                <div className="flex flex-wrap gap-1">
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    接入点 {ci + 1}
+                    {c.provider_name ? (
+                      <span className="ml-2 text-muted-foreground font-normal">
+                        {c.provider_name}
+                      </span>
+                    ) : null}
+                    {hasDefault && (
+                      <span className="ml-2 text-[10px] text-primary font-mono">含默认</span>
+                    )}
+                  </p>
+                  {!connOpen && (
+                    <p className="text-[10px] font-mono text-muted-foreground truncate mt-0.5">
+                      {formatLab} · {hostHint} · {c.models.length} 模型
+                      {c.api_key_set || c.api_key.trim() ? " · Key✓" : " · 无 Key"}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1 shrink-0">
                   <button
                     type="button"
                     className="btn-ghost !h-8 !px-2 text-xs"
@@ -452,6 +490,11 @@ export default function SettingsPage() {
                         }
                         return { ...f, connections: next, default_endpoint_id: def };
                       });
+                      setExpandedConns((s) => {
+                        const next = { ...s };
+                        delete next[c.key];
+                        return next;
+                      });
                     }}
                     aria-label="删除接入点"
                   >
@@ -467,7 +510,7 @@ export default function SettingsPage() {
                   <div
                     role="status"
                     className={
-                      "rounded-[var(--radius-sm)] border px-3 py-2 text-xs leading-relaxed " +
+                      "mx-3 mb-3 rounded-[var(--radius-sm)] border px-3 py-2 text-xs leading-relaxed " +
                       (tr.ok
                         ? "border-success/35 bg-success/10 text-foreground"
                         : "border-destructive/40 bg-destructive/10 text-destructive")
@@ -478,6 +521,8 @@ export default function SettingsPage() {
                 );
               })()}
 
+              {connOpen && (
+              <div className="space-y-4 px-4 pb-4 border-t border-border/60 pt-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <Field label="供应商">
                   <input
@@ -774,9 +819,12 @@ export default function SettingsPage() {
                   );
                 })}
               </ul>
+              </div>
+              )}
             </div>
           );
         })}
+        </div>
 
         {modelCount < 2 && (
           <p className="text-xs text-warning">

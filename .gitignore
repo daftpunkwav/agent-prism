@@ -51,5 +51,8 @@ logs/
 tmp/
 temp/
 
+# Playwright CLI 本地会话产物
+.playwright-cli/
+
 # Git worktrees
 .worktrees/

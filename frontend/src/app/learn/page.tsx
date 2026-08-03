@@ -92,11 +92,11 @@ export default function LearnPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 stagger-children">
         {WEEK_PLAN.map((step) => (
           <section
             key={step.week}
-            className="panel-surface flex flex-col gap-3 p-5"
+            className="panel-surface panel-lift flex flex-col gap-3 p-5"
             data-lane={(step.week - 1) % 4}
           >
             <div className="flex items-start justify-between gap-3">

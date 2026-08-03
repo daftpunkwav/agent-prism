@@ -493,13 +493,17 @@ def _resolve_baseline_overrides(
     else:
         raw = {k: v for k, v in baseline.items() if v is not None}
 
-    # model_id → endpoint_id 兼容
-    if "model_id" in raw and "endpoint_id" not in raw:
+    # model_id → endpoint_id 兼容（旧客户端）；有 endpoint_id 时丢弃 model_id，
+    # 避免同时出现时落入「基线不支持字段」而整次运行秒失败。
+    if "model_id" in raw:
         mid = str(raw.pop("model_id"))
-        catalog = list(_ENDPOINT_CATALOG.values()) or list(_cached_provider().endpoints)
-        matched = next((e for e in catalog if e.model == mid), None)
-        if matched:
-            raw["endpoint_id"] = matched.id
+        if "endpoint_id" not in raw:
+            catalog = list(_ENDPOINT_CATALOG.values()) or list(
+                _cached_provider().endpoints
+            )
+            matched = next((e for e in catalog if e.model == mid), None)
+            if matched:
+                raw["endpoint_id"] = matched.id
 
     locked_field = DIMENSION_FIELD[dimension]
     resolved: dict[str, Any] = {}

@@ -18,42 +18,52 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isArena = pathname.startsWith("/arena");
 
   return (
-    <div className={isArena ? "h-dvh flex flex-col overflow-hidden" : "min-h-screen flex flex-col"}>
-      <header className="shell-header shrink-0 z-50">
-        <div className="mx-auto flex h-14 max-w-[1680px] items-center justify-between px-4 md:px-6">
-          <Link href="/arena" className="flex items-center gap-2.5 group min-w-0">
-            <span className="brand-mark text-[10px] font-mono font-semibold tracking-tight text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
-              AP
+    <div
+      className={
+        isArena ? "h-dvh flex flex-col overflow-hidden" : "min-h-screen flex flex-col"
+      }
+    >
+      <header className="shell-header shrink-0">
+        <div className="shell-header-inner">
+          <Link href="/arena" className="brand-link group">
+            <span className="brand-mark" aria-hidden>
+              <span className="brand-mark-glyph">AP</span>
             </span>
-            <span className="brand-wordmark truncate">AgentPrism</span>
+            <span className="brand-wordmark">
+              Agent<span className="brand-wordmark-accent">Prism</span>
+            </span>
           </Link>
-          <nav className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-            {NAV.map(({ href, label, icon: Icon }) => {
-              const active = pathname.startsWith(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className="seg-tab flex items-center gap-1.5"
-                  data-active={active}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{label}</span>
-                </Link>
-              );
-            })}
-            <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+
+          <nav className="shell-nav" aria-label="主导航">
+            <div className="shell-nav-track">
+              {NAV.map(({ href, label, icon: Icon }) => {
+                const active = pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="seg-tab"
+                    data-active={active}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <Icon className="h-3.5 w-3.5" aria-hidden />
+                    <span className="hidden sm:inline">{label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+            <span className="shell-nav-divider" aria-hidden />
             <ThemeToggle />
           </nav>
         </div>
         <div className="spectrum-line" aria-hidden />
       </header>
+
       <main
         className={
           isArena
-            ? "flex-1 min-h-0 overflow-hidden w-full max-w-[1680px] mx-auto"
-            : "mx-auto w-full max-w-[1680px] flex-1 px-4 py-8 md:px-8"
+            ? "flex-1 min-h-0 overflow-hidden w-full max-w-[1680px] mx-auto page-enter"
+            : "mx-auto w-full max-w-[1680px] flex-1 px-4 py-8 md:px-8 page-enter"
         }
       >
         {children}

@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 type ArenaModuleProps = {
   /** 模块标题 */
   title: string;
-  /** 收起时显示的摘要（可多行分组） */
+  /** 收起时显示的摘要（标题下方完整宽度） */
   summary?: ReactNode;
   /** 是否展开 */
   open: boolean;
@@ -20,7 +20,7 @@ type ArenaModuleProps = {
 };
 
 /**
- * Arena 可折叠模块：配置类默认收起，摘要仍可见；展开后显示完整内容。
+ * Arena 可折叠模块：收起时标题一行、摘要独占下一行，避免挤在标题旁。
  */
 export function ArenaModule({
   title,
@@ -35,25 +35,34 @@ export function ArenaModule({
   return (
     <section className={"arena-module " + className} data-open={open}>
       <div className="arena-module-head">
-        <button
-          type="button"
-          className="arena-module-toggle"
-          onClick={onToggle}
-          aria-expanded={open}
-        >
-          <ChevronDown className="arena-module-chevron" aria-hidden />
-          <span className="arena-module-titles">
-            {eyebrow && <span className="eyebrow">{eyebrow}</span>}
-            <span className="arena-module-title">{title}</span>
-          </span>
-          {!open && summary != null && (
-            <span className="arena-module-summary">{summary}</span>
+        <div className="arena-module-head-row">
+          <button
+            type="button"
+            className="arena-module-toggle"
+            onClick={onToggle}
+            aria-expanded={open}
+          >
+            <ChevronDown className="arena-module-chevron" aria-hidden />
+            <span className="arena-module-titles">
+              {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+              <span className="arena-module-title">{title}</span>
+            </span>
+          </button>
+          {actions && (
+            <div className="arena-module-actions" onClick={(e) => e.stopPropagation()}>
+              {actions}
+            </div>
           )}
-        </button>
-        {actions && (
-          <div className="arena-module-actions" onClick={(e) => e.stopPropagation()}>
-            {actions}
-          </div>
+        </div>
+        {!open && summary != null && (
+          <button
+            type="button"
+            className="arena-module-summary"
+            onClick={onToggle}
+            aria-label="展开实验维度配置"
+          >
+            {summary}
+          </button>
         )}
       </div>
       {open && <div className="arena-module-body">{children}</div>}

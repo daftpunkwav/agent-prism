@@ -32,6 +32,10 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // 默认左下角圆形「N」会压住指南页 sticky TOC；移到右下角避开侧栏
+  devIndicators: {
+    position: "bottom-right",
+  },
   async rewrites() {
     return [
       {

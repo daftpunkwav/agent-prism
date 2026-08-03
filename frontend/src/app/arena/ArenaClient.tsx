@@ -447,7 +447,7 @@ export function ArenaClient() {
             prompt_profile: d.prompt_profile,
             temperature: d.temperature,
             endpoint_id: d.endpoint_id,
-            model_id: d.model_id,
+            // 接入点以 endpoint_id 为准，勿再塞 model_id（会与后端校验冲突）
             thinking_level: d.thinking_level,
             top_p: d.top_p,
             frequency_penalty: d.frequency_penalty,
@@ -532,15 +532,20 @@ export function ArenaClient() {
 
   const baselinePayload = useMemo(() => {
     const locked = DIMENSION_FIELD[dimension];
+    const allowed = new Set(
+      (meta?.baseline_fields ?? []).map((f) => f.field).filter(Boolean),
+    );
     const out: BaselineOverrides = {};
     (Object.keys(baseline) as Array<keyof BaselineOverrides>).forEach((key) => {
+      if (key === locked || key === "model_id") return;
+      if (allowed.size > 0 && !allowed.has(key)) return;
       const val = baseline[key];
-      if (key !== locked && typeof val === "string" && val) {
+      if (typeof val === "string" && val) {
         out[key] = val;
       }
     });
     return out;
-  }, [baseline, dimension]);
+  }, [baseline, dimension, meta]);
 
   // 组件卸载时取消 in-flight Arena 运行，防止 setState on unmounted
   useEffect(() => {
@@ -583,6 +588,13 @@ export function ArenaClient() {
 
   const handleEvent = useCallback((event: ArenaEvent) => {
     const label = event.pipeline;
+    // 路由/基线级错误：提到输入条，并清掉占位列，避免「空列 + 无反馈」
+    if (event.type === "error" && (label === "system" || !label)) {
+      setError(event.message || "运行错误");
+      setColumns({});
+      setRunning(false);
+      return;
+    }
     setColumns((prev) => {
       const col = prev[label] ?? { label, events: [] };
       const next = { ...col };
@@ -807,53 +819,89 @@ export function ArenaClient() {
 
     return (
     <div className="arena-shell">
-      <div className="arena-chrome" data-running={running ? "true" : undefined}>
+      <div
+        className="arena-setup"
+        data-running={running ? "true" : undefined}
+        data-config-open={configOpen ? "true" : undefined}
+      >
+        <div className="arena-chrome">
         <ArenaModule
           title="实验维度"
           eyebrow="配置"
           open={configOpen}
           onToggle={() => setConfigOpen((v) => !v)}
           summary={
-            <span className="arena-module-summary-stack">
-              <span className="arena-summary-chip">
-                维·{activeDim?.label ?? "未选"}
+            <div className="arena-summary-board">
+              <div className="arena-summary-dim">
+                <span className="arena-summary-kicker">对比维</span>
+                <span className="arena-summary-dim-label">
+                  {activeDim?.label ?? "未选"}
+                </span>
                 {activeSelections.length > 0 && (
-                  <>
-                    {" · "}
+                  <span className="arena-summary-dim-vals">
                     {activeSelections
                       .map(
                         (v) =>
                           activeDim?.options.find((o) => o.value === v)?.label ?? v,
                       )
-                      .join(" / ")}
-                  </>
+                      .slice(0, 3)
+                      .join(" · ")}
+                    {activeSelections.length > 3
+                      ? ` +${activeSelections.length - 3}`
+                      : ""}
+                  </span>
                 )}
-              </span>
-              {meta?.baseline_fields &&
-                (["pipeline", "decode", "access"] as const).map((g) => {
-                  const items = meta.baseline_fields!.filter(
-                    (f) => (f.group || "pipeline") === g,
-                  );
-                  if (items.length === 0) return null;
-                  const bits = items.map((field) => {
-                    const locked = field.dimension === dimension;
-                    const value =
-                      baseline[field.field as keyof BaselineOverrides] ?? field.default;
-                    const lab = locked
-                      ? "对比维"
-                      : (field.options.find((o) => o.value === value)?.label ?? value);
-                    return `${field.label}:${lab}`;
-                  });
-                  return (
-                    <span
-                      key={g}
-                      className="arena-summary-chip arena-summary-chip-muted"
-                    >
-                      {BASELINE_GROUP_LABEL[g]} · {bits.join(" · ")}
-                    </span>
-                  );
-                })}
-            </span>
+              </div>
+              <div className="arena-summary-groups">
+                {meta?.baseline_fields &&
+                  (["pipeline", "decode", "access"] as const).map((g) => {
+                    const items = meta.baseline_fields!.filter(
+                      (f) => (f.group || "pipeline") === g,
+                    );
+                    if (items.length === 0) return null;
+                    const highlight = items.filter((f) => f.dimension !== dimension);
+                    const shown = (highlight.length ? highlight : items).slice(
+                      0,
+                      g === "decode" ? 3 : 2,
+                    );
+                    return (
+                      <div key={g} className="arena-summary-group" data-group={g}>
+                        <span className="arena-summary-group-label">
+                          {BASELINE_GROUP_LABEL[g]}
+                        </span>
+                        <div className="arena-summary-pills">
+                          {shown.map((field) => {
+                            const locked = field.dimension === dimension;
+                            const value =
+                              baseline[field.field as keyof BaselineOverrides] ??
+                              field.default;
+                            const lab = locked
+                              ? "对比维"
+                              : (field.options.find((o) => o.value === value)?.label ??
+                                value);
+                            return (
+                              <span
+                                key={field.field}
+                                className="arena-summary-pill"
+                                data-locked={locked}
+                                title={`${field.label}: ${lab}`}
+                              >
+                                <em>{field.label}</em>
+                                {lab}
+                              </span>
+                            );
+                          })}
+                          {items.length > shown.length && (
+                            <span className="arena-summary-pill arena-summary-pill-more">
+                              +{items.length - shown.length}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
           }
           actions={
             <div className="arena-setup-tools">
@@ -1050,103 +1098,110 @@ export function ArenaClient() {
             )}
           </div>
         </ArenaModule>
+        </div>
 
-        <section className="composer-bar composer-bar-pinned">
+        <section className="composer-bar">
           {error && (
-            <p className="text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded-[var(--radius-sm)] px-3 py-1.5">
+            <p
+              role="alert"
+              className="text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded-[var(--radius-sm)] px-3 py-1.5"
+            >
               {error}
             </p>
           )}
           <div className="arena-run-strip">
-            <label className="config-select-field">
-              <span className="eyebrow">任务模板</span>
-              <select
-                className="baseline-select config-select"
-                value={activeTemplateId ?? ""}
-                disabled={running || templates.length === 0}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  if (!id) {
-                    setActiveTemplateId(null);
+            <span className="eyebrow arena-run-strip-label" id="arena-template-label">
+              任务模板
+            </span>
+            <select
+              className="baseline-select arena-run-strip-select"
+              value={activeTemplateId ?? ""}
+              disabled={running || templates.length === 0}
+              onChange={(e) => {
+                const id = e.target.value;
+                if (!id) {
+                  setActiveTemplateId(null);
+                  return;
+                }
+                const t = templates.find((x) => x.id === id);
+                if (t) applyTemplate(t);
+              }}
+              aria-labelledby="arena-template-label"
+            >
+              <option value="">自定义问题</option>
+              {templates.some((t) => (t.category ?? "scored") === "scored") && (
+                <optgroup label="可判分">
+                  {templates
+                    .filter((t) => (t.category ?? "scored") === "scored")
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                        {JUDGE_TYPE_LABEL[t.judge.type]
+                          ? `（${JUDGE_TYPE_LABEL[t.judge.type]}）`
+                          : ""}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+              {templates.some((t) => t.category === "quick") && (
+                <optgroup label="快题">
+                  {templates
+                    .filter((t) => t.category === "quick")
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+            </select>
+            <input
+              className="form-input arena-run-strip-input"
+              placeholder="输入问题，折射出多条 Agent 管线…"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (activeSelections.length < 2) {
+                    setConfigOpen(true);
+                    setError("请至少选择 2 个对比项后再运行");
                     return;
                   }
-                  const t = templates.find((x) => x.id === id);
-                  if (t) applyTemplate(t);
+                  void runArena();
+                }
+              }}
+              disabled={running}
+              aria-label="实验问题"
+            />
+            {running ? (
+              <button type="button" className="btn-ghost composer-run" onClick={cancelRun}>
+                <Square className="h-4 w-4" />
+                停止
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-primary composer-run"
+                disabled={!question.trim()}
+                title={
+                  activeSelections.length < 2
+                    ? "请先展开「实验维度」并至少选择 2 项"
+                    : undefined
+                }
+                onClick={() => {
+                  if (activeSelections.length < 2) {
+                    setConfigOpen(true);
+                    setError("请至少选择 2 个对比项后再运行");
+                    return;
+                  }
+                  void runArena();
                 }}
-                aria-label="任务模板"
               >
-                <option value="">自定义问题</option>
-                {templates.some((t) => (t.category ?? "scored") === "scored") && (
-                  <optgroup label="可判分">
-                    {templates
-                      .filter((t) => (t.category ?? "scored") === "scored")
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                          {JUDGE_TYPE_LABEL[t.judge.type]
-                            ? `（${JUDGE_TYPE_LABEL[t.judge.type]}）`
-                            : ""}
-                        </option>
-                      ))}
-                  </optgroup>
-                )}
-                {templates.some((t) => t.category === "quick") && (
-                  <optgroup label="快题">
-                    {templates
-                      .filter((t) => t.category === "quick")
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                  </optgroup>
-                )}
-              </select>
-            </label>
-            <div className="composer-row">
-              <input
-                className="form-input"
-                placeholder="输入问题，折射出多条 Agent 管线…"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    runArena();
-                  }
-                }}
-                disabled={running}
-                aria-label="实验问题"
-              />
-              {running ? (
-                <button type="button" className="btn-ghost composer-run" onClick={cancelRun}>
-                  <Square className="h-4 w-4" />
-                  停止
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={!question.trim()}
-                  title={
-                    activeSelections.length < 2
-                      ? "请先展开「实验维度」并至少选择 2 项"
-                      : undefined
-                  }
-                  onClick={() => {
-                    if (activeSelections.length < 2) {
-                      setConfigOpen(true);
-                      setError("请至少选择 2 个对比项后再运行");
-                      return;
-                    }
-                    runArena();
-                  }}
-                >
-                  <Send className="h-4 w-4" />
-                  运行
-                </button>
-              )}
-            </div>
+                <Send className="h-4 w-4" />
+                运行
+              </button>
+            )}
           </div>
         </section>
       </div>
@@ -1189,35 +1244,37 @@ export function ArenaClient() {
         )}
 
         <main className="arena-stage">
-          <div className="arena-stage-banner">
-            <span className="eyebrow">输出</span>
-            <span className="arena-stage-banner-title">结果 · 报告 · Trace</span>
-          </div>
-          <div role="tablist" aria-label="Arena 视图切换" className="arena-stage-tabs">
-            <MainTabButton
-              active={mainTab === "results"}
-              onClick={() => setMainTab("results")}
-              icon={<Terminal className="h-3.5 w-3.5" />}
-              label="输出结果"
-              badge={running ? "运行中" : columnList.length > 0 ? columnList.length : null}
-            />
-            <MainTabButton
-              active={mainTab === "report"}
-              onClick={() => setMainTab("report")}
-              icon={<BarChart3 className="h-3.5 w-3.5" />}
-              label="对比报告"
-              disabled={!hasMetrics}
-              disabledReason="至少有一条 Pipeline 完成后才能查看报告"
-              badge={hasMetrics ? columnList.filter((c) => c.metrics).length : null}
-            />
-            <MainTabButton
-              active={mainTab === "diff"}
-              onClick={() => setMainTab("diff")}
-              icon={<GitCompare className="h-3.5 w-3.5" />}
-              label="Trace 对比"
-              disabled={!allCompleted}
-              disabledReason="所有 Pipeline 完成后才能对比"
-            />
+          <div className="arena-stage-toolbar">
+            <div className="arena-stage-banner">
+              <span className="eyebrow">输出</span>
+              <span className="arena-stage-banner-title">结果</span>
+            </div>
+            <div role="tablist" aria-label="Arena 视图切换" className="arena-stage-tabs">
+              <MainTabButton
+                active={mainTab === "results"}
+                onClick={() => setMainTab("results")}
+                icon={<Terminal className="h-3.5 w-3.5" />}
+                label="输出结果"
+                badge={running ? "运行中" : columnList.length > 0 ? columnList.length : null}
+              />
+              <MainTabButton
+                active={mainTab === "report"}
+                onClick={() => setMainTab("report")}
+                icon={<BarChart3 className="h-3.5 w-3.5" />}
+                label="对比报告"
+                disabled={!hasMetrics}
+                disabledReason="至少有一条 Pipeline 完成后才能查看报告"
+                badge={hasMetrics ? columnList.filter((c) => c.metrics).length : null}
+              />
+              <MainTabButton
+                active={mainTab === "diff"}
+                onClick={() => setMainTab("diff")}
+                icon={<GitCompare className="h-3.5 w-3.5" />}
+                label="Trace 对比"
+                disabled={!allCompleted}
+                disabledReason="所有 Pipeline 完成后才能对比"
+              />
+            </div>
           </div>
 
           <div className="arena-stage-body">

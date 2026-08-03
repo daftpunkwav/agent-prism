@@ -182,26 +182,50 @@ export default function GuidePage() {
     <div className="guide-page">
       <header className="guide-hero guide-reveal is-visible">
         <div className="guide-hero-slit" aria-hidden />
-        <p className="eyebrow">OPTICAL BENCH · REFERENCE</p>
-        <h1 className="page-title">维度与基线说明</h1>
-        <p className="guide-hero-lead">
-          控制变量法的结构化参考：字段如何映射、基线如何锁定、九个对比维在
-          LangChain / LangGraph 上是否真实生效。
-        </p>
-        <div className="guide-hero-actions">
-          <Link href="/arena" className="btn-primary">
-            <FlaskConical className="h-4 w-4" />
-            打开 Arena
-          </Link>
-          <Link href="/learn" className="btn-ghost">
-            学习路径
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+        <div className="guide-hero-grid">
+          <div className="guide-hero-copy">
+            <p className="eyebrow">OPTICAL BENCH · REFERENCE</p>
+            <h1 className="page-title">维度与基线说明</h1>
+            <p className="guide-hero-lead">
+              控制变量法的结构化参考：字段如何映射、基线如何锁定、九个对比维在
+              LangChain / LangGraph 上是否真实生效。
+            </p>
+            <div className="guide-hero-actions">
+              <Link href="/arena" className="btn-primary">
+                <FlaskConical className="h-4 w-4" />
+                打开 Arena
+              </Link>
+              <Link href="/learn" className="btn-ghost">
+                学习路径
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+          <aside className="guide-hero-aside" aria-label="速览">
+            <div className="guide-hero-stat">
+              <span className="guide-hero-stat-value">{DIMENSIONS.length}</span>
+              <span className="guide-hero-stat-label">对比维度</span>
+            </div>
+            <div className="guide-hero-stat">
+              <span className="guide-hero-stat-value">{FIELD_MATRIX.length}</span>
+              <span className="guide-hero-stat-label">字段映射</span>
+            </div>
+            <div className="guide-hero-stat">
+              <span className="guide-hero-stat-value">{TOOLSET_TABLE.length}</span>
+              <span className="guide-hero-stat-label">工具集预设</span>
+            </div>
+            <ul className="guide-hero-tags">
+              <li>管线 · 解码 · 接入点</li>
+              <li>基线锁定当前对比维</li>
+              <li>真实生效 / 框架相关</li>
+            </ul>
+          </aside>
         </div>
       </header>
 
       <div className="guide-layout">
-        <nav className="guide-toc guide-reveal is-visible" aria-label="本页目录">
+        {/* sticky TOC 不加 guide-reveal：transform 会破坏 sticky */}
+        <nav className="guide-toc" aria-label="本页目录">
           {TOC_GROUPS.map((group) => (
             <div key={group.title} className="guide-toc-group">
               <p className="eyebrow">{group.title}</p>
