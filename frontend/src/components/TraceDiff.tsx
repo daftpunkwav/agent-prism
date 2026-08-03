@@ -46,7 +46,8 @@ function alignTraces(columns: Array<{ label: string; events: ArenaEvent[] }>): A
       ) {
         continue;
       }
-      const step = ev.step ?? 0;
+      // 判别联合：thinking 事件无 step 字段
+      const step = "step" in ev ? (ev.step ?? 0) : 0;
 
       // thought_delta：每个 step 只写一次合并后的全文
       if (ev.type === "thought_delta") {

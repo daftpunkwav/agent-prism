@@ -5,8 +5,15 @@ import { Moon, Sun } from "lucide-react";
 
 type Theme = "light" | "dark";
 
+/**
+ * 主题切换按钮。
+ *
+ * 默认 ``"dark"`` — 与 layout.tsx 中预渲染的 class 保持一致，避免首屏
+ * 渲染闪烁（icon 从 null → Sun/Moon 的切换）。``useLayoutEffect`` 在浏览器
+ * 绘制前同步从 DOM 读真实状态。
+ */
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme | null>(null);
+  const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
     const current = document.documentElement.classList.contains("dark") ? "dark" : "light";

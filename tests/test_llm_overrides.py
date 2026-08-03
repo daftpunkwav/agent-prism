@@ -33,7 +33,7 @@ def _cfg(**kwargs) -> ProviderConfig:
 
 def test_explicit_temperature_overrides_provider():
     clear_pipeline_llm_overrides()
-    with patch("app.arena.llm.ChatOpenAI") as mock_cls:
+    with patch("langchain_openai.ChatOpenAI") as mock_cls:
         mock_cls.return_value = MagicMock()
         create_chat_model(config=_cfg(), temperature=0.7)
         kwargs = mock_cls.call_args.kwargs
@@ -45,7 +45,7 @@ def test_pipeline_contextvar_overrides_temperature():
     clear_pipeline_llm_overrides()
     set_pipeline_llm_overrides(temperature=0.55, model="pipeline-model")
     try:
-        with patch("app.arena.llm.ChatOpenAI") as mock_cls:
+        with patch("langchain_openai.ChatOpenAI") as mock_cls:
             mock_cls.return_value = MagicMock()
             create_chat_model(config=_cfg())
             kwargs = mock_cls.call_args.kwargs

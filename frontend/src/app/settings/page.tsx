@@ -31,7 +31,15 @@ export default function SettingsPage() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // toast 定时器清理 — 放在 fetchProvider effect 之前统一管理
   useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    // 组件卸载时取消 in-flight 请求，避免 setState on unmounted
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -67,12 +75,6 @@ export default function SettingsPage() {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(msg);
     toastTimerRef.current = setTimeout(() => setToast(null), 3200);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
   }, []);
 
   const onSubmit = async (e: FormEvent) => {
@@ -164,12 +166,14 @@ export default function SettingsPage() {
               placeholder="留空则保持已保存的 Key"
               value={form.api_key}
               onChange={(e) => setForm({ ...form, api_key: e.target.value })}
+              autoComplete="off"
             />
             <button
               type="button"
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               onClick={() => setShowKey(!showKey)}
               aria-label={showKey ? "隐藏 API Key" : "显示 API Key"}
+              aria-pressed={showKey}
             >
               {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>

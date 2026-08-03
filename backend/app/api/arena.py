@@ -76,8 +76,8 @@ async def arena_run(request: ArenaRunRequest):
             async for event in _pool.stream_parallel(request):
                 yield {"event": "arena", "data": json.dumps(event.model_dump(), ensure_ascii=False)}
         except asyncio.CancelledError:
-            # 客户端断开连接时静默退出
-            pass
+            # 客户端断开 — runner 内部已取消所有 worker task，无需额外清理
+            raise
 
     return EventSourceResponse(event_generator())
 
@@ -149,14 +149,20 @@ async def list_projects():
 @router.post("/projects")
 async def create_project(body: ProjectCreate):
     mgr = get_project_manager()
-    project = mgr.create_from_run(body)
+    try:
+        project = mgr.create_from_run(body)
+    except OSError:
+        raise HTTPException(status_code=500, detail="项目保存失败") from None
     return {"project": project.model_dump()}
 
 
 @router.delete("/projects/{project_id}")
 async def delete_project(project_id: str):
     mgr = get_project_manager()
-    ok = mgr.delete_project(project_id)
+    try:
+        ok = mgr.delete_project(project_id)
+    except OSError:
+        raise HTTPException(status_code=500, detail="项目删除失败") from None
     if not ok:
         raise HTTPException(status_code=404, detail="项目不存在")
     return {"deleted": project_id}

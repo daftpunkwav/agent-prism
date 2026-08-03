@@ -23,11 +23,11 @@ __all__ = [
     "get_harness_description",
 ]
 
-# 去除 LLM 输出中常见的 ```json ... ``` 或 ``` ... ``` 代码块包裹
-_JSON_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
+# 去除 LLM 输出中常见的 ```json ... ``` 或 ``` ... ``` 代码块包裹 — 容忍前后空白
+_JSON_FENCE = re.compile(r"```(?:json|JSON)?\s*\n?(.*?)\n?\s*```", re.DOTALL)
 
-# 提示注入模式：检测 LLM 是否试图篡改系统指令
-_INJECTION_PATTERNS = re.compile(
+# 提示注入模式：检测 LLM 是否试图篡改系统指令（单一编译正则，供 _detect_injection 使用）
+_INJECTION_PATTERN_RE = re.compile(
     r"(?i)(ignore\s+(all\s+)?previous\s+instructions?|"
     r"you\s+are\s+now\s+|"
     r"disregard\s+|"
@@ -37,8 +37,51 @@ _INJECTION_PATTERNS = re.compile(
 
 
 def _strip_json_fence(text: str) -> str:
-    """去除 LLM 返回的 markdown code fence，便于后续 json.loads 解析。"""
-    return _JSON_FENCE.sub("", text).strip()
+    """去除 LLM 返回的 markdown code fence，便于后续 json.loads 解析。
+
+    优先匹配首个 ```` ```json ... ``` ```` 块；若不存在则去掉所有行首 ```` ``` ```` 标记。
+    """
+    match = _JSON_FENCE.search(text)
+    if match:
+        return match.group(1).strip()
+    # 退化路径：去掉所有 fence-like 行
+    cleaned = re.sub(r"^```(?:json|JSON)?\s*$", "", text, flags=re.MULTILINE)
+    return cleaned.strip()
+
+
+# 自进化 prompt_additions 的注入防护：剥离可能覆盖系统指令的危险 token，
+# 并限制总长度避免上下文爆炸
+_INJECTION_PATTERNS = [
+    re.compile(r"ignore\s+(?:all\s+)?previous\s+instructions", re.IGNORECASE),
+    re.compile(r"disregard\s+(?:the\s+)?system\s+prompt", re.IGNORECASE),
+    re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
+    re.compile(r"<\|.*?\|>"),  # Anthropic/OpenAI 特殊 token
+    re.compile(r"\[INST\]|\[/INST\]", re.IGNORECASE),  # Llama 风格
+]
+_MAX_ADDITION_CHARS = 1000
+
+
+def _sanitize_prompt_additions(additions: list[str] | None) -> str:
+    """清洗 LLM 建议的 prompt 追加内容，防止 prompt injection。"""
+    if not additions:
+        return ""
+    cleaned: list[str] = []
+    for raw in additions:
+        if not isinstance(raw, str):
+            continue
+        text = raw.strip()
+        if not text:
+            continue
+        # 剥离危险模式
+        for pat in _INJECTION_PATTERNS:
+            text = pat.sub("[已过滤]", text)
+        # 限制单条长度
+        text = text[:500]
+        cleaned.append(text)
+        if sum(len(c) for c in cleaned) >= _MAX_ADDITION_CHARS:
+            break
+    joined = " ".join(cleaned)[:_MAX_ADDITION_CHARS]
+    return joined
 
 
 def _sanitize_for_json(text: str) -> str:
@@ -52,7 +95,7 @@ def _sanitize_for_json(text: str) -> str:
 
 def _detect_injection(text: str) -> bool:
     """检测文本中是否包含提示注入模式。"""
-    return bool(_INJECTION_PATTERNS.search(text))
+    return bool(_INJECTION_PATTERN_RE.search(text))
 
 
 # ===== 验证器 =====

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -32,9 +32,9 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
   // 用 Map 维护每个 (type, step) 最新的段索引，避免 O(n) 扫描
   // thought / thought_delta / thought_end 共用 thought:N 稳定 key
   const segIndex = new Map<string, number>();
-  for (let i = 0; i < events.length; i++) {
-    const ev = events[i]!;
-    const step = ev.step ?? 0;
+  for (const ev of events) {
+    // 判别联合：只有带 step 的事件类型才能取 step
+    const step = "step" in ev ? (ev.step ?? 0) : 0;
     const key = `${ev.type}:${step}`;
     if (ev.type === "thought") {
       const thoughtKey = `thought:${step}`;
@@ -152,12 +152,13 @@ export function TraceView({
   colorIndex?: number;
 }) {
   const accentColor = COLUMN_COLORS[colorIndex % COLUMN_COLORS.length] ?? "var(--chart-1)";
-  const segments = mergeEvents(events);
+  // 用 useMemo 缓存 — events 引用未变时（父组件其它 state 更新）不重算
+  const segments = useMemo(() => mergeEvents(events), [events]);
 
   // 实时跟随:若有未完成 thought,容器自动滚到底部
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // 当 segments 变化且有未完成段,滚到底部
+  // 当 segments 变化且有未完成段,触发滚到底部
   useEffect(() => {
     const c = containerRef.current;
     if (!c) return;

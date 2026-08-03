@@ -29,6 +29,7 @@ import {
   BaselineOverrides,
   DimensionId,
   DimensionOption,
+  PipelineMetrics,
   TokenStats,
   createProject,
   fetchArenaMeta,
@@ -48,11 +49,11 @@ const DIMENSION_FIELD: Record<DimensionId, keyof BaselineOverrides> = {
 type ColumnState = {
   label: string;
   events: ArenaEvent[];
-  metrics?: ArenaEvent["metrics"];
+  metrics?: PipelineMetrics;
   tokenStats?: TokenStats;
-  error?: string;
   /** 后端实际工作空间名（来自 complete/token_update 事件） */
   workspace?: string;
+  error?: string;
 };
 
 type MainTab = "results" | "report" | "diff";
@@ -111,7 +112,7 @@ const TASK_TEMPLATES: Array<{ id: string; label: string; question: string }> = [
   },
 ];
 
-function metricsToTokenStats(m: NonNullable<ArenaEvent["metrics"]>): TokenStats {
+function metricsToTokenStats(m: PipelineMetrics): TokenStats {
   return {
     input_tokens: m.input_tokens,
     output_tokens: m.output_tokens,
@@ -357,18 +358,14 @@ export function ArenaClient() {
   const [savingProject, setSavingProject] = useState(false);
   const [saveProjectMsg, setSaveProjectMsg] = useState<string | null>(null);
 
+  // 活跃 workspace 名称：直接从后端返回的 col.workspace 读取（后端在 complete
+  // / token_update 事件中带 workspace 字段），无需前端猜测后缀。
   const activeWorkspace = useMemo(() => {
     const cols = Object.values(columns);
     if (cols.length === 0) return null;
-    const withWs = cols.find((c) => c.workspace);
-    if (withWs?.workspace) return withWs.workspace;
-    for (const col of cols) {
-      for (let i = col.events.length - 1; i >= 0; i--) {
-        const ws = col.events[i]?.workspace;
-        if (ws) return ws;
-      }
-    }
-    return null;
+    const completed = cols.find((c) => c.workspace);
+    if (completed?.workspace) return completed.workspace;
+    return cols[0]?.workspace ?? null;
   }, [columns]);
 
   useEffect(() => {
@@ -410,6 +407,13 @@ export function ArenaClient() {
     return out;
   }, [baseline, dimension]);
 
+  // 组件卸载时取消 in-flight Arena 运行，防止 setState on unmounted
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
   const activeDim = useMemo(
     () => meta?.dimensions.find((d) => d.id === dimension) ?? null,
     [meta, dimension],
@@ -448,23 +452,24 @@ export function ArenaClient() {
       const col = prev[label] ?? { label, events: [] };
       const next = { ...col };
 
-      if (event.workspace) {
-        next.workspace = event.workspace;
-      }
-
-      if (event.type === "token_update" && event.token_stats) {
-        next.tokenStats = event.token_stats as TokenStats;
+      if (event.type === "token_update") {
+        next.tokenStats = { ...event.token_stats };
+        if (event.workspace) next.workspace = event.workspace;
+      } else if (event.type === "complete") {
+        if (event.metrics) {
+          next.metrics = event.metrics;
+          next.tokenStats = event.token_stats
+            ? { ...event.token_stats }
+            : metricsToTokenStats(event.metrics);
+        }
+        if (event.workspace) next.workspace = event.workspace;
+        // complete 事件不追加到 events 列表（避免 TraceView 渲染空 segment）
+      } else if (event.type === "error") {
+        next.error = event.message || "运行错误";
+        next.events = [...col.events, event];
       } else {
         next.events = [...col.events, event];
       }
-
-      if (event.type === "complete" && event.metrics) {
-        next.metrics = event.metrics;
-        next.tokenStats = event.token_stats
-          ? ({ ...event.token_stats } as TokenStats)
-          : metricsToTokenStats(event.metrics);
-      }
-      if (event.type === "error") next.error = event.message;
 
       return { ...prev, [label]: next };
     });
@@ -894,7 +899,7 @@ export function ArenaClient() {
         )}
 
         <main className="arena-stage">
-          <div className="arena-stage-tabs">
+          <div role="tablist" aria-label="Arena 视图切换" className="arena-stage-tabs">
             <MainTabButton
               active={mainTab === "results"}
               onClick={() => setMainTab("results")}
@@ -908,6 +913,7 @@ export function ArenaClient() {
               icon={<BarChart3 className="h-3.5 w-3.5" />}
               label="对比报告"
               disabled={!hasMetrics}
+              disabledReason="至少有一条 Pipeline 完成后才能查看报告"
               badge={hasMetrics ? columnList.filter((c) => c.metrics).length : null}
             />
             <MainTabButton
@@ -916,6 +922,7 @@ export function ArenaClient() {
               icon={<GitCompare className="h-3.5 w-3.5" />}
               label="Trace 对比"
               disabled={!allCompleted}
+              disabledReason="所有 Pipeline 完成后才能对比"
             />
           </div>
 
@@ -1036,6 +1043,7 @@ function MainTabButton({
   icon,
   label,
   disabled,
+  disabledReason,
   badge,
 }: {
   active: boolean;
@@ -1043,14 +1051,19 @@ function MainTabButton({
   icon: React.ReactNode;
   label: string;
   disabled?: boolean;
+  disabledReason?: string;
   badge?: number | string | null;
 }) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
+      aria-disabled={disabled}
       onClick={onClick}
       disabled={disabled}
       className="main-tab"
+      title={disabled ? disabledReason : undefined}
       data-active={active}
     >
       {icon}
