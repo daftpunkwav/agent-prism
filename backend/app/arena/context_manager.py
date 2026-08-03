@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 
 from app.arena.types import ContextStrategy
 
-__all__ = ["ContextStrategy", "ContextManager", "prepare_messages_for_llm"]
+__all__ = ["ContextStrategy", "ContextManager", "prepare_messages_for_llm", "maybe_vector_snippets"]
 
 
 class ContextManager:
@@ -136,11 +136,13 @@ def _summarize_lc_messages(messages: list[BaseMessage]) -> str:
     return "\n".join(lines)
 
 
-def _maybe_vector_snippets(query: str) -> str:
+def maybe_vector_snippets(query: str) -> str:
     """从当前工作空间检索相关片段（失败则空串）。
 
     复用 Workspace 上缓存的 SimpleVectorStore（文件变更时自动失效），
-    避免每次 LLM 调用都重建向量库。
+    避免每次 LLM 调用都重建向量库。prompt 层（``prompts.build_messages``）
+    与上下文裁剪层（``prepare_messages_for_llm``）共用同一实现，保证
+    检索片段格式一致。
     """
     try:
         from app.arena.tools import get_workspace_mgr
@@ -213,7 +215,7 @@ def prepare_messages_for_llm(
                 query = _msg_text(m)
                 break
         if query:
-            snippets = _maybe_vector_snippets(query)
+            snippets = maybe_vector_snippets(query)
             if snippets:
                 # fence + 免责声明：检索片段仅为参考资料，防止内容被当作系统指令执行
                 result.append(

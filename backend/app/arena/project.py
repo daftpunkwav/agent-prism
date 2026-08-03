@@ -20,7 +20,7 @@ from pydantic import ValidationError
 
 from app.adapters.common import get_workspace_mgr
 from app.models import PipelineRunResult, Project, ProjectCreate
-from app.storage import _atomic_write_json
+from app.storage import atomic_write_json
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class ProjectManager:
         """原子写入 projects.json。失败时记录日志并重新抛出。"""
         try:
             payload = [p.model_dump() for p in self._projects.values()]
-            _atomic_write_json(PROJECTS_FILE, payload)
+            atomic_write_json(PROJECTS_FILE, payload)
         except OSError as exc:
             logger.error("保存 %s 失败: %s", PROJECTS_FILE, exc)
             raise

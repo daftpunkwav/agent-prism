@@ -167,8 +167,10 @@ def _check_exclude(answer: str, spec: JudgeSpec) -> JudgeResult:
 def _check_regex(answer: str, spec: JudgeSpec) -> JudgeResult:
     if not spec.pattern:
         return JudgeResult(passed=False, reason="未配置正则", details=[])
+    # 防御 ReDoS：截断超长输入（预置模板最长匹配不超过 100 字符）
+    safe_answer = answer[:2000]
     try:
-        ok = re.search(spec.pattern, answer) is not None
+        ok = re.search(spec.pattern, safe_answer) is not None
     except re.error as exc:
         return JudgeResult(passed=False, reason=f"正则无效: {exc}", details=[])
     return JudgeResult(

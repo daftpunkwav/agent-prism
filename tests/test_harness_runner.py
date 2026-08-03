@@ -2,7 +2,7 @@
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from app.arena.harness import (
     HarnessRunner,
@@ -142,7 +142,7 @@ def test_stream_events_verify_retries_on_fail():
 
     async def _collect():
         graph = SimpleNamespace(astream_events=fake_astream_events)
-        with patch("app.arena.harness.verify_result") as mock_verify:
+        with patch("app.arena.harness.verify_result", new_callable=AsyncMock) as mock_verify:
             mock_verify.side_effect = [(False, "差"), (True, "好")]
             events = []
             async for ev in runner.stream_events(

@@ -2,7 +2,9 @@
 
 import time
 
-from app.arena.workspace import WorkspaceManager
+import pytest
+
+from app.arena.workspace import Workspace, WorkspaceError, WorkspaceManager
 
 
 def test_create_and_get():
@@ -100,3 +102,34 @@ def test_lru_all_active_falls_back_to_oldest():
     assert mgr.get("w1") is None
     assert mgr.get("w2") is not None
     assert mgr.get("w3") is not None
+
+
+# ===== 路径规范化：多点 / Windows 保留名 =====
+
+
+def test_normalize_rejects_multi_dot_paths():
+    """纯点号路径（.... 等）应被拒绝，避免无意义路径进入工作空间。"""
+    ws = Workspace(name="t")
+    with pytest.raises(WorkspaceError):
+        ws.write_file("....", "x")
+    with pytest.raises(WorkspaceError):
+        ws.write_file("....//", "x")
+    with pytest.raises(WorkspaceError):
+        ws.write_file("...", "x")
+
+
+def test_normalize_rejects_windows_reserved_names():
+    """Windows 保留设备名（con/nul/com1/lpt1 等）应被拒绝，大小写不敏感。"""
+    ws = Workspace(name="t")
+    for name in ("con", "CON", "nul", "NUL", "prn", "aux", "com1", "lpt9"):
+        try:
+            ws.write_file(name, "x")
+        except WorkspaceError:
+            pass
+        else:
+            raise AssertionError(f"应拒绝 Windows 保留名: {name}")
+    # 带扩展名的保留名（con.txt）同样拒绝
+    with pytest.raises(WorkspaceError):
+        ws.write_file("con.txt", "x")
+    # 子路径中的普通文件名不受影响
+    assert ws.write_file("console.log", "x").startswith("已写入")

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 import time
 from contextvars import ContextVar
@@ -40,6 +41,11 @@ def get_current_workspace_name() -> str | None:
 # 控制字符集合（含空字节 \x00）
 _CONTROL_CHARS = set(chr(c) for c in range(0, 32)) | {"\x7f"}
 
+# Windows 保留设备名（CON/PRN/AUX/NUL/COM1-9/LPT1-9），大小写不敏感。
+# 当前工作空间为内存 dict 不落盘，但文件名会持久化到 projects.json，
+# 若未来引入真实落盘会在 Windows 触发系统级错误，故统一拦截。
+_WIN_RESERVED = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)", re.IGNORECASE)
+
 
 def _has_control_chars(s: str) -> bool:
     """检查字符串是否包含控制字符。"""
@@ -52,6 +58,10 @@ class WorkspaceFile:
 
     path: str
     content: str = ""
+
+
+class WorkspaceError(Exception):
+    """工作空间操作错误（API 层捕获后转 HTTPException，工具层转为 tool 结果字符串）。"""
 
 
 @dataclass
@@ -102,6 +112,9 @@ class Workspace:
         # 拒绝向上遍历与单点
         if normalized in ("..", "../", ".") or normalized.startswith("../"):
             return ""
+        # 拒绝 Windows 保留设备名（con/nul 等）与纯点号路径（.... 等多点）
+        if _WIN_RESERVED.match(normalized) or set(normalized) == {"."}:
+            return ""
         # 移除可能的前导 ./
         if normalized.startswith("./"):
             normalized = normalized[2:]
@@ -132,18 +145,18 @@ class Workspace:
         return sorted(results)
 
     def read_file(self, path: str) -> str:
-        """读取文件内容。"""
+        """读取文件内容。文件不存在或路径非法时抛 WorkspaceError。"""
         path = self._normalize(path)
         f = self.files.get(path)
         if f is None:
-            return f"错误: 文件不存在: {path}"
+            raise WorkspaceError(f"错误: 文件不存在: {path}")
         return f.content
 
     def write_file(self, path: str, content: str) -> str:
-        """写入文件（覆盖）。"""
+        """写入文件（覆盖）。路径非法时抛 WorkspaceError。"""
         path = self._normalize(path)
         if path.endswith("/") or not path:
-            return "错误: 无效的文件路径"
+            raise WorkspaceError("错误: 无效的文件路径")
         # 确保目录存在
         dir_name = os.path.dirname(path)
         if dir_name:
@@ -153,22 +166,22 @@ class Workspace:
         return f"已写入: {path} ({len(content)} 字节)"
 
     def append_file(self, path: str, content: str) -> str:
-        """追加内容到文件。"""
+        """追加内容到文件。文件不存在时抛 WorkspaceError。"""
         path = self._normalize(path)
         existing = self.files.get(path)
         if existing is None:
-            return f"错误: 文件不存在: {path}（请先用 write_file 创建）"
+            raise WorkspaceError(f"错误: 文件不存在: {path}（请先用 write_file 创建）")
         existing.content += content
         self._invalidate_rag_cache()
         return f"已追加 {len(content)} 字节到: {path}"
 
     def create_file(self, path: str, content: str = "") -> str:
-        """创建新文件，如果已存在则报错。"""
+        """创建新文件，如果已存在或路径非法则抛 WorkspaceError。"""
         path = self._normalize(path)
         if path.endswith("/") or not path:
-            return "错误: 无效的文件路径"
+            raise WorkspaceError("错误: 无效的文件路径")
         if path in self.files:
-            return f"错误: 文件已存在: {path}（请用 write_file 覆盖）"
+            raise WorkspaceError(f"错误: 文件已存在: {path}（请用 write_file 覆盖）")
         dir_name = os.path.dirname(path)
         if dir_name:
             self._ensure_dir(dir_name)
@@ -177,10 +190,10 @@ class Workspace:
         return f"已创建: {path}"
 
     def delete_file(self, path: str) -> str:
-        """删除文件。"""
+        """删除文件。文件不存在时抛 WorkspaceError。"""
         path = self._normalize(path)
         if path not in self.files:
-            return f"错误: 文件不存在: {path}"
+            raise WorkspaceError(f"错误: 文件不存在: {path}")
         del self.files[path]
         self._invalidate_rag_cache()
         return f"已删除: {path}"

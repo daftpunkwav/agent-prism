@@ -55,7 +55,7 @@ def test_create_project_save_failure_returns_500(monkeypatch):
     def _boom(*_a, **_k):
         raise OSError("disk full")
 
-    monkeypatch.setattr(project_module, "_atomic_write_json", _boom)
+    monkeypatch.setattr(project_module, "atomic_write_json", _boom)
     # 重置单例，确保走被 monkeypatch 的路径
     project_module.reset_project_manager_for_tests()
     try:

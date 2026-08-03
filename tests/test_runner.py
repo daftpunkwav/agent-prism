@@ -149,3 +149,58 @@ def test_cancellation_propagates_to_workers(monkeypatch):
     _drain_async(pool.stream_parallel(req), max_events=1)
 
     assert cancelled, "worker 应该被取消"
+
+
+def test_stream_parallel_merges_multiple_workers(monkeypatch):
+    """多 worker 并发产出事件，主消费者应收到全部（顺序按到达合并）。"""
+
+    async def emit(config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
+        yield ArenaEvent(type="thought_delta", pipeline=config.label, content=f"{config.label}-1")
+        yield ArenaEvent(type="thought_delta", pipeline=config.label, content=f"{config.label}-2")
+        yield ArenaEvent(type="complete", pipeline=config.label)
+
+    a = _make_adapter("merge-a", emit)
+    b = _make_adapter("merge-b", emit)
+    pool = _make_pool(a, b, monkeypatch)
+    req = ArenaRunRequest(question="x", dimension="framework", selections=["merge-a", "merge-b"])
+
+    events = _drain_async(pool.stream_parallel(req))
+
+    # display_name = framework_id.upper()，事件 pipeline/label 均为大写形式
+    contents = [ev.content for ev in events]
+    assert "MERGE-A-1" in contents
+    assert "MERGE-A-2" in contents
+    assert "MERGE-B-1" in contents
+    assert "MERGE-B-2" in contents
+    completes = [ev for ev in events if ev.type == "complete"]
+    assert len(completes) == 2
+    assert not [ev for ev in events if ev.type == "error"]
+
+
+def test_stream_parallel_adapter_reserved_error(monkeypatch):
+    """访问 reserved 未实现框架 → 产出「尚未实现」错误事件，不中断其余 worker。"""
+    from app.arena import router as router_module
+
+    # 注册表为空时 autogen/crewai 处于 reserved 状态
+    monkeypatch.setattr(
+        router_module,
+        "DIMENSION_OPTIONS",
+        {
+            "framework": [
+                ("framework", "autogen", "AutoGen"),
+                ("framework", "crewai", "CrewAI"),
+            ],
+            "prompt": [("prompt_profile", "zero_shot", "Zero-shot")],
+            "reasoning": [("reasoning", "react", "ReAct")],
+            "context": [("context", "sliding", "Sliding")],
+            "harness": [("harness", "bare", "Bare")],
+        },
+    )
+    pool = RunnerPool(FrameworkAdapterRegistry())
+    req = ArenaRunRequest(question="x", dimension="framework", selections=["autogen", "crewai"])
+
+    events = _drain_async(pool.stream_parallel(req))
+
+    errors = [ev for ev in events if ev.type == "error"]
+    assert len(errors) == 2
+    assert all("尚未实现" in ev.message for ev in errors)

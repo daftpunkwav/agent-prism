@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
@@ -35,15 +38,15 @@ def _llm_messages(state: AgentState, extra: list | None = None) -> list:
 # ===== ReAct 模式 =====
 
 
-def _react_node(state: AgentState) -> dict:
+async def _react_node(state: AgentState) -> dict:
     """ReAct: 标准 Thought → Action → Observation 循环"""
     llm = _create_llm()
     llm_with_tools = _bind_tools(llm)
-    response = llm_with_tools.invoke(_llm_messages(state))
+    response = await llm_with_tools.ainvoke(_llm_messages(state))
     return {"messages": [response], "step_count": state["step_count"] + 1}
 
 
-def _react_tool_node(state: AgentState) -> dict:
+async def _react_tool_node(state: AgentState) -> dict:
     """执行工具调用。未知工具也写入 ToolMessage，保证与 tool_calls 1:1 对齐。"""
 
     last_msg = state["messages"][-1]
@@ -84,7 +87,7 @@ def _react_tool_node(state: AgentState) -> dict:
 
         tool_func = next((t for t in ARENA_TOOLS if t.name == tool_name), None)
         if tool_func:
-            result = tool_func.invoke(tool_args)
+            result = await tool_func.ainvoke(tool_args)
             tc_count += 1
             prior_names.append(tool_name)
             tool_messages.append(
@@ -137,10 +140,10 @@ def build_react_graph() -> StateGraph:
 # ===== CoT+Tool 模式 =====
 
 
-def _cot_think_node(state: AgentState) -> dict:
+async def _cot_think_node(state: AgentState) -> dict:
     """CoT+Tool: 先完整推理，再统一调用工具"""
     llm = _create_llm()
-    response = llm.invoke(
+    response = await llm.ainvoke(
         _llm_messages(
             state,
             [SystemMessage(content="\n\n[阶段1: 推理]\n请先完整分析问题，列出所有需要的步骤和工具。不要调用工具，只输出推理过程。")],
@@ -152,11 +155,11 @@ def _cot_think_node(state: AgentState) -> dict:
     }
 
 
-def _cot_act_node(state: AgentState) -> dict:
+async def _cot_act_node(state: AgentState) -> dict:
     """CoT+Tool: 根据推理结果统一执行工具"""
     llm = _create_llm()
     llm_with_tools = _bind_tools(llm)
-    response = llm_with_tools.invoke(
+    response = await llm_with_tools.ainvoke(
         _llm_messages(
             state,
             [SystemMessage(content="\n\n[阶段2: 行动]\n基于上述推理，现在执行所需的工具调用。")],
@@ -165,9 +168,9 @@ def _cot_act_node(state: AgentState) -> dict:
     return {"messages": [response], "step_count": state["step_count"] + 1}
 
 
-def _cot_tool_node(state: AgentState) -> dict:
+async def _cot_tool_node(state: AgentState) -> dict:
     """执行工具调用（与 ReAct 相同）"""
-    return _react_tool_node(state)
+    return await _react_tool_node(state)
 
 
 def _cot_should_continue(state: AgentState) -> str:
@@ -193,11 +196,11 @@ def build_cot_tool_graph() -> StateGraph:
 # ===== ToT 模式 =====
 
 
-def _tot_generate_node(state: AgentState) -> dict:
+async def _tot_generate_node(state: AgentState) -> dict:
     """ToT: 生成多个候选方案"""
     llm = _create_llm()
     llm_with_tools = _bind_tools(llm)
-    response = llm_with_tools.invoke(
+    response = await llm_with_tools.ainvoke(
         _llm_messages(
             state,
             [SystemMessage(content="\n\n[ToT: 生成候选]\n请生成 2-3 个不同的解决方案思路，分别评估每个方案的优劣。")],
@@ -209,11 +212,11 @@ def _tot_generate_node(state: AgentState) -> dict:
     }
 
 
-def _tot_evaluate_node(state: AgentState) -> dict:
+async def _tot_evaluate_node(state: AgentState) -> dict:
     """ToT: 评估并选择最优方案"""
     llm = _create_llm()
     llm_with_tools = _bind_tools(llm)
-    response = llm_with_tools.invoke(
+    response = await llm_with_tools.ainvoke(
         _llm_messages(
             state,
             [SystemMessage(content="\n\n[ToT: 评估选择]\n评估以上方案，选择最优的一个，然后执行。")],
@@ -225,9 +228,9 @@ def _tot_evaluate_node(state: AgentState) -> dict:
     }
 
 
-def _tot_execute_node(state: AgentState) -> dict:
+async def _tot_execute_node(state: AgentState) -> dict:
     """ToT: 执行选定方案的工具调用"""
-    return _react_tool_node(state)
+    return await _react_tool_node(state)
 
 
 def _tot_should_continue(state: AgentState) -> str:
@@ -260,18 +263,18 @@ def build_tot_graph() -> StateGraph:
 # ===== Reflexion 模式 =====
 
 
-def _reflexion_execute_node(state: AgentState) -> dict:
+async def _reflexion_execute_node(state: AgentState) -> dict:
     """Reflexion: 执行任务（可发起工具调用）"""
     llm = _create_llm()
     llm_with_tools = _bind_tools(llm)
-    response = llm_with_tools.invoke(_llm_messages(state))
+    response = await llm_with_tools.ainvoke(_llm_messages(state))
     return {
         "messages": [response],
         "step_count": state["step_count"] + 1,
     }
 
 
-def _reflexion_reflect_node(state: AgentState) -> dict:
+async def _reflexion_reflect_node(state: AgentState) -> dict:
     """Reflexion: 反思结果质量"""
     llm = _create_llm()
     last_response = state["messages"][-1].content
@@ -285,7 +288,7 @@ def _reflexion_reflect_node(state: AgentState) -> dict:
         ),
         HumanMessage(content=f"回答内容：\n{last_response}"),
     ]
-    response = llm.invoke(reflect_prompt)
+    response = await llm.ainvoke(reflect_prompt)
     return {
         "messages": [response],
         "reflections": state.get("reflections", []) + [response.content],
@@ -336,18 +339,62 @@ def build_reflexion_graph() -> StateGraph:
     return graph
 
 
-# ===== 图构建器入口 =====
+# ===== 推理模式注册表 =====
+
+
+@dataclass(frozen=True)
+class ReasoningModeSpec:
+    """推理模式单一来源注册项：prompt 配置 + 图构建器 + 展示信息。
+
+    新增推理模式只需在 ``REASONING_MODES`` 中补一项，图构建、
+    prompt 后缀、路由选项与前端标签自动跟随，不再需要同步改多处散落字典。
+    """
+
+    mode: ReasoningMode
+    label: str
+    description: str
+    system_suffix: str
+    user_suffix: str = ""
+    graph_builder: Callable[[], StateGraph] | None = None
+
+
+REASONING_MODES: dict[ReasoningMode, ReasoningModeSpec] = {
+    "react": ReasoningModeSpec(
+        mode="react",
+        label="ReAct",
+        description="标准 ReAct：Thought → Action → Observation 循环",
+        system_suffix="\n\n使用 ReAct 模式：先思考（Thought），再决定行动（Action），最后观察结果（Observation），循环直到完成任务。",
+        graph_builder=build_react_graph,
+    ),
+    "cot_tool": ReasoningModeSpec(
+        mode="cot_tool",
+        label="CoT+Tool",
+        description="CoT+Tool：先完整推理链，再统一调用工具",
+        system_suffix="\n\n使用 Chain-of-Thought + Tool 模式：先用完整推理链分析问题，规划好所有需要的步骤，然后统一执行工具调用。",
+        user_suffix="\n\n请先详细分析问题，列出推理步骤，再执行工具。",
+        graph_builder=build_cot_tool_graph,
+    ),
+    "tot": ReasoningModeSpec(
+        mode="tot",
+        label="ToT",
+        description="ToT：多分支探索，评估后选最优",
+        system_suffix="\n\n使用 Tree-of-Thought 模式：对每个步骤生成多个候选方案，评估每个方案，选择最优方案继续。",
+        graph_builder=build_tot_graph,
+    ),
+    "reflexion": ReasoningModeSpec(
+        mode="reflexion",
+        label="Reflexion",
+        description="Reflexion：执行 → 评估 → 反思 → 重试",
+        system_suffix="\n\n使用 Reflexion 模式：执行后评估结果质量，反思改进方向，必要时重试。最多重试 2 次。",
+        graph_builder=build_reflexion_graph,
+    ),
+}
 
 
 def build_reasoning_graph(mode: ReasoningMode) -> StateGraph:
     """根据推理模式构建对应的 LangGraph 图"""
-    builders = {
-        "react": build_react_graph,
-        "cot_tool": build_cot_tool_graph,
-        "tot": build_tot_graph,
-        "reflexion": build_reflexion_graph,
-    }
-    builder = builders.get(mode, build_react_graph)
+    spec = REASONING_MODES.get(mode, REASONING_MODES["react"])
+    builder = spec.graph_builder or build_react_graph
     return builder()
 
 

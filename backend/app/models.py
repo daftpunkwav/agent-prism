@@ -32,7 +32,6 @@ __all__ = [
     "Project",
     "ProjectCreate",
     "WorkspaceFileUpsert",
-    "PipelineRunResult",
 ]
 
 

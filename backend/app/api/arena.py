@@ -15,6 +15,7 @@ from app.arena.project import get_project_manager
 from app.arena.router import DEFAULT_BASE, list_baseline_fields, list_dimension_options
 from app.arena.runner import RunnerPool, build_registry
 from app.arena.templates import get_template, template_payloads
+from app.arena.workspace import WorkspaceError
 from app.models import ArenaRunRequest, ProjectCreate, WorkspaceFileUpsert
 
 router = APIRouter(prefix="/api/arena", tags=["arena"])
@@ -118,6 +119,9 @@ async def arena_judge(body: JudgeRequest):
 
 # ===== 工作空间 API =====
 
+# 安全说明：当前为单用户本地部署模型，workspace 名含随机后缀不可预测。
+# 多用户部署时必须在此处增加所有权/会话校验，防止越权读写。
+
 
 @router.get("/workspace/{workspace_name}/files")
 async def workspace_files(workspace_name: str):
@@ -138,9 +142,10 @@ async def workspace_file(workspace_name: str, path: str = Query(...)):
     ws = _ws_mgr.get(workspace_name)
     if ws is None:
         raise HTTPException(status_code=404, detail="工作空间不存在")
-    content = ws.read_file(path)
-    if content.startswith("错误:"):
-        raise HTTPException(status_code=404, detail=content)
+    try:
+        content = ws.read_file(path)
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"path": path, "content": content}
 
 
@@ -150,12 +155,13 @@ async def workspace_save_file(workspace_name: str, body: WorkspaceFileUpsert):
     ws = _ws_mgr.get(workspace_name)
     if ws is None:
         raise HTTPException(status_code=404, detail="工作空间不存在")
-    if body.create_only:
-        result = ws.create_file(body.path, body.content)
-    else:
-        result = ws.write_file(body.path, body.content)
-    if result.startswith("错误:"):
-        raise HTTPException(status_code=400, detail=result)
+    try:
+        if body.create_only:
+            result = ws.create_file(body.path, body.content)
+        else:
+            result = ws.write_file(body.path, body.content)
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"path": body.path, "message": result}
 
 
@@ -165,9 +171,10 @@ async def workspace_delete_file(workspace_name: str, path: str = Query(...)):
     ws = _ws_mgr.get(workspace_name)
     if ws is None:
         raise HTTPException(status_code=404, detail="工作空间不存在")
-    result = ws.delete_file(path)
-    if result.startswith("错误:"):
-        raise HTTPException(status_code=400, detail=result)
+    try:
+        result = ws.delete_file(path)
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"path": path, "message": result}
 
 

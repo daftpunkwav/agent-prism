@@ -115,6 +115,15 @@ def test_regex_match():
     assert judge_answer("不确定", spec).passed is False
 
 
+def test_regex_truncates_oversized_answer():
+    """超长 answer 应在匹配前截断，避免正则回溯卡顿（ReDoS 防御）。"""
+    spec = JudgeSpec(type="regex", pattern=r"\d{1,4}(\.\d+)?\s*(分钟|min)")
+    # 10000 字符的纯数字串：截断后快速返回不通过，且不抛异常
+    r = judge_answer("9" * 10000, spec)
+    assert r.passed is False
+    assert "未匹配" in r.reason
+
+
 def test_empty_answer_fails():
     spec = JudgeSpec(type="keyword", any_of=["a"], min_hits=1)
     assert judge_answer("", spec).passed is False

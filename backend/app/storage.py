@@ -1,9 +1,11 @@
 """持久化辅助：原子 JSON 写、备份、目录创建。
 
-为避免配置/项目数据在写一半时崩溃导致文件损坏，统一走 ``_atomic_write_json``：
+为避免配置/项目数据在写一半时崩溃导致文件损坏，统一走 ``atomic_write_json``：
 1. 把 JSON 写入同目录下的临时文件（``*.tmp``）
 2. ``os.replace`` 原子替换目标文件
 3. 旧版本备份到 ``<name>.bak``（仅当目标已存在）
+
+注：该函数虽无下划线前缀，但它是供 config/project 跨模块使用的公共 API。
 """
 
 from __future__ import annotations
@@ -13,8 +15,10 @@ import os
 import shutil
 from pathlib import Path
 
+__all__ = ["atomic_write_json"]
 
-def _atomic_write_json(path: Path, payload: object, *, backup: bool = True) -> None:
+
+def atomic_write_json(path: Path, payload: object, *, backup: bool = True) -> None:
     """原子写入 JSON 文件。可选备份旧版本到 ``<name>.bak``。
 
     Parameters

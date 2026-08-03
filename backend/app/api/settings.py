@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import anthropic
 from fastapi import APIRouter, HTTPException
 
@@ -85,6 +87,12 @@ async def test_provider(body: ProviderConfigUpdate | None = None) -> ConnectionT
 
 
 async def _test_anthropic(cfg: ProviderConfig) -> ConnectionTestResult:
+    """在后台线程执行同步 SDK 调用，避免阻塞事件循环。"""
+    return await asyncio.to_thread(_test_anthropic_sync, cfg)
+
+
+def _test_anthropic_sync(cfg: ProviderConfig) -> ConnectionTestResult:
+    """Anthropic SDK 连接测试（同步实现，供线程池调用）。"""
     try:
         client = anthropic.Anthropic(
             api_key=cfg.api_key,
@@ -119,6 +127,12 @@ async def _test_anthropic(cfg: ProviderConfig) -> ConnectionTestResult:
 
 
 async def _test_openai(cfg: ProviderConfig) -> ConnectionTestResult:
+    """在后台线程执行同步 SDK 调用，避免阻塞事件循环。"""
+    return await asyncio.to_thread(_test_openai_sync, cfg)
+
+
+def _test_openai_sync(cfg: ProviderConfig) -> ConnectionTestResult:
+    """OpenAI SDK 连接测试（同步实现，供线程池调用）。"""
     try:
         # 延迟导入 openai — 避免强依赖（部分用户只用 Anthropic）
         import openai

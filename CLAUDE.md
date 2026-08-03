@@ -11,10 +11,11 @@
 ## 2. 技术栈
 
 - **前端**: Next.js 16 + React 19 + TypeScript + Tailwind CSS v4
-- **后端**: FastAPI + Python 3.10+ + SSE (sse-starlette) + Pydantic v2
+- **后端**: FastAPI + Python 3.11+ + SSE (sse-starlette) + Pydantic v2
 - **LLM**: LangChain + LangGraph + ChatAnthropic / ChatOpenAI（BYOK）
 - **前端状态**: 仅 React useState/useReducer/useRef，不用 Zustand/Redux
 - **后端数据**: 文件级 JSON（data/ 目录），不用数据库
+- **目标 Python 版本**: `requires-python >=3.11`；CI 使用 3.14（与本地 venv 对齐，本地 3.11+ 亦可）
 
 ## 3. 目录规范
 
@@ -121,7 +122,7 @@ scripts/
 - SSE 事件统一用 `ArenaEvent` + `json.dumps(ensure_ascii=False)`
 - 对外错误用 `sanitize_error_message`（仅异常类型名），不泄露堆栈/密钥
 - 线程安全: Agent 工作空间通过 `contextvars.ContextVar` 隔离（异步栈感知，非 threading.local）
-- JSON 持久化走 `storage._atomic_write_json`
+- JSON 持久化走 `storage.atomic_write_json`
 - 优先用标准库，不引入新依赖
 
 ### 前端

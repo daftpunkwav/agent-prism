@@ -1,4 +1,8 @@
-"""工具调用相关性护栏 — 拦截明显偏离用户问题的 tool_calls。"""
+"""工具调用相关性护栏 - 启发式关键词 + 字符重叠，非精确判断。
+
+本护栏用于拦截明显的工具跑题调用，不保证覆盖所有场景。
+误拦时模型会收到 reason 提示自行修正；漏拦时不影响安全（工具本身有沙箱）。
+"""
 
 from __future__ import annotations
 
@@ -7,6 +11,7 @@ import re
 
 __all__ = ["assess_tool_relevance"]
 
+# 启发式关键词（不保证完备，仅覆盖常见表达）
 _TIME_HINTS = ("几点", "时间", "何时", "what time", "current time", "现在几点")
 _SUM_HINTS = ("等于多少", "求和", "加到", "1+2", "sum")
 _FILE_HINTS = ("写入", "保存", "html", "文件", "fib", ".txt", ".html", "创建")
@@ -97,8 +102,10 @@ def assess_tool_relevance(
             )
 
     # 3) write_file 内容提到完全不同的竞赛题/项目且问题未提及
+    #    仅保留通用话题词（todo/待办/斐波那契）；过拟合的 euler/phi_ascii 已移除，
+    #    此类"话题漂移"主要由上方 _char_overlap_ratio 低重叠判断覆盖
     if tool_name in {"write_file", "create_file"} and prior:
-        markers = ("euler", "欧拉", "project euler", "todo", "待办", "phi_ascii", "斐波那契")
+        markers = ("todo", "待办", "斐波那契")
         # 斐波那契若问题包含则放行
         lower_blob = blob.lower()
         lower_q = q.lower()

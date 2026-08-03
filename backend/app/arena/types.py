@@ -36,5 +36,4 @@ EventType = Literal[
     "error",
     "token_update",
     "thinking",
-    "harness_edit",
 ]

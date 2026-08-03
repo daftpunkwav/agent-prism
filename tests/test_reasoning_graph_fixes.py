@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from langgraph.graph import END
 
@@ -25,7 +26,7 @@ def test_tot_evaluate_node_binds_tools_not_nameerror():
     """evaluate 节点必须定义 llm_with_tools，不得 NameError。"""
     fake_llm = MagicMock()
     fake_bound = MagicMock()
-    fake_bound.invoke.return_value = SimpleNamespace(content="选方案 A", tool_calls=[])
+    fake_bound.ainvoke = AsyncMock(return_value=SimpleNamespace(content="选方案 A", tool_calls=[]))
     fake_llm.bind_tools.return_value = fake_bound
 
     with (
@@ -39,9 +40,9 @@ def test_tot_evaluate_node_binds_tools_not_nameerror():
             "tool_calls": 0,
             "reflections": [],
         }
-        out = _tot_evaluate_node(state)
+        out = asyncio.run(_tot_evaluate_node(state))
         bind.assert_called_once_with(fake_llm)
-        fake_bound.invoke.assert_called_once()
+        fake_bound.ainvoke.assert_called_once()
         assert out["step_count"] == 2
         assert len(out["messages"]) == 1
 
@@ -57,7 +58,7 @@ def test_react_tool_node_unknown_tool_still_emits_toolmessage():
         "tool_calls": 0,
         "reflections": [],
     }
-    out = _react_tool_node(state)
+    out = asyncio.run(_react_tool_node(state))
     assert len(out["messages"]) == 1
     msg = out["messages"][0]
     assert msg.tool_call_id == "call_1"

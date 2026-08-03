@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from app.arena.reasoning_graph import REASONING_MODES
 from app.arena.types import DimensionId
 from app.config import ProviderConfig, load_provider_config
 from app.models import BaselineOverrides, PipelineConfig
@@ -40,10 +41,7 @@ DIMENSION_OPTIONS: dict[DimensionId, list[tuple[str, str, str]]] = {
         ("prompt_profile", "structured", "Structured"),
     ],
     "reasoning": [
-        ("reasoning", "react", "ReAct"),
-        ("reasoning", "cot_tool", "CoT+Tool"),
-        ("reasoning", "tot", "ToT"),
-        ("reasoning", "reflexion", "Reflexion"),
+        ("reasoning", spec.mode, spec.label) for spec in REASONING_MODES.values()
     ],
     "context": [
         ("context", "sliding", "滑动窗口"),

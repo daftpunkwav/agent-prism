@@ -94,12 +94,11 @@ class RunnerPool:
                 logger.warning("客户端断开后 worker 清理超时（仍有 %d 个未结束）", sum(1 for w in workers if not w.done()))
             raise
         finally:
-            # 收尾：所有 worker 必须收尾（已结束 / 已取消）；若有残留也等待一次
-            if workers:
-                try:
-                    await asyncio.wait_for(asyncio.gather(*workers, return_exceptions=True), timeout=5)
-                except asyncio.TimeoutError:
-                    logger.warning("worker 收尾超时（仍有 %d 个未结束）", sum(1 for w in workers if not w.done()))
+            # 仅记录未结束的 worker（异常路径的兜底；正常路径 workers 已全部 done，
+            # 无需再次 gather — 已完成的 task 再次等待无意义）
+            leaked = [w for w in workers if not w.done()]
+            if leaked:
+                logger.warning("检测到 %d 个未结束 worker", len(leaked))
 
     async def _worker(
         self,

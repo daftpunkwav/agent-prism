@@ -3,37 +3,31 @@
 from __future__ import annotations
 
 import logging
-import time
-import uuid
 from collections.abc import AsyncIterator
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
+from app.adapters._common_run import (
+    RunState,
+    begin_pipeline,
+    create_run_workspace,
+    emit_harness_event,
+    emit_stream_event,
+    finish_event,
+)
+from app.adapters.common import token_update_event
 from app.arena.errors import sanitize_error_message
 from app.arena.harness import HarnessRunner
-from app.arena.llm import clear_pipeline_llm_overrides, set_pipeline_llm_overrides
-from app.arena.prompts import build_messages
+from app.arena.llm import clear_pipeline_llm_overrides
 from app.arena.reasoning import get_reasoning_description
-from app.arena.reasoning_graph import (
-    build_cot_tool_graph,
-    build_react_graph,
-    build_reflexion_graph,
-    build_tot_graph,
-)
-from app.arena.stream_utils import extract_chunk_parts
-from app.arena.token_utils import TokenTracker, extract_usage
-from app.arena.workspace import clear_current_workspace, set_current_workspace
+from app.arena.reasoning_graph import REASONING_MODES, build_react_graph
+from app.arena.workspace import clear_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
 logger = logging.getLogger(__name__)
 
-_GRAPH_BUILDERS = {
-    "react": build_react_graph,
-    "cot_tool": build_cot_tool_graph,
-    "tot": build_tot_graph,
-    "reflexion": build_reflexion_graph,
-}
+# on_node_start 不产生阶段提示的骨架节点（agent/execute 是主循环节点）
+_NODE_START_EXCLUDED = frozenset({"agent", "execute"})
 
 
 class LangGraphAdapter:
@@ -42,30 +36,14 @@ class LangGraphAdapter:
 
     async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
         label = config.label or self.display_name
-        started = time.perf_counter()
-        tracker = TokenTracker.from_provider()
+        state = RunState(label=label)
+        # workspace 创建在 try 外（失败直接抛给 runner 收敛，与原实现一致）
+        state.ws_name = create_run_workspace(question, label)
 
-        # 每个运行实例独占一个工作空间（时间戳 + uuid 后缀，避免同毫秒碰撞覆盖）
-        ws_name = f"{label}_{int(started * 1000)}_{uuid.uuid4().hex[:6]}"
-        ws = get_workspace_mgr().create(ws_name)
-        set_current_workspace(ws_name)
-        ws.write_file("README.md", f"# {label} Agent 工作空间\n\n问题: {question}\n")
-
-        step = 0
-        tool_calls = 0
-        # 在后端也保留当前正在流式输出的 step，便于 tool_start 正确递增
-        streaming_step: int | None = None
-        thinking_step: int | None = None
         try:
-            set_pipeline_llm_overrides(
-                temperature=config.temperature,
-                model=config.model_id or None,
-            )
-            system, user = build_messages(
-                question, config.prompt_profile, config.reasoning, config.harness, config.context
-            )
-            tracker.seed_prompt(system, user)
-            yield token_update_event(label, tracker, workspace=ws_name)
+            system, user = begin_pipeline(question, config, label)
+            state.tracker.seed_prompt(system, user)
+            yield token_update_event(label, state.tracker, workspace=state.ws_name)
 
             mode_label = get_reasoning_description(config.reasoning) or "ReAct 循环"
             yield ArenaEvent(
@@ -78,9 +56,10 @@ class LangGraphAdapter:
                 ),
             )
 
-            graph_builder = _GRAPH_BUILDERS.get(config.reasoning, build_react_graph)
+            spec = REASONING_MODES.get(config.reasoning, REASONING_MODES["react"])
             # 提高 LangGraph 默认递归限制（默认 25）；同时 max_steps 控制业务循环
-            graph = graph_builder().compile().with_config({"recursion_limit": 50})
+            builder = spec.graph_builder or build_react_graph
+            graph = builder().compile().with_config({"recursion_limit": 50})
 
             initial_state = {
                 "messages": [
@@ -98,151 +77,30 @@ class LangGraphAdapter:
             harness_runner = HarnessRunner(level=config.harness)
 
             async for event in harness_runner.stream_events(question, graph, initial_state):
-                # Harness 控制事件（verify / reflect / harness_edit）
-                if isinstance(event, dict) and event.get("_harness"):
-                    if streaming_step is not None:
-                        yield ArenaEvent(
-                            type="thought_end",
-                            pipeline=label,
-                            step=streaming_step,
-                            content="",
-                        )
-                        streaming_step = None
-                    thinking_step = None
-                    step += 1
-                    ev_type = event.get("type") or "verify"
-                    yield ArenaEvent(
-                        type=ev_type,  # type: ignore[arg-type]
-                        pipeline=label,
-                        step=step,
-                        content=str(event.get("content") or ""),
-                        passed=event.get("passed"),
-                        workspace=ws_name,
-                    )
+                harness_evts = emit_harness_event(state, event)
+                if harness_evts:
+                    for ev in harness_evts:
+                        yield ev
                     continue
+                node_name = event.get("name", "") if isinstance(event, dict) else ""
+                for ev in emit_stream_event(
+                    state,
+                    event,
+                    node_name=node_name,
+                    node_start_excluded=_NODE_START_EXCLUDED,
+                ):
+                    yield ev
 
-                kind = event.get("event", "")
-                data = event.get("data", {})
-                node_name = event.get("name", "")
-
-                if kind == "on_chat_model_stream":
-                    thinking, text = extract_chunk_parts(data.get("chunk"))
-                    if thinking:
-                        if thinking_step is None:
-                            step += 1
-                            thinking_step = step
-                        yield ArenaEvent(
-                            type="thinking",
-                            pipeline=label,
-                            step=thinking_step,
-                            content=thinking,
-                        )
-                    if text:
-                        if streaming_step is None:
-                            step += 1
-                            streaming_step = step
-                        yield ArenaEvent(
-                            type="thought_delta",
-                            pipeline=label,
-                            step=streaming_step,
-                            content=text,
-                        )
-                elif kind == "on_chat_model_end":
-                    usage = extract_usage(data)
-                    if usage["input_tokens"] or usage["output_tokens"]:
-                        tracker.add_usage(usage)
-                        yield token_update_event(label, tracker, workspace=ws_name)
-                    if streaming_step is not None:
-                        yield ArenaEvent(
-                            type="thought_end",
-                            pipeline=label,
-                            step=streaming_step,
-                            content="",
-                        )
-                    streaming_step = None
-                    thinking_step = None
-                elif kind == "on_tool_start":
-                    if streaming_step is not None:
-                        yield ArenaEvent(
-                            type="thought_end",
-                            pipeline=label,
-                            step=streaming_step,
-                            content="",
-                        )
-                        streaming_step = None
-                    thinking_step = None
-                    tool_calls += 1
-                    step += 1
-                    tool_name = data.get("name", node_name)
-                    tool_input = data.get("input", {})
-                    yield ArenaEvent(
-                        type="action",
-                        pipeline=label,
-                        step=step,
-                        tool=tool_name,
-                        args=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
-                    )
-                elif kind == "on_tool_end":
-                    step += 1
-                    output = data.get("output", "")
-                    yield ArenaEvent(
-                        type="observation",
-                        pipeline=label,
-                        step=step,
-                        result=str(output),
-                    )
-                elif kind == "on_node_start" and node_name not in ("agent", "execute"):
-                    if streaming_step is not None:
-                        yield ArenaEvent(
-                            type="thought_end",
-                            pipeline=label,
-                            step=streaming_step,
-                            content="",
-                        )
-                        streaming_step = None
-                    thinking_step = None
-                    yield ArenaEvent(
-                        type="thought",
-                        pipeline=label,
-                        step=step,
-                        content=f"[阶段: {node_name}]",
-                    )
-
-            duration_ms = int((time.perf_counter() - started) * 1000)
-            yield ArenaEvent(
-                type="complete",
-                pipeline=label,
-                workspace=ws_name,
-                metrics=build_metrics(
-                    tracker,
-                    success=True,
-                    duration_ms=duration_ms,
-                    tool_calls=tool_calls,
-                    steps=step,
-                ),
-                token_stats=tracker.as_dict(),
-            )
+            yield finish_event(state, success=True)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Pipeline %s 失败", label)
             yield ArenaEvent(
                 type="error",
                 pipeline=label,
-                workspace=ws_name,
+                workspace=state.ws_name,
                 message=sanitize_error_message(exc),
             )
-            yield ArenaEvent(
-                type="complete",
-                pipeline=label,
-                workspace=ws_name,
-                metrics=build_metrics(
-                    tracker,
-                    success=False,
-                    duration_ms=int((time.perf_counter() - started) * 1000),
-                    tool_calls=tool_calls,
-                    steps=step,
-                ),
-                token_stats=tracker.as_dict(),
-            )
+            yield finish_event(state, success=False)
         finally:
             clear_pipeline_llm_overrides()
             clear_current_workspace()

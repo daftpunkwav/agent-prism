@@ -21,12 +21,13 @@ import logging
 import multiprocessing as _mp
 import sys
 import threading
+from contextvars import ContextVar
 from datetime import datetime, timezone
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from app.arena.workspace import Workspace, WorkspaceManager, get_current_workspace_name
+from app.arena.workspace import Workspace, WorkspaceError, WorkspaceManager, get_current_workspace_name
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +45,20 @@ _PROCESS_KILL_GRACE = 1.0
 # 全局工作空间管理器（每个 Agent 运行独立创建 workspace）
 _workspace_mgr = WorkspaceManager()
 
+# 请求级覆盖（类似 llm.py 的 _pipeline_overrides）：
+# 测试可注入独立实例隔离状态，避免污染全局单例；生产代码不调用，行为不变。
+_workspace_override: ContextVar[WorkspaceManager | None] = ContextVar(
+    "ws_override", default=None
+)
+
 
 def get_workspace_mgr() -> WorkspaceManager:
-    return _workspace_mgr
+    return _workspace_override.get() or _workspace_mgr
+
+
+def set_workspace_mgr_override(mgr: WorkspaceManager | None) -> None:
+    """注入请求级工作空间管理器覆盖（供测试隔离）。传 None 恢复全局单例。"""
+    _workspace_override.set(mgr)
 
 
 # ===== 无状态工具 =====
@@ -349,7 +361,10 @@ def write_file(path: str, content: str) -> str:
     ws = _get_ws()
     if ws is None:
         return "错误: 未找到工作空间"
-    return ws.write_file(path, _truncate_content(content))
+    try:
+        return ws.write_file(path, _truncate_content(content))
+    except WorkspaceError as exc:
+        return str(exc)
 
 
 @tool(args_schema=_AppendFileInput)
@@ -358,7 +373,10 @@ def append_file(path: str, content: str) -> str:
     ws = _get_ws()
     if ws is None:
         return "错误: 未找到工作空间"
-    return ws.append_file(path, _truncate_content(content))
+    try:
+        return ws.append_file(path, _truncate_content(content))
+    except WorkspaceError as exc:
+        return str(exc)
 
 
 @tool(args_schema=_CreateFileInput)
@@ -367,7 +385,10 @@ def create_file(path: str, content: str = "") -> str:
     ws = _get_ws()
     if ws is None:
         return "错误: 未找到工作空间"
-    return ws.create_file(path, _truncate_content(content))
+    try:
+        return ws.create_file(path, _truncate_content(content))
+    except WorkspaceError as exc:
+        return str(exc)
 
 
 @tool
@@ -376,7 +397,10 @@ def read_file(path: str) -> str:
     ws = _get_ws()
     if ws is None:
         return "错误: 未找到工作空间"
-    return ws.read_file(path)
+    try:
+        return ws.read_file(path)
+    except WorkspaceError as exc:
+        return str(exc)
 
 
 @tool
@@ -406,7 +430,10 @@ def delete_file(path: str) -> str:
     ws = _get_ws()
     if ws is None:
         return "错误: 未找到工作空间"
-    return ws.delete_file(path)
+    try:
+        return ws.delete_file(path)
+    except WorkspaceError as exc:
+        return str(exc)
 
 
 # ===== 代码执行工具 =====

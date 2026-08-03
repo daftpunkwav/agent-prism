@@ -204,9 +204,13 @@ def test_run_code_large_output_truncated_not_timed_out():
 
 
 def test_workspace_rejects_null_byte():
-    from app.arena.workspace import Workspace
+    import pytest
+
+    from app.arena.workspace import Workspace, WorkspaceError
 
     ws = Workspace(name="t")
     # 空字节会被 os.path.normpath 静默剥离，必须显式拒绝
-    assert ws.write_file("foo\x00.txt", "x").startswith("错误")
-    assert ws.write_file("bar\x07.py", "x").startswith("错误")
+    with pytest.raises(WorkspaceError):
+        ws.write_file("foo\x00.txt", "x")
+    with pytest.raises(WorkspaceError):
+        ws.write_file("bar\x07.py", "x")

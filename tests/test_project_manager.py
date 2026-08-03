@@ -112,7 +112,7 @@ def test_save_io_error_bubbles(isolated_projects_file, monkeypatch):
     def _boom(_path, _payload, **_kw):
         raise OSError("disk full")
 
-    monkeypatch.setattr(project_module, "_atomic_write_json", _boom)
+    monkeypatch.setattr(project_module, "atomic_write_json", _boom)
 
     with pytest.raises(OSError, match="disk full"):
         mgr.create_from_run(_make_create("after"))

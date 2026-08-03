@@ -7,6 +7,7 @@ import logging
 import re
 import unicodedata
 
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.arena.llm import create_chat_model
@@ -27,43 +28,20 @@ __all__ = [
 # 去除 LLM 输出中常见的 ```json ... ``` 或 ``` ... ``` 代码块包裹 — 容忍前后空白
 _JSON_FENCE = re.compile(r"```(?:json|JSON)?\s*\n?(.*?)\n?\s*```", re.DOTALL)
 
-# 提示注入模式：检测 LLM 是否试图篡改系统指令（单一编译正则，供 _detect_injection 使用）
-_INJECTION_PATTERN_RE = re.compile(
-    r"(?i)(ignore\s+(all\s+)?previous\s+instructions?|"
-    r"you\s+are\s+now\s+|"
-    r"disregard\s+|"
-    r"override\s+(your\s+)?(system\s+)?(prompt|instructions?)|"
-    r"new\s+instructions?\s*:|"
-    r"忽略\s*(以上|之前|先前)?\s*(所有)?\s*(指令|提示|规则)|"
-    r"你现在是|"
-    r"扮演|"
-    r"越狱)"
-)
-
-
-def _strip_json_fence(text: str) -> str:
-    """去除 LLM 返回的 markdown code fence，便于后续 json.loads 解析。
-
-    优先匹配首个 ```` ```json ... ``` ```` 块；若不存在则去掉所有行首 ```` ``` ```` 标记。
-    """
-    match = _JSON_FENCE.search(text)
-    if match:
-        return match.group(1).strip()
-    # 退化路径：去掉所有 fence-like 行
-    cleaned = re.sub(r"^```(?:json|JSON)?\s*$", "", text, flags=re.MULTILINE)
-    return cleaned.strip()
-
-
-# 自进化 prompt_additions 的注入防护：剥离可能覆盖系统指令的危险 token，
-# 并限制总长度避免上下文爆炸
-_INJECTION_PATTERNS = [
+# 提示注入模式（单一来源）：供 _detect_injection 检测 LLM 输出，
+# 与 _sanitize_prompt_additions 清洗 LLM 建议的 prompt 追加共用，
+# 避免两套正则漂移。
+_INJECTION_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"ignore\s+(?:all\s+)?previous\s+instructions", re.IGNORECASE),
     re.compile(r"disregard\s+(?:the\s+)?system\s+prompt", re.IGNORECASE),
+    re.compile(r"override\s+(?:your\s+)?(?:system\s+)?(?:prompt|instructions?)", re.IGNORECASE),
+    re.compile(r"new\s+instructions?\s*:", re.IGNORECASE),
     re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
     re.compile(r"<\|.*?\|>"),  # Anthropic/OpenAI 特殊 token
     re.compile(r"\[INST\]|\[/INST\]", re.IGNORECASE),  # Llama 风格
     re.compile(r"忽略\s*(?:以上|之前|先前)?\s*(?:所有)?\s*(?:指令|提示|规则)"),
     re.compile(r"你现在是"),
+    re.compile(r"扮演"),
     re.compile(r"越狱"),
 ]
 _MAX_ADDITION_CHARS = 1000
@@ -93,6 +71,19 @@ def _sanitize_prompt_additions(additions: list[str] | None) -> str:
     return joined
 
 
+def _strip_json_fence(text: str) -> str:
+    """去除 LLM 返回的 markdown code fence，便于后续 json.loads 解析。
+
+    优先匹配首个 ```` ```json ... ``` ```` 块；若不存在则去掉所有行首 ```` ``` ```` 标记。
+    """
+    match = _JSON_FENCE.search(text)
+    if match:
+        return match.group(1).strip()
+    # 退化路径：去掉所有 fence-like 行
+    cleaned = re.sub(r"^```(?:json|JSON)?\s*$", "", text, flags=re.MULTILINE)
+    return cleaned.strip()
+
+
 def _sanitize_for_json(text: object) -> str:
     """清理 LLM 输出中可能的提示注入内容，保留有效 JSON。
 
@@ -117,17 +108,17 @@ def _sanitize_for_json(text: object) -> str:
 def _detect_injection(text: str) -> bool:
     """检测文本中是否包含提示注入模式。"""
     normalized = unicodedata.normalize("NFKC", text)
-    return bool(_INJECTION_PATTERN_RE.search(normalized))
+    return any(pat.search(normalized) for pat in _INJECTION_PATTERNS)
 
 
 # ===== 验证器 =====
 
 
-def verify_result(
+async def verify_result(
     question: str,
     answer: str,
     tool_calls: int,
-    model=None,
+    model: BaseChatModel | None = None,
 ) -> tuple[bool, str]:
     """验证 LLM 输出质量。返回 (是否通过, 原因)。"""
     # 检测提示注入
@@ -149,7 +140,7 @@ def verify_result(
         HumanMessage(content=f"问题：{question}\n\n回答：{answer[:2000]}\n\n工具调用次数：{tool_calls}"),
     ]
     try:
-        response = llm.invoke(prompt)
+        response = await llm.ainvoke(prompt)
         cleaned = _sanitize_for_json(response.content)
         result = json.loads(cleaned)
         return result.get("passed", False), result.get("reason", "无法解析验证结果")
@@ -161,11 +152,11 @@ def verify_result(
 # ===== 反思器 =====
 
 
-def reflect_on_failure(
+async def reflect_on_failure(
     question: str,
     answer: str,
     verification_reason: str,
-    model=None,
+    model: BaseChatModel | None = None,
 ) -> str:
     """反思失败原因，生成改进建议。"""
     llm = model or create_chat_model()
@@ -179,7 +170,7 @@ def reflect_on_failure(
         HumanMessage(content=f"问题：{question}\n\n回答：{answer[:2000]}\n\n验证未通过原因：{verification_reason}"),
     ]
     try:
-        response = llm.invoke(prompt)
+        response = await llm.ainvoke(prompt)
         cleaned = _sanitize_for_json(response.content)
         result = json.loads(cleaned)
         return result.get("strategy", result.get("insight", "继续尝试"))
@@ -190,12 +181,12 @@ def reflect_on_failure(
 # ===== 自进化 =====
 
 
-def propose_harness_edit(
+async def propose_harness_edit(
     question: str,
     answer: str,
     reflection: str,
     current_prompt: str,
-    model=None,
+    model: BaseChatModel | None = None,
 ) -> dict:
     """提出 Harness 配置修改建议。"""
     llm = model or create_chat_model()
@@ -211,7 +202,7 @@ def propose_harness_edit(
         HumanMessage(content=f"问题：{question}\n\n当前 system prompt：{current_prompt[:500]}\n\n反思：{reflection}"),
     ]
     try:
-        response = llm.invoke(prompt)
+        response = await llm.ainvoke(prompt)
         cleaned = _sanitize_for_json(response.content)
         return json.loads(cleaned)
     except Exception:
@@ -310,7 +301,7 @@ class HarnessRunner:
                 }
                 break
 
-            passed, reason = verify_result(question, answer, tool_calls)
+            passed, reason = await verify_result(question, answer, tool_calls)
             yield {
                 "_harness": True,
                 "type": "verify",
@@ -333,7 +324,7 @@ class HarnessRunner:
                 continue
 
             # reflect / self_evolve：反思后带着策略重试
-            insight = reflect_on_failure(question, answer, reason)
+            insight = await reflect_on_failure(question, answer, reason)
             self.reflections.append(insight)
             yield {
                 "_harness": True,
@@ -351,7 +342,7 @@ class HarnessRunner:
                     human_msgs.append(m)
 
             if self.level == "self_evolve":
-                edit = propose_harness_edit(question, answer, insight, system_msg)
+                edit = await propose_harness_edit(question, answer, insight, system_msg)
                 self.harness_edits.append(edit)
                 yield {
                     "_harness": True,
