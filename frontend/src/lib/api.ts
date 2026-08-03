@@ -287,6 +287,63 @@ export async function streamArenaRun(
   }
 }
 
+// ===== 任务模板 API =====
+
+export interface JudgeSpec {
+  type: "keyword" | "json" | "code" | "numeric" | "exclude" | "regex";
+  any_of?: string[];
+  all_of?: string[];
+  min_hits?: number;
+  required_fields?: string[];
+  must_contain?: string[];
+  max_len?: number;
+  operator?: "==" | ">=" | "<=" | ">" | "<";
+  value?: number;
+  tolerance?: number;
+  patterns?: string[];
+  pattern?: string;
+}
+
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  description: string;
+  question: string;
+  suggested_dimension: DimensionId;
+  suggested_selections: string[];
+  judge: JudgeSpec;
+}
+
+export interface JudgeResult {
+  passed: boolean;
+  reason: string;
+  details: string[];
+}
+
+export async function fetchTemplates(options?: { signal?: AbortSignal }): Promise<TaskTemplate[]> {
+  const res = await fetch(`${API_BASE}/api/arena/templates`, {
+    cache: "no-store",
+    signal: options?.signal,
+  });
+  if (!res.ok) throw new Error("加载任务模板失败");
+  const data = await res.json();
+  return data.templates || [];
+}
+
+export async function judgeAnswers(
+  templateId: string,
+  answers: Record<string, string>,
+): Promise<Record<string, JudgeResult>> {
+  const res = await fetch(`${API_BASE}/api/arena/judge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ template_id: templateId, answers }),
+  });
+  if (!res.ok) throw new Error("判分失败");
+  const data = await res.json();
+  return data.results || {};
+}
+
 // ===== 项目管理 API =====
 
 export interface PipelineRunResult {

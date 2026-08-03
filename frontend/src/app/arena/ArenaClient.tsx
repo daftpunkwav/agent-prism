@@ -29,11 +29,15 @@ import {
   BaselineOverrides,
   DimensionId,
   DimensionOption,
+  JudgeResult,
   PipelineMetrics,
+  TaskTemplate,
   TokenStats,
   createProject,
   fetchArenaMeta,
+  fetchTemplates,
   isAbortError,
+  judgeAnswers,
   streamArenaRun,
 } from "@/lib/api";
 
@@ -54,9 +58,21 @@ type ColumnState = {
   /** 后端实际工作空间名（来自 complete/token_update 事件） */
   workspace?: string;
   error?: string;
+  /** 自动判分结果（模板任务运行完成后填充） */
+  judge?: JudgeResult;
 };
 
 type MainTab = "results" | "report" | "diff";
+
+/** 判分方式 → 展示徽章文案 */
+const JUDGE_TYPE_LABEL: Record<string, string> = {
+  keyword: "关键词",
+  json: "JSON",
+  code: "代码",
+  numeric: "数字",
+  exclude: "拒答检测",
+  regex: "正则",
+};
 
 const TASK_TEMPLATES: Array<{ id: string; label: string; question: string }> = [
   { id: "time", label: "时间", question: "现在几点？" },
@@ -125,6 +141,24 @@ function metricsToTokenStats(m: PipelineMetrics): TokenStats {
   };
 }
 
+/**
+ * 从列事件中提取"最终答案"用于自动判分：
+ * 累积所有 thought / thought_delta 内容（取最后 4000 字符），
+ * 若无 thought 则回退到最后一条 observation 的 result。
+ */
+function extractFinalAnswer(events: ArenaEvent[]): string {
+  let thought = "";
+  let lastObs = "";
+  for (const ev of events) {
+    if (ev.type === "thought" || ev.type === "thought_delta") {
+      thought = (thought + (ev.content ?? "")).slice(-4000);
+    } else if (ev.type === "observation") {
+      lastObs = ev.result ?? "";
+    }
+  }
+  return (thought || lastObs).trim();
+}
+
 function LaneTile({
   option,
   selected,
@@ -181,6 +215,7 @@ function ComparisonReport({ columns }: { columns: Record<string, ColumnState> })
               <th className="!text-right">工具</th>
               <th className="!text-right">步骤</th>
               <th className="!text-center">状态</th>
+              <th className="!text-center">判分</th>
             </tr>
           </thead>
           <tbody>
@@ -227,6 +262,21 @@ function ComparisonReport({ columns }: { columns: Record<string, ColumnState> })
                       </span>
                     )}
                   </td>
+                  <td className="text-center">
+                    {col.judge ? (
+                      <span
+                        className={
+                          "inline-flex items-center gap-1 font-mono text-[10px] " +
+                          (col.judge.passed ? "text-success" : "text-destructive")
+                        }
+                        title={col.judge.reason}
+                      >
+                        {col.judge.passed ? "✅" : "❌"} 判分
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground/40 text-[10px]">—</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -248,6 +298,15 @@ function ComparisonReport({ columns }: { columns: Record<string, ColumnState> })
             · {lowestToken.metrics!.total_tokens.toLocaleString()}
           </span>
         </p>
+        {cols.some((c) => c.judge) && (
+          <p className="text-[11px]">
+            自动判分：
+            <span className="font-medium text-foreground">
+              {cols.filter((c) => c.judge?.passed).length} / {cols.filter((c) => c.judge).length}
+            </span>{" "}
+            通过（L1 格式/约束验证，无 LLM）
+          </p>
+        )}
       </div>
     </div>
   );
@@ -330,6 +389,31 @@ function ColumnCard({
           <span>步骤 {col.metrics.steps}</span>
         </div>
       )}
+      {col.judge && (
+        <div
+          className={
+            "border-t px-3 py-2 text-[11px] shrink-0 flex items-start gap-1.5 " +
+            (col.judge.passed
+              ? "border-t-success/30 bg-success/5 text-success"
+              : "border-t-destructive/30 bg-destructive/5 text-destructive")
+          }
+          title={col.judge.details.join("\n")}
+        >
+          <span
+            aria-hidden
+            className={
+              "mt-1 h-1.5 w-1.5 shrink-0 rounded-full " +
+              (col.judge.passed ? "bg-current" : "bg-current")
+            }
+          />
+          <span className="min-w-0">
+            <span className="font-mono font-medium">
+              {col.judge.passed ? "判分通过" : "判分未通过"}
+            </span>
+            <span className="ml-2 text-muted-foreground">{col.judge.reason}</span>
+          </span>
+        </div>
+      )}
       {col.error && (
         <div className="border-t border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive shrink-0">
           {col.error}
@@ -357,6 +441,9 @@ export function ArenaClient() {
   const [projectName, setProjectName] = useState("");
   const [savingProject, setSavingProject] = useState(false);
   const [saveProjectMsg, setSaveProjectMsg] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+  const [judging, setJudging] = useState(false);
 
   // 活跃 workspace 名称：直接从后端返回的 col.workspace 读取（后端在 complete
   // / token_update 事件中带 workspace 字段），无需前端猜测后缀。
@@ -394,6 +481,31 @@ export function ArenaClient() {
       });
     return () => ac.abort();
   }, []);
+
+  // 加载可判分任务模板（失败不阻塞主流程）
+  useEffect(() => {
+    const ac = new AbortController();
+    fetchTemplates({ signal: ac.signal })
+      .then(setTemplates)
+      .catch((err: Error) => {
+        if (err.name !== "AbortError") {
+          console.error("加载任务模板失败:", err);
+        }
+      });
+    return () => ac.abort();
+  }, []);
+
+  const applyTemplate = useCallback(
+    (t: TaskTemplate) => {
+      setQuestion(t.question);
+      setActiveTemplateId(t.id);
+      // 预填建议维度与子项
+      setDimension(t.suggested_dimension);
+      setSelections(t.suggested_selections);
+      setError(null);
+    },
+    [],
+  );
 
   const baselinePayload = useMemo(() => {
     const locked = DIMENSION_FIELD[dimension];
@@ -492,6 +604,7 @@ export function ArenaClient() {
     setError(null);
     setRunning(true);
     setMainTab("results");
+    judgedRef.current = null; // 新运行需重新判分
     const placeholderCols: Record<string, ColumnState> = {};
     for (const opt of activeDim?.options ?? []) {
       if (activeSelections.includes(opt.value)) {
@@ -633,6 +746,37 @@ export function ArenaClient() {
     }
     if (!allCompleted) reportVisitedRef.current = false;
   }, [allCompleted]);
+
+  // 运行完成后若使用可判分模板，自动判分所有列
+  const judgedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!allCompleted || !activeTemplateId || judging) return;
+    const runKey = `${activeTemplateId}:${question.trim()}`;
+    if (judgedRef.current === runKey) return;
+    const answers: Record<string, string> = {};
+    for (const c of columnList) {
+      const text = extractFinalAnswer(c.events);
+      if (text) answers[c.label] = text;
+    }
+    if (Object.keys(answers).length === 0) return;
+    judgedRef.current = runKey;
+    setJudging(true);
+    judgeAnswers(activeTemplateId, answers)
+      .then((results) => {
+        setColumns((prev) => {
+          const next: Record<string, ColumnState> = {};
+          for (const [label, col] of Object.entries(prev)) {
+            next[label] = results[label] ? { ...col, judge: results[label] } : col;
+          }
+          return next;
+        });
+      })
+      .catch((err: Error) => {
+        console.error("判分失败:", err);
+        setError(err instanceof Error ? err.message : "自动判分失败");
+      })
+      .finally(() => setJudging(false));
+  }, [allCompleted, activeTemplateId, judging, columnList, question]);
 
   if (metaLoading) {
     return (
@@ -814,13 +958,37 @@ export function ArenaClient() {
             </p>
           )}
           <div className="composer-templates">
+            {templates.length > 0 && (
+              <span className="composer-template-group" aria-hidden>
+                可判分
+              </span>
+            )}
+            {templates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className="btn-ghost text-[11px]"
+                data-active={activeTemplateId === t.id}
+                title={`${t.name}（${t.description}）· 判分: ${JUDGE_TYPE_LABEL[t.judge.type] ?? t.judge.type}`}
+                onClick={() => applyTemplate(t)}
+              >
+                {t.name}
+                <span className="composer-template-badge">
+                  {JUDGE_TYPE_LABEL[t.judge.type] ?? t.judge.type}
+                </span>
+              </button>
+            ))}
+            {templates.length > 0 && <span className="composer-template-sep" aria-hidden />}
             {TASK_TEMPLATES.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 className="btn-ghost text-[11px]"
                 title={t.question}
-                onClick={() => setQuestion(t.question)}
+                onClick={() => {
+                  setQuestion(t.question);
+                  setActiveTemplateId(null);
+                }}
               >
                 {t.label}
               </button>

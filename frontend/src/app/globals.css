@@ -661,7 +661,44 @@ body {
 .composer-templates {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.35rem;
+}
+
+/* 可判分模板组标签 */
+.composer-template-group {
+  font-size: 10px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  padding-right: 0.25rem;
+}
+
+/* 可判分模板徽章（判分方式） */
+.composer-template-badge {
+  font-size: 9px;
+  line-height: 1;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border-radius: 999px;
+  padding: 2px 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.composer-templates .btn-ghost[data-active="true"] {
+  border-color: var(--primary);
+  color: var(--foreground);
+}
+
+/* 模板组间分隔线 */
+.composer-template-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin-inline: 0.25rem;
 }
 
 .composer-row {
