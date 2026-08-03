@@ -1,7 +1,7 @@
 # AgentPrism 开发进度报告
 
 > 本文档面向**当前实现**撰写。每个声明都对应 `backend/app/`、`frontend/src/` 或 `tests/` 下的实际代码；与早期 PRD/README 不一致时，**以本文档为准**。
-> 数据截止：2026-07-23（最近一次 commit `05f59da chore(ci): 根目录 pytest tests/ + 声明 langchain-openai`）。
+> 数据截止：2026-08-03（合并 `fix/full-review` 并完成安全硬化后）。
 
 ---
 
@@ -21,7 +21,7 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 | 推理 | LangGraph `StateGraph`（ReAct / CoT+Tool / ToT / Reflexion 四张图） |
 | 数据 | 文件级 JSON（`provider_config.json` + `projects.json`），**无 SQL/ORM** |
 | 前端状态 | 仅 `useState` / `useReducer` / `useRef`，无 Zustand/Redux |
-| 测试 | 仓库根 `tests/`，**20 个文件 / 146 个 `test_` 函数** |
+| 测试 | 仓库根 `tests/`，**27 个文件 / 约 228 个 `test_` 函数** |
 
 ---
 
@@ -67,7 +67,7 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 
 ### 2.3 测试（`tests/`）
 
-**20 个测试文件 / 146 个 `test_` 函数**（含类内缩进测试）。
+**27 个测试文件 / 约 228 个 `test_` 函数**（含类内缩进测试；以 `PYTHONPATH=backend pytest tests/ -v` 收集结果为准）。
 
 | 文件 | 用例数 | 覆盖范围 |
 |---|---|---|
@@ -164,7 +164,7 @@ workers = [asyncio.create_task(worker(c)) for c in configs]
 ### 4.1 高优先级
 
 1. **测试运行数与 README/PRD 不一致**
-   - README 写「108 用例」，PRD 也写「108」；实际 146 个 `test_` 函数（`grep -rE "^\s*(def |async def )test_" tests/ | wc -l` = 146）
+   - README / 旧文档曾写「108 用例」；当前以根目录 `tests/` 实测为准（约 228 个 `test_` 函数）
    - 建议：以 `pytest --collect-only -q` 输出为准，并加 `pytest --co` 到 CI
 
 2. **`is_mvp_ready` 死代码**
@@ -240,7 +240,7 @@ workers = [asyncio.create_task(worker(c)) for c in configs]
 - **Provider 测试命令**：`Settings → 管理与测试`
 - **运行 Arena**：根目录 `cd backend && uvicorn app.main:app --reload --port 8000` + 另起终端 `cd frontend && npm run dev`
 - **跑全部测试**：`PYTHONPATH=backend pytest tests/ -v`（根目录）
-- **backend 测试数**：20 文件 / 146 函数（实测，`grep -E "^\s*(def\|async def) test_" tests/ -r`）
+- **backend 测试数**：27 文件 / 约 228 函数（实测，仓库根 `tests/`）
 - **workspace 限制**：最多 32 个；空闲 > 1h 自动回收；LRU 淘汰
 - **run_code 超时**：1~10s，超时强制 terminate + kill 子进程
 - **请求体上限**：10MB，超出返回 413

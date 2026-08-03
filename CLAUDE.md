@@ -50,7 +50,8 @@ backend/app/
 │   ├── common.py            # 共享函数
 │   ├── langchain_adapter.py
 │   └── langgraph_adapter.py
-└── tests/                   # 单元测试（pytest，108 用例）
+
+tests/                       # 单元测试（pytest，仓库根目录；约 27 文件 / 228 用例）
 
 frontend/src/
 ├── app/                     # 页面（App Router）
@@ -101,9 +102,9 @@ scripts/
 ## 5. 代码约束
 
 ### 后端
-- 所有新模块必须有对应 `tests/test_xxx.py`
-- 运行测试: `cd backend && pytest tests/ -v`
-- 运行 lint: `cd backend && ruff check app/ tests/`
+- 所有新模块必须有对应 `tests/test_xxx.py`（仓库根目录）
+- 运行测试: `PYTHONPATH=backend pytest tests/ -v`（仓库根目录）
+- 运行 lint: `cd backend && ruff check app/`
 - Pydantic 模型放在 `models.py`
 - Tool 定义在 `arena/tools.py`，纯函数提取为 `_safe_xxx` 便于测试
 - SSE 事件统一用 `ArenaEvent` + `json.dumps(ensure_ascii=False)`
