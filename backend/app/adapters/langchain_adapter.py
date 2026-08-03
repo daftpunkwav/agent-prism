@@ -13,6 +13,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
 from app.arena.context_manager import prepare_messages_for_llm
+from app.arena.errors import sanitize_error_message
 from app.arena.harness import HarnessRunner
 from app.arena.llm import (
     clear_pipeline_llm_overrides,
@@ -35,11 +36,6 @@ def _normalize_args(input_value: object) -> dict:
     if isinstance(input_value, dict):
         return input_value
     return {"input": input_value}
-
-
-def _sanitize_error(exc: Exception) -> str:
-    """脱敏异常消息，仅保留类型名，避免泄露 API key / endpoint 等敏感信息。"""
-    return f"{type(exc).__name__}"
 
 
 class _ArenaContextMiddleware(AgentMiddleware):
@@ -320,7 +316,7 @@ class LangChainAdapter:
                 type="error",
                 pipeline=label,
                 workspace=ws_name,
-                message=_sanitize_error(exc),
+                message=sanitize_error_message(exc),
             )
             yield ArenaEvent(
                 type="complete",

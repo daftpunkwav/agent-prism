@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import unicodedata
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -32,7 +33,11 @@ _INJECTION_PATTERN_RE = re.compile(
     r"you\s+are\s+now\s+|"
     r"disregard\s+|"
     r"override\s+(your\s+)?(system\s+)?(prompt|instructions?)|"
-    r"new\s+instructions?\s*:)"
+    r"new\s+instructions?\s*:|"
+    r"忽略\s*(以上|之前|先前)?\s*(所有)?\s*(指令|提示|规则)|"
+    r"你现在是|"
+    r"扮演|"
+    r"越狱)"
 )
 
 
@@ -57,6 +62,9 @@ _INJECTION_PATTERNS = [
     re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
     re.compile(r"<\|.*?\|>"),  # Anthropic/OpenAI 特殊 token
     re.compile(r"\[INST\]|\[/INST\]", re.IGNORECASE),  # Llama 风格
+    re.compile(r"忽略\s*(?:以上|之前|先前)?\s*(?:所有)?\s*(?:指令|提示|规则)"),
+    re.compile(r"你现在是"),
+    re.compile(r"越狱"),
 ]
 _MAX_ADDITION_CHARS = 1000
 
@@ -69,7 +77,8 @@ def _sanitize_prompt_additions(additions: list[str] | None) -> str:
     for raw in additions:
         if not isinstance(raw, str):
             continue
-        text = raw.strip()
+        # NFKC 归一化：折叠全角/兼容字符，降低同形字绕过
+        text = unicodedata.normalize("NFKC", raw).strip()
         if not text:
             continue
         # 剥离危险模式
@@ -86,7 +95,6 @@ def _sanitize_prompt_additions(additions: list[str] | None) -> str:
 
 def _sanitize_for_json(text: str) -> str:
     """清理 LLM 输出中可能的提示注入内容，保留有效 JSON。"""
-    # 移除 JSON 外的注入文本
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         return _strip_json_fence(match.group())
@@ -95,7 +103,8 @@ def _sanitize_for_json(text: str) -> str:
 
 def _detect_injection(text: str) -> bool:
     """检测文本中是否包含提示注入模式。"""
-    return bool(_INJECTION_PATTERN_RE.search(text))
+    normalized = unicodedata.normalize("NFKC", text)
+    return bool(_INJECTION_PATTERN_RE.search(normalized))
 
 
 # ===== 验证器 =====

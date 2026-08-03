@@ -16,6 +16,7 @@ from collections.abc import AsyncIterator
 from app.adapters.base import AdapterReservedError, FrameworkAdapterRegistry
 from app.adapters.langchain_adapter import LangChainAdapter
 from app.adapters.langgraph_adapter import LangGraphAdapter
+from app.arena.errors import sanitize_error_message
 from app.arena.router import DimensionRouter
 from app.models import ArenaEvent, ArenaRunRequest, PipelineConfig
 
@@ -121,7 +122,7 @@ class RunnerPool:
                 ArenaEvent(
                     type="error",
                     pipeline=cfg.label,
-                    message=type(exc).__name__,
+                    message=sanitize_error_message(exc),
                 )
             )
         finally:

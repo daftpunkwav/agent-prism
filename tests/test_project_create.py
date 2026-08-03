@@ -41,3 +41,38 @@ def test_list_projects_ok():
     res = client.get("/api/arena/projects")
     assert res.status_code == 200
     assert "projects" in res.json()
+
+
+def test_create_project_save_failure_returns_500(monkeypatch):
+    """落盘失败时 API 必须返回 500，不能假成功。"""
+    from app.arena import project as project_module
+    from app.arena.project import get_project_manager
+
+    mgr = get_workspace_mgr()
+    ws = "proj_ws_fail"
+    mgr.create(ws).write_file("x.txt", "X")
+
+    def _boom(*_a, **_k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(project_module, "_atomic_write_json", _boom)
+    # 重置单例，确保走被 monkeypatch 的路径
+    project_module.reset_project_manager_for_tests()
+    try:
+        res = client.post(
+            "/api/arena/projects",
+            json={
+                "name": "应失败",
+                "question": "q",
+                "dimension": "framework",
+                "pipeline_labels": ["A"],
+                "workspace_names": [ws],
+            },
+        )
+        assert res.status_code == 500
+        assert "保存失败" in res.json().get("detail", "")
+        # 内存也不应留下假项目
+        assert get_project_manager().get_project("dummy") is None
+    finally:
+        mgr.remove(ws)
+        project_module.reset_project_manager_for_tests()

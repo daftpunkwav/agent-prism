@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
+from app.arena.errors import sanitize_error_message
 from app.arena.harness import HarnessRunner
 from app.arena.llm import clear_pipeline_llm_overrides, set_pipeline_llm_overrides
 from app.arena.prompts import build_messages
@@ -32,11 +33,6 @@ _GRAPH_BUILDERS = {
     "tot": build_tot_graph,
     "reflexion": build_reflexion_graph,
 }
-
-
-def _sanitize_error(exc: Exception) -> str:
-    """脱敏异常消息，仅保留类型名。"""
-    return f"{type(exc).__name__}"
 
 
 class LangGraphAdapter:
@@ -231,7 +227,7 @@ class LangGraphAdapter:
                 type="error",
                 pipeline=label,
                 workspace=ws_name,
-                message=_sanitize_error(exc),
+                message=sanitize_error_message(exc),
             )
             yield ArenaEvent(
                 type="complete",

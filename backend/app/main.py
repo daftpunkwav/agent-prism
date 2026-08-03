@@ -20,6 +20,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 降低 HTTP 客户端噪音，避免 Authorization / API Key 进入 INFO 日志
+for _noisy in ("httpx", "httpcore", "openai", "urllib3", "anthropic"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
