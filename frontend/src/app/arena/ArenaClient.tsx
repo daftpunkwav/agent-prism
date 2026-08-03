@@ -130,7 +130,8 @@ function extractFinalAnswer(events: ArenaEvent[], turn?: number): string {
   let lastObs = "";
   for (const ev of events) {
     const evTurn = "turn" in ev ? (ev.turn ?? 0) : 0;
-    if (target > 0 && evTurn > 0 && evTurn !== target) continue;
+    // 指定轮次时必须严格匹配，避免 turn=0 / 其它轮污染答案
+    if (target > 0 && evTurn !== target) continue;
     if (ev.type === "thought" || ev.type === "thought_delta") {
       thought = (thought + (ev.content ?? "")).slice(-4000);
     } else if (ev.type === "observation") {
@@ -457,6 +458,8 @@ export function ArenaClient() {
   const awaitingHistoryCommit = useRef<{ turn: number; question: string } | null>(
     null,
   );
+  /** 当前正在跑的轮次（1-based），用于剥离/保留历史 Trace */
+  const currentTurnRef = useRef(0);
 
   // 活跃 workspace 名称：直接从后端返回的 col.workspace 读取（后端在 complete
   // / token_update 事件中带 workspace 字段），无需前端猜测后缀。
@@ -624,10 +627,27 @@ export function ArenaClient() {
 
   const handleEvent = useCallback((event: ArenaEvent) => {
     const label = event.pipeline;
-    // 路由/基线级错误：提到输入条，并清掉占位列，避免「空列 + 无反馈」
+    // 路由/基线级错误：提到输入条；保留已完成历史轮，仅剥离本轮
     if (event.type === "error" && (label === "system" || !label)) {
       setError(event.message || "运行错误");
-      setColumns({});
+      awaitingHistoryCommit.current = null;
+      const turn = currentTurnRef.current;
+      setColumns((prev) => {
+        const next: Record<string, ColumnState> = {};
+        for (const [key, col] of Object.entries(prev)) {
+          next[key] = {
+            ...col,
+            events: col.events.filter((e) => {
+              const t = "turn" in e ? (e.turn ?? 0) : 0;
+              return t > 0 && t < turn;
+            }),
+            metrics: undefined,
+            error: undefined,
+            judge: undefined,
+          };
+        }
+        return next;
+      });
       setRunning(false);
       return;
     }
@@ -663,6 +683,23 @@ export function ArenaClient() {
     if (ac && !ac.signal.aborted) {
       ac.abort();
     }
+    awaitingHistoryCommit.current = null;
+    const turn = currentTurnRef.current;
+    setColumns((prev) => {
+      const next: Record<string, ColumnState> = {};
+      for (const [key, col] of Object.entries(prev)) {
+        next[key] = {
+          ...col,
+          events: col.events.filter((e) => {
+            const t = "turn" in e ? (e.turn ?? 0) : 0;
+            return t > 0 && t < turn;
+          }),
+          metrics: col.metrics,
+          error: undefined,
+        };
+      }
+      return next;
+    });
     setRunning(false);
   }, []);
 
@@ -678,18 +715,23 @@ export function ArenaClient() {
     judgedRef.current = null; // 新运行需重新判分
     const q = question.trim();
     const turn = Math.floor(chatHistory.length / 2) + 1;
+    currentTurnRef.current = turn;
     awaitingHistoryCommit.current = { turn, question: q };
     const historySnapshot = chatHistory;
 
-    // 多轮：保留既往 turn 的 events，仅重置本轮 metrics
+    // 多轮：保留更早轮次；剥离本轮及以后（含失败重试残留）
     setColumns((prev) => {
       const next: Record<string, ColumnState> = {};
       for (const opt of activeDim?.options ?? []) {
         if (!activeSelections.includes(opt.value)) continue;
         const old = prev[opt.label];
+        const kept = (old?.events ?? []).filter((e) => {
+          const t = "turn" in e ? (e.turn ?? 0) : 0;
+          return t > 0 && t < turn;
+        });
         next[opt.label] = {
           label: opt.label,
-          events: old?.events ?? [],
+          events: kept,
           metrics: undefined,
           tokenStats: old?.tokenStats,
           workspace: old?.workspace,
@@ -714,7 +756,10 @@ export function ArenaClient() {
         historySnapshot,
       );
     } catch (err) {
-      if (isAbortError(err) || signal.aborted) return;
+      if (isAbortError(err) || signal.aborted) {
+        awaitingHistoryCommit.current = null;
+        return;
+      }
       console.error(err);
       setError(err instanceof Error ? err.message : String(err));
       awaitingHistoryCommit.current = null;

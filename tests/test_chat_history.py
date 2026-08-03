@@ -46,10 +46,18 @@ def test_arena_run_request_messages_ok():
     assert len(req.messages) == 2
 
 
+def test_arena_run_request_messages_must_pair():
+    with pytest.raises(ValidationError):
+        ArenaRunRequest(
+            question="继续",
+            messages=[ChatMessage(role="user", content="只有用户")],
+        )
+
+
 def test_arena_run_request_messages_total_cap():
     with pytest.raises(ValidationError):
         ArenaRunRequest(
-            question="x",
+            question="x" * 100,
             messages=[
                 ChatMessage(role="user", content="a" * 4000),
                 ChatMessage(role="assistant", content="b" * 4000),
@@ -57,6 +65,5 @@ def test_arena_run_request_messages_total_cap():
                 ChatMessage(role="assistant", content="d" * 4000),
                 ChatMessage(role="user", content="e" * 4000),
                 ChatMessage(role="assistant", content="f" * 4000),
-                ChatMessage(role="user", content="g"),
             ],
         )

@@ -103,10 +103,19 @@ class ArenaRunRequest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_history(self) -> ArenaRunRequest:
-        """限制历史总长，避免撑爆上下文窗口。"""
-        total = sum(len(m.content) for m in self.messages)
+        """限制历史总长，并要求 user/assistant 交替成对。"""
+        msgs = self.messages
+        if len(msgs) % 2 != 0:
+            raise ValueError("对话历史须成对（user/assistant），条数须为偶数")
+        for i, m in enumerate(msgs):
+            expect = "user" if i % 2 == 0 else "assistant"
+            if m.role != expect:
+                raise ValueError(
+                    f"对话历史第 {i + 1} 条应为 {expect}，实际为 {m.role}"
+                )
+        total = sum(len(m.content) for m in msgs) + len(self.question)
         if total > 24_000:
-            raise ValueError("对话历史总长度超过上限（24000 字符）")
+            raise ValueError("对话历史与本轮问题合计超过上限（24000 字符）")
         return self
 
 

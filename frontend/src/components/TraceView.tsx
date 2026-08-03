@@ -194,14 +194,26 @@ export function TraceView({
       style={{ ["--lane" as string]: accentColor }}
     >
       {multiTurn
-        ? turns.map((t) => (
-            <div key={`turn-${t}`} className="trace-turn">
-              <div className="trace-turn-label">第 {t} 轮</div>
-              {segments
-                .filter((s) => s.turn === t)
-                .map((seg) => renderSegment(seg, accentColor))}
-            </div>
-          ))
+        ? (
+            <>
+              {turns.map((t) => (
+                <div key={`turn-${t}`} className="trace-turn">
+                  <div className="trace-turn-label">第 {t} 轮</div>
+                  {segments
+                    .filter((s) => s.turn === t)
+                    .map((seg) => renderSegment(seg, accentColor))}
+                </div>
+              ))}
+              {segments.some((s) => s.turn === 0) && (
+                <div className="trace-turn">
+                  <div className="trace-turn-label">未标注轮次</div>
+                  {segments
+                    .filter((s) => s.turn === 0)
+                    .map((seg) => renderSegment(seg, accentColor))}
+                </div>
+              )}
+            </>
+          )
         : segments.map((seg) => renderSegment(seg, accentColor))}
 
       {running && segments.length === 0 && (

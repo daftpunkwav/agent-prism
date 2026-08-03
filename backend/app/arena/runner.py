@@ -18,7 +18,7 @@ from app.adapters.langchain_adapter import LangChainAdapter
 from app.adapters.langgraph_adapter import LangGraphAdapter
 from app.arena.errors import sanitize_error_message
 from app.arena.router import DimensionRouter, sync_framework_options_from_registry, sync_model_options_from_provider
-from app.models import ArenaEvent, ArenaRunRequest, PipelineConfig
+from app.models import ArenaEvent, ArenaRunRequest, PipelineConfig, PipelineMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -125,21 +125,41 @@ class RunnerPool:
             # 客户端断开 — 让上层统一取消
             raise
         except AdapterReservedError as exc:
+            turn = (len(request.messages) // 2) + 1
             await queue.put(
                 ArenaEvent(
                     type="error",
                     pipeline=cfg.label,
                     message=f"框架「{exc.framework_id}」尚未实现",
+                    turn=turn,
+                )
+            )
+            await queue.put(
+                ArenaEvent(
+                    type="complete",
+                    pipeline=cfg.label,
+                    turn=turn,
+                    metrics=PipelineMetrics(success=False, duration_ms=0),
                 )
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("Pipeline %s 失败", cfg.label)
+            turn = (len(request.messages) // 2) + 1
             # 仅暴露异常类型名，避免泄露 provider 内部细节（如 API key、endpoint）
             await queue.put(
                 ArenaEvent(
                     type="error",
                     pipeline=cfg.label,
                     message=sanitize_error_message(exc),
+                    turn=turn,
+                )
+            )
+            await queue.put(
+                ArenaEvent(
+                    type="complete",
+                    pipeline=cfg.label,
+                    turn=turn,
+                    metrics=PipelineMetrics(success=False, duration_ms=0),
                 )
             )
         finally:
