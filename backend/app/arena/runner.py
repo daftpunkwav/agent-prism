@@ -111,7 +111,15 @@ class RunnerPool:
         queue: asyncio.Queue[ArenaEvent | None],
     ) -> None:
         try:
-            async for event in self.registry.get(cfg.framework).run(request.question, cfg):
+            async for event in self.registry.get(cfg.framework).run(
+                request.question,
+                cfg,
+                history=list(request.messages),
+            ):
+                # 轮次由前端维护；后端按「历史条数」派生 1-based turn 便于 Trace 对齐
+                turn = (len(request.messages) // 2) + 1
+                if event.turn == 0:
+                    event = event.model_copy(update={"turn": turn})
                 await queue.put(event)
         except asyncio.CancelledError:
             # 客户端断开 — 让上层统一取消

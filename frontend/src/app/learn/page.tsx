@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, Compass, Flag, Lightbulb, Route } from "lucide-react";
 
-/** 6 周学习路径（PRD §2.5 内容设计落地）。每步关联具体 Arena 实验。 */
+/** 8 周学习路径。每步关联具体 Arena 实验，含多轮对话与解码/工具维。 */
 const WEEK_PLAN = [
   {
     week: 1,
@@ -12,7 +12,7 @@ const WEEK_PLAN = [
     items: [
       "跑一次框架对比：同一问题、同一 Prompt、同一工具集",
       "观察两列的 Thought / Action / Observation 流式输出",
-      "读对比报告：耗时、Token、工具调用次数硬指标",
+      "读对比报告：耗时、Token、工具调用次数等硬指标",
     ],
     dimension: "framework",
     href: "/arena?dimension=framework&template=fibonacci_code",
@@ -43,18 +43,30 @@ const WEEK_PLAN = [
   },
   {
     week: 4,
+    title: "多轮对话",
+    goal: "掌握共享 messages 历史与按轮次分段对比",
+    items: [
+      "在同一组对比列上连续追问 2–3 轮：各列共享历史，仅 question 变化",
+      "观察 Trace 按 turn 折叠：每轮 Thought / Action 是否独立分段",
+      "对比不同列在多轮中的「记忆一致性」：是否引用前轮结论",
+    ],
+    dimension: "context",
+    href: "/arena?dimension=context&template=arithmetic_mix",
+  },
+  {
+    week: 5,
     title: "上下文工程",
     goal: "理解滑动窗口 / 摘要 / 向量 / 混合四种 Memory 策略",
     items: [
+      "在多轮基础上对比 sliding 与 summary：早期轮次信息是否被保留",
       "使用「距离午夜分钟数」模板（需调用工具多轮）",
-      "对比滑动窗口与向量检索在处理工具结果时的差异",
-      "观察工作空间面板中 Agent 写下的文件",
+      "观察工作空间面板中 Agent 写下的文件，配合 vector 策略检索",
     ],
     dimension: "context",
     href: "/arena?dimension=context&template=time_until_midnight",
   },
   {
-    week: 5,
+    week: 6,
     title: "Harness 工程",
     goal: "体验裸运行 → 验证 → 反思 → 自进化的演进",
     items: [
@@ -66,17 +78,29 @@ const WEEK_PLAN = [
     href: "/arena?dimension=harness&template=no_refusal",
   },
   {
-    week: 6,
-    title: "综合实战",
-    goal: "独立完成实验报告",
+    week: 7,
+    title: "解码与模型",
+    goal: "隔离温度、思考强度与接入点对输出质量的影响",
     items: [
-      "自定义一个任务（或从任务模板库中自选）",
-      "调整对比维度与基线参数，复跑 2 次以上",
-      "对比 Trace、阅读自动判分，形成自己的结论",
+      "对比 temperature 0 vs 0.7：同一任务跑两次，观察稳定性与创造性",
+      "若 Settings 配置了多个接入点，对比 model 维；基线钉死温度与思考档位",
+      "对支持思考的模型，对比 thinking off vs medium，观察 thinking 事件流",
+    ],
+    dimension: "temperature",
+    href: "/arena?dimension=temperature&template=builtin_types",
+  },
+  {
+    week: 8,
+    title: "工具与步数 · 综合实战",
+    goal: "控制工具可用性与循环深度，独立完成实验报告",
+    items: [
+      "对比 toolset full vs calc_time：观察工具受限时 Agent 如何降级",
+      "对比 max_steps 5 vs 15：复杂任务是否在步数上限前给出答案",
+      "自定义任务或多轮追问，复跑 2 次以上，按轮阅读 TraceDiff 与判分",
       "把结果保存为项目，形成实验档案",
     ],
-    dimension: "framework",
-    href: "/arena",
+    dimension: "toolset",
+    href: "/arena?dimension=toolset&template=quick_files",
   },
 ];
 
@@ -87,8 +111,8 @@ export default function LearnPage() {
         <p className="eyebrow mb-2">LEARNING PATH</p>
         <h1 className="page-title">学习路径</h1>
         <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
-          六周循序渐进，从「看懂框架差异」到「独立完成实验报告」。
-          每一步都对应 Arena 里的真实对比实验，跟着走就能建立体感。
+          八周循序渐进：从「看懂框架差异」到「多轮对话按轮对比」，再到温度 / 模型 / 思考强度 / 工具集等解码与能力维，
+          最后独立完成实验报告。每一步都对应 Arena 里的真实对比实验。
         </p>
       </div>
 
@@ -150,13 +174,13 @@ export default function LearnPage() {
             <p className="text-sm font-medium">进阶方向</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               任务模板库的「可自动判分」徽章表示该任务有客观通过标准（JSON 可解析、代码可执行、数字匹配…），
-              适合检验 Prompt / 推理 / Harness 的改进是否真的有效。
+              适合检验 Prompt / 推理 / Harness 的改进是否真的有效。多轮实验请保持每轮基线一致，按 turn 阅读 Trace 与报告。
             </p>
           </div>
         </div>
-        <Link href="/arena" className="btn-ghost shrink-0">
+        <Link href="/guide" className="btn-ghost shrink-0">
           <Lightbulb className="h-4 w-4" />
-          打开 Arena
+          维度说明
         </Link>
       </section>
     </div>

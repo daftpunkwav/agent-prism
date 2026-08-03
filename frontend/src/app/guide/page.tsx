@@ -5,9 +5,11 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { ArrowRight, FlaskConical, ShieldAlert } from "lucide-react";
 import {
   BASELINE_RULES,
+  COMPARE_FORMS,
   DIMENSIONS,
   FIELD_MATRIX,
   HONESTY,
+  MULTI_TURN_DOC,
   PIPELINE_STAGES,
   REALITY_LABEL,
   TOC_GROUPS,
@@ -187,8 +189,8 @@ export default function GuidePage() {
             <p className="eyebrow">OPTICAL BENCH · REFERENCE</p>
             <h1 className="page-title">维度与基线说明</h1>
             <p className="guide-hero-lead">
-              控制变量法的结构化参考：字段如何映射、基线如何锁定、九个对比维在
-              LangChain / LangGraph 上是否真实生效。
+              控制变量法的结构化参考：字段如何映射、基线如何锁定、十个对比维在
+              LangChain / LangGraph 上是否真实生效，以及多轮对话如何按轮次分段对比。
             </p>
             <div className="guide-hero-actions">
               <Link href="/arena" className="btn-primary">
@@ -217,7 +219,8 @@ export default function GuidePage() {
             <ul className="guide-hero-tags">
               <li>管线 · 解码 · 接入点</li>
               <li>基线锁定当前对比维</li>
-              <li>真实生效 / 框架相关</li>
+              <li>多轮共享 messages 历史</li>
+              <li>Trace 按 turn 分段对比</li>
             </ul>
           </aside>
         </div>
@@ -290,11 +293,57 @@ export default function GuidePage() {
             </section>
           </Reveal>
 
+          <Reveal delay={20}>
+            <section id="multi-turn" className="guide-section">
+              <div className="guide-section-rail" aria-hidden />
+              <h2>{MULTI_TURN_DOC.title}与按轮对比</h2>
+              <p>{MULTI_TURN_DOC.summary}</p>
+
+              <div className="guide-block">
+                <h3>运行机制</h3>
+                <ol className="guide-path-list">
+                  {MULTI_TURN_DOC.mechanics.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ol>
+              </div>
+
+              <div className="guide-block">
+                <h3>约束与边界</h3>
+                <ul className="guide-code-list">
+                  {MULTI_TURN_DOC.limits.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="guide-rule-grid">
+                {COMPARE_FORMS.map((row, i) => (
+                  <article key={row.title} className="guide-rule-card" data-lane={i % 5}>
+                    <h3>{row.title}</h3>
+                    <p>{row.body}</p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="guide-block">
+                <h3>代码入口</h3>
+                <ul className="guide-code-list">
+                  {MULTI_TURN_DOC.modules.map((m) => (
+                    <li key={m}>
+                      <code>{m}</code>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          </Reveal>
+
           <Reveal delay={40}>
             <section id="field-matrix" className="guide-section">
               <div className="guide-section-rail" aria-hidden />
               <h2>字段总表</h2>
-              <p>九个对比维与 PipelineConfig 字段一一对应；也可全部出现在基线面板中。</p>
+              <p>十个对比维与 PipelineConfig 字段一一对应；也可全部出现在基线面板中。多轮历史走 ArenaRunRequest.messages，不属于对比维。</p>
               <div className="guide-ledger" role="table" aria-label="字段总表">
                 <div className="guide-ledger-head" role="row">
                   <span role="columnheader">维度</span>

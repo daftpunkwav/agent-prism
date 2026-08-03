@@ -20,9 +20,30 @@ from app.arena.stream_utils import extract_chunk_parts
 from app.arena.token_utils import TokenTracker, extract_usage
 from app.arena.tools import set_active_toolset
 from app.arena.workspace import get_workspace_mgr, set_current_workspace
-from app.models import ArenaEvent, PipelineConfig
+from app.models import ArenaEvent, ChatMessage, PipelineConfig
 
 logger = logging.getLogger(__name__)
+
+
+def build_initial_lc_messages(
+    system: str,
+    user: str,
+    history: list[ChatMessage] | None = None,
+) -> list:
+    """System + 共享历史 + 本轮 user，供两 adapter 共用。"""
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+    msgs: list = [SystemMessage(content=system)]
+    for m in history or []:
+        text = (m.content or "").strip()
+        if not text:
+            continue
+        if m.role == "assistant":
+            msgs.append(AIMessage(content=text))
+        else:
+            msgs.append(HumanMessage(content=text))
+    msgs.append(HumanMessage(content=user))
+    return msgs
 
 
 @dataclass

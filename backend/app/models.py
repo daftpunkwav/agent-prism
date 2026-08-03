@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -25,6 +25,7 @@ __all__ = [
     "EventType",
     "PipelineConfig",
     "BaselineOverrides",
+    "ChatMessage",
     "ArenaRunRequest",
     "PipelineMetrics",
     "ArenaEvent",
@@ -82,6 +83,13 @@ class BaselineOverrides(BaseModel):
     toolset: ToolsetId | None = None
 
 
+class ChatMessage(BaseModel):
+    """多轮对话中的一条历史消息（不含本轮 question）。"""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ArenaRunRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     dimension: DimensionId = "framework"
@@ -90,6 +98,16 @@ class ArenaRunRequest(BaseModel):
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     # 非对比维的基线覆盖（如框架对比时改用 tot 推理）
     baseline: BaselineOverrides | None = None
+    # 共享对话历史（各列同一上下文）；仅含本轮之前的 user/assistant
+    messages: list[ChatMessage] = Field(default_factory=list, max_length=24)
+
+    @model_validator(mode="after")
+    def _validate_history(self) -> ArenaRunRequest:
+        """限制历史总长，避免撑爆上下文窗口。"""
+        total = sum(len(m.content) for m in self.messages)
+        if total > 24_000:
+            raise ValueError("对话历史总长度超过上限（24000 字符）")
+        return self
 
 
 class PipelineMetrics(BaseModel):
@@ -123,6 +141,8 @@ class ArenaEvent(BaseModel):
     metrics: PipelineMetrics | None = None
     message: str = ""
     token_stats: dict[str, int | float] | None = None
+    # 多轮对话轮次（1-based）；0 表示单轮/未标注
+    turn: int = Field(default=0, ge=0, le=64)
 
 
 class LlmEndpointPublic(BaseModel):

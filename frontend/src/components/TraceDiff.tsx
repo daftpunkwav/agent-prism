@@ -10,13 +10,14 @@ interface TraceDiffProps {
 
 interface AlignedRow {
   step: number;
+  turn: number;
   type: string;
   contents: Record<string, string>;
   differences: Set<string>;
 }
 
 function alignTraces(columns: Array<{ label: string; events: ArenaEvent[] }>): AlignedRow[] {
-  /** 按 step 对齐各列的事件。先合并 thought_delta 为完整文本。*/
+  /** 按 turn:step 对齐各列事件（2C 按轮对比）。先合并 thought_delta。*/
   const rows: Map<number, AlignedRow> = new Map();
   const labels = columns.map((c) => c.label);
 
@@ -26,12 +27,15 @@ function alignTraces(columns: Array<{ label: string; events: ArenaEvent[] }>): A
     for (const ev of col.events) {
       if (ev.type === "thought_delta") {
         const step = ev.step ?? 0;
-        thoughtByStep.set(step, (thoughtByStep.get(step) || "") + (ev.content || ""));
+        const turn = ev.turn ?? 0;
+        const ak = turn * 10000 + step;
+        thoughtByStep.set(ak, (thoughtByStep.get(ak) || "") + (ev.content || ""));
       } else if (ev.type === "thought" && ev.content) {
         const step = ev.step ?? 0;
-        // 完整 thought 优先覆盖（若无 delta）
-        if (!thoughtByStep.has(step)) {
-          thoughtByStep.set(step, ev.content);
+        const turn = ev.turn ?? 0;
+        const ak = turn * 10000 + step;
+        if (!thoughtByStep.has(ak)) {
+          thoughtByStep.set(ak, ev.content);
         }
       }
     }
@@ -46,43 +50,45 @@ function alignTraces(columns: Array<{ label: string; events: ArenaEvent[] }>): A
       ) {
         continue;
       }
-      // 判别联合：thinking 事件无 step 字段
       const step = "step" in ev ? (ev.step ?? 0) : 0;
+      const turn = "turn" in ev ? (ev.turn ?? 0) : 0;
+      const ak = turn * 10000 + step;
 
-      // thought_delta：每个 step 只写一次合并后的全文
       if (ev.type === "thought_delta") {
-        if (seenThoughtSteps.has(step)) continue;
-        seenThoughtSteps.add(step);
-        const text = thoughtByStep.get(step) || "";
-        if (!rows.has(step)) {
-          rows.set(step, {
+        if (seenThoughtSteps.has(ak)) continue;
+        seenThoughtSteps.add(ak);
+        const text = thoughtByStep.get(ak) || "";
+        if (!rows.has(ak)) {
+          rows.set(ak, {
             step,
+            turn,
             type: "thought",
             contents: {},
             differences: new Set(),
           });
         }
-        const row = rows.get(step)!;
+        const row = rows.get(ak)!;
         row.contents[col.label] = text;
         if (row.type !== "thought") row.differences.add("type");
         continue;
       }
 
       if (ev.type === "thought") {
-        if (seenThoughtSteps.has(step)) continue;
-        seenThoughtSteps.add(step);
+        if (seenThoughtSteps.has(ak)) continue;
+        seenThoughtSteps.add(ak);
       }
 
       const text = getEventText(ev);
-      if (!rows.has(step)) {
-        rows.set(step, {
+      if (!rows.has(ak)) {
+        rows.set(ak, {
           step,
+          turn,
           type: ev.type === "thought" ? "thought" : ev.type,
           contents: {},
           differences: new Set(),
         });
       }
-      const row = rows.get(step)!;
+      const row = rows.get(ak)!;
       row.contents[col.label] = text;
       // 类型不一致视为差异
       if (row.type !== (ev.type === "thought" ? "thought" : ev.type)) {
@@ -92,7 +98,9 @@ function alignTraces(columns: Array<{ label: string; events: ArenaEvent[] }>): A
   }
 
   // 检测差异：相同 step 但内容不同
-  const sortedRows = Array.from(rows.values()).sort((a, b) => a.step - b.step);
+  const sortedRows = Array.from(rows.values()).sort(
+    (a, b) => a.turn - b.turn || a.step - b.step,
+  );
   for (const row of sortedRows) {
     const texts = labels.map((l) => row.contents[l] || "").filter(Boolean);
     if (texts.length >= 2) {
@@ -136,7 +144,7 @@ export function TraceDiff({ columns }: TraceDiffProps) {
   const alignedRows = useMemo(() => alignTraces(columns), [columns]);
   const labels = columns.map((c) => c.label);
   const diffCount = alignedRows.filter((r) => r.differences.size > 0).length;
-  // 展开的长文本集合：key = `${row.step}:${label}`
+  // 展开的长文本集合：key = `${row.turn}:${row.step}:${label}`
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // 文本截断阈值（PROGRESS §4.2.7：长 thought 需要展开交互）
   const TRUNCATE_AT = 300;
@@ -195,8 +203,11 @@ export function TraceDiff({ columns }: TraceDiffProps) {
           </thead>
           <tbody>
             {alignedRows.map((row) => (
-              <tr key={row.step} className="hover:bg-muted/20">
-                <td className="font-mono text-muted-foreground align-top">{row.step}</td>
+              <tr key={`${row.turn}-${row.step}-${row.type}`} className="hover:bg-muted/20">
+                <td className="font-mono text-muted-foreground align-top whitespace-nowrap">
+                  {row.turn > 0 ? `T${row.turn}.` : ""}
+                  {row.step}
+                </td>
                 <td className="text-muted-foreground align-top">
                   <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider">
                     {getTypeIcon(row.type)}
@@ -206,7 +217,7 @@ export function TraceDiff({ columns }: TraceDiffProps) {
                 {labels.map((label) => {
                   const text = row.contents[label] ?? "";
                   const isDiff = row.differences.has(label);
-                  const cellKey = `${row.step}:${label}`;
+                  const cellKey = `${row.turn}:${row.step}:${label}`;
                   const isExpanded = expanded.has(cellKey);
                   const needsTruncate = text.length > TRUNCATE_AT;
                   return (

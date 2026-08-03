@@ -127,30 +127,72 @@ export interface TokenStats {
   input_usage_pct: number;
 }
 
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 /**
  * SSE 事件判别联合（discriminated union by `type`）。
  *
  * 每种事件类型只携带它真正用到的字段；新增字段时编译器会强制处理所有分支。
+ * ``turn`` 为多轮对话轮次（1-based）；缺省/0 表示单轮。
  */
 export type ArenaEvent =
-  | { type: "thought"; pipeline: string; content?: string; step?: number }
-  | { type: "thought_delta"; pipeline: string; content: string; step?: number }
-  | { type: "thought_end"; pipeline: string; content?: string; step?: number }
-  | { type: "action"; pipeline: string; tool: string; args?: Record<string, unknown>; step?: number }
-  | { type: "observation"; pipeline: string; result: string; step?: number }
-  | { type: "verify"; pipeline: string; passed?: boolean; content?: string; reason?: string; step?: number }
-  | { type: "reflect"; pipeline: string; content?: string; reason?: string; step?: number }
-  | { type: "harness_edit"; pipeline: string; content?: string; reason?: string; step?: number }
+  | { type: "thought"; pipeline: string; content?: string; step?: number; turn?: number }
+  | { type: "thought_delta"; pipeline: string; content: string; step?: number; turn?: number }
+  | { type: "thought_end"; pipeline: string; content?: string; step?: number; turn?: number }
+  | {
+      type: "action";
+      pipeline: string;
+      tool: string;
+      args?: Record<string, unknown>;
+      step?: number;
+      turn?: number;
+    }
+  | { type: "observation"; pipeline: string; result: string; step?: number; turn?: number }
+  | {
+      type: "verify";
+      pipeline: string;
+      passed?: boolean;
+      content?: string;
+      reason?: string;
+      step?: number;
+      turn?: number;
+    }
+  | {
+      type: "reflect";
+      pipeline: string;
+      content?: string;
+      reason?: string;
+      step?: number;
+      turn?: number;
+    }
+  | {
+      type: "harness_edit";
+      pipeline: string;
+      content?: string;
+      reason?: string;
+      step?: number;
+      turn?: number;
+    }
   | {
       type: "complete";
       pipeline: string;
       metrics?: PipelineMetrics;
       token_stats?: TokenStats;
       workspace?: string;
+      turn?: number;
     }
-  | { type: "error"; pipeline: string; message?: string }
-  | { type: "token_update"; pipeline: string; token_stats: TokenStats; workspace?: string }
-  | { type: "thinking"; pipeline: string; content?: string };
+  | { type: "error"; pipeline: string; message?: string; turn?: number }
+  | {
+      type: "token_update";
+      pipeline: string;
+      token_stats: TokenStats;
+      workspace?: string;
+      turn?: number;
+    }
+  | { type: "thinking"; pipeline: string; content?: string; step?: number; turn?: number };
 
 export interface PipelineMetrics {
   success: boolean;
@@ -262,6 +304,7 @@ export async function streamArenaRun(
   selections?: string[],
   baseline?: BaselineOverrides,
   onParseError?: (raw: string, err: Error) => void,
+  messages?: ChatMessage[],
 ): Promise<void> {
   let res: Response;
   try {
@@ -272,6 +315,9 @@ export async function streamArenaRun(
     };
     if (baseline && Object.keys(baseline).length > 0) {
       body.baseline = baseline;
+    }
+    if (messages && messages.length > 0) {
+      body.messages = messages;
     }
     res = await fetch(`${API_BASE}/api/arena/run`, {
       method: "POST",

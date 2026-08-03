@@ -6,13 +6,12 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-from langchain.agents import create_agent
-from langchain.agents.middleware.types import AgentMiddleware
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import SystemMessage, ToolMessage
 
 from app.adapters._common_run import (
     RunState,
     begin_pipeline,
+    build_initial_lc_messages,
     create_run_workspace,
     emit_harness_event,
     emit_stream_event,
@@ -29,7 +28,7 @@ from app.arena.llm import (
 from app.arena.message_sanitize import sanitize_messages_for_model, with_tool_grounding
 from app.arena.tools import clear_active_toolset, get_active_tools
 from app.arena.workspace import clear_current_workspace
-from app.models import ArenaEvent, PipelineConfig
+from app.models import ArenaEvent, ChatMessage, PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +132,13 @@ class LangChainAdapter:
     framework_id = "langchain"
     display_name = "LangChain"
 
-    async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
+    async def run(
+        self,
+        question: str,
+        config: PipelineConfig,
+        *,
+        history: list[ChatMessage] | None = None,
+    ) -> AsyncIterator[ArenaEvent]:
         label = config.label or self.display_name
         state = RunState.for_pipeline(label, config)
         # workspace 创建在 try 外（失败直接抛给 runner 收敛，与原实现一致）
@@ -149,6 +154,7 @@ class LangChainAdapter:
                 if config.reasoning == "react"
                 else "推理=仅 Prompt（create_agent 骨架仍为 Tool Calling）"
             )
+            hist_n = len(history or [])
             yield ArenaEvent(
                 type="thought",
                 pipeline=label,
@@ -158,6 +164,7 @@ class LangChainAdapter:
                     f"context={config.context}(真实裁剪) · harness={config.harness} · "
                     f"temp={config.temperature} · model={config.model_id} · "
                     f"max_steps={config.max_steps} · toolset={config.toolset} · {reasoning_note}"
+                    + (f" · history={hist_n}" if hist_n else "")
                 ),
             )
 
@@ -177,7 +184,7 @@ class LangChainAdapter:
                 middleware=[_ArenaContextMiddleware(config.context, question=question)],
             ).with_config({"recursion_limit": max(25, int(config.max_steps) * 4)})
             initial_state: dict[str, Any] = {
-                "messages": [SystemMessage(content=system), HumanMessage(content=user)],
+                "messages": build_initial_lc_messages(system, user, history),
             }
 
             harness_runner = HarnessRunner(level=config.harness)

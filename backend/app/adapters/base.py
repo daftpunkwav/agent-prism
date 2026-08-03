@@ -22,7 +22,7 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Protocol, runtime_checkable
 
-from app.models import ArenaEvent, PipelineConfig
+from app.models import ArenaEvent, ChatMessage, PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,16 @@ class FrameworkAdapter(Protocol):
     framework_id: str
     display_name: str
 
-    async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
+    async def run(
+        self,
+        question: str,
+        config: PipelineConfig,
+        *,
+        history: list[ChatMessage] | None = None,
+    ) -> AsyncIterator[ArenaEvent]:
         """流式运行并产出 ArenaEvent。
 
+        ``history`` 为共享对话历史（不含本轮 question），各列相同。
         实现者必须用 ``async def`` 配合 ``yield ArenaEvent(...)``。
         此处的 ``if False: yield`` 仅为让 mypy 将本 Protocol 方法识别为
         async generator（Protocol 体无 yield 会被误判为普通 coroutine，

@@ -29,6 +29,7 @@ import {
   ArenaEvent,
   ArenaMeta,
   BaselineOverrides,
+  ChatMessage,
   DimensionId,
   DimensionOption,
   JudgeResult,
@@ -115,14 +116,21 @@ function metricsToTokenStats(m: PipelineMetrics): TokenStats {
 }
 
 /**
- * 从列事件中提取"最终答案"用于自动判分：
- * 累积所有 thought / thought_delta 内容（取最后 4000 字符），
- * 若无 thought 则回退到最后一条 observation 的 result。
+ * 从列事件中提取"最终答案"用于自动判分 / 续聊历史：
+ * 默认取最后一轮；可指定 turn。
+ * 累积 thought / thought_delta（取最后 4000 字符），
+ * 若无 thought 则回退到最后一条 observation。
  */
-function extractFinalAnswer(events: ArenaEvent[]): string {
+function extractFinalAnswer(events: ArenaEvent[], turn?: number): string {
+  const target =
+    turn != null
+      ? turn
+      : Math.max(0, ...events.map((e) => ("turn" in e ? (e.turn ?? 0) : 0)));
   let thought = "";
   let lastObs = "";
   for (const ev of events) {
+    const evTurn = "turn" in ev ? (ev.turn ?? 0) : 0;
+    if (target > 0 && evTurn > 0 && evTurn !== target) continue;
     if (ev.type === "thought" || ev.type === "thought_delta") {
       thought = (thought + (ev.content ?? "")).slice(-4000);
     } else if (ev.type === "observation") {
@@ -309,12 +317,16 @@ function ColumnCard({
   showStop,
   onStop,
   lane,
+  isHistorySeed,
+  onUseAsSeed,
 }: {
   col: ColumnState;
   running: boolean;
   showStop: boolean;
   onStop: () => void;
   lane: number;
+  isHistorySeed?: boolean;
+  onUseAsSeed?: () => void;
 }) {
   return (
     <div className="column-card h-full min-h-0 flex flex-col" data-lane={lane % 4}>
@@ -330,6 +342,11 @@ function ColumnCard({
               }
             />
             <span className="font-semibold text-sm truncate">{col.label}</span>
+            {isHistorySeed && (
+              <span className="arena-seed-badge" title="续聊历史采用本列回复">
+                续聊种子
+              </span>
+            )}
             {col.metrics && (
               <span className="font-mono text-[10px] text-muted-foreground shrink-0">
                 {col.metrics.success ? "OK" : "FAIL"} · {col.metrics.duration_ms}ms
@@ -342,16 +359,28 @@ function ColumnCard({
             </div>
           )}
         </div>
-        {showStop && (
-          <button
-            type="button"
-            className="btn-ghost !h-7 !px-2 text-[10px] shrink-0"
-            onClick={onStop}
-          >
-            <Square className="h-3 w-3" />
-            停止
-          </button>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {onUseAsSeed && col.metrics && !isHistorySeed && (
+            <button
+              type="button"
+              className="btn-ghost !h-7 !px-2 text-[10px]"
+              onClick={onUseAsSeed}
+              title="续聊时采用本列回复写入共享历史"
+            >
+              用作续聊
+            </button>
+          )}
+          {showStop && (
+            <button
+              type="button"
+              className="btn-ghost !h-7 !px-2 text-[10px]"
+              onClick={onStop}
+            >
+              <Square className="h-3 w-3" />
+              停止
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <TraceView events={col.events} running={running && !col.metrics} colorIndex={lane} />
@@ -421,6 +450,13 @@ export function ArenaClient() {
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
   const [judging, setJudging] = useState(false);
+  /** 1A：各列共享的对话历史（不含本轮 question） */
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  /** 续聊时采用哪一列的回复写入历史 */
+  const [historySeedLabel, setHistorySeedLabel] = useState<string | null>(null);
+  const awaitingHistoryCommit = useRef<{ turn: number; question: string } | null>(
+    null,
+  );
 
   // 活跃 workspace 名称：直接从后端返回的 col.workspace 读取（后端在 complete
   // / token_update 事件中带 workspace 字段），无需前端猜测后缀。
@@ -640,37 +676,69 @@ export function ArenaClient() {
     setRunning(true);
     setMainTab("results");
     judgedRef.current = null; // 新运行需重新判分
-    const placeholderCols: Record<string, ColumnState> = {};
-    for (const opt of activeDim?.options ?? []) {
-      if (activeSelections.includes(opt.value)) {
-        placeholderCols[opt.label] = { label: opt.label, events: [] };
+    const q = question.trim();
+    const turn = Math.floor(chatHistory.length / 2) + 1;
+    awaitingHistoryCommit.current = { turn, question: q };
+    const historySnapshot = chatHistory;
+
+    // 多轮：保留既往 turn 的 events，仅重置本轮 metrics
+    setColumns((prev) => {
+      const next: Record<string, ColumnState> = {};
+      for (const opt of activeDim?.options ?? []) {
+        if (!activeSelections.includes(opt.value)) continue;
+        const old = prev[opt.label];
+        next[opt.label] = {
+          label: opt.label,
+          events: old?.events ?? [],
+          metrics: undefined,
+          tokenStats: old?.tokenStats,
+          workspace: old?.workspace,
+          error: undefined,
+          judge: undefined,
+        };
       }
-    }
-    setColumns(placeholderCols);
+      return next;
+    });
     abortRef.current = new AbortController();
 
     const signal = abortRef.current.signal;
     try {
       await streamArenaRun(
-        question,
+        q,
         dimension,
         handleEvent,
         signal,
         activeSelections,
         baselinePayload,
+        undefined,
+        historySnapshot,
       );
     } catch (err) {
       if (isAbortError(err) || signal.aborted) return;
       console.error(err);
       setError(err instanceof Error ? err.message : String(err));
+      awaitingHistoryCommit.current = null;
     } finally {
       setRunning(false);
     }
   };
 
+  const clearConversation = useCallback(() => {
+    if (running) return;
+    setChatHistory([]);
+    setColumns({});
+    setHistorySeedLabel(null);
+    awaitingHistoryCommit.current = null;
+    setError(null);
+    setQuestion("");
+  }, [running]);
+
   useEffect(() => {
     setSelections([]);
     setColumns({});
+    setChatHistory([]);
+    setHistorySeedLabel(null);
+    awaitingHistoryCommit.current = null;
     setError(null);
     setMainTab("results");
     setProjectName("");
@@ -681,6 +749,24 @@ export function ArenaClient() {
 
   const hasMetrics = columnList.some((c) => c.metrics);
   const allCompleted = columnList.length >= 2 && columnList.every((c) => c.metrics);
+
+  // 本轮全部完成后：把 user + 种子列 assistant 写入共享历史
+  useEffect(() => {
+    const pending = awaitingHistoryCommit.current;
+    if (!pending || running || !allCompleted) return;
+    awaitingHistoryCommit.current = null;
+    const seed =
+      (historySeedLabel && columns[historySeedLabel]) || columnList[0];
+    if (!seed) return;
+    const answer = extractFinalAnswer(seed.events, pending.turn).slice(0, 4000);
+    setChatHistory((h) => [
+      ...h,
+      { role: "user", content: pending.question },
+      { role: "assistant", content: answer || "（无文本回复）" },
+    ]);
+    if (!historySeedLabel) setHistorySeedLabel(seed.label);
+    setQuestion("");
+  }, [running, allCompleted, columns, columnList, historySeedLabel]);
 
   const saveAsProject = useCallback(async () => {
     if (!allCompleted || savingProject) return;
@@ -740,6 +826,8 @@ export function ArenaClient() {
                 showStop={running && !col.metrics}
                 onStop={cancelRun}
                 lane={idx}
+                isHistorySeed={historySeedLabel === col.label}
+                onUseAsSeed={() => setHistorySeedLabel(col.label)}
               />
             ) : (
               <ColumnPlaceholder key={opt.value} name={opt.label} lane={idx} />
@@ -767,6 +855,8 @@ export function ArenaClient() {
             showStop={running && !col.metrics}
             onStop={cancelRun}
             lane={idx}
+            isHistorySeed={historySeedLabel === col.label}
+            onUseAsSeed={() => setHistorySeedLabel(col.label)}
           />
         ))}
       </div>
@@ -844,11 +934,7 @@ export function ArenaClient() {
                         (v) =>
                           activeDim?.options.find((o) => o.value === v)?.label ?? v,
                       )
-                      .slice(0, 3)
                       .join(" · ")}
-                    {activeSelections.length > 3
-                      ? ` +${activeSelections.length - 3}`
-                      : ""}
                   </span>
                 )}
               </div>
@@ -859,18 +945,13 @@ export function ArenaClient() {
                       (f) => (f.group || "pipeline") === g,
                     );
                     if (items.length === 0) return null;
-                    const highlight = items.filter((f) => f.dimension !== dimension);
-                    const shown = (highlight.length ? highlight : items).slice(
-                      0,
-                      g === "decode" ? 3 : 2,
-                    );
                     return (
                       <div key={g} className="arena-summary-group" data-group={g}>
                         <span className="arena-summary-group-label">
                           {BASELINE_GROUP_LABEL[g]}
                         </span>
                         <div className="arena-summary-pills">
-                          {shown.map((field) => {
+                          {items.map((field) => {
                             const locked = field.dimension === dimension;
                             const value =
                               baseline[field.field as keyof BaselineOverrides] ??
@@ -891,11 +972,6 @@ export function ArenaClient() {
                               </span>
                             );
                           })}
-                          {items.length > shown.length && (
-                            <span className="arena-summary-pill arena-summary-pill-more">
-                              +{items.length - shown.length}
-                            </span>
-                          )}
                         </div>
                       </div>
                     );
@@ -1109,6 +1185,35 @@ export function ArenaClient() {
               {error}
             </p>
           )}
+          {(chatHistory.length > 0 || historySeedLabel) && (
+            <div className="arena-chat-history">
+              <div className="arena-chat-history-head">
+                <span className="eyebrow">对话历史</span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {Math.floor(chatHistory.length / 2)} 轮
+                  {historySeedLabel ? ` · 种子「${historySeedLabel}」` : ""}
+                </span>
+                <button
+                  type="button"
+                  className="btn-ghost !h-6 !px-2 text-[10px] ml-auto"
+                  onClick={clearConversation}
+                  disabled={running}
+                >
+                  新对话
+                </button>
+              </div>
+              <ol className="arena-chat-history-list">
+                {chatHistory.map((m, i) => (
+                  <li key={`${m.role}-${i}`} data-role={m.role}>
+                    <span className="arena-chat-role">
+                      {m.role === "user" ? "你" : historySeedLabel || "助手"}
+                    </span>
+                    <span className="arena-chat-content">{m.content}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
           <div className="arena-run-strip">
             <span className="eyebrow arena-run-strip-label" id="arena-template-label">
               任务模板
@@ -1157,7 +1262,11 @@ export function ArenaClient() {
             </select>
             <input
               className="form-input arena-run-strip-input"
-              placeholder="输入问题，折射出多条 Agent 管线…"
+              placeholder={
+                chatHistory.length > 0
+                  ? "继续追问（各列共享上方对话历史）…"
+                  : "输入问题，折射出多条 Agent 管线…"
+              }
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {

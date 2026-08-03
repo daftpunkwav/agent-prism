@@ -5,11 +5,10 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 
-from langchain_core.messages import HumanMessage, SystemMessage
-
 from app.adapters._common_run import (
     RunState,
     begin_pipeline,
+    build_initial_lc_messages,
     create_run_workspace,
     emit_harness_event,
     emit_stream_event,
@@ -23,7 +22,7 @@ from app.arena.reasoning import get_reasoning_description
 from app.arena.reasoning_graph import REASONING_MODES, build_react_graph
 from app.arena.tools import clear_active_toolset
 from app.arena.workspace import clear_current_workspace
-from app.models import ArenaEvent, PipelineConfig
+from app.models import ArenaEvent, ChatMessage, PipelineConfig
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,13 @@ class LangGraphAdapter:
     framework_id = "langgraph"
     display_name = "LangGraph"
 
-    async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
+    async def run(
+        self,
+        question: str,
+        config: PipelineConfig,
+        *,
+        history: list[ChatMessage] | None = None,
+    ) -> AsyncIterator[ArenaEvent]:
         label = config.label or self.display_name
         state = RunState.for_pipeline(label, config)
         # workspace 创建在 try 外（失败直接抛给 runner 收敛，与原实现一致）
@@ -47,6 +52,7 @@ class LangGraphAdapter:
             yield token_update_event(label, state.tracker, workspace=state.ws_name)
 
             mode_label = get_reasoning_description(config.reasoning) or "ReAct 循环"
+            hist_n = len(history or [])
             yield ArenaEvent(
                 type="thought",
                 pipeline=label,
@@ -56,6 +62,7 @@ class LangGraphAdapter:
                     f"context={config.context}(真实裁剪) · harness={config.harness} · "
                     f"temp={config.temperature} · model={config.model_id} · "
                     f"max_steps={config.max_steps} · toolset={config.toolset}"
+                    + (f" · history={hist_n}" if hist_n else "")
                 ),
             )
 
@@ -66,10 +73,7 @@ class LangGraphAdapter:
             graph = builder().compile().with_config({"recursion_limit": recursion_limit})
 
             initial_state = {
-                "messages": [
-                    SystemMessage(content=system),
-                    HumanMessage(content=user),
-                ],
+                "messages": build_initial_lc_messages(system, user, history),
                 "step_count": 0,
                 "max_steps": int(config.max_steps),
                 "tool_calls": 0,

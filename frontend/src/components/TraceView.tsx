@@ -19,6 +19,7 @@ interface DisplaySegment {
   id: string;
   kind: SegmentKind;
   step: number;
+  turn: number;
   text: string; // 完整文本(thought 边收 delta 边累积)
   tool?: string;
   args?: Record<string, unknown>;
@@ -33,22 +34,24 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
   // thought / thought_delta / thought_end 共用 thought:N 稳定 key
   const segIndex = new Map<string, number>();
   for (const ev of events) {
-    // 判别联合：只有带 step 的事件类型才能取 step
+    // 判别联合：只有带 step 的事件类型才能取 step；turn 隔离多轮
     const step = "step" in ev ? (ev.step ?? 0) : 0;
-    const key = `${ev.type}:${step}`;
+    const turn = "turn" in ev ? (ev.turn ?? 0) : 0;
+    const key = `${turn}:${ev.type}:${step}`;
     if (ev.type === "thought") {
-      const thoughtKey = `thought:${step}`;
+      const thoughtKey = `thought:${turn}:${step}`;
       const s: DisplaySegment = {
         id: `t:thought:${segs.length}`,
         kind: "thought",
         step,
+        turn,
         text: ev.content || "",
         completed: true,
       };
       segs.push(s);
       segIndex.set(thoughtKey, segs.length - 1);
     } else if (ev.type === "thought_delta") {
-      const thoughtKey = `thought:${step}`;
+      const thoughtKey = `thought:${turn}:${step}`;
       const idx = segIndex.get(thoughtKey);
       if (idx !== undefined && segs[idx]!.kind === "thought" && !segs[idx]!.completed) {
         segs[idx]!.text += ev.content || "";
@@ -57,6 +60,7 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
           id: `t:thought:${segs.length}`,
           kind: "thought",
           step,
+          turn,
           text: ev.content || "",
           completed: false,
         };
@@ -64,14 +68,14 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
         segIndex.set(thoughtKey, segs.length - 1);
       }
     } else if (ev.type === "thought_end") {
-      const thoughtKey = `thought:${step}`;
+      const thoughtKey = `thought:${turn}:${step}`;
       const idx = segIndex.get(thoughtKey);
       if (idx !== undefined && segs[idx]!.kind === "thought" && !segs[idx]!.completed) {
         segs[idx]!.completed = true;
       }
     } else if (ev.type === "thinking") {
       // 模型内心独白：与可见回答分离，避免把跑偏 thinking 当成最终答案
-      const thinkKey = `thinking:${step}`;
+      const thinkKey = `thinking:${turn}:${step}`;
       const idx = segIndex.get(thinkKey);
       if (idx !== undefined && segs[idx]!.kind === "thinking") {
         segs[idx]!.text += ev.content || "";
@@ -80,6 +84,7 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
           id: `t:thinking:${segs.length}`,
           kind: "thinking",
           step,
+          turn,
           text: ev.content || "",
           completed: true,
         };
@@ -91,6 +96,7 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
         id: key + ":" + segs.length,
         kind: "action",
         step,
+        turn,
         text: "",
         tool: ev.tool,
         args: ev.args,
@@ -101,6 +107,7 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
         id: key + ":" + segs.length,
         kind: "observation",
         step,
+        turn,
         text: ev.result || "",
         completed: true,
       });
@@ -109,6 +116,7 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
         id: key + ":" + segs.length,
         kind: "error",
         step,
+        turn,
         text: ev.message || "",
         completed: true,
       });
@@ -117,6 +125,7 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
         id: key + ":" + segs.length,
         kind: "verify",
         step,
+        turn,
         text: ev.content || "",
         completed: true,
       });
@@ -125,6 +134,7 @@ function mergeEvents(events: ArenaEvent[]): DisplaySegment[] {
         id: key + ":" + segs.length,
         kind: "reflect",
         step,
+        turn,
         text: ev.content || "",
         completed: true,
       });
@@ -171,13 +181,28 @@ export function TraceView({
     }
   }, [segments]);
 
+  const turns = useMemo(() => {
+    const ids = [...new Set(segments.map((s) => s.turn).filter((t) => t > 0))];
+    return ids.sort((a, b) => a - b);
+  }, [segments]);
+  const multiTurn = turns.length > 1 || (turns.length === 1 && turns[0]! > 1);
+
   return (
     <div
       ref={containerRef}
       className="flex flex-col gap-2.5 p-3"
       style={{ ["--lane" as string]: accentColor }}
     >
-      {segments.map((seg) => renderSegment(seg, accentColor))}
+      {multiTurn
+        ? turns.map((t) => (
+            <div key={`turn-${t}`} className="trace-turn">
+              <div className="trace-turn-label">第 {t} 轮</div>
+              {segments
+                .filter((s) => s.turn === t)
+                .map((seg) => renderSegment(seg, accentColor))}
+            </div>
+          ))
+        : segments.map((seg) => renderSegment(seg, accentColor))}
 
       {running && segments.length === 0 && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
