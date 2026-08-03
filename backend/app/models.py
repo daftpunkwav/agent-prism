@@ -8,10 +8,12 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.arena.types import (
     ApiFormat,
+    ContextStrategy,
     DimensionId,
     EventType,
     HarnessLevel,
     PromptProfile,
+    ReasoningMode,
 )
 
 __all__ = [
@@ -36,8 +38,8 @@ __all__ = [
 
 class PipelineConfig(BaseModel):
     framework: str = "langgraph"
-    reasoning: str = "react"
-    context: str = "sliding"
+    reasoning: ReasoningMode = "react"
+    context: ContextStrategy = "sliding"
     harness: HarnessLevel = "bare"
     prompt_profile: PromptProfile = "zero_shot"
     model_id: str = "step-3.7-flash"

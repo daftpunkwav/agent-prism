@@ -241,7 +241,7 @@ def _run_code_subprocess(code: str, q: _mp.Queue) -> None:  # pragma: no cover -
             sys.stdout, sys.stderr = old_stdout, old_stderr
 
 
-def _terminate_process(proc: _mp.Process) -> None:
+def _terminate_process(proc: _mp.process.BaseProcess) -> None:
     """尽量强制终止子进程：terminate → join → kill。"""
     if not proc.is_alive():
         return

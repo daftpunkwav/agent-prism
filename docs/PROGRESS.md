@@ -1,7 +1,7 @@
 # AgentPrism 开发进度报告
 
 > 本文档面向**当前实现**撰写。每个声明都对应 `backend/app/`、`frontend/src/` 或 `tests/` 下的实际代码；与早期 PRD/README 不一致时，**以本文档为准**。
-> 数据截止：2026-08-03（合并 `fix/full-review` 并完成安全硬化后）。
+> 数据截止：2026-08-03（合并 `fix/full-review` + 安全硬化 + **Phase 8 学习路径 / Phase 9 任务模板库**落地后）。
 
 ---
 
@@ -21,7 +21,9 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 | 推理 | LangGraph `StateGraph`（ReAct / CoT+Tool / ToT / Reflexion 四张图） |
 | 数据 | 文件级 JSON（`provider_config.json` + `projects.json`），**无 SQL/ORM** |
 | 前端状态 | 仅 `useState` / `useReducer` / `useRef`，无 Zustand/Redux |
-| 测试 | 仓库根 `tests/`，**27 个文件 / 约 228 个 `test_` 函数** |
+| 任务模板 | `arena/templates.py` 8 个预置模板 + `arena/judging.py` 确定性判分器（无 LLM） |
+| 学习路径 | `/learn` 6 周引导页，一键预填 Arena（URL 参数） |
+| 测试 | 仓库根 `tests/`，**30 个文件 / 267+ 个 `test_` 函数**（CI 含 ruff + mypy + pytest） |
 
 ---
 
@@ -160,59 +162,50 @@ workers = [asyncio.create_task(worker(c)) for c in configs]
 ## 4. 修改意见（已知遗留问题与改进点）
 
 > 这些是**主动记录的待改进项**，不是缺陷清单；按优先级排序。
+> ✅ 标记 = 已在 `feat/templates-roadmap` 分支解决。
 
 ### 4.1 高优先级
 
-1. **测试运行数与 README/PRD 不一致**
-   - README / 旧文档曾写「108 用例」；当前以根目录 `tests/` 实测为准（约 228 个 `test_` 函数）
-   - 建议：以 `pytest --collect-only -q` 输出为准，并加 `pytest --co` 到 CI
+1. **测试运行数不一致** ✅
+   - CI 已加 `pytest tests/ --collect-only -q | tail -1` 用例数统计；README/PROGRESS 以实测 267+ 为准
 
-2. **`is_mvp_ready` 死代码**
-   - `router.py:118` 定义 `is_mvp_ready()` 注释「兼容保留」，但已无调用方
-   - 建议：删除或迁移到测试 fixture
+2. **`is_mvp_ready` 死代码** ✅
+   - 已删除 `router.py` 的 `is_mvp_ready`，测试改为「所有维度 route 出 ≥2 条 pipeline」
 
-3. **`SimpleVectorStore` 每次重建**
-   - `prompts.py:78` 在 `build_messages` 调用时 `SimpleVectorStore()` 新建一次
-   - 建议：cache per workspace 或由 Adapter 预处理
+3. **`SimpleVectorStore` 每次重建** ✅
+   - 已实现 **Workspace 惰性缓存**（`Workspace.rag_store()`）：文件变更（write/append/create/delete）自动失效；
+     过滤 `.gitkeep`、单文件截断 4000 字符；`context_manager._maybe_vector_snippets` 复用缓存
 
 ### 4.2 中优先级
 
 4. **Workspace TTL=1h 对 Arena 长会话不够**
-   - 用户多轮 Trace 对比需要历史 workspace，但 `DEFAULT_TTL_SECONDS=3600` 默认回收
-   - 建议：ArenaClient 在「保存为项目」时同步备份到 `data/projects.json` 的 `workspace_files`，避免回收后丢文件
+   - 保留：ArenaClient「保存为项目」已持久化 `workspace_files` 到 `projects.json`；TTL 回收不影响已保存项目
+   - LRU 淘汰已改为**优先淘汰最近 5 分钟未访问项**，保护运行中 pipeline ✅
 
 5. **`on_node_start` 黑名单耦合**
-   - `langgraph_adapter.py:185` 写死 `node_name not in ("agent", "execute")` 才输出 thought 事件
-   - 建议：在 `reasoning_graph.py` 暴露节点元数据（`get_node_metadata(node_name)`），由 Adapter 查询而非硬编码
+   - 未处理（低影响：仅影响 thought 事件过滤的节点名）
 
-6. **`_pipeline_overrides` 缺少自动重置保障**
-   - Adapter 用 try/finally 调 `clear_pipeline_llm_overrides()`，但若 runner 在 await 中被 `CancelledError` 取消，finally 一定执行吗？
-   - 建议：测试覆盖「CancelledError 路径下 ContextVar 是否清空」
+6. **`_pipeline_overrides` 自动重置保障** ✅
+   - 新增测试：CancelledError 路径下 finally 仍清空 ContextVar + adapter finally 源码级契约
 
-7. **TraceDiff 文本截断到 300 字符**
-   - `TraceDiff.tsx:205` `text.length > 300 ? text.slice(0, 300) + "…"`
-   - 建议：暴露「展开」交互，避免长 thought 看不全
+7. **TraceDiff 文本截断到 300 字符** ✅
+   - 已加「展开全文（N 字符）/收起」交互（`aria-expanded`）
 
 ### 4.3 低优先级
 
-8. **前端只有 AR 主题切换，无 i18n**
-   - `ThemeToggle` 是亮 / 暗切换，没做多语言
-   - 建议：暂缓，等 Phase 8 学习路径阶段再加
+8. **前端无 i18n** — 暂缓（中文优先为产品定位）
 
-9. **`scratchpad` / 多轮任务模板尚未实现**
-   - PRD §2.2「任务模板库」标注「尚未实现」，当前 `ArenaClient` 只有 3 个 in-page 示例
-   - 建议：从「可自动判分」类型开始（JSON 解析 / 关键词命中）
+9. **任务模板库** ✅
+   - Phase 9 已落地：`arena/templates.py` 8 个模板 + `arena/judging.py` 判分器 + 前端自动判分徽章
 
-10. **`openai_chat` Provider 测试能用但默认仍是 Anthropic**
-    - `api/settings.py:76` 已实现 OpenAI 测试路径，但 `Settings.api_format` 默认 `anthropic_messages`
-    - 建议：Settings UI 提示「OpenAI 兼容需自行确认 use_full_url / auth_field」
+10. **`openai_chat` Provider 默认 Anthropic** — Settings UI 高级选项已提示格式差异
 
-11. **CI 没跑 mypy**
-    - `pyproject.toml` 配置了 `[tool.mypy]`，但 CI 只有 ruff + pytest
-    - 建议：可选加 `mypy app/`，strict 模式可能太重，先用 `--ignore-missing-imports`
+11. **CI 没跑 mypy** ✅
+    - CI 已加 `mypy app/ --ignore-missing-imports` 硬性门槛；`app/` 当前零错误
+    - 修复过程中顺带升级：`PipelineConfig.reasoning/context/harness/prompt_profile` 为 Literal 类型、
+      `FrameworkAdapter` Protocol 声明 async generator 语义、`_sanitize_for_json` 接受内容块列表
 
-12. **pre-commit 与 ruff 行长 160**
-    - `.pre-commit-config.yaml` ruff 行长可能与 pyproject 一致但建议确认
+12. **pre-commit 与 ruff 行长 160** — 保持一致（未改）
 
 ---
 
@@ -223,12 +216,12 @@ workers = [asyncio.create_task(worker(c)) for c in configs]
 | 阶段 | 目标 | 状态 |
 |---|---|---|
 | Phase 1-5 | 已在 `main` 分支落地（5 个维度 + 对比报告 + Trace + Workspace + 项目） | ✅ |
-| Phase 6 | Adapter 接入 AutoGen / CrewAI（`FrameworkAdapter` Protocol 已就位） | ⏳ |
+| Phase 8 | 学习路径引导 UI（`/learn` 6 周计划 + Arena URL 预填） | ✅ |
+| Phase 9 | 任务模板库（8 个预置模板 + 确定性判分器 + 前端判分徽章） | ✅ |
+| Phase 6 | Adapter 接入 AutoGen / CrewAI（Python 3.14 环境依赖不可装，保持预留条目） | ⏳ |
 | Phase 7 | MCP 集成（PRD §4.3） | 📝 规划 |
-| Phase 8 | 学习路径引导 UI | 📝 规划 |
-| Phase 9 | 任务模板库（可自动判分） | 📝 规划 |
 | Phase 10 | Harness Lab（独立 YAML 编辑器） | 📝 规划 |
-| Phase 11 | CI 加 mypy / Node 版本矩阵 | ⏳ |
+| Phase 11 | CI 加 mypy（✅ 已完成）/ Node 版本矩阵 | ⏳ |
 
 ---
 

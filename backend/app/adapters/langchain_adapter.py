@@ -222,7 +222,7 @@ class LangChainAdapter:
                     thinking_step = None
                     step += 1
                     yield ArenaEvent(
-                        type=event.get("type") or "verify",  # type: ignore[arg-type]
+                        type=event.get("type") or "verify",
                         pipeline=label,
                         step=step,
                         content=str(event.get("content") or ""),

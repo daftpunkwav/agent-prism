@@ -33,7 +33,10 @@ class FrameworkAdapter(Protocol):
 
     async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
         """流式运行并产出 ArenaEvent。"""
-        ...
+        # 让 mypy 识别本方法为 async generator：Protocol 体无 yield 会被
+        # 误判为普通 coroutine，导致与实现类结构不兼容
+        if False:  # pragma: no cover
+            yield
 
 
 class AdapterNotFoundError(KeyError):

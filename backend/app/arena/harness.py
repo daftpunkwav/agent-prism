@@ -93,8 +93,21 @@ def _sanitize_prompt_additions(additions: list[str] | None) -> str:
     return joined
 
 
-def _sanitize_for_json(text: str) -> str:
-    """清理 LLM 输出中可能的提示注入内容，保留有效 JSON。"""
+def _sanitize_for_json(text: object) -> str:
+    """清理 LLM 输出中可能的提示注入内容，保留有效 JSON。
+
+    ``response.content`` 可能是 str 或内容块列表，统一转 str 处理。
+    """
+    if isinstance(text, list):
+        # LangChain 内容块列表：提取文本部分
+        parts: list[str] = []
+        for block in text:
+            if isinstance(block, dict):
+                parts.append(str(block.get("text") or block.get("thinking") or ""))
+            else:
+                parts.append(str(block))
+        text = "".join(parts)
+    text = str(text)
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         return _strip_json_fence(match.group())

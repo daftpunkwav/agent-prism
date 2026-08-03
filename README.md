@@ -110,11 +110,14 @@ API Key 保存在本地 `data/provider_config.json`，**仅本地保存，不会
 ## 测试
 
 ```bash
-# 后端测试 — 当前 20 个测试文件 / 146 个 test_ 函数
+# 后端测试 — 30 个测试文件 / 267+ 个 test_ 函数
 PYTHONPATH=backend pytest tests/ -v
 
 # 仅 lint
 cd backend && ruff check app/ tests/
+
+# 类型检查
+cd backend && mypy app/ --ignore-missing-imports
 
 # 前端类型检查 + 构建
 cd frontend && npx tsc --noEmit
@@ -132,21 +135,16 @@ cd frontend && npm run build
 ## 最近改进
 
 ### 后端
+- **任务模板库 + 自动判分器**（Phase 9）：`arena/templates.py` 8 个预置可判分模板 + `arena/judging.py` 确定性判分器（JSON / 关键词 / 代码语法 / 数字 / 拒答检测 / 正则，无 LLM 依赖）；`GET /api/arena/templates` + `POST /api/arena/judge`
+- **安全加固**：self_evolve 的 prompt 注入脱敏生效（`_sanitize_prompt_additions`）；`run_code` 输出 32KB 截断（根治大输出误报超时）+ Queue 清理；`calculate` 拦截大指数幂 CPU DoS；断开清理加 5s 超时；向量片段 fence + 免责声明；LRU 淘汰保护运行中工作空间
 - **WorkspaceManager 增加 TTL 与 LRU 上限**：默认 1h 空闲回收 + 最多 32 个工作空间（`commit 17c864d`）
 - **LangGraph 适配器接入 HarnessRunner 主路径**：`astream_events` 真实拦截 verify/reflect/harness_edit（`commit 18785da`）
 - **HarnessRunner.stream_events 真实验证重试循环**：max_retries 区分 bare/verify/reflect/self_evolve（`commit a054b26`）
 - **run_code 改独立进程沙箱**：AST 静态校验 + terminate/kill 子进程（`commit 8e69763`）
-- **workspace 事件、verify 签名与 Pipeline 采样参数**：修正签名后向兼容（`commit 15557ad`）
-- **ToT evaluate NameError、未知工具对齐、Reflexion 边冲突**：修复合图死环等 bug（`commit 3bb6885`）
 - **提交 langchain-openai 依赖**：`api_format="openai_chat"` 实际可用（`commit 3c647d0`）
 - **FastAPI 现代化**：`@app.on_event("startup")` 迁移到 `lifespan` 上下文管理器
-- **沙箱安全**：`run_code` 工具 stdout 重定向改为独立 StringIO，消除并发请求间输出污染
 - **API 安全**：连接测试错误响应仅返回异常类型，避免泄露内部 endpoint/堆栈
-- **API 一致性**：Arena `/meta` 复用 RunnerPool 中的注册表；`is_mvp_ready` 失效检查替换为 `route()` 的 ValueError 透传
-- **类型严谨**：`prompts.py` `build_messages` 参数类型升级为 `ReasoningMode` / `HarnessLevel` Literal
-- **去重**：`harness.py` 提取 `_strip_json_fence` 工具函数替代 3 处硬编码 markdown fence
-- **性能**：DimensionRouter 用 `lru_cache` 缓存 provider 配置，避免每列重复读 JSON
-- **请求体大小限制中间件**：10MB 上限，非法 Content-Length 返回 400
+- **类型严谨**：`PipelineConfig.reasoning/context/harness/prompt_profile` 升级为 Literal；`mypy app/` 零错误
 
 ### 项目管理
 - **Bug 修复**：`create_from_run` 之前用 `f"{label}_"` 模糊前缀匹配 workspace，同 label 多次跑会覆盖；改用 `workspace_names` 精确匹配
@@ -154,16 +152,19 @@ cd frontend && npm run build
 - **ID 唯一**：`_generate_project_id` 添加微秒时间戳 + UUID 后缀，避免同毫秒并发创建冲突
 
 ### 前端
+- **学习路径引导页 `/learn`**（Phase 8）：6 周学习路径，每步一键跳转 Arena 并预填模板/维度/子项
+- **可判分任务模板**：Arena 底部模板区分「可判分」组（判分方式徽章），运行完成后自动判分并展示通过/未通过（列徽章 + 对比报告判分列）
+- **URL 参数预填**：`/arena?template=...&q=...&dimension=...&selections=...`
+- **TraceDiff 长文本展开**：>300 字符可「展开全文/收起」
 - **Arena 对比报告增加「保存为项目」**：`ArenaClient` 跑完后输入项目名一键入库（`commit 1665376`）
-- **API 一致性**：ExperimentPanel 温度调节改 `onPointerUp` 统一提交（替代 `onMouseUp/TouchEnd/KeyUp` 三件套）
-- **渲染优化**：TraceView 用 `useState` setter 替代 `useReducer` 作渲染触发器
-- **TraceDiff 累积 thought_delta**：按 step 对齐 + 类型/内容双重差异检测
 - **workspace 真实名**：WorkspacePanel 优先取事件中的真实 workspace 名，禁止猜测前缀
 - **可访问性**：aria-labels + toast 定时器清理
 
 ### 测试
+- **判分器 22 用例 + 模板库 9 用例**（`tests/test_judging.py` + `tests/test_templates.py`）
+- **ContextVar 取消路径回归**：CancelledError 下 finally 必须清空 pipeline 覆盖参数
+- **前端契约**：模板/判分/学习路径/URL 预填 API 契约测试
 - **WorkspaceManager TTL/LRU 回收用例**（`commit e398964`）
-- **HarnessRunner stream_events bare/verify 重试用例**（`commit 5f5bcf5`）
 - **测试目录规范迁移至仓库根 tests/**（`commit 8510cfa`）
 
 ## 路线图
@@ -173,10 +174,10 @@ cd frontend && npm run build
 - [x] Phase 3: 三栏 UI + 对比报告 + 真流式 thought_delta
 - [x] Phase 4: 全维度启用（推理/上下文/Harness 引擎 + LangGraph 图）
 - [x] Phase 5: Harness 引擎完善（Verify/Reflect/Self-Evolve + 真实验证循环）
-- [ ] Phase 6: AutoGen / CrewAI Adapter 实装（当前仅注册为预留条目，调用时抛 `AdapterReservedError`）
+- [x] Phase 8: 学习路径引导 UI（`/learn` 6 周计划，一键预填 Arena）
+- [x] Phase 9: 任务模板库（8 个预置可判分模板 + 确定性判分器）
+- [ ] Phase 6: AutoGen / CrewAI Adapter 实装（预留条目，Python 3.14 环境暂不可装）
 - [ ] Phase 7: MCP Server / Client 集成
-- [ ] Phase 8: 学习路径引导 UI
-- [ ] Phase 9: 任务模板库（可自动判分）
 - [ ] Phase 10: Harness Lab（独立 YAML 编辑器 + Primitive 组合）
 
 详见 [docs/PROGRESS.md](./docs/PROGRESS.md) §5。

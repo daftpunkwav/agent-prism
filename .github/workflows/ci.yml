@@ -23,8 +23,13 @@ jobs:
       - name: Run ruff
         working-directory: backend
         run: ruff check app/
+      - name: Run mypy
+        working-directory: backend
+        run: mypy app/ --ignore-missing-imports
       - name: Run tests (repo root tests/)
         run: PYTHONPATH=backend pytest tests/ -v
+      - name: 测试用例数统计
+        run: PYTHONPATH=backend pytest tests/ --collect-only -q | tail -1
 
   frontend-build:
     name: Frontend Build
