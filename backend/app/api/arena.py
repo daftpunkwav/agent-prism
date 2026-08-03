@@ -6,12 +6,15 @@ import asyncio
 import json
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from app.adapters.common import get_workspace_mgr
+from app.arena.judging import judge_answers
 from app.arena.project import get_project_manager
 from app.arena.router import DEFAULT_BASE, list_baseline_fields, list_dimension_options
 from app.arena.runner import RunnerPool, build_registry
+from app.arena.templates import get_template, template_payloads
 from app.models import ArenaRunRequest, ProjectCreate, WorkspaceFileUpsert
 
 router = APIRouter(prefix="/api/arena", tags=["arena"])
@@ -80,6 +83,37 @@ async def arena_run(request: ArenaRunRequest):
             raise
 
     return EventSourceResponse(event_generator())
+
+
+# ===== 任务模板 API =====
+
+
+class JudgeRequest(BaseModel):
+    """判分请求：template_id + {label: 最终答案文本}。"""
+
+    template_id: str = Field(min_length=1, max_length=100)
+    answers: dict[str, str] = Field(default_factory=dict, max_length=16)
+
+
+@router.get("/templates")
+async def arena_templates():
+    """返回任务模板列表（含判分规则，前端可展示判分方式）。"""
+    return {"templates": template_payloads()}
+
+
+@router.post("/judge")
+async def arena_judge(body: JudgeRequest):
+    """对给定答案按模板判分规则自动判分（L1 格式/约束验证，无 LLM）。"""
+    template = get_template(body.template_id)
+    if template is None:
+        raise HTTPException(status_code=404, detail=f"模板不存在: {body.template_id}")
+    results = judge_answers(body.answers, template.judge)
+    return {
+        "template_id": template.id,
+        "template_name": template.name,
+        "judge_type": template.judge.type,
+        "results": {label: r.model_dump() for label, r in results.items()},
+    }
 
 
 # ===== 工作空间 API =====
