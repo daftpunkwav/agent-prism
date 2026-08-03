@@ -1,7 +1,7 @@
 # AgentPrism 开发进度报告
 
 > 本文档面向**当前实现**撰写。每个声明都对应 `backend/app/`、`frontend/src/` 或 `tests/` 下的实际代码；与早期 PRD/README 不一致时，**以本文档为准**。
-> 数据截止：2026-08-03（合并 `fix/full-review` + 安全硬化 + **Phase 8 学习路径 / Phase 9 任务模板库**落地后）。
+> 数据截止：2026-08-03（HEAD `ef55504`；Phase 8 学习路径 / Phase 9 任务模板库 + mypy 硬性门槛已落地）。
 
 ---
 
@@ -19,11 +19,11 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 | 后端 | FastAPI + Pydantic v2 + sse-starlette（`lifespan` 已迁移） |
 | LLM | LangChain `ChatAnthropic` / `ChatOpenAI`，BYOK（`data/provider_config.json`） |
 | 推理 | LangGraph `StateGraph`（ReAct / CoT+Tool / ToT / Reflexion 四张图） |
-| 数据 | 文件级 JSON（`provider_config.json` + `projects.json`），**无 SQL/ORM** |
+| 数据 | 文件级 JSON（`provider_config.json` + `projects.json`），**无 SQL/ORM**；原子写见 `storage.py` |
 | 前端状态 | 仅 `useState` / `useReducer` / `useRef`，无 Zustand/Redux |
 | 任务模板 | `arena/templates.py` 8 个预置模板 + `arena/judging.py` 确定性判分器（无 LLM） |
 | 学习路径 | `/learn` 6 周引导页，一键预填 Arena（URL 参数） |
-| 测试 | 仓库根 `tests/`，**30 个文件 / 267+ 个 `test_` 函数**（CI 含 ruff + mypy + pytest） |
+| 测试 | 仓库根 `tests/`，**29 个文件 / 268 个 `test_` 函数**（CI：ruff + mypy + pytest） |
 
 ---
 
@@ -33,78 +33,95 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 
 | 模块 | 文件 | 关键能力 |
 |---|---|---|
-| 入口 | `main.py` | `lifespan` 替代 `on_event`；CORS；10MB 请求体限制中间件；非法 Content-Length 返回 400 |
-| 配置 | `config.py` | `Settings`（env）+ `ProviderConfig`（JSON），原子写 + `.bak` 备份 |
+| 入口 | `main.py` | `lifespan`；CORS；10MB 请求体限制；第三方 logger 降级 WARNING |
+| 配置 | `config.py` | `Settings`（env）+ `ProviderConfig`（JSON），经 `storage` 原子写 |
+| 存储 | `storage.py` | `_atomic_write_json`（tmp → fsync → bak → replace） |
 | 模型 | `models.py` | `PipelineConfig` / `ArenaRunRequest` / `ArenaEvent` / `PipelineMetrics` / `ProviderConfig*` / `Project*` |
-| 类型 | `arena/types.py` | 6 个 Literal 单一来源（DimensionId / PromptProfile / ReasoningMode / ContextStrategy / HarnessLevel / ApiFormat / EventType） |
-| 路由 | `arena/router.py` | `DimensionRouter.route()` 生成 configs；`@lru_cache` 缓存 provider 配置；Provider 更新时 `invalidate_provider_cache` |
-| 池 | `arena/runner.py` | `RunnerPool` 通过 `asyncio.Queue` 合并 2～4 路 SSE；客户端断开 `CancelledError` 取消所有 worker |
-| 适配器 | `adapters/{base,langchain_adapter,langgraph_adapter,common}.py` | `FrameworkAdapter` Protocol + Registry + 热插拔监听器；LangChain 用 `create_agent`，LangGraph 用真实 StateGraph |
-| 推理图 | `arena/reasoning_graph.py` | `build_react_graph` / `build_cot_tool_graph` / `build_tot_graph` / `build_reflexion_graph` |
-| 推理 Prompt | `arena/reasoning.py` | 4 个模式 → System/User 后缀；`get_reasoning_description` 复用 |
-| Prompt | `arena/prompts.py` | 4 个 Profile（zero_shot / few_shot / cot_prompt / structured）；`build_messages` 注入推理/Harness/上下文 |
-| 上下文 | `arena/context_manager.py` + `arena/rag.py` | `ContextManager`（sliding / summary / hybrid）+ `SimpleVectorStore`（TF-IDF + 余弦相似度）+ `ContextRetriever`（混合策略） |
-| Harness | `arena/harness.py` | `HarnessRunner.stream_events` 走 `astream_events`；`verify_result` / `reflect_on_failure` / `propose_harness_edit` 三个 LLM 调用；`_sanitize_for_json` 抗 prompt 注入 |
-| 工具 | `arena/tools.py` | **11 个 tool**：get_current_time / calculate / write_file / create_file / append_file / read_file / list_files / file_tree / delete_file / run_code（独立进程沙箱）/ summarize_text |
-| 工作空间 | `arena/workspace.py` | `Workspace`（路径规范化拒绝绝对路径/../`./`/控制字符）；`WorkspaceManager`（**TTL 1 小时 + LRU 32 上限 + 线程锁**） |
-| LLM | `arena/llm.py` | `create_chat_model` 按 `api_format` 选 Anthropic / OpenAI；`_pipeline_overrides` 通过 `ContextVar` 让 pipeline 级覆盖 |
-| Token | `arena/token_utils.py` | `TokenTracker`（带 API 用量回退到估算）；`extract_usage` 兼容 LangChain `usage_metadata` 与 OpenAI 风格 |
-| 流式 | `arena/stream_utils.py` | `extract_chunk_text` 统一 dict / .content / .text 入口；识别 `thinking` 块 |
-| 项目 | `arena/project.py` | `ProjectManager` 原子写；`_generate_project_id` 用 UUID+时间戳避免冲突 |
-| API | `api/arena.py` | `/meta` `/run` `/workspace/{name}/{files,file}` `/projects`（GET/POST/DELETE） |
-| API | `api/settings.py` | `/api/settings/provider` GET/PUT + `/test`，**API Key 脱敏 + 错误类型脱敏** |
+| 类型 | `arena/types.py` | Literal 单一来源（DimensionId / PromptProfile / ReasoningMode / ContextStrategy / HarnessLevel / ApiFormat / EventType） |
+| 路由 | `arena/router.py` | `DimensionRouter.route()`；`@lru_cache` provider；`invalidate_provider_cache` |
+| 池 | `arena/runner.py` | `RunnerPool` 合并 2～4 路 SSE；断开取消 worker；错误脱敏 |
+| 适配器 | `adapters/{base,langchain_adapter,langgraph_adapter,common}.py` | Protocol + Registry；LangChain `create_agent` / LangGraph StateGraph |
+| 推理图 | `arena/reasoning_graph.py` | ReAct / CoT+Tool / ToT / Reflexion 四张图 |
+| 推理 Prompt | `arena/reasoning.py` | 4 模式 System/User 后缀 |
+| Prompt | `arena/prompts.py` | 4 Profile；`build_messages` 注入推理/Harness/上下文 |
+| 上下文 | `arena/context_manager.py` + `arena/rag.py` | sliding / summary / hybrid + TF-IDF 向量；Workspace 惰性 RAG 缓存 |
+| Harness | `arena/harness.py` | `astream_events` 拦截；verify / reflect / propose_harness_edit；prompt 注入脱敏 |
+| 工具 | `arena/tools.py` | **11 个 tool**（含独立进程 `run_code` 沙箱） |
+| 工具守卫 | `arena/tool_guard.py` | `assess_tool_relevance` 拦截跑题 tool_calls |
+| 消息消毒 | `arena/message_sanitize.py` | strip thinking/tool_use + 任务锚定 |
+| 错误脱敏 | `arena/errors.py` | `sanitize_error_message`（仅异常类型名） |
+| 模板 | `arena/templates.py` | 8 个预置可判分模板 |
+| 判分 | `arena/judging.py` | keyword / json / code / numeric / exclude / regex |
+| 工作空间 | `arena/workspace.py` | 路径规范化；TTL 1h + LRU 32 + 锁；运行中保护 |
+| LLM | `arena/llm.py` | 按 `api_format` 选客户端；`_pipeline_overrides` ContextVar |
+| Token | `arena/token_utils.py` | API 用量回退估算 |
+| 流式 | `arena/stream_utils.py` | 统一 chunk 文本提取 |
+| 项目 | `arena/project.py` | 原子写；精确 `workspace_names`；落盘失败抛错 |
+| API | `api/arena.py` | `/meta` `/run` `/templates` `/judge` `/workspace/...` `/projects` |
+| API | `api/settings.py` | `/api/settings/provider` GET/PUT + `/test` |
 
 ### 2.2 前端（`frontend/src/`）
 
-| 组件 | 能力 |
+| 组件 / 页面 | 能力 |
 |---|---|
-| `AppShell.tsx` | 顶部导航（`/arena` `/projects` `/settings`）+ ThemeToggle |
-| `ArenaClient.tsx` | Arena 主页面：维度切换 + chip 多选 + 三 Tab（输出结果 / 对比报告 / Trace 对比） + 跑前确认 + 跑后「保存为项目」 |
-| `TraceView.tsx` | 实时归并 `thought_delta` → Markdown 渲染（`react-markdown` + `remark-gfm`）；按 step 累积；自动滚到底 |
-| `TraceDiff.tsx` | 按 step 对齐各列事件，标记差异（类型不一致 / 内容不一致） |
-| `WorkspacePanel.tsx` | 文件树（嵌套目录可展开）+ 预览/编辑 + 新建/删除；polling 间隔运行中 1.5s / 闲置 5s；AbortController 取消切换 |
-| `ExperimentPanel.tsx` | 5 个采样参数滑块（Temperature / Top P / Frequency / Presence / Max Tokens）；`onPointerUp` 统一提交（避免长按方向键反复 PUT） |
-| `TokenStatsPanel.tsx` | compact / full 两态；显示输入 / 输出 / 总计 + 上下文 / 输入占比双进度条 |
-| `lib/api.ts` | 12 个 API 函数；SSE 客户端带 `AbortSignal` 与 `data:` 行解析 |
+| `AppShell.tsx` | 导航：`/arena` `/learn` `/projects` `/settings` + ThemeToggle |
+| `learn/page.tsx` | 6 周学习路径，每步链到 Arena URL 预填 |
+| `ArenaClient.tsx` | 维度切换 + 模板/判分 + 三 Tab + 保存为项目 |
+| `TraceView.tsx` | `thought_delta` 归并 + Markdown |
+| `TraceDiff.tsx` | step 对齐差异；长文本「展开/收起」 |
+| `WorkspacePanel.tsx` | 文件树 + 预览/编辑；polling + AbortController |
+| `ExperimentPanel.tsx` | 采样参数滑块；单一 `flushParams` PUT |
+| `TokenStatsPanel.tsx` | compact / full 两态 |
+| `error.tsx` / `global-error.tsx` | 路由级 / 全局错误边界 |
+| `lib/api.ts` | **15** 个 API 函数；ArenaEvent discriminated union |
 
 ### 2.3 测试（`tests/`）
 
-**27 个测试文件 / 约 228 个 `test_` 函数**（含类内缩进测试；以 `PYTHONPATH=backend pytest tests/ -v` 收集结果为准）。
+**29 个测试文件 / 268 个 `test_` 函数**（AST 统计；以 `PYTHONPATH=backend pytest tests/ -v` 为准）。
 
 | 文件 | 用例数 | 覆盖范围 |
 |---|---|---|
-| `test_harness_runner.py` | 15 | `HarnessRunner` bare/verify/reflect/self_evolve 重试循环、`_pick_final_state`、`stream_events` |
-| `test_tool_security.py` | 15 | `_safe_calculate` AST 白名单、`run_code` AST 阻断（import / dunder / `__import__` 等） |
-| `test_rag.py` | 10 | `SimpleVectorStore` TF-IDF + 余弦、`chunk_text`、`ContextRetriever` 4 种策略 |
-| `test_reasoning_harness.py` | 10 | 推理图 + Harness 联合 |
-| `test_registry_extended.py` | 10 | Adapter Registry 热插拔 |
-| `test_token_utils.py` | 9 | `TokenTracker` 用量回退 + 估算路径 |
-| `test_workspace_manager.py` | 7 | TTL / LRU / 锁 / remove |
-| `test_reasoning_graphs.py` | 6 | 4 张图编译 + 节点结构 |
-| `test_stream_utils.py` | 5 | 多 provider chunk 格式（dict / content 列表 / thinking） |
-| `test_router.py` | 5 | `DimensionRouter.route` + `selections` |
-| `test_frontend_session_contracts.py` | 5 | API → 前端类型契约 |
-| `test_reasoning_graph_fixes.py` | 4 | 旧版 graph bug 回归 |
-| `test_prompts_context.py` | 4 | `build_messages` 上下文注入 |
-| `test_prompts.py` | 3 | 4 个 Profile |
-| `test_registry.py` | 4 | 基础注册/查询/异常 |
-| `test_llm_overrides.py` | 3 | `_pipeline_overrides` ContextVar 隔离 |
-| `test_request_size_middleware.py` | 3 | 10MB 上限 + 非法 Content-Length |
-| `test_project_create.py` | 2 | Project 创建（精确 `workspace_names` 匹配） |
-| `test_workspace_api.py` | 2 | Workspace 文件 API 路径 |
-| `test_sandbox_security.py` | 类形式 | 沙箱逃逸回归 |
+| `test_tool_security.py` | 33 | calculate / run_code AST 与沙箱边界 |
+| `test_harness_runner.py` | 27 | Harness 重试循环、stream_events |
+| `test_sandbox_security.py` | 24 | 沙箱逃逸回归 |
+| `test_judging.py` | 19 | 六种判分类型 |
+| `test_validation.py` | 14 | 请求/模型校验 |
+| `test_rag.py` | 10 | TF-IDF / ContextRetriever |
+| `test_reasoning_harness.py` | 10 | 推理图 + Harness |
+| `test_registry_extended.py` | 10 | Adapter 热插拔 |
+| `test_message_sanitize.py` | 10 | 消息消毒 + tool_guard |
+| `test_token_utils.py` | 9 | TokenTracker |
+| `test_templates.py` | 9 | 模板库完整性 |
+| `test_workspace_manager.py` | 9 | TTL / LRU |
+| `test_frontend_session_contracts.py` | 9 | 前后端契约（含模板/判分） |
+| `test_project_manager.py` | 9 | 项目落盘 / 回滚 |
+| `test_llm_factory.py` | 6 | LLM 工厂 |
+| `test_agent_state_context.py` | 6 | ContextVar / AgentState |
+| `test_reasoning_graphs.py` | 6 | 四图编译 |
+| `test_stream_utils.py` | 6 | chunk 解析 |
+| `test_router.py` | 6 | DimensionRouter |
+| `test_llm_overrides.py` | 5 | pipeline overrides |
+| `test_reasoning_graph_fixes.py` | 5 | graph 回归 |
+| `test_baseline_overrides.py` | 4 | 基线覆盖 |
+| `test_prompts_context.py` | 4 | 上下文注入 |
+| `test_registry.py` | 4 | 基础注册 |
+| `test_prompts.py` | 3 | Prompt profiles |
+| `test_request_size_middleware.py` | 3 | 10MB 限制 |
+| `test_runner.py` | 3 | 取消 / 错误脱敏 |
+| `test_project_create.py` | 3 | create_from_run |
+| `test_workspace_api.py` | 2 | Workspace 文件 API |
 
 ### 2.4 CI
 
 `.github/workflows/ci.yml`：
-- **backend-test**：`pip install -e ".[dev]"` + `ruff check app/` + `PYTHONPATH=backend pytest tests/ -v`
+- **backend-test**：`pip install -e ".[dev]"` + `ruff check app/` + `mypy app/ --ignore-missing-imports` + `PYTHONPATH=backend pytest tests/ -v` + collect-only 统计
 - **frontend-build**：`npm ci` + `npx tsc --noEmit` + `npm run build`
 
 ### 2.5 数据持久化
 
-- `data/provider_config.json`：用户 BYOK 配置（脱敏 API Key、采样参数、上下文窗口等）
-- `data/projects.json`：项目列表（问题 / 维度 / 工作空间文件 / 指标摘要）
-- 两份文件都走**原子写**（`tmp → bak → rename`）
+- `data/provider_config.json`：BYOK 配置（脱敏 API Key、采样参数等）
+- `data/projects.json`：项目列表
+- 均经 `storage._atomic_write_json`（tmp → bak → rename）
 
 ---
 
@@ -112,128 +129,101 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 
 ### 3.1 控制变量法 — `PipelineConfig`
 
-每个 Pipeline 是一个完整的 Pydantic 模型（`backend/app/models.py`）。`DimensionRouter.route(dimension, selections)` 生成 configs 列表，只有被对比的维度字段变化；其余字段使用 `DEFAULT_BASE`（框架=langgraph、推理=react、上下文=sliding、Harness=bare、Prompt=zero_shot、`prompt_version="v1.0.0"`）。
+`DimensionRouter.route(dimension, selections)` 只变对比维度字段；其余用 `DEFAULT_BASE`（框架=langgraph、推理=react、上下文=sliding、Harness=bare、Prompt=zero_shot、`prompt_version="v1.0.0"`）。
 
 ### 3.2 并行执行 — `RunnerPool.stream_parallel`
 
-```python
-queue: asyncio.Queue[ArenaEvent | None] = asyncio.Queue()
-workers = [asyncio.create_task(worker(c)) for c in configs]
-# 主循环 yield queue 中的事件，直到收到 len(configs) 个 None 哨兵
-```
-
-`CancelledError` 时：取消所有 worker → `asyncio.gather(*workers, return_exceptions=True)` 等待清理 → 重新 raise。
+`asyncio.Queue` 合并多路事件；`CancelledError` 时取消 worker → `gather(..., return_exceptions=True)` → 再 raise。对外错误走 `sanitize_error_message`。
 
 ### 3.3 工作空间隔离 — `contextvars.ContextVar`
 
-`_current_workspace: ContextVar[str | None] = ContextVar("current_workspace")`。每个 Adapter 在进入时 `set_current_workspace(ws_name)`，工具通过 `_get_ws()` 拿到当前 workspace。**为什么不是 `threading.local`**：asyncio 任务会在不同线程间调度，`threading.local` 会在 `await` 时丢失；`ContextVar` 是官方异步栈感知方案。
+异步栈感知；工具经 `_get_ws()` 取当前 workspace。名称带 UUID 短后缀，避免同 label 覆盖。
 
-### 3.4 Tool 沙箱 — 独立进程 + AST 静态校验
+### 3.4 Tool 沙箱 — 独立进程 + AST
 
-- `_safe_run_code(code, timeout)`：用 `mp.get_context("spawn")` 启动子进程，AST 先做静态检查（阻断 `__class__` 等 dunder、常见反射名、import），再执行
-- 超时 `proc.join(timeout)` → `proc.terminate()` → 等 1s → `proc.kill()`
-- 并发上限 `_RUN_CODE_SEM = threading.Semaphore(4)`，避免资源耗尽
+`run_code`：`spawn` 子进程、AST 阻断 dunder/import、超时 terminate/kill、Semaphore(4)、输出截断。`calculate`：AST 白名单 + 大指数拦截。
 
-### 3.5 LLM 用量统计 — 多源回退
+### 3.5 任务模板 + 判分
 
-`extract_usage`：
-1. `output.usage_metadata`（LangChain 标准）
-2. `output.response_metadata.usage` / `token_usage`（OpenAI 风格）
-3. 都没有 → 走 `estimate_tokens(text)//3` 估算路径
-
-`TokenTracker._usage_from_api` 标记是否曾拿到真实用量，决定 `effective_input_tokens` 走哪条路径。
+模板携带 `JudgeSpec`；前端跑完后调用 `/judge`。判分纯函数、确定性，不做语义判断（语义属 Harness L3）。
 
 ### 3.6 Harness 循环 — `astream_events` 拦截
 
-`HarnessRunner.stream_events` 直接 yield LangGraph 的图事件，但额外注入 `_harness: True` 的控制事件（verify / reflect / harness_edit）。Adapter 在事件循环里识别这种事件，转成对应 `ArenaEvent` 推给前端。
+注入 `_harness: True` 控制事件；`verify_result` 解析失败默认未通过。
 
-`verify_result` 解析失败时**默认未通过**（不静默放行，避免削弱 Harness 对比意义）。
+### 3.7 上下文策略
 
-### 3.7 上下文策略 — `vector` 在 Prompt 层注入
+`vector` 在 Prompt 层注入 TF-IDF top-3（Workspace 惰性缓存）；其余走 `ContextManager`。
 
-`build_messages(..., context=...)`：当 `context == "vector"` 且工作空间有文件时，构建 `SimpleVectorStore` 检索 top-3 相关片段，附到 user prompt 后。`summary` / `hybrid` / `sliding` 走 `ContextManager`。
+### 3.8 Trace 流式渲染
 
-### 3.8 Trace 流式渲染 — 稳定 key
-
-`TraceView.mergeEvents` 用 `Map<"type:step", index>` 维护同一段的索引，避免 O(n) 扫描；`thought / thought_delta / thought_end` 共用 `thought:N` key，thought 段边收 delta 边累积，`thought_end` 切到完整 Markdown 渲染。
+`TraceView.mergeEvents` 用稳定 key 归并 `thought_delta`；`thought_end` 切完整 Markdown。
 
 ---
 
 ## 4. 修改意见（已知遗留问题与改进点）
 
-> 这些是**主动记录的待改进项**，不是缺陷清单；按优先级排序。
-> ✅ 标记 = 已在 `feat/templates-roadmap` 分支解决。
+> ✅ = 已在近期分支解决；其余按优先级保留。
 
-### 4.1 高优先级
+### 4.1 高优先级（多数已关闭）
 
-1. **测试运行数不一致** ✅
-   - CI 已加 `pytest tests/ --collect-only -q | tail -1` 用例数统计；README/PROGRESS 以实测 267+ 为准
+1. **测试运行数不一致** ✅ — CI collect-only；文档以 29/268 为准
+2. **`is_mvp_ready` 死代码** ✅ — 已删
+3. **`SimpleVectorStore` 每次重建** ✅ — Workspace `rag_store()` 惰性缓存
+4. **API Key SSE 泄漏** ✅ — `sanitize_error_message`
+5. **Project 落盘失败仍 200** ✅ — 抛错 + HTTP 500
+6. **前端无 ErrorBoundary** ✅ — `error.tsx` + `global-error.tsx`
+7. **ExperimentPanel 多 PUT** ✅ — 单一 `flushParams`
+8. **CI 无 mypy** ✅ — 硬性门槛，`app/` 零错误
 
-2. **`is_mvp_ready` 死代码** ✅
-   - 已删除 `router.py` 的 `is_mvp_ready`，测试改为「所有维度 route 出 ≥2 条 pipeline」
+### 4.2 中优先级（仍开放）
 
-3. **`SimpleVectorStore` 每次重建** ✅
-   - 已实现 **Workspace 惰性缓存**（`Workspace.rag_store()`）：文件变更（write/append/create/delete）自动失效；
-     过滤 `.gitkeep`、单文件截断 4000 字符；`context_manager._maybe_vector_snippets` 复用缓存
-
-### 4.2 中优先级
-
-4. **Workspace TTL=1h 对 Arena 长会话不够**
-   - 保留：ArenaClient「保存为项目」已持久化 `workspace_files` 到 `projects.json`；TTL 回收不影响已保存项目
-   - LRU 淘汰已改为**优先淘汰最近 5 分钟未访问项**，保护运行中 pipeline ✅
-
-5. **`on_node_start` 黑名单耦合**
-   - 未处理（低影响：仅影响 thought 事件过滤的节点名）
-
-6. **`_pipeline_overrides` 自动重置保障** ✅
-   - 新增测试：CancelledError 路径下 finally 仍清空 ContextVar + adapter finally 源码级契约
-
-7. **TraceDiff 文本截断到 300 字符** ✅
-   - 已加「展开全文（N 字符）/收起」交互（`aria-expanded`）
+4. **Workspace TTL=1h** — 已保存项目不受影响；LRU 保护运行中项 ✅
+5. **`on_node_start` 黑名单耦合** — 低影响，未处理
+6. **`_pipeline_overrides` 取消路径** ✅ — ContextVar finally 测试覆盖
+7. **TraceDiff 300 字符截断** ✅ — 可展开全文
+8. **同步 `llm.invoke` 阻塞事件循环** — `reasoning_graph` / `harness` 仍同步调用
+9. **`_atomic_write_json` 无跨进程文件锁** — 有原子写/备份，无 flock
+10. **ArenaClient 巨型组件** — 仍约 1200+ 行，待拆分
+11. **前端无单元测试 / 无 SSE E2E** — 仍开放
+12. **`column-status-dot` 仅靠颜色** — ARIA 未补全
 
 ### 4.3 低优先级
 
-8. **前端无 i18n** — 暂缓（中文优先为产品定位）
+8. **前端无 i18n** — 暂缓
+9. **任务模板库** ✅ — Phase 9
+10. **`openai_chat` Provider** — Settings 高级选项已提示
+11. **pre-commit 与 ruff 行长 160** — 保持一致
+12. **学习路径 UI** ✅ — Phase 8
 
-9. **任务模板库** ✅
-   - Phase 9 已落地：`arena/templates.py` 8 个模板 + `arena/judging.py` 判分器 + 前端自动判分徽章
-
-10. **`openai_chat` Provider 默认 Anthropic** — Settings UI 高级选项已提示格式差异
-
-11. **CI 没跑 mypy** ✅
-    - CI 已加 `mypy app/ --ignore-missing-imports` 硬性门槛；`app/` 当前零错误
-    - 修复过程中顺带升级：`PipelineConfig.reasoning/context/harness/prompt_profile` 为 Literal 类型、
-      `FrameworkAdapter` Protocol 声明 async generator 语义、`_sanitize_for_json` 接受内容块列表
-
-12. **pre-commit 与 ruff 行长 160** — 保持一致（未改）
+详见 [`CODE_REVIEW.md`](./CODE_REVIEW.md) 修复状态附录。
 
 ---
 
 ## 5. 路线图（基于现状的修订）
 
-> 原 PRD 路线图已与实际进展错位；以下按当前代码反推未来工作。
-
 | 阶段 | 目标 | 状态 |
 |---|---|---|
-| Phase 1-5 | 已在 `main` 分支落地（5 个维度 + 对比报告 + Trace + Workspace + 项目） | ✅ |
-| Phase 8 | 学习路径引导 UI（`/learn` 6 周计划 + Arena URL 预填） | ✅ |
-| Phase 9 | 任务模板库（8 个预置模板 + 确定性判分器 + 前端判分徽章） | ✅ |
-| Phase 6 | Adapter 接入 AutoGen / CrewAI（Python 3.14 环境依赖不可装，保持预留条目） | ⏳ |
-| Phase 7 | MCP 集成（PRD §4.3） | 📝 规划 |
-| Phase 10 | Harness Lab（独立 YAML 编辑器） | 📝 规划 |
-| Phase 11 | CI 加 mypy（✅ 已完成）/ Node 版本矩阵 | ⏳ |
+| Phase 1-5 | 5 维度 + 对比报告 + Trace + Workspace + 项目 + 安全硬化 | ✅ |
+| Phase 8 | 学习路径引导 UI（`/learn`） | ✅ |
+| Phase 9 | 任务模板库 + 确定性判分器 | ✅ |
+| Phase 11 | CI mypy 硬性门槛 | ✅ |
+| Phase 6 | AutoGen / CrewAI Adapter（Python 3.14 暂不可装） | ⏳ |
+| Phase 7 | MCP 集成 | 📝 规划 |
+| Phase 10 | Harness Lab（YAML Primitive 编辑器） | 📝 规划 |
+| 后续 | Node/OS 矩阵、前端 vitest、SSE E2E、文件锁、异步 LLM | ⏳ |
 
 ---
 
 ## 6. 重要事实速查
 
-- **前端框架**：Next.js 16.2.10。⚠️ `frontend/AGENTS.md` 明确警告：**This is NOT the Next.js you know**，写代码前必须读 `node_modules/next/dist/docs/`，已弃用的 API 与训练数据可能不一致
-- **默认 Provider**：StepFun（`anthropic_messages` 兼容），Base URL `https://api.stepfun.com/step_plan`
+- **前端框架**：Next.js 16.2.10。⚠️ 写代码前读 `frontend/AGENTS.md` + `node_modules/next/dist/docs/`
+- **默认 Provider**：StepFun（`anthropic_messages`），Base URL `https://api.stepfun.com/step_plan`
 - **默认模型**：`step-3.7-flash`
-- **Provider 测试命令**：`Settings → 管理与测试`
-- **运行 Arena**：根目录 `cd backend && uvicorn app.main:app --reload --port 8000` + 另起终端 `cd frontend && npm run dev`
-- **跑全部测试**：`PYTHONPATH=backend pytest tests/ -v`（根目录）
-- **backend 测试数**：27 文件 / 约 228 函数（实测，仓库根 `tests/`）
-- **workspace 限制**：最多 32 个；空闲 > 1h 自动回收；LRU 淘汰
-- **run_code 超时**：1~10s，超时强制 terminate + kill 子进程
-- **请求体上限**：10MB，超出返回 413
+- **页面**：`/arena` `/learn` `/projects` `/settings`
+- **模板 API**：`GET /api/arena/templates`、`POST /api/arena/judge`
+- **跑测试**：`PYTHONPATH=backend pytest tests/ -v` → **29 文件 / 268 函数**
+- **lint / 类型**：`ruff check app/`、`mypy app/ --ignore-missing-imports`
+- **workspace**：最多 32；空闲 > 1h 回收；LRU 保护运行中
+- **run_code 超时**：1~10s，超时 terminate + kill
+- **请求体上限**：10MB → 413

@@ -1,9 +1,60 @@
 # AgentPrism 代码审查报告
 
 > **审查范围**：`backend/app/` + `frontend/src/` + `tests/` + `.github/workflows/` + 根配置
-> **审查时间**：2026-07-23（commit `cfac8df docs: 新增 PROGRESS.md 并同步 README/PRD 与当前实现`）
+> **原审查时间**：2026-07-23（commit `cfac8df`）
 > **审查方式**：4 个并行只读子 agent（架构 / 安全 / 错误处理 / 前端测试）+ 主 agent 整合
-> **本报告性质**：**只读审查，未修改任何代码**。所有发现按严重度排序；标 ✅ 的"已确认"指已读源码验证，标 🔎 的"推测"指需进一步运行验证。
+> **本报告性质**：§0–§6 为**历史只读审查快照**（未改写原文发现）。修复进度见下方 **§A 修复状态更新**。
+
+---
+
+## A. 修复状态更新（2026-08-03 / HEAD `ef55504`）
+
+> 对照原报告高/中项与当前代码核对。✅ = 已修复；🟡 = 部分修复；❌ = 仍存在。
+
+### 关键高优先级
+
+| 原问题 | 状态 | 说明 |
+|---|---|---|
+| API Key 经 SSE 泄漏 | ✅ | `runner` → `sanitize_error_message`（仅异常类型名） |
+| Project 落盘失败仍 200 | ✅ | `_save` 抛错；API 返回 HTTP 500；失败回滚内存 |
+| 前端无 ErrorBoundary | ✅ | `app/error.tsx` + `app/global-error.tsx` |
+| ExperimentPanel 5 滑块并发 PUT | ✅ | 单一 `flushParams` + 共享 pending（未加 debounce） |
+| 全局 `:focus-visible` | ✅ | `globals.css` 已加 |
+| CI 无 mypy | ✅ | `ci.yml` 硬性门槛；`app/` 零错误 |
+| Workspace 同名覆盖 | ✅ | adapters UUID 短后缀 |
+| `_atomic_write_json` 无文件锁 | 🟡 | 已统一到 `storage.py`（原子写+备份）；**仍无跨进程锁** |
+| 同步 `llm.invoke` 阻塞事件循环 | ❌ | `reasoning_graph` / `harness` 仍同步 |
+| ArenaClient 巨型组件 | ❌ | 现约 1200+ 行，未拆分 |
+| `column-status-dot` 仅靠颜色 | ❌ | 仍缺 `role="status"` / `aria-label` |
+| 前端 0 测试 / 无 SSE E2E | ❌ | 仍无 vitest / 无 wire 协议 E2E |
+
+### 中优先级摘要
+
+| 主题 | 状态 |
+|---|---|
+| 前端 `ArenaEvent` 联合类型 | ✅ discriminated union |
+| Provider 采样参数 bounds | ✅ `ge`/`le` |
+| `workspace_names` max_length | ✅ |
+| 第三方 logger 隔离 | ✅ WARNING |
+| RAG fence + 免责声明 | 🟡 有 fence，语义注入面仍在 |
+| `run_code` 安全加固 | 🟡 子进程+AST+截断+队列清理；Semaphore 仍可堵事件循环 |
+| `_detect_injection` | 🟡 扩中文/NFKC；零宽等未全覆盖 |
+| 表头 `scope` / 部分 ARIA | 🟡 部分补齐 |
+| Adapter 反向依赖 arena | ❌ |
+| `/run` 无速率限制 | ❌ |
+| `confirm()` 危险操作 | ❌ |
+
+### 文档数字勘误（相对原报告）
+
+| 原报告说法 | 当前事实 |
+|---|---|
+| 20 测试文件 / 146 用例 | **29** / **268** |
+| ArenaClient ~850 行 | ~1200+ 行 |
+| `_atomic_write_json` 双份实现 | 统一 `app/storage.py` |
+| 前端无 error.tsx | 已有 |
+| `api_key` max 256 | 现 `max_length=4096` |
+
+**原报告 §0–§6 下文保留作历史证据，行号/状态可能已过时；以本节与 [`PROGRESS.md`](./PROGRESS.md) 为准。**
 
 ---
 

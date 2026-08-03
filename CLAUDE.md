@@ -23,9 +23,10 @@ backend/app/
 ├── main.py                  # FastAPI 入口（lifespan、CORS、请求大小限制、日志）
 ├── config.py                # 配置加载（.env + JSON）
 ├── models.py                # Pydantic 模型
+├── storage.py               # 原子写 JSON（tmp → bak → rename）
 ├── api/                     # FastAPI 路由
 │   ├── __init__.py
-│   ├── arena.py             # Arena API（meta、run/SSE、workspace CRUD、projects CRUD）
+│   ├── arena.py             # Arena API（meta、run/SSE、templates、judge、workspace、projects）
 │   └── settings.py          # Provider 配置 API（GET/PUT /test）
 ├── arena/                   # Arena 核心逻辑
 │   ├── router.py            # 维度路由（5 维度全启用）
@@ -33,12 +34,17 @@ backend/app/
 │   ├── prompts.py           # Prompt 模板 + build_messages（4 profiles）
 │   ├── llm.py               # LLM 客户端工厂（ChatAnthropic / ChatOpenAI）
 │   ├── tools.py             # 统一 Tool 集（11 个工具 + 沙箱）
+│   ├── tool_guard.py        # 工具相关性守卫（拦截跑题 tool_calls）
+│   ├── message_sanitize.py  # 消息消毒 + 任务锚定
 │   ├── workspace.py         # Agent 工作空间（contextvars.ContextVar 隔离）
 │   ├── context_manager.py   # 上下文策略
 │   ├── reasoning.py         # 推理模式 prompt 模板
 │   ├── reasoning_graph.py   # 推理模式 LangGraph 图
 │   ├── harness.py           # Harness 引擎（验证/反思/自进化）
 │   ├── rag.py               # RAG 向量检索（TF-IDF）
+│   ├── templates.py         # 任务模板库（8 个预置可判分模板）
+│   ├── judging.py           # 确定性判分器（无 LLM）
+│   ├── errors.py            # 对外错误脱敏（仅异常类型名）
 │   ├── agent_state.py       # AgentState 共享 TypedDict 定义
 │   ├── project.py           # 项目管理
 │   ├── token_utils.py       # Token 统计
@@ -51,19 +57,22 @@ backend/app/
 │   ├── langchain_adapter.py
 │   └── langgraph_adapter.py
 
-tests/                       # 单元测试（pytest，仓库根目录；约 27 文件 / 228 用例）
+tests/                       # 单元测试（pytest，仓库根目录；29 文件 / 268 个 test_）
 
 frontend/src/
 ├── app/                     # 页面（App Router）
-│   ├── page.tsx             # 根页面
+│   ├── page.tsx             # 根页面（重定向 /arena）
 │   ├── layout.tsx           # 根布局
+│   ├── error.tsx            # 路由级错误边界
+│   ├── global-error.tsx     # 全局错误边界
 │   ├── arena/               # Arena 页面 + ArenaClient
 │   │   ├── page.tsx
 │   │   └── ArenaClient.tsx
+│   ├── learn/page.tsx       # 学习路径（6 周引导）
 │   ├── settings/page.tsx    # Provider 配置
 │   └── projects/page.tsx    # 项目管理
 ├── components/              # UI 组件
-│   ├── AppShell.tsx         # 导航栏
+│   ├── AppShell.tsx         # 导航栏（Arena / 学习路径 / 项目 / 设置）
 │   ├── ThemeToggle.tsx      # 主题切换
 │   ├── TraceView.tsx        # 轨迹渲染
 │   ├── WorkspacePanel.tsx   # 工作空间（含文件编辑器）
@@ -71,11 +80,12 @@ frontend/src/
 │   ├── TokenStatsPanel.tsx  # Token 统计
 │   └── TraceDiff.tsx        # Trace 对比
 ├── lib/
-│   └── api.ts               # 前端 API 层（12 个函数）
-└── globals.css              # 全局样式
+│   └── api.ts               # 前端 API 层（15 个函数）
+
+# 全局样式：frontend/src/app/globals.css
 
 .github/workflows/          # CI
-└── ci.yml                   # GitHub Actions（backend-test + frontend-build）
+└── ci.yml                   # GitHub Actions（ruff + mypy + pytest + tsc + build）
 
 .pre-commit-config.yaml      # pre-commit hooks（ruff + trailing-whitespace + check-yaml 等）
 scripts/
@@ -105,10 +115,13 @@ scripts/
 - 所有新模块必须有对应 `tests/test_xxx.py`（仓库根目录）
 - 运行测试: `PYTHONPATH=backend pytest tests/ -v`（仓库根目录）
 - 运行 lint: `cd backend && ruff check app/`
-- Pydantic 模型放在 `models.py`
+- 运行类型检查: `cd backend && mypy app/ --ignore-missing-imports`
+- Pydantic 模型放在 `models.py`（模板/判分相关模型可在对应模块内）
 - Tool 定义在 `arena/tools.py`，纯函数提取为 `_safe_xxx` 便于测试
 - SSE 事件统一用 `ArenaEvent` + `json.dumps(ensure_ascii=False)`
+- 对外错误用 `sanitize_error_message`（仅异常类型名），不泄露堆栈/密钥
 - 线程安全: Agent 工作空间通过 `contextvars.ContextVar` 隔离（异步栈感知，非 threading.local）
+- JSON 持久化走 `storage._atomic_write_json`
 - 优先用标准库，不引入新依赖
 
 ### 前端
@@ -126,17 +139,18 @@ scripts/
   - type: `feat` / `fix` / `refactor` / `test` / `chore` / `style` / `docs`
   - scope: `backend` / `frontend` / `arena` / `ui` / `security` / `ci`
 - **大功能**: 新开分支开发 → 测试全绿 → fast-forward 合并到 main
-- **pre-commit + CI**: pre-commit（ruff + trailing-whitespace + check-yaml）+ CI（ruff + pytest + tsc + build）自动校验
+- **pre-commit + CI**: pre-commit（ruff + trailing-whitespace + check-yaml）+ CI（ruff + mypy + pytest + tsc + build）自动校验
 
 ## 7. 安全约束
 
-- `calculate` 工具: 白名单 AST 节点，仅允许数字 + 算术运算符
-- `run_code` 工具: 沙箱命名空间仅暴露安全内置函数
+- `calculate` 工具: 白名单 AST 节点，仅允许数字 + 算术运算符；拦截大指数幂
+- `run_code` 工具: 独立进程沙箱 + AST 静态校验 + 1–10s 超时 terminate/kill + 输出截断
 - 路径规范化: 拒绝绝对路径、`..`、`./`
 - Tool 调用通过 `contextvars.ContextVar` 隔离
-- Provider API Key 脱敏返回
+- Provider API Key 脱敏返回；SSE 错误仅暴露异常类型名
 - 请求体大小限制 10MB（防止超大请求）
 - SSE 客户端断开: 捕获 `CancelledError` 优雅退出
+- RAG / Harness: 检索片段 fence + prompt 注入脱敏
 
 ## 8. 适配器扩展（新增框架）
 

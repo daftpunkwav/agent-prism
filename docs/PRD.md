@@ -2,11 +2,13 @@
 
 > **配套文档**
 > - 当前实现状态、修改意见、未实现清单：[`PROGRESS.md`](./PROGRESS.md)
-> - 测试统计（20 文件 / 146 函数）与 CI 配置：[`PROGRESS.md` §2.3–2.4](./PROGRESS.md)
+> - 测试统计（29 文件 / 268 个 `test_`）与 CI 配置：[`PROGRESS.md` §2.3–2.4](./PROGRESS.md)
+> - 代码审查与修复状态：[`CODE_REVIEW.md`](./CODE_REVIEW.md)
 > - 路线图（基于现状修订）：[`PROGRESS.md` §5](./PROGRESS.md)
 >
 > **原则**：本文档只描述**产品意图**（why / what）；实现细节与变更记录以 `PROGRESS.md` 为准。
 > 「尚未实现」「当前实现」「与早期版本差异」等描述直接标注在原章节中，便于读者识别文档时序。
+> 数据截止：2026-08-03（Phase 8 学习路径 + Phase 9 任务模板库已落地）。
 
 ## 1. 产品概述
 
@@ -68,9 +70,9 @@ AgentPrism 是一个 Agent 对比实验台（Arena）。用户输入一个问题
 |---------|------|------|-----|------|
 | `framework` | 框架 | 2 | ✅ | LangChain vs LangGraph |
 | `prompt` | 提示词策略 | 4 | ✅ | 同一编排，不同 Prompt _PROFILE |
-| `reasoning` | 推理模式 | 4 | Phase 2 | ReAct / CoT+Tool / ToT / Reflexion |
-| `context` | 上下文策略 | 4 | Phase 2 | 滑动窗口 / 摘要 / 向量 / 混合 |
-| `harness` | Harness | 4 | Phase 2 | 裸运行 / 验证 / 反思 / 自进化 |
+| `reasoning` | 推理模式 | 4 | ✅ | ReAct / CoT+Tool / ToT / Reflexion |
+| `context` | 上下文策略 | 4 | ✅ | 滑动窗口 / 摘要 / 向量 / 混合 |
+| `harness` | Harness | 4 | ✅ | 裸运行 / 验证 / 反思 / 自进化 |
 
 ---
 
@@ -78,8 +80,8 @@ AgentPrism 是一个 Agent 对比实验台（Arena）。用户输入一个问题
 
 | 列 | 框架 | 编排方式 | 核心特点 | 状态 |
 |----|------|---------|---------|------|
-| 1 | LangChain | AgentExecutor + Tools | 链式组合，ReAct 生态成熟 | MVP 实现 |
-| 2 | LangGraph | StateGraph + Nodes | 图编排，显式状态与检查点 | MVP 实现 |
+| 1 | LangChain | `create_agent` + Tools | 链式组合，ReAct 生态成熟 | 已实现 |
+| 2 | LangGraph | StateGraph + Nodes | 图编排，显式状态与检查点 | 已实现 |
 
 **预留扩展**（实现 `FrameworkAdapter` 接口后注册即可接入，无需改 Arena 核心）：
 
@@ -107,7 +109,7 @@ Prompt 模板版本化管理（`prompt_version`），写入 Trace 元数据，�
 
 ---
 
-**维度三：推理模式对比**（4 列，Phase 2）
+**维度三：推理模式对比**（4 列，已实现）
 
 | 列 | 模式 | 流程 | 适用场景 |
 |----|------|------|---------|
@@ -118,7 +120,7 @@ Prompt 模板版本化管理（`prompt_version`），写入 Trace 元数据，�
 
 ---
 
-**维度四：上下文策略对比**（4 列，Phase 2）
+**维度四：上下文策略对比**（4 列，已实现）
 
 适用于**脚本化多轮任务**（任务模板驱动，非单次问答）：
 
@@ -126,12 +128,12 @@ Prompt 模板版本化管理（`prompt_version`），写入 Trace 元数据，�
 |----|------|------|------|
 | 1 | 滑动窗口 | 保留最近 N 条消息 | 简单但丢失早期信息 |
 | 2 | 摘要压缩 | 超阈值时对旧消息做摘要 | 信息保留好但有摘要损失 |
-| 3 | 向量检索 | 按 embedding 相似度检索历史 | 相关性强但缺少时序 |
+| 3 | 向量检索 | 按 TF-IDF 余弦相似度检索工作空间片段 | 相关性强但缺少时序 |
 | 4 | 混合策略 | 摘要 + 向量 + 滑动窗口 | 综合最优但复杂 |
 
 ---
 
-**维度五：Harness 对比**（4 列，Phase 2）
+**维度五：Harness 对比**（4 列，已实现）
 
 | 列 | Harness 级别 | 特征 |
 |----|-------------|------|
@@ -205,21 +207,22 @@ Prompt 模板版本化管理（`prompt_version`），写入 Trace 元数据，�
 
 任务模板库中的题目优先使用**可自动判分**的检查项（代码可执行、JSON 可解析、关键词命中等）；开放题不生成硬排名，仅展示指标与软分析。
 
-### 2.2 任务模板库（规划中，尚未实现）
+### 2.2 任务模板库（已实现）
 
-预置不同类型的任务模板，覆盖 Agent 的典型场景：
+预置 **8 个可自动判分** 任务模板（`arena/templates.py`），覆盖典型 Agent 场景；判分由确定性引擎完成（`arena/judging.py`，无 LLM 依赖）：
 
-| 模板 | 描述 | 测试重点 |
-|------|------|---------|
-| 信息检索 | "对比 React 和 Vue 的性能差异" | 工具调用准确性 |
-| 代码生成 | "写一个并发爬虫并解释原理" | 代码正确性 + 推理深度 |
-| 多步推理 | "分析这个API的设计缺陷并提出改进" | 推理链完整性 |
-| 长上下文 | "总结这篇论文并指出三个关键贡献" | 上下文保持能力 |
-| 工具组合 | "查询北京天气+推荐穿搭+生成购物清单" | 多工具编排能力 |
+| 模板 ID | 名称 | 判分类型 | 测试重点 |
+|---------|------|---------|---------|
+| `json_profile` | JSON 结构化输出 | `json` | 格式遵从（L1） |
+| `arithmetic_mix` | 混合算术 | `numeric` | 多步计算准确性 |
+| `prime_count` | 100 以内质数 | `numeric` | 多步推理可判分 |
+| `fibonacci_code` | 斐波那契函数 | `code` | 代码语法 + 结构 |
+| `builtin_types` | Python 内置数据结构 | `keyword` | 知识检索命中 |
+| `no_refusal` | 拒绝检测 | `exclude` | 鲁棒性（不拒答） |
+| `time_until_midnight` | 距离午夜分钟数 | `regex` | 工具组合多轮 |
+| `string_reverse` | 字符串反转 | `code` | 代码生成 + 解释 |
 
-用户也可自定义任务。
-
-> **注意**：任务模板库尚未实现，当前用户需手动输入问题或点击 Arena 页面底部的三个 in-page 示例模板。
+API：`GET /api/arena/templates`、`POST /api/arena/judge`。Arena 底部按「可判分」分组展示；运行完成后自动判分（列徽章 + 对比报告判分列）。用户也可手动输入自定义问题（开放题不生成硬排名）。
 
 ### 2.3 Trace 回放
 
@@ -257,7 +260,7 @@ Prompt 模板版本化管理（`prompt_version`），写入 Trace 元数据，�
 | 第5周 | Harness 工程 | Harness 对比（裸运行 / 验证 / 反思 / 自进化） |
 | 第6周 | 综合实战 | 自定义任务 + 参数复现，独立完成实验报告 |
 
-> **注意**：学习路径引导 UI 尚未实现（Phase 8 规划中），以上为内容设计建议。
+> **当前状态**：学习路径引导 UI 已落地（`/learn`，Phase 8）。每步一键跳转 Arena 并预填 `dimension` / `template` URL 参数；导航栏「学习路径」入口可用。
 
 ---
 
@@ -268,12 +271,13 @@ Prompt 模板版本化管理（`prompt_version`），写入 Trace 元数据，�
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        Frontend (Next.js 16)                  │
-│  Arena UI │ Projects │ Settings │ Trace Viewer               │
+│  Arena UI │ Learn │ Projects │ Settings │ Trace Viewer       │
 └───────────────────────────┬─────────────────────────────────┘
                             │ SSE / REST
 ┌───────────────────────────┴─────────────────────────────────┐
 │                     API Gateway (FastAPI)                     │
-│  /arena/run │ /arena/meta │ /arena/workspace │ /arena/projects│
+│  /arena/run │ /arena/meta │ /arena/templates │ /arena/judge  │
+│  /arena/workspace │ /arena/projects                          │
 │  /settings/provider │ /settings/provider/test                │
 │  /api/health                                                 │
 └───────────────────────────┬─────────────────────────────────┘
@@ -657,7 +661,8 @@ class MCPToolBridge:
 
 | 页面 | 路径 | 说明 |
 |------|------|------|
-| Arena | `/arena` | 主实验台（多列并行 + 流式输出） |
+| Arena | `/arena` | 主实验台（多列并行 + 流式输出 + 任务模板/判分） |
+| 学习路径 | `/learn` | 6 周引导，一键预填 Arena 实验 |
 | Projects | `/projects` | 项目管理（创建/查看/删除项目） |
 | Settings | `/settings` | Provider 配置（API Key + Base URL + 模型选择 + 连接测试） |
 
@@ -846,13 +851,24 @@ class MCPToolBridge:
 - [x] 项目数据原子写（`.tmp → .bak → rename`）防止崩溃丢数据
 - [x] 测试根目录迁移至仓库根 `tests/`，CI `PYTHONPATH=backend pytest tests/ -v`（`backend/tests/` 已弃用）
 
-### Phase 6：MCP + 学习路径（后续）
+### Phase 8：学习路径引导 UI ✅
 
+- [x] `/learn` 6 周学习路径页面
+- [x] 每步一键跳转 Arena（`dimension` / `template` URL 预填）
+- [x] AppShell 导航入口「学习路径」
+
+### Phase 9：任务模板库 + 自动判分 ✅
+
+- [x] `arena/templates.py` 8 个预置可判分模板
+- [x] `arena/judging.py` 确定性判分（json / keyword / code / numeric / exclude / regex）
+- [x] `GET /api/arena/templates` + `POST /api/arena/judge`
+- [x] Arena 可判分徽章 + 对比报告判分列
+
+### Phase 6 / 7 / 10：后续规划
+
+- [ ] AutoGen / CrewAI Adapter 实装（Phase 1 即预留；Python 3.14 环境依赖暂不可装）
 - [ ] MCP Server / Client（§4.3 草案已有，但未实装）
-- [ ] 学习路径引导 UI（§2.5 内容设计已写，UI 未实现）
-- [ ] 任务模板库（§2.2，可自动判分）
 - [ ] Harness Lab 独立编辑器（§4.2 Primitive 组装 + YAML 导入导出）
-- [ ] AutoGen / CrewAI Adapter 实装（Phase 1 即预留，Phase 6 推进）
 
 ---
 

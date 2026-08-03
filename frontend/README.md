@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AgentPrism Frontend
 
-## Getting Started
+Next.js 16 App Router 前端：Arena 实验台、学习路径、项目管理、Provider 设置。
 
-First, run the development server:
+> ⚠️ **This is NOT the Next.js you know.** 写代码前务必读 [`AGENTS.md`](./AGENTS.md) 与 `node_modules/next/dist/docs/`。
+
+## 技术栈
+
+- Next.js **16.2.10** + React **19.2.4** + TypeScript 5.9
+- Tailwind CSS v4
+- 状态：仅 React 内置 hooks（无 Zustand/Redux）
+- Markdown：`react-markdown` + `remark-gfm`
+
+## 页面
+
+| 路径 | 说明 |
+|------|------|
+| `/` | 重定向到 `/arena` |
+| `/arena` | 主实验台（五维度对比 + SSE 流式 + 判分） |
+| `/learn` | 6 周学习路径（一键预填 Arena） |
+| `/projects` | 项目管理 |
+| `/settings` | Provider BYOK 配置 |
+
+## 本地开发
 
 ```bash
+# 需先启动后端（默认 http://localhost:8000）
+cd frontend
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开 http://localhost:3000。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+也可使用仓库脚本：`scripts/dev-frontend.ps1`。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 校验
 
-## Learn More
+```bash
+npx tsc --noEmit
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 目录要点
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/           # App Router 页面 + error.tsx / global-error.tsx
+├── components/    # TraceView / WorkspacePanel / ExperimentPanel 等
+└── lib/api.ts     # 与后端契约（15 个 API 函数）
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+后端与整体说明见仓库根 [`README.md`](../README.md)；开发约束见 [`CLAUDE.md`](../CLAUDE.md)。
