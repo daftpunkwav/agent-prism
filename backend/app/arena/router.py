@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from app.arena.reasoning_graph import REASONING_MODES
 from app.arena.types import DimensionId
 from app.config import ProviderConfig, load_provider_config
 from app.models import BaselineOverrides, PipelineConfig
+
+if TYPE_CHECKING:
+    from app.adapters.base import FrameworkAdapterRegistry
 
 # 流水线默认值（控制变量法的基线）
 DEFAULT_BASE: dict = {
@@ -28,8 +32,8 @@ DIMENSION_FIELD: dict[DimensionId, str] = {
     "harness": "harness",
 }
 
-# 每个维度下可选项的元组 (字段名, 取值, 显示标签)
-DIMENSION_OPTIONS: dict[DimensionId, list[tuple[str, str, str]]] = {
+# 静态维度选项（framework 由 registry 动态覆盖）
+_STATIC_DIMENSION_OPTIONS: dict[DimensionId, list[tuple[str, str, str]]] = {
     "framework": [
         ("framework", "langchain", "LangChain"),
         ("framework", "langgraph", "LangGraph"),
@@ -57,6 +61,11 @@ DIMENSION_OPTIONS: dict[DimensionId, list[tuple[str, str, str]]] = {
     ],
 }
 
+# 可变视图：framework 可被 sync_framework_options_from_registry 覆盖
+DIMENSION_OPTIONS: dict[DimensionId, list[tuple[str, str, str]]] = {
+    k: list(v) for k, v in _STATIC_DIMENSION_OPTIONS.items()
+}
+
 # 支持的维度集合（用于 API 校验）
 SUPPORTED_DIMENSIONS: frozenset[DimensionId] = frozenset(DIMENSION_OPTIONS.keys())
 
@@ -64,6 +73,38 @@ SUPPORTED_DIMENSIONS: frozenset[DimensionId] = frozenset(DIMENSION_OPTIONS.keys(
 _BASELINE_OPTION_VALUES: dict[str, frozenset[str]] = {
     DIMENSION_FIELD[dim]: frozenset(v for _, v, _ in opts) for dim, opts in DIMENSION_OPTIONS.items()
 }
+
+
+def _rebuild_baseline_option_values() -> None:
+    """DIMENSION_OPTIONS 变更后重建基线校验集合。"""
+    global _BASELINE_OPTION_VALUES
+    _BASELINE_OPTION_VALUES = {
+        DIMENSION_FIELD[dim]: frozenset(v for _, v, _ in opts)
+        for dim, opts in DIMENSION_OPTIONS.items()
+    }
+
+
+def sync_framework_options_from_registry(registry: FrameworkAdapterRegistry) -> None:
+    """用已注册 Adapter 覆盖 framework 维度选项，兑现「register 后 UI 可用」。"""
+    available = registry.list_available()
+    if not available:
+        return
+    DIMENSION_OPTIONS["framework"] = [
+        ("framework", item["id"], item["name"]) for item in available
+    ]
+    _rebuild_baseline_option_values()
+    # 若默认 framework 不在可用列表，回退到第一项
+    ids = {item["id"] for item in available}
+    if DEFAULT_BASE["framework"] not in ids:
+        DEFAULT_BASE["framework"] = available[0]["id"]
+
+
+def reset_dimension_options() -> None:
+    """测试用：恢复静态 DIMENSION_OPTIONS（清除 registry 同步副作用）。"""
+    for key, opts in _STATIC_DIMENSION_OPTIONS.items():
+        DIMENSION_OPTIONS[key] = list(opts)
+    DEFAULT_BASE["framework"] = "langgraph"
+    _rebuild_baseline_option_values()
 
 
 @lru_cache(maxsize=1)
@@ -93,7 +134,10 @@ def _base(**overrides) -> PipelineConfig:
 
 def list_dimension_options(dimension: DimensionId) -> list[dict[str, str]]:
     """返回维度下所有可选项，供前端 checkbox 渲染。"""
-    return [{"field": field, "value": value, "label": label} for field, value, label in DIMENSION_OPTIONS.get(dimension, [])]
+    return [
+        {"field": field, "value": value, "label": label}
+        for field, value, label in DIMENSION_OPTIONS.get(dimension, [])
+    ]
 
 
 def list_baseline_fields() -> list[dict]:

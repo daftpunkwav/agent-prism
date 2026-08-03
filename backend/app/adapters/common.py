@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from app.arena.token_utils import TokenTracker
-from app.arena.tools import get_workspace_mgr
-from app.arena.workspace import WorkspaceManager
+from app.arena.workspace import WorkspaceManager, get_workspace_mgr
 from app.models import ArenaEvent, PipelineMetrics
 
 __all__ = [

@@ -6,17 +6,16 @@ import asyncio
 import json
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from app.adapters.common import get_workspace_mgr
 from app.arena.judging import judge_answers
 from app.arena.project import get_project_manager
 from app.arena.router import DEFAULT_BASE, list_baseline_fields, list_dimension_options
 from app.arena.runner import RunnerPool, build_registry
 from app.arena.templates import get_template, template_payloads
-from app.arena.workspace import WorkspaceError
-from app.models import ArenaRunRequest, ProjectCreate, WorkspaceFileUpsert
+from app.arena.workspace import WorkspaceError, get_workspace_mgr
+from app.config import settings as app_settings
+from app.models import ArenaRunRequest, JudgeRequest, ProjectCreate, WorkspaceFileUpsert
 
 router = APIRouter(prefix="/api/arena", tags=["arena"])
 
@@ -50,6 +49,7 @@ _DIMENSION_META: list[dict] = [
 
 _pool = RunnerPool(build_registry())
 _ws_mgr = get_workspace_mgr()
+_run_sem = asyncio.Semaphore(max(1, int(app_settings.max_concurrent_runs)))
 
 
 @router.get("/meta")
@@ -77,8 +77,12 @@ async def arena_meta():
 async def arena_run(request: ArenaRunRequest):
     async def event_generator():
         try:
-            async for event in _pool.stream_parallel(request):
-                yield {"event": "arena", "data": json.dumps(event.model_dump(), ensure_ascii=False)}
+            async with _run_sem:
+                async for event in _pool.stream_parallel(request):
+                    yield {
+                        "event": "arena",
+                        "data": json.dumps(event.model_dump(), ensure_ascii=False),
+                    }
         except asyncio.CancelledError:
             # 客户端断开 — runner 内部已取消所有 worker task，无需额外清理
             raise
@@ -87,13 +91,6 @@ async def arena_run(request: ArenaRunRequest):
 
 
 # ===== 任务模板 API =====
-
-
-class JudgeRequest(BaseModel):
-    """判分请求：template_id + {label: 最终答案文本}。"""
-
-    template_id: str = Field(min_length=1, max_length=100)
-    answers: dict[str, str] = Field(default_factory=dict, max_length=16)
 
 
 @router.get("/templates")
@@ -121,6 +118,7 @@ async def arena_judge(body: JudgeRequest):
 
 # 安全说明：当前为单用户本地部署模型，workspace 名含随机后缀不可预测。
 # 多用户部署时必须在此处增加所有权/会话校验，防止越权读写。
+# 可选：设置 AGENTPRISM_API_TOKEN 启用全 API 共享密钥认证。
 
 
 @router.get("/workspace/{workspace_name}/files")

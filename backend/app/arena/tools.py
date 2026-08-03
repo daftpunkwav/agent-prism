@@ -21,13 +21,20 @@ import logging
 import multiprocessing as _mp
 import sys
 import threading
-from contextvars import ContextVar
 from datetime import datetime, timezone
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from app.arena.workspace import Workspace, WorkspaceError, WorkspaceManager, get_current_workspace_name
+from app.arena.workspace import (
+    Workspace,
+    WorkspaceError,
+    get_current_workspace_name,
+    get_workspace_mgr,
+)
+
+# 兼容 re-export（测试仍可 ``from app.arena.tools import set_workspace_mgr_override``）
+from app.arena.workspace import set_workspace_mgr_override as set_workspace_mgr_override
 
 logger = logging.getLogger(__name__)
 
@@ -41,24 +48,6 @@ _RUN_CODE_SEM = threading.Semaphore(4)
 _MAX_RUN_CODE_OUTPUT = 32 * 1024
 # 子进程 join 后额外等待 terminate/kill 的秒数
 _PROCESS_KILL_GRACE = 1.0
-
-# 全局工作空间管理器（每个 Agent 运行独立创建 workspace）
-_workspace_mgr = WorkspaceManager()
-
-# 请求级覆盖（类似 llm.py 的 _pipeline_overrides）：
-# 测试可注入独立实例隔离状态，避免污染全局单例；生产代码不调用，行为不变。
-_workspace_override: ContextVar[WorkspaceManager | None] = ContextVar(
-    "ws_override", default=None
-)
-
-
-def get_workspace_mgr() -> WorkspaceManager:
-    return _workspace_override.get() or _workspace_mgr
-
-
-def set_workspace_mgr_override(mgr: WorkspaceManager | None) -> None:
-    """注入请求级工作空间管理器覆盖（供测试隔离）。传 None 恢复全局单例。"""
-    _workspace_override.set(mgr)
 
 
 # ===== 无状态工具 =====
@@ -102,9 +91,10 @@ def _safe_calculate(expression: str) -> str:
         ast.USub,
         ast.UAdd,
     )
-    # 防 CPU DoS：幂运算指数与任何数值常量的大小上限
-    _MAX_POW_EXPONENT = 1_000_000
+    # 防 CPU DoS：指数与常量上限刻意收紧（大底数^大指数仍可在 AST 通过后爆炸）
+    _MAX_POW_EXPONENT = 1_000
     _MAX_CONSTANT_ABS = 10**15
+    _MAX_RESULT_DIGITS = 4_096
     for node in ast.walk(tree):
         if not isinstance(node, ALLOWED_NODES):
             return "错误: 不允许的语法元素"
@@ -115,7 +105,11 @@ def _safe_calculate(expression: str) -> str:
                 return "错误: 数字过大"
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
             # 指数必须是字面常量且不超过上限（阻断 2**300000000 这类大整数 DoS）
-            if not (isinstance(node.right, ast.Constant) and isinstance(node.right.value, int) and abs(node.right.value) <= _MAX_POW_EXPONENT):
+            if not (
+                isinstance(node.right, ast.Constant)
+                and isinstance(node.right.value, int)
+                and abs(node.right.value) <= _MAX_POW_EXPONENT
+            ):
                 return "错误: 幂指数过大或不合法"
 
     try:
@@ -125,7 +119,13 @@ def _safe_calculate(expression: str) -> str:
             {"__builtins__": {}},
             {},
         )
-        return str(result)
+        if isinstance(result, int) and abs(result).bit_length() > _MAX_RESULT_DIGITS * 4:
+            # bit_length 约 3.32 bit/digit；用 4 作保守上界，避免超大 int 转 str 卡死
+            return "错误: 计算结果过大"
+        text = str(result)
+        if len(text) > _MAX_RESULT_DIGITS:
+            return "错误: 计算结果过大"
+        return text
     except Exception:
         # 不把内部异常文本回显给 LLM（避免泄漏路径/内部细节）
         logger.exception("calculate 失败: %s", expression[:200])
@@ -155,6 +155,13 @@ _FORBIDDEN_DUNDERS: frozenset[str] = frozenset({
     "__dict__",
     "__init_subclass__",
     "__subclasshook__",
+    "__code__",
+    "__reduce__",
+    "__reduce_ex__",
+    "__func__",
+    "__self__",
+    "__module__",
+    "__qualname__",
 })
 
 

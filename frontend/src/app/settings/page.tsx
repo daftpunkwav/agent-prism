@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, ExternalLink, Eye, EyeOff, Loader2, Zap } from "lucide-react";
 import { ProviderConfig, fetchProvider, saveProvider, testProvider } from "@/lib/api";
+import { safeHttpUrl } from "@/lib/safeUrl";
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -147,11 +148,15 @@ export default function SettingsPage() {
               onChange={(e) => setForm({ ...form, website_url: e.target.value })}
             />
             <a
-              href={form.website_url}
+              href={safeHttpUrl(form.website_url) ?? undefined}
               target="_blank"
               rel="noreferrer"
               className="btn-ghost shrink-0 !h-11 !w-11 !p-0"
               aria-label="打开官网链接"
+              aria-disabled={!safeHttpUrl(form.website_url)}
+              onClick={(e) => {
+                if (!safeHttpUrl(form.website_url)) e.preventDefault();
+              }}
             >
               <ExternalLink className="h-4 w-4" />
             </a>

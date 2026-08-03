@@ -121,3 +121,13 @@ class TestCalculateSecurity:
         assert _safe_calculate("2 + 3") == "5"
         assert _safe_calculate("(2 + 3) * 4") == "20"
         assert _safe_calculate("2 ** 8") == "256"
+
+    def test_rejects_huge_nested_power(self):
+        """合法 AST 但指数过大的嵌套幂必须拦截。"""
+        assert "过大" in _safe_calculate("(10**15)**1000000")
+        assert "过大" in _safe_calculate("2 ** 1001")
+
+    def test_allows_max_reasonable_power(self):
+        """结果位数过大时拒绝（避免 str 卡死）；2**1000 仍允许。"""
+        assert _safe_calculate("2 ** 1000").startswith("10715086")
+

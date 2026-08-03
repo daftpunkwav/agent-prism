@@ -13,12 +13,12 @@ import time
 import uuid
 from dataclasses import dataclass, field
 
-from app.adapters.common import build_metrics, get_workspace_mgr, token_update_event
+from app.adapters.common import build_metrics, token_update_event
 from app.arena.llm import set_pipeline_llm_overrides
 from app.arena.prompts import build_messages
 from app.arena.stream_utils import extract_chunk_parts
 from app.arena.token_utils import TokenTracker, extract_usage
-from app.arena.workspace import set_current_workspace
+from app.arena.workspace import get_workspace_mgr, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
 logger = logging.getLogger(__name__)

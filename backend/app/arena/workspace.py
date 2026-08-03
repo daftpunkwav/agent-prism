@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 # 上下文变量：当前请求/任务的工作空间名称
 _current_workspace: ContextVar[str | None] = ContextVar("current_workspace", default=None)
 
+# 请求级覆盖：测试可注入独立实例隔离状态；生产不调用，行为不变。
+_workspace_override: ContextVar[WorkspaceManager | None] = ContextVar(
+    "ws_override", default=None
+)
+
 # 默认：最多保留 32 个工作空间；空闲超过 1 小时回收
 DEFAULT_MAX_WORKSPACES = 32
 DEFAULT_TTL_SECONDS = 3600.0
@@ -323,3 +328,17 @@ class WorkspaceManager:
             removed += 1
             logger.info("Workspace LRU 淘汰: %s", oldest)
         return removed
+
+
+# 全局单例必须在 WorkspaceManager 类定义之后初始化
+_workspace_mgr = WorkspaceManager()
+
+
+def get_workspace_mgr() -> WorkspaceManager:
+    """返回当前生效的 WorkspaceManager（支持测试 override）。"""
+    return _workspace_override.get() or _workspace_mgr
+
+
+def set_workspace_mgr_override(mgr: WorkspaceManager | None) -> None:
+    """注入请求级工作空间管理器覆盖（供测试隔离）。传 None 恢复全局单例。"""
+    _workspace_override.set(mgr)

@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     # 请求体大小上限（字节），超过返回 413
     max_request_size: int = 10 * 1024 * 1024
+    # 可选 API Token；非空时除 /api/health 外需 Bearer / X-API-Token
+    api_token: str = ""
+    # 同时进行的 Arena run 上限（防止无认证时成本/资源耗尽）
+    max_concurrent_runs: int = 4
 
     @cached_property
     def cors_origin_list(self) -> list[str]:

@@ -22,7 +22,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 # 判分类型
-JudgeType = Literal["keyword", "json", "code", "numeric", "exclude", "regex"]
+JudgeType = Literal["keyword", "json", "code", "numeric", "exclude", "regex", "none"]
 
 # 提取 Python 代码块：```python ... ``` 或 ``` ... ```
 _CODE_FENCE = re.compile(r"```(?:python|py)?\s*\n(.*?)\n?\s*```", re.DOTALL)
@@ -181,7 +181,9 @@ def _check_regex(answer: str, spec: JudgeSpec) -> JudgeResult:
 
 
 def judge_answer(answer: str, spec: JudgeSpec) -> JudgeResult:
-    """按 JudgeSpec 判分单条答案。空答案直接失败。"""
+    """按 JudgeSpec 判分单条答案。空答案直接失败（``none`` 类型除外）。"""
+    if spec.type == "none":
+        return JudgeResult(passed=True, reason="该模板不支持自动判分", details=[])
     if not answer or not answer.strip():
         return JudgeResult(passed=False, reason="答案为空", details=[])
     if spec.type == "keyword":

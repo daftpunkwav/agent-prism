@@ -2,7 +2,18 @@
 
 import pytest
 
-from app.arena.router import DimensionRouter
+from app.arena.router import DimensionRouter, reset_dimension_options, sync_framework_options_from_registry
+from app.arena.runner import build_registry
+
+
+@pytest.fixture(autouse=True)
+def _restore_framework_options():
+    """确保 framework 选项回到内置 Adapter，免受其它测试的 registry 同步污染。"""
+    reset_dimension_options()
+    sync_framework_options_from_registry(build_registry())
+    yield
+    reset_dimension_options()
+    sync_framework_options_from_registry(build_registry())
 
 
 @pytest.fixture

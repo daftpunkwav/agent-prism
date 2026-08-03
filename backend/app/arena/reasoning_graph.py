@@ -55,7 +55,7 @@ async def _react_tool_node(state: AgentState) -> dict:
     from langchain_core.messages import ToolMessage
 
     from app.arena.message_sanitize import extract_original_question, inject_tool_result_reminder
-    from app.arena.tool_guard import assess_tool_relevance
+    from app.arena.tool_guard import blocked_tool_message_content
 
     question = extract_original_question(state.get("messages") or [])
     # 本轮之前已成功执行的工具名（粗算：用计数无法还原名字，从历史 Tool 前的 AI 收集）
@@ -70,16 +70,16 @@ async def _react_tool_node(state: AgentState) -> dict:
     for call in tool_calls:
         tool_name = call["name"]
         tool_args = call["args"] if isinstance(call.get("args"), dict) else {}
-        allowed, reason = assess_tool_relevance(
+        blocked = blocked_tool_message_content(
             question,
             tool_name,
             tool_args,
             prior_tool_names=prior_names,
         )
-        if not allowed:
+        if blocked is not None:
             tool_messages.append(
                 ToolMessage(
-                    content=inject_tool_result_reminder(reason, question),
+                    content=blocked,
                     tool_call_id=call["id"],
                 )
             )

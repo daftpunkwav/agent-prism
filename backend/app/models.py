@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.arena.types import (
     ApiFormat,
@@ -15,6 +15,7 @@ from app.arena.types import (
     PromptProfile,
     ReasoningMode,
 )
+from app.arena.url_validate import validate_llm_base_url, validate_website_url
 
 __all__ = [
     "DimensionId",
@@ -32,6 +33,7 @@ __all__ = [
     "Project",
     "ProjectCreate",
     "WorkspaceFileUpsert",
+    "JudgeRequest",
 ]
 
 
@@ -145,6 +147,16 @@ class ProviderConfigUpdate(BaseModel):
     max_input_tokens: int = Field(default=120_000, ge=256, le=10_000_000)
     max_output_tokens: int = Field(default=2048, ge=64, le=128_000)
 
+    @field_validator("website_url")
+    @classmethod
+    def _check_website_url(cls, v: str) -> str:
+        return validate_website_url(v)
+
+    @field_validator("base_url")
+    @classmethod
+    def _check_base_url(cls, v: str) -> str:
+        return validate_llm_base_url(v)
+
 
 class ConnectionTestResult(BaseModel):
     ok: bool
@@ -203,3 +215,10 @@ class WorkspaceFileUpsert(BaseModel):
     path: str = Field(min_length=1, max_length=512)
     content: str = Field(default="", max_length=512 * 1024)
     create_only: bool = False
+
+
+class JudgeRequest(BaseModel):
+    """判分请求：template_id + {label: 最终答案文本}。"""
+
+    template_id: str = Field(min_length=1, max_length=100)
+    answers: dict[str, str] = Field(default_factory=dict, max_length=16)

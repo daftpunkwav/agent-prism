@@ -75,61 +75,8 @@ const JUDGE_TYPE_LABEL: Record<string, string> = {
   numeric: "数字",
   exclude: "拒答检测",
   regex: "正则",
+  none: "快题",
 };
-
-const TASK_TEMPLATES: Array<{ id: string; label: string; question: string }> = [
-  { id: "time", label: "时间", question: "现在几点？" },
-  { id: "calc", label: "计算", question: "计算 (128 + 64) * 2 / 8 + 15" },
-  {
-    id: "multi-time",
-    label: "多步·时间",
-    question: "获取当前时间，并计算距离午夜的分钟数",
-  },
-  {
-    id: "multi-factorial",
-    label: "多步·阶乘",
-    question: "先用代码计算 17 的阶乘，再把结果写入 result.txt",
-  },
-  {
-    id: "files",
-    label: "文件读写",
-    question: "创建 notes.md，写入三条今日待办，再读取并列出工作空间文件",
-  },
-  {
-    id: "code-file",
-    label: "代码+文件",
-    question:
-      "写一个 hello.py（打印 Hello AgentPrism），用 run_code 执行它，把输出追加到 log.txt",
-  },
-  {
-    id: "primes",
-    label: "素数统计",
-    question: "用代码找出 1 到 100 中所有素数，并统计个数",
-  },
-  {
-    id: "fibonacci",
-    label: "斐波那契",
-    question: "用代码生成斐波那契数列前 20 项，写入 fib.txt",
-  },
-  {
-    id: "summarize",
-    label: "文本摘要",
-    question:
-      "将下面文字摘要到 80 字以内：Agent 对比实验需要在相同任务下并行观察框架、提示词、推理模式与上下文策略的差异，才能量化延迟、Token 与工具调用次数。",
-  },
-  {
-    id: "pipeline",
-    label: "综合编排",
-    question:
-      "获取当前时间 → 计算本小时还剩多少分钟 → 把结论写入 report.md → 再摘要该文件内容",
-  },
-  {
-    id: "plan",
-    label: "实验规划",
-    question:
-      "规划一个三步实验：对比 LangChain 与 LangGraph 在工具调用上的差异；每步写清目标、工具与成功标准",
-  },
-];
 
 function metricsToTokenStats(m: PipelineMetrics): TokenStats {
   return {
@@ -503,9 +450,13 @@ export function ArenaClient() {
     (t: TaskTemplate) => {
       setQuestion(t.question);
       setActiveTemplateId(t.id);
-      // 预填建议维度与子项
-      setDimension(t.suggested_dimension);
-      setSelections(t.suggested_selections);
+      // 预填建议维度与子项（快题可能无建议，保留当前选择）
+      if (t.suggested_dimension) {
+        setDimension(t.suggested_dimension);
+      }
+      if (t.suggested_selections.length >= 2) {
+        setSelections(t.suggested_selections);
+      }
       setError(null);
     },
     [],
@@ -787,6 +738,8 @@ export function ArenaClient() {
   const judgedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!allCompleted || !activeTemplateId || judging) return;
+    const tpl = templates.find((t) => t.id === activeTemplateId);
+    if (!tpl || tpl.judge.type === "none" || tpl.category === "quick") return;
     const runKey = `${activeTemplateId}:${question.trim()}`;
     if (judgedRef.current === runKey) return;
     const answers: Record<string, string> = {};
@@ -812,7 +765,7 @@ export function ArenaClient() {
         setError(err instanceof Error ? err.message : "自动判分失败");
       })
       .finally(() => setJudging(false));
-  }, [allCompleted, activeTemplateId, judging, columnList, question]);
+  }, [allCompleted, activeTemplateId, judging, columnList, question, templates]);
 
   if (metaLoading) {
     return (
@@ -994,12 +947,14 @@ export function ArenaClient() {
             </p>
           )}
           <div className="composer-templates">
-            {templates.length > 0 && (
+            {templates.filter((t) => (t.category ?? "scored") === "scored").length > 0 && (
               <span className="composer-template-group" aria-hidden>
                 可判分
               </span>
             )}
-            {templates.map((t) => (
+            {templates
+              .filter((t) => (t.category ?? "scored") === "scored")
+              .map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -1014,19 +969,26 @@ export function ArenaClient() {
                 </span>
               </button>
             ))}
-            {templates.length > 0 && <span className="composer-template-sep" aria-hidden />}
-            {TASK_TEMPLATES.map((t) => (
+            {templates.some((t) => t.category === "quick") && (
+              <span className="composer-template-sep" aria-hidden />
+            )}
+            {templates.some((t) => t.category === "quick") && (
+              <span className="composer-template-group" aria-hidden>
+                快题
+              </span>
+            )}
+            {templates
+              .filter((t) => t.category === "quick")
+              .map((t) => (
               <button
                 key={t.id}
                 type="button"
                 className="btn-ghost text-[11px]"
+                data-active={activeTemplateId === t.id}
                 title={t.question}
-                onClick={() => {
-                  setQuestion(t.question);
-                  setActiveTemplateId(null);
-                }}
+                onClick={() => applyTemplate(t)}
               >
-                {t.label}
+                {t.name}
               </button>
             ))}
           </div>

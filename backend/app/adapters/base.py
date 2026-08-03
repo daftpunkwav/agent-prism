@@ -18,10 +18,13 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from typing import Protocol, runtime_checkable
 
 from app.models import ArenaEvent, PipelineConfig
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -114,6 +117,8 @@ class FrameworkAdapterRegistry:
         for listener in self._listeners:
             try:
                 listener(framework_id, action)
-            except Exception:
-                # 监听器异常不影响主流程
-                pass
+            except Exception:  # noqa: BLE001
+                # 监听器异常不影响主流程，但须留痕便于排查
+                logger.exception(
+                    "Registry listener 失败: %s %s", framework_id, action
+                )

@@ -69,8 +69,7 @@ class _ArenaContextMiddleware(AgentMiddleware):
 
         同步/异步两份工具包装仅在此判断后的「执行 handler」一步不同。
         """
-        from app.arena.message_sanitize import inject_tool_result_reminder
-        from app.arena.tool_guard import assess_tool_relevance
+        from app.arena.tool_guard import blocked_tool_message_content
 
         call = request.tool_call or {}
         tool_name = str(call.get("name") or "")
@@ -83,15 +82,15 @@ class _ArenaContextMiddleware(AgentMiddleware):
             tcs = getattr(m, "tool_calls", None) or []
             prior.extend(str(c.get("name") or "") for c in tcs)
 
-        allowed, reason = assess_tool_relevance(
+        blocked = blocked_tool_message_content(
             self.question,
             tool_name,
             tool_args,
             prior_tool_names=prior,
         )
-        if not allowed:
+        if blocked is not None:
             return ToolMessage(
-                content=inject_tool_result_reminder(reason, self.question),
+                content=blocked,
                 tool_call_id=str(call.get("id") or ""),
             )
         return None

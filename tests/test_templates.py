@@ -16,8 +16,20 @@ def test_templates_loaded():
 def test_every_template_has_judge():
     """所有模板必须自带可执行的判分规则。"""
     for t in list_templates():
-        assert t.judge.type in ("keyword", "json", "code", "numeric", "exclude", "regex")
+        assert t.judge.type in (
+            "keyword",
+            "json",
+            "code",
+            "numeric",
+            "exclude",
+            "regex",
+            "none",
+        )
         assert t.question.strip()
+        if t.category == "quick":
+            assert t.judge.type == "none"
+        else:
+            assert t.judge.type != "none"
 
 
 def test_get_template_by_id():

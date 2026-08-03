@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from app.adapters.common import get_workspace_mgr
+from app.arena.workspace import get_workspace_mgr
 from app.main import app
 
 client = TestClient(app)

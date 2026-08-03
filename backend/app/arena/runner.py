@@ -17,7 +17,7 @@ from app.adapters.base import AdapterReservedError, FrameworkAdapterRegistry
 from app.adapters.langchain_adapter import LangChainAdapter
 from app.adapters.langgraph_adapter import LangGraphAdapter
 from app.arena.errors import sanitize_error_message
-from app.arena.router import DimensionRouter
+from app.arena.router import DimensionRouter, sync_framework_options_from_registry
 from app.models import ArenaEvent, ArenaRunRequest, PipelineConfig
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,8 @@ def build_registry() -> FrameworkAdapterRegistry:
     registry = FrameworkAdapterRegistry()
     registry.register(LangChainAdapter())
     registry.register(LangGraphAdapter())
+    # 闭环：维度选项与 registry 同源
+    sync_framework_options_from_registry(registry)
     return registry
 
 
@@ -35,6 +37,7 @@ class RunnerPool:
 
     def __init__(self, registry: FrameworkAdapterRegistry | None = None) -> None:
         self.registry = registry or build_registry()
+        sync_framework_options_from_registry(self.registry)
         self.router = DimensionRouter()
 
     def configs_for(self, request: ArenaRunRequest) -> list[PipelineConfig]:
@@ -50,7 +53,6 @@ class RunnerPool:
     async def stream_parallel(
         self,
         request: ArenaRunRequest,
-        on_cancel: AsyncIterator[None] | None = None,
     ) -> AsyncIterator[ArenaEvent]:
         try:
             configs = self.configs_for(request)

@@ -18,7 +18,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from app.adapters.common import get_workspace_mgr
+from app.arena.workspace import get_workspace_mgr
 from app.models import PipelineRunResult, Project, ProjectCreate
 from app.storage import atomic_write_json
 

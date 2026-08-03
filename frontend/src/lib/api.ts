@@ -290,7 +290,7 @@ export async function streamArenaRun(
 // ===== 任务模板 API =====
 
 export interface JudgeSpec {
-  type: "keyword" | "json" | "code" | "numeric" | "exclude" | "regex";
+  type: "keyword" | "json" | "code" | "numeric" | "exclude" | "regex" | "none";
   any_of?: string[];
   all_of?: string[];
   min_hits?: number;
@@ -312,6 +312,7 @@ export interface TaskTemplate {
   suggested_dimension: DimensionId;
   suggested_selections: string[];
   judge: JudgeSpec;
+  category?: "scored" | "quick";
 }
 
 export interface JudgeResult {

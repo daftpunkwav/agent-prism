@@ -53,6 +53,13 @@ def create_chat_model(
     if not cfg.api_key:
         raise ValueError("未配置 API Key，请先在 Settings 页面设置")
 
+    from app.arena.url_validate import UrlValidationError, validate_llm_base_url
+
+    try:
+        validate_llm_base_url(cfg.base_url)
+    except UrlValidationError as exc:
+        raise ValueError(str(exc)) from exc
+
     overrides = _pipeline_overrides.get() or {}
 
     base_url = cfg.base_url.rstrip("/")

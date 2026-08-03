@@ -31,6 +31,11 @@ def atomic_write_json(path: Path, payload: object, *, backup: bool = True) -> No
         若目标已存在，是否将其复制到 ``<name>.bak``。默认为 True。
     """
     path.parent.mkdir(parents=True, exist_ok=True)
+    # 含密钥的配置目录尽量收紧权限（Unix）；Windows 上 chmod 语义有限，best-effort
+    try:
+        os.chmod(path.parent, 0o700)
+    except OSError:
+        pass
     tmp = path.with_suffix(path.suffix + ".tmp")
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     # 写临时文件
@@ -38,13 +43,25 @@ def atomic_write_json(path: Path, payload: object, *, backup: bool = True) -> No
         fh.write(text)
         fh.flush()
         os.fsync(fh.fileno())
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
     # 备份旧文件
     if backup and path.exists():
         bak = path.with_suffix(path.suffix + ".bak")
         try:
             shutil.copy2(path, bak)
+            try:
+                os.chmod(bak, 0o600)
+            except OSError:
+                pass
         except OSError:
             # 备份失败不阻塞主流程（best-effort）
             pass
     # 原子替换
     os.replace(tmp, path)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass

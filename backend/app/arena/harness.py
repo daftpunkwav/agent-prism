@@ -356,8 +356,10 @@ class HarnessRunner:
                     if additions:
                         system_msg = system_msg + f"\n\n[Harness 自进化 #{self.attempts}]\n{additions}"
 
-            # 将反思策略注入 system，下一轮重新开跑
-            system_msg = system_msg + f"\n\n[上一轮反思]\n{insight}"
+            # 将反思策略注入 system，下一轮重新开跑（同样脱敏防间接注入）
+            safe_insight = _sanitize_prompt_additions([insight]) if insight else ""
+            if safe_insight:
+                system_msg = system_msg + f"\n\n[上一轮反思]\n{safe_insight}"
             state = {
                 **dict(initial_state),
                 "messages": [SystemMessage(content=system_msg), *human_msgs],
@@ -367,7 +369,11 @@ class HarnessRunner:
             }
 
     async def execute(self, question: str, graph, initial_state: dict, emitter_callback) -> dict:
-        """兼容旧接口：通过 callback 转发事件，返回最终状态。"""
+        """兼容旧接口：通过 callback 转发事件，返回最终状态。
+
+        .. deprecated::
+            生产路径请使用 :meth:`stream_events`；本方法仅保留兼容。
+        """
         async for event in self.stream_events(question, graph, initial_state):
             maybe = emitter_callback(event)
             if hasattr(maybe, "__await__"):

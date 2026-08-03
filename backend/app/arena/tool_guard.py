@@ -9,7 +9,32 @@ from __future__ import annotations
 import json
 import re
 
-__all__ = ["assess_tool_relevance"]
+__all__ = ["assess_tool_relevance", "blocked_tool_message_content"]
+
+
+def blocked_tool_message_content(
+    question: str,
+    tool_name: str,
+    tool_args: dict | None,
+    *,
+    prior_tool_names: list[str] | None = None,
+) -> str | None:
+    """若应拦截工具调用，返回已锚定的拦截文案；否则返回 None。
+
+    LangChain Middleware 与 LangGraph tool node 共用此入口，避免双实现漂移。
+    """
+    from app.arena.message_sanitize import inject_tool_result_reminder
+
+    allowed, reason = assess_tool_relevance(
+        question,
+        tool_name,
+        tool_args,
+        prior_tool_names=prior_tool_names,
+    )
+    if allowed:
+        return None
+    return inject_tool_result_reminder(reason, question)
+
 
 # 启发式关键词（不保证完备，仅覆盖常见表达）
 _TIME_HINTS = ("几点", "时间", "何时", "what time", "current time", "现在几点")
