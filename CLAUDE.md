@@ -23,7 +23,7 @@
 backend/app/
 ├── main.py                  # FastAPI 入口（lifespan、CORS、请求大小限制、日志）
 ├── config.py                # 配置加载（.env + JSON）
-├── models.py                # Pydantic 模型
+├── models.py                # Pydantic 模型（含 ChatMessage / ArenaRunRequest.messages）
 ├── storage.py               # 原子写 JSON（tmp → bak → rename）
 ├── api/                     # FastAPI 路由
 │   ├── __init__.py
@@ -58,7 +58,7 @@ backend/app/
 │   ├── langchain_adapter.py
 │   └── langgraph_adapter.py
 
-tests/                       # 单元测试（pytest，仓库根目录；29 文件 / 268 个 test_）
+tests/                       # 单元测试（pytest，仓库根目录；37 文件 / 344 个 test_）
 
 frontend/src/
 ├── app/                     # 页面（App Router）
@@ -66,22 +66,23 @@ frontend/src/
 │   ├── layout.tsx           # 根布局
 │   ├── error.tsx            # 路由级错误边界
 │   ├── global-error.tsx     # 全局错误边界
-│   ├── arena/               # Arena 页面 + ArenaClient
+│   ├── arena/               # Arena 页面 + ArenaClient（含共享多轮 chatHistory）
 │   │   ├── page.tsx
 │   │   └── ArenaClient.tsx
-│   ├── learn/page.tsx       # 学习路径（6 周引导）
+│   ├── guide/               # 维度说明（含多轮 / 对比形态）
+│   ├── learn/page.tsx       # 学习路径（8 周引导）
 │   ├── settings/page.tsx    # Provider 配置
 │   └── projects/page.tsx    # 项目管理
 ├── components/              # UI 组件
-│   ├── AppShell.tsx         # 导航栏（Arena / 学习路径 / 项目 / 设置）
+│   ├── AppShell.tsx         # 导航栏（Arena / 维度说明 / 学习路径 / 项目 / 设置）
 │   ├── ThemeToggle.tsx      # 主题切换
-│   ├── TraceView.tsx        # 轨迹渲染
+│   ├── TraceView.tsx        # 轨迹渲染（支持按 turn 分段）
 │   ├── WorkspacePanel.tsx   # 工作空间（含文件编辑器）
 │   ├── ExperimentPanel.tsx  # 实验参数
 │   ├── TokenStatsPanel.tsx  # Token 统计
-│   └── TraceDiff.tsx        # Trace 对比
+│   └── TraceDiff.tsx        # Trace 对比（多轮按 turn 对齐）
 ├── lib/
-│   └── api.ts               # 前端 API 层（15 个函数）
+│   └── api.ts               # 前端 API 层（含 streamArenaRun messages）
 
 # 全局样式：frontend/src/app/globals.css
 

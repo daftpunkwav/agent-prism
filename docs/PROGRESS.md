@@ -1,15 +1,15 @@
 # AgentPrism 开发进度报告
 
 > 本文档面向**当前实现**撰写。每个声明都对应 `backend/app/`、`frontend/src/` 或 `tests/` 下的实际代码；与早期 PRD/README 不一致时，**以本文档为准**。
-> 数据截止：2026-08-03（HEAD `ef55504`；Phase 8 学习路径 / Phase 9 任务模板库 + mypy 硬性门槛已落地）。
+> 数据截止：2026-08-04（HEAD `ad1c07f`；共享多轮对话 + 按轮 Trace；学习路径扩至八周；Vercel 风格 UI）。
 
 ---
 
 ## 1. 一句话总览
 
-AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 条 Agent 管线并行运行，差异通过流式 Trace + 硬指标报告实时可见。
+AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 条 Agent 管线并行运行，差异通过流式 Trace + 硬指标报告实时可见。各列可**共享对话历史**续聊，Trace / TraceDiff 按 `turn` 分段对比。
 
-**已实现 5 个对比维度**（`framework` / `prompt` / `reasoning` / `context` / `harness`），每条管线共用同一份 Tool 集与 LLM 客户端，通过 `PipelineConfig` 切换维度下的变量。
+**已实现 5 个对比维度**（`framework` / `prompt` / `reasoning` / `context` / `harness`），每条管线共用同一份 Tool 集与 LLM 客户端，通过 `PipelineConfig` 切换维度下的变量。多轮是**对比形态**（共享 `messages`），不是新的 Pipeline 维度。
 
 **技术栈实际状态**：
 
@@ -22,8 +22,9 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 | 数据 | 文件级 JSON（`provider_config.json` + `projects.json`），**无 SQL/ORM**；原子写见 `storage.py` |
 | 前端状态 | 仅 `useState` / `useReducer` / `useRef`，无 Zustand/Redux |
 | 任务模板 | `arena/templates.py` 8 个预置模板 + `arena/judging.py` 确定性判分器（无 LLM） |
-| 学习路径 | `/learn` 6 周引导页，一键预填 Arena（URL 参数） |
-| 测试 | 仓库根 `tests/`，**29 个文件 / 268 个 `test_` 函数**（CI：ruff + mypy + pytest） |
+| 多轮 | `ArenaRunRequest.messages` + 适配器 `history=`；前端 `chatHistory`；事件带 `turn` |
+| 学习路径 | `/learn` 8 周引导页，一键预填 Arena（URL 参数）；`/guide` 维度与多轮说明 |
+| 测试 | 仓库根 `tests/`，**37 个文件 / 344 个 `test_` 函数**（CI：ruff + mypy + pytest） |
 
 ---
 
@@ -36,10 +37,10 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 | 入口 | `main.py` | `lifespan`；CORS；10MB 请求体限制；第三方 logger 降级 WARNING |
 | 配置 | `config.py` | `Settings`（env）+ `ProviderConfig`（JSON），经 `storage` 原子写 |
 | 存储 | `storage.py` | `_atomic_write_json`（tmp → fsync → bak → replace） |
-| 模型 | `models.py` | `PipelineConfig` / `ArenaRunRequest` / `ArenaEvent` / `PipelineMetrics` / `ProviderConfig*` / `Project*` |
+| 模型 | `models.py` | `PipelineConfig` / `ArenaRunRequest`（含 `messages`） / `ChatMessage` / `ArenaEvent`（含 `turn`） / `PipelineMetrics` / `ProviderConfig*` / `Project*` |
 | 类型 | `arena/types.py` | Literal 单一来源（DimensionId / PromptProfile / ReasoningMode / ContextStrategy / HarnessLevel / ApiFormat / EventType） |
 | 路由 | `arena/router.py` | `DimensionRouter.route()`；`@lru_cache` provider；`invalidate_provider_cache` |
-| 池 | `arena/runner.py` | `RunnerPool` 合并 2～4 路 SSE；断开取消 worker；错误脱敏 |
+| 池 | `arena/runner.py` | `RunnerPool` 合并 2～4 路 SSE；断开取消 worker；失败补发 `complete`；错误脱敏 |
 | 适配器 | `adapters/{base,langchain_adapter,langgraph_adapter,common}.py` | Protocol + Registry；LangChain `create_agent` / LangGraph StateGraph |
 | 推理图 | `arena/reasoning_graph.py` | ReAct / CoT+Tool / ToT / Reflexion 四张图 |
 | 推理 Prompt | `arena/reasoning.py` | 4 模式 System/User 后缀 |
@@ -64,20 +65,21 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 
 | 组件 / 页面 | 能力 |
 |---|---|
-| `AppShell.tsx` | 导航：`/arena` `/learn` `/projects` `/settings` + ThemeToggle |
-| `learn/page.tsx` | 6 周学习路径，每步链到 Arena URL 预填 |
-| `ArenaClient.tsx` | 维度切换 + 模板/判分 + 三 Tab + 保存为项目 |
-| `TraceView.tsx` | `thought_delta` 归并 + Markdown |
-| `TraceDiff.tsx` | step 对齐差异；长文本「展开/收起」 |
+| `AppShell.tsx` | 导航：`/arena` `/guide` `/learn` `/projects` `/settings` + ThemeToggle |
+| `learn/page.tsx` | 8 周学习路径（含多轮续聊），每步链到 Arena URL 预填 |
+| `guide/` | 维度说明 + 多轮 / 对比形态文档 |
+| `ArenaClient.tsx` | 维度切换 + 模板/判分 + 共享多轮 + 三 Tab + 保存为项目 |
+| `TraceView.tsx` | `thought_delta` 归并 + Markdown；多轮按 turn 分段 |
+| `TraceDiff.tsx` | step / turn 对齐差异；长文本「展开/收起」 |
 | `WorkspacePanel.tsx` | 文件树 + 预览/编辑；polling + AbortController |
 | `ExperimentPanel.tsx` | 采样参数滑块；单一 `flushParams` PUT |
 | `TokenStatsPanel.tsx` | compact / full 两态 |
 | `error.tsx` / `global-error.tsx` | 路由级 / 全局错误边界 |
-| `lib/api.ts` | **15** 个 API 函数；ArenaEvent discriminated union |
+| `lib/api.ts` | API 函数；`streamArenaRun(..., messages?)`；ArenaEvent discriminated union |
 
 ### 2.3 测试（`tests/`）
 
-**29 个测试文件 / 268 个 `test_` 函数**（AST 统计；以 `PYTHONPATH=backend pytest tests/ -v` 为准）。
+**37 个测试文件 / 344 个 `test_` 函数**（AST 统计；以 `PYTHONPATH=backend pytest tests/ -v` 为准）。
 
 | 文件 | 用例数 | 覆盖范围 |
 |---|---|---|
@@ -159,6 +161,10 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 
 `TraceView.mergeEvents` 用稳定 key 归并 `thought_delta`；`thought_end` 切完整 Markdown。
 
+### 3.9 共享多轮 — `messages` + `turn`
+
+`ArenaRunRequest.messages` 成对校验；适配器 `build_initial_lc_messages`；runner 戳 `turn`；worker 失败补发 `complete`。前端 `chatHistory` 跨列共享；重试/取消/系统错误剥离本轮 events，保留更早轮。
+
 ---
 
 ## 4. 修改意见（已知遗留问题与改进点）
@@ -167,7 +173,7 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 
 ### 4.1 高优先级（多数已关闭）
 
-1. **测试运行数不一致** ✅ — CI collect-only；文档以 29/268 为准
+1. **测试运行数不一致** ✅ — CI collect-only；文档以 37/344 为准（2026-08-04 复测）
 2. **`is_mvp_ready` 死代码** ✅ — 已删
 3. **`SimpleVectorStore` 每次重建** ✅ — Workspace `rag_store()` 惰性缓存
 4. **API Key SSE 泄漏** ✅ — `sanitize_error_message`
@@ -194,7 +200,7 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 9. **任务模板库** ✅ — Phase 9
 10. **`openai_chat` Provider** — Settings 高级选项已提示
 11. **pre-commit 与 ruff 行长 160** — 保持一致
-12. **学习路径 UI** ✅ — Phase 8
+12. **学习路径 UI** ✅ — Phase 8（已扩至八周，含多轮）
 
 详见 [`CODE_REVIEW.md`](./CODE_REVIEW.md) 修复状态附录。
 
@@ -205,9 +211,11 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 | 阶段 | 目标 | 状态 |
 |---|---|---|
 | Phase 1-5 | 5 维度 + 对比报告 + Trace + Workspace + 项目 + 安全硬化 | ✅ |
-| Phase 8 | 学习路径引导 UI（`/learn`） | ✅ |
+| Phase 8 | 学习路径引导 UI（`/learn`，现 8 周） | ✅ |
 | Phase 9 | 任务模板库 + 确定性判分器 | ✅ |
 | Phase 11 | CI mypy 硬性门槛 | ✅ |
+| 多轮形态 | 共享 `messages` + 按轮 Trace / TraceDiff（非新维度） | ✅ |
+| UI 重设计 | Vercel 风格 token + Arena 配置/运行条 | ✅ |
 | Phase 6 | AutoGen / CrewAI Adapter（Python 3.14 暂不可装） | ⏳ |
 | Phase 7 | MCP 集成 | 📝 规划 |
 | Phase 10 | Harness Lab（YAML Primitive 编辑器） | 📝 规划 |
@@ -220,9 +228,10 @@ AgentPrism 是一个 **Agent 对比实验台**：用户提一个问题，2～4 �
 - **前端框架**：Next.js 16.2.10。⚠️ 写代码前读 `frontend/AGENTS.md` + `node_modules/next/dist/docs/`
 - **默认 Provider**：StepFun（`anthropic_messages`），Base URL `https://api.stepfun.com/step_plan`
 - **默认模型**：`step-3.7-flash`
-- **页面**：`/arena` `/learn` `/projects` `/settings`
+- **页面**：`/arena` `/guide` `/learn` `/projects` `/settings`
+- **多轮 API**：`POST /api/arena/run` 可选 `messages`（user/assistant 成对，合计含本轮问题 ≤24000 字符）
 - **模板 API**：`GET /api/arena/templates`、`POST /api/arena/judge`
-- **跑测试**：`PYTHONPATH=backend pytest tests/ -v` → **29 文件 / 268 函数**
+- **跑测试**：`PYTHONPATH=backend pytest tests/ -v` → **37 文件 / 344 函数**
 - **lint / 类型**：`ruff check app/`、`mypy app/ --ignore-missing-imports`
 - **workspace**：最多 32；空闲 > 1h 回收；LRU 保护运行中
 - **run_code 超时**：1~10s，超时 terminate + kill

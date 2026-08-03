@@ -21,12 +21,14 @@ AgentPrism 的答案：**同一个问题，多条管线并行跑，差异一目�
 ### Arena 实验台
 
 - **五维度对比**：框架 / 提示词 / 推理模式 / 上下文策略 / Harness
+- **共享多轮对话**：各列共用 `messages` 续聊；跑完可「用作续聊」，Trace / TraceDiff 按 `turn` 分段
 - **实时流式输出**：打字机效果渲染 Agent 推理过程，支持 Markdown
 - **工具调用展示**：文件操作折叠预览、代码执行代码块、参数格式化
 - **对比报告**：耗时 / Token / 工具调用 / 步骤数硬指标对比表格 + 最快/最省标记
-- **Trace 对比**：按 step 对齐各列事件，差异高亮（TraceDiff 组件）
+- **Trace 对比**：按 step（多轮时按 `turn*10000+step`）对齐各列事件，差异高亮（TraceDiff）
 - **Agent 工作空间**：每个 Agent 独立文件系统（路径规范化 + TTL/LRU），实时文件浏览器侧栏
 - **项目管理**：从 Arena 运行结果一键创建项目，保存工作空间和对比结果
+- **维度说明 / 学习路径**：`/guide` 说明对比维度与多轮形态；`/learn` 八周引导一键预填 Arena
 
 ### 对比维度
 
@@ -110,7 +112,7 @@ API Key 保存在本地 `data/provider_config.json`，**仅本地保存，不会
 ## 测试
 
 ```bash
-# 后端测试 — 29 个测试文件 / 268 个 test_ 函数
+# 后端测试 — 37 个测试文件 / 344 个 test_ 函数
 PYTHONPATH=backend pytest tests/ -v
 
 # 仅 lint
@@ -151,7 +153,10 @@ cd frontend && npm run build
 - **ID 唯一**：微秒时间戳 + UUID 后缀
 
 ### 前端
-- **学习路径引导页 `/learn`**（Phase 8）：6 周计划，一键预填 Arena
+- **Vercel 风格 UI**：Geist 字体 + 设计 token；配置摘要三栏铺满；运行条任务模板 / 输入 / 运行同高
+- **共享多轮对话**：`chatHistory` +「用作续聊」/「新对话」；按轮 Trace；对比形态为 Trace 分段而非新维度
+- **学习路径引导页 `/learn`**（Phase 8）：八周计划（含多轮续聊与按轮对比），一键预填 Arena
+- **维度说明 `/guide`**：含多轮与对比形态说明
 - **可判分任务模板**：判分方式徽章 + 跑后自动判分（列徽章 / 对比报告列）
 - **URL 参数预填**：`/arena?template=...&q=...&dimension=...&selections=...`
 - **路由错误边界**：`error.tsx` + `global-error.tsx`
@@ -161,9 +166,11 @@ cd frontend && npm run build
 
 ### 测试
 - **判分器 + 模板库**：`tests/test_judging.py` + `tests/test_templates.py`
+- **多轮历史契约**：`tests/test_chat_history.py`（成对交替、长度上限、`turn` 戳记）
+- **基线覆盖**：`tests/test_baseline_overrides.py`
 - **消息消毒 / tool_guard**：`tests/test_message_sanitize.py`
 - **ContextVar 取消路径**、前端契约（模板/判分/学习路径）、Workspace TTL/LRU
-- **统计**：29 文件 / 268 个 `test_`（仓库根 `tests/`）
+- **统计**：37 文件 / 344 个 `test_`（仓库根 `tests/`）
 
 ## 路线图
 

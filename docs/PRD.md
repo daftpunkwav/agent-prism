@@ -2,13 +2,13 @@
 
 > **配套文档**
 > - 当前实现状态、修改意见、未实现清单：[`PROGRESS.md`](./PROGRESS.md)
-> - 测试统计（29 文件 / 268 个 `test_`）与 CI 配置：[`PROGRESS.md` §2.3–2.4](./PROGRESS.md)
+> - 测试统计（37 文件 / 344 个 `test_`）与 CI 配置：[`PROGRESS.md` §2.3–2.4](./PROGRESS.md)
 > - 代码审查与修复状态：[`CODE_REVIEW.md`](./CODE_REVIEW.md)
 > - 路线图（基于现状修订）：[`PROGRESS.md` §5](./PROGRESS.md)
 >
 > **原则**：本文档只描述**产品意图**（why / what）；实现细节与变更记录以 `PROGRESS.md` 为准。
 > 「尚未实现」「当前实现」「与早期版本差异」等描述直接标注在原章节中，便于读者识别文档时序。
-> 数据截止：2026-08-03（Phase 8 学习路径 + Phase 9 任务模板库已落地）。
+> 数据截止：2026-08-04（共享多轮对话 + 八周学习路径 + Vercel 风格 UI 已落地；实现细节见 `PROGRESS.md`）。
 
 ## 1. 产品概述
 
@@ -259,8 +259,17 @@ API：`GET /api/arena/templates`、`POST /api/arena/judge`。Arena 底部按「�
 | 第4周 | 上下文工程 | 跑多轮任务 + 上下文策略对比 |
 | 第5周 | Harness 工程 | Harness 对比（裸运行 / 验证 / 反思 / 自进化） |
 | 第6周 | 综合实战 | 自定义任务 + 参数复现，独立完成实验报告 |
+| 第7周 | 共享多轮续聊 | 各列共用对话历史，观察跨轮一致性 |
+| 第8周 | 按轮 Trace 对比 | Trace / TraceDiff 按 turn 分段，对比多轮行为 |
 
-> **当前状态**：学习路径引导 UI 已落地（`/learn`，Phase 8）。每步一键跳转 Arena 并预填 `dimension` / `template` URL 参数；导航栏「学习路径」入口可用。
+> **当前状态**：学习路径引导 UI 已落地（`/learn`，Phase 8，现为八周）。每步一键跳转 Arena 并预填 URL 参数；导航栏「学习路径」入口可用。维度说明见 `/guide`（含多轮与对比形态）。
+
+### 2.6 共享多轮对话（对比形态）
+
+- **不是新维度**：不新增 `PipelineConfig` 字段；各列共享同一份 `messages` + 当前 `question`。
+- **后端**：`ArenaRunRequest.messages`（user/assistant 成对，最多 24 条）；SSE `ArenaEvent.turn`。
+- **前端**：`chatHistory`、「用作续聊」/「新对话」；TraceView / TraceDiff 按轮分段。
+- **约束**：历史与本轮问题合计 ≤24000 字符；失败/重试时剥离本轮 Trace，保留更早轮次。
 
 ---
 
@@ -661,8 +670,9 @@ class MCPToolBridge:
 
 | 页面 | 路径 | 说明 |
 |------|------|------|
-| Arena | `/arena` | 主实验台（多列并行 + 流式输出 + 任务模板/判分） |
-| 学习路径 | `/learn` | 6 周引导，一键预填 Arena 实验 |
+| Arena | `/arena` | 主实验台（多列并行 + 流式输出 + 任务模板/判分 + 共享多轮） |
+| 维度说明 | `/guide` | 对比维度、多轮与对比形态说明 |
+| 学习路径 | `/learn` | 8 周引导，一键预填 Arena 实验 |
 | Projects | `/projects` | 项目管理（创建/查看/删除项目） |
 | Settings | `/settings` | Provider 配置（API Key + Base URL + 模型选择 + 连接测试） |
 
@@ -853,7 +863,9 @@ class MCPToolBridge:
 
 ### Phase 8：学习路径引导 UI ✅
 
-- [x] `/learn` 6 周学习路径页面
+- [x] `/learn` 8 周学习路径页面（含多轮续聊与按轮对比）
+- [x] `/guide` 维度说明（含多轮与对比形态）
+- [x] 共享多轮对话（`messages` + `turn` Trace）
 - [x] 每步一键跳转 Arena（`dimension` / `template` URL 预填）
 - [x] AppShell 导航入口「学习路径」
 
