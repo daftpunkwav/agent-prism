@@ -71,3 +71,42 @@ def test_thought_merge_key_contract():
 
     assert thought_key("thought_delta", 3) == thought_key("thought_end", 3)
     assert thought_key("thought_delta", 3) != thought_key("action", 3)
+
+
+def test_templates_and_judge_contract():
+    """任务模板库前端契约：api.ts 必须暴露 fetchTemplates / judgeAnswers / TaskTemplate / JudgeResult。"""
+    src = API_TS.read_text(encoding="utf-8")
+    assert "export interface TaskTemplate" in src
+    assert "export interface JudgeResult" in src
+    assert "export async function fetchTemplates" in src
+    assert "export async function judgeAnswers" in src
+    assert "template_id" in src
+    assert "suggested_dimension" in src
+
+
+def test_arena_client_judge_integration():
+    """ArenaClient 集成判分：提取答案 → judgeAnswers → 显示徽章。"""
+    src = ARENA_CLIENT.read_text(encoding="utf-8")
+    assert "judgeAnswers" in src
+    assert "extractFinalAnswer" in src
+    assert "judge" in src
+    assert "判分通过" in src
+    assert "判分未通过" in src
+    assert "JUDGE_TYPE_LABEL" in src
+
+
+def test_learn_page_and_url_prefill_contract():
+    """学习路径契约：/learn 页面存在；ArenaClient 支持 URL 参数预填。"""
+    learn_page = ROOT / "frontend" / "src" / "app" / "learn" / "page.tsx"
+    assert learn_page.exists()
+    learn_src = learn_page.read_text(encoding="utf-8")
+    assert "WEEK_PLAN" in learn_src
+    assert "开始这一步" in learn_src
+    # AppShell 导航包含学习路径
+    shell = ROOT / "frontend" / "src" / "components" / "AppShell.tsx"
+    shell_src = shell.read_text(encoding="utf-8")
+    assert '"/learn"' in shell_src
+    # ArenaClient 使用 useSearchParams 做 URL 预填
+    assert "useSearchParams" in ARENA_CLIENT.read_text(encoding="utf-8")
+    assert 'searchParams.get("template")' in ARENA_CLIENT.read_text(encoding="utf-8")
+    assert 'searchParams.get("q")' in ARENA_CLIENT.read_text(encoding="utf-8")

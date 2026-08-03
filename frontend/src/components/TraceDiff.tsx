@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { ArrowLeftRight, Lightbulb, Zap, AlertTriangle, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeftRight, ChevronDown, ChevronUp, Lightbulb, Zap, AlertTriangle, Plus } from "lucide-react";
 import { ArenaEvent } from "@/lib/api";
 
 interface TraceDiffProps {
@@ -136,10 +136,26 @@ export function TraceDiff({ columns }: TraceDiffProps) {
   const alignedRows = useMemo(() => alignTraces(columns), [columns]);
   const labels = columns.map((c) => c.label);
   const diffCount = alignedRows.filter((r) => r.differences.size > 0).length;
+  // 展开的长文本集合：key = `${row.step}:${label}`
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // 文本截断阈值（PROGRESS §4.2.7：长 thought 需要展开交互）
+  const TRUNCATE_AT = 300;
 
   if (columns.length < 2 || alignedRows.length === 0) {
     return null;
   }
+
+  const toggleExpand = (key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   return (
     <section className="data-table-wrap fade-in">
@@ -188,8 +204,11 @@ export function TraceDiff({ columns }: TraceDiffProps) {
                   </span>
                 </td>
                 {labels.map((label) => {
-                  const text = row.contents[label];
+                  const text = row.contents[label] ?? "";
                   const isDiff = row.differences.has(label);
+                  const cellKey = `${row.step}:${label}`;
+                  const isExpanded = expanded.has(cellKey);
+                  const needsTruncate = text.length > TRUNCATE_AT;
                   return (
                     <td
                       key={label}
@@ -201,8 +220,30 @@ export function TraceDiff({ columns }: TraceDiffProps) {
                       {text ? (
                         <div className="space-y-1">
                           <p className="font-mono whitespace-pre-wrap break-words text-[11px]">
-                            {text.length > 300 ? text.slice(0, 300) + "…" : text}
+                            {needsTruncate && !isExpanded
+                              ? text.slice(0, TRUNCATE_AT) + "…"
+                              : text}
                           </p>
+                          {needsTruncate && (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground"
+                              onClick={() => toggleExpand(cellKey)}
+                              aria-expanded={isExpanded}
+                            >
+                              {isExpanded ? (
+                                <>
+                                  <ChevronUp className="h-2.5 w-2.5" />
+                                  收起
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronDown className="h-2.5 w-2.5" />
+                                  展开全文（{text.length} 字符）
+                                </>
+                              )}
+                            </button>
+                          )}
                           {isDiff && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-mono text-warning">
                               <AlertTriangle className="h-2.5 w-2.5" />
