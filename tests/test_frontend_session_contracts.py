@@ -61,6 +61,17 @@ def test_arena_client_has_baseline_controls():
     assert "body.baseline" in api
 
 
+def test_arena_client_has_thinking_dimension_and_baseline_groups():
+    src = ARENA_CLIENT.read_text(encoding="utf-8")
+    assert 'thinking: "thinking_level"' in src or "thinking: 'thinking_level'" in src
+    assert "baseline-groups" in src
+    assert "BASELINE_GROUP_LABEL" in src
+    api = API_TS.read_text(encoding="utf-8")
+    assert '| "thinking"' in api or '"thinking"' in api
+    assert "thinking_level" in api
+    assert "group?" in api
+
+
 def test_thought_merge_key_contract():
     """纯逻辑：thought_delta 与 thought_end 必须共享同一 key。"""
 

@@ -16,16 +16,16 @@ from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from app.config import ProviderConfig, load_provider_config
+from app.config import LlmEndpoint, ProviderConfig, load_provider_config
 
-# Pipeline 级覆盖（temperature / model 等），按异步任务隔离
+# Pipeline 级覆盖（连接 + 解码），按异步任务隔离
 _pipeline_overrides: ContextVar[dict[str, Any] | None] = ContextVar(
     "llm_pipeline_overrides", default=None
 )
 
 
 def set_pipeline_llm_overrides(**kwargs: Any) -> None:
-    """设置当前任务的 LLM 覆盖参数（如 temperature、model）。"""
+    """设置当前任务的 LLM 覆盖参数（连接与解码均可）。"""
     current = dict(_pipeline_overrides.get() or {})
     current.update({k: v for k, v in kwargs.items() if v is not None})
     _pipeline_overrides.set(current)
@@ -44,26 +44,14 @@ def create_chat_model(
     top_p: float | None = None,
     frequency_penalty: float | None = None,
     presence_penalty: float | None = None,
+    endpoint: LlmEndpoint | None = None,
 ) -> BaseChatModel:
     """根据 api_format 创建对应的 LLM 客户端。
 
-    优先级：显式参数 > pipeline overrides（ContextVar）> ProviderConfig。
+    优先级：显式参数 > pipeline overrides（ContextVar）> endpoint / ProviderConfig。
     """
     cfg = config or load_provider_config()
-    if not cfg.api_key:
-        raise ValueError("未配置 API Key，请先在 Settings 页面设置")
-
-    from app.arena.url_validate import UrlValidationError, validate_llm_base_url
-
-    try:
-        validate_llm_base_url(cfg.base_url)
-    except UrlValidationError as exc:
-        raise ValueError(str(exc)) from exc
-
     overrides = _pipeline_overrides.get() or {}
-
-    base_url = cfg.base_url.rstrip("/")
-    resolved_model = model or overrides.get("model") or cfg.model
 
     def _pick(explicit: Any, key: str, default: Any) -> Any:
         if explicit is not None:
@@ -72,14 +60,63 @@ def create_chat_model(
             return overrides[key]
         return default
 
+    # 连接：显式 endpoint / overrides.endpoint_id → 接入点；否则用顶层镜像（兼容旧调用）
+    use_endpoint_connection = endpoint is not None or bool(overrides.get("endpoint_id"))
+    if endpoint is not None:
+        ep = endpoint
+    elif overrides.get("endpoint_id"):
+        ep = cfg.resolve_endpoint(str(overrides["endpoint_id"]))
+    else:
+        ep = cfg.default_endpoint()
+
+    if use_endpoint_connection:
+        api_key = _pick(None, "api_key", ep.api_key)
+        base_url = str(_pick(None, "base_url", ep.base_url)).rstrip("/")
+        api_format = _pick(None, "api_format", ep.api_format)
+        auth_field = _pick(None, "auth_field", ep.auth_field)
+        default_model = ep.model
+    else:
+        api_key = _pick(None, "api_key", cfg.api_key)
+        base_url = str(_pick(None, "base_url", cfg.base_url)).rstrip("/")
+        api_format = _pick(None, "api_format", cfg.api_format)
+        auth_field = _pick(None, "auth_field", cfg.auth_field)
+        default_model = cfg.model
+
+    if not api_key:
+        raise ValueError("未配置 API Key，请先在 Settings 页面设置")
+
+    from app.arena.url_validate import UrlValidationError, validate_llm_base_url
+
+    try:
+        validate_llm_base_url(base_url)
+    except UrlValidationError as exc:
+        raise ValueError(str(exc)) from exc
+
+    resolved_model = model or overrides.get("model") or default_model
     resolved_temp = _pick(temperature, "temperature", cfg.temperature)
-    resolved_max = _pick(max_tokens, "max_tokens", cfg.max_output_tokens)
+    resolved_max = int(_pick(max_tokens, "max_tokens", cfg.max_output_tokens))
     resolved_top_p = _pick(top_p, "top_p", cfg.top_p)
     resolved_freq = _pick(frequency_penalty, "frequency_penalty", cfg.frequency_penalty)
     resolved_pres = _pick(presence_penalty, "presence_penalty", cfg.presence_penalty)
 
-    if cfg.api_format == "openai_chat":
-        # 延迟导入：未安装 langchain_openai 时不影响 Anthropic 路径
+    from app.arena.thinking import build_thinking_client_kwargs
+
+    thinking_capable = bool(
+        _pick(None, "thinking_capable", getattr(ep, "thinking_capable", False))
+    )
+    thinking_level = str(
+        _pick(None, "thinking_level", getattr(ep, "thinking_level", "off") or "off")
+    )
+    think_kw = build_thinking_client_kwargs(
+        api_format=str(api_format),
+        level=thinking_level,
+        thinking_capable=thinking_capable,
+        max_tokens=resolved_max,
+    )
+    if "max_tokens" in think_kw:
+        resolved_max = int(think_kw.pop("max_tokens"))
+
+    if api_format == "openai_chat":
         try:
             from langchain_openai import ChatOpenAI
         except ImportError as exc:
@@ -87,11 +124,11 @@ def create_chat_model(
                 "api_format='openai_chat' 需要安装 langchain-openai"
             ) from exc
         default_headers: dict[str, str] = {}
-        if cfg.auth_field and cfg.auth_field != "Authorization":
-            default_headers[cfg.auth_field] = cfg.api_key
+        if auth_field and auth_field != "Authorization":
+            default_headers[str(auth_field)] = str(api_key)
         kwargs: dict[str, Any] = {
             "model": resolved_model,
-            "api_key": cfg.api_key,
+            "api_key": api_key,
             "base_url": base_url,
             "temperature": resolved_temp,
             "max_tokens": resolved_max,
@@ -106,9 +143,13 @@ def create_chat_model(
             kwargs["frequency_penalty"] = resolved_freq
         if resolved_pres is not None:
             kwargs["presence_penalty"] = resolved_pres
+        # reasoning_effort / model_kwargs
+        if "reasoning_effort" in think_kw:
+            kwargs["reasoning_effort"] = think_kw["reasoning_effort"]
+        if "model_kwargs" in think_kw:
+            kwargs["model_kwargs"] = think_kw["model_kwargs"]
         return ChatOpenAI(**kwargs)
 
-    # 默认 anthropic_messages — 延迟导入，避免模块 import 时强依赖
     try:
         from langchain_anthropic import ChatAnthropic
     except ImportError as exc:
@@ -117,7 +158,7 @@ def create_chat_model(
         ) from exc
     anthropic_kwargs: dict[str, Any] = {
         "model": resolved_model,
-        "api_key": cfg.api_key,
+        "api_key": api_key,
         "base_url": base_url,
         "temperature": resolved_temp,
         "max_tokens": resolved_max,
@@ -126,4 +167,6 @@ def create_chat_model(
     }
     if resolved_top_p is not None:
         anthropic_kwargs["top_p"] = resolved_top_p
+    if "thinking" in think_kw:
+        anthropic_kwargs["thinking"] = think_kw["thinking"]
     return ChatAnthropic(**anthropic_kwargs)

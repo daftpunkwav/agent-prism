@@ -115,3 +115,48 @@ def test_sanitize_messages_for_model_preserves_human():
     out = sanitize_messages_for_model(msgs)
     assert out[1].content == "q"
     assert out[2].content == "y"
+
+
+def test_flatten_non_consecutive_system_messages():
+    """尾部/中段 System 必须压平，否则 Anthropic 抛 ValueError。"""
+    from app.arena.message_sanitize import flatten_system_messages_for_provider
+
+    msgs = [
+        SystemMessage(content="sys-a"),
+        SystemMessage(content="sys-b"),
+        HumanMessage(content="q"),
+        AIMessage(content="a"),
+        SystemMessage(content="阶段提示"),
+    ]
+    out = flatten_system_messages_for_provider(msgs)
+    systems = [m for m in out if isinstance(m, SystemMessage)]
+    assert len(systems) == 1
+    assert "sys-a" in systems[0].content
+    assert "sys-b" in systems[0].content
+    assert isinstance(out[0], SystemMessage)
+    assert any(
+        isinstance(m, HumanMessage) and "阶段提示" in str(m.content) for m in out
+    )
+    # sanitize 路径同样压平
+    out2 = sanitize_messages_for_model(msgs)
+    assert sum(1 for m in out2 if isinstance(m, SystemMessage)) == 1
+
+
+def test_prepare_vector_appends_human_not_trailing_system():
+    from unittest.mock import patch
+
+    from app.arena.context_manager import prepare_messages_for_llm
+
+    msgs = [
+        SystemMessage(content="sys"),
+        HumanMessage(content="查水果维生素"),
+    ]
+    with patch(
+        "app.arena.context_manager.maybe_vector_snippets",
+        return_value="苹果含维生素 C",
+    ):
+        out = prepare_messages_for_llm(msgs, strategy="vector", window_size=10)
+    assert isinstance(out[0], SystemMessage)
+    trailing_systems = [m for m in out[1:] if isinstance(m, SystemMessage)]
+    assert trailing_systems == []
+    assert any(isinstance(m, HumanMessage) and "维生素" in str(m.content) for m in out)

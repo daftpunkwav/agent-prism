@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Source_Sans_3, Syne } from "next/font/google";
+import { IBM_Plex_Sans, JetBrains_Mono, Syne } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 
@@ -9,8 +9,9 @@ const syne = Syne({
   weight: ["500", "600", "700", "800"],
 });
 
-const sourceSans = Source_Sans_3({
-  variable: "--font-source-sans",
+/** 光学台正文：仪器说明书气质，避免 Inter/Source 默认感 */
+const ibmPlexSans = IBM_Plex_Sans({
+  variable: "--font-ibm-plex",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
@@ -40,7 +41,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body
-        className={`${syne.variable} ${sourceSans.variable} ${jetbrainsMono.variable} antialiased`}
+        className={`${syne.variable} ${ibmPlexSans.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <AppShell>{children}</AppShell>
       </body>

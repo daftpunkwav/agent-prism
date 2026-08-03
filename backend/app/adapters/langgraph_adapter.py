@@ -21,6 +21,7 @@ from app.arena.harness import HarnessRunner
 from app.arena.llm import clear_pipeline_llm_overrides
 from app.arena.reasoning import get_reasoning_description
 from app.arena.reasoning_graph import REASONING_MODES, build_react_graph
+from app.arena.tools import clear_active_toolset
 from app.arena.workspace import clear_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
@@ -36,7 +37,7 @@ class LangGraphAdapter:
 
     async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
         label = config.label or self.display_name
-        state = RunState(label=label)
+        state = RunState.for_pipeline(label, config)
         # workspace 创建在 try 外（失败直接抛给 runner 收敛，与原实现一致）
         state.ws_name = create_run_workspace(question, label)
 
@@ -52,14 +53,17 @@ class LangGraphAdapter:
                 step=0,
                 content=(
                     f"[LangGraph] {mode_label} · {config.prompt_profile} · "
-                    f"context={config.context}(真实裁剪) · harness={config.harness}"
+                    f"context={config.context}(真实裁剪) · harness={config.harness} · "
+                    f"temp={config.temperature} · model={config.model_id} · "
+                    f"max_steps={config.max_steps} · toolset={config.toolset}"
                 ),
             )
 
             spec = REASONING_MODES.get(config.reasoning, REASONING_MODES["react"])
-            # 提高 LangGraph 默认递归限制（默认 25）；同时 max_steps 控制业务循环
+            # 提高 LangGraph 默认递归限制；max_steps 控制业务循环上限
             builder = spec.graph_builder or build_react_graph
-            graph = builder().compile().with_config({"recursion_limit": 50})
+            recursion_limit = max(50, int(config.max_steps) * 5)
+            graph = builder().compile().with_config({"recursion_limit": recursion_limit})
 
             initial_state = {
                 "messages": [
@@ -67,7 +71,7 @@ class LangGraphAdapter:
                     HumanMessage(content=user),
                 ],
                 "step_count": 0,
-                "max_steps": 10,
+                "max_steps": int(config.max_steps),
                 "tool_calls": 0,
                 "reflections": [],
                 "context_strategy": config.context,
@@ -103,4 +107,5 @@ class LangGraphAdapter:
             yield finish_event(state, success=False)
         finally:
             clear_pipeline_llm_overrides()
+            clear_active_toolset()
             clear_current_workspace()

@@ -2,8 +2,9 @@
 
 import pytest
 
-from app.arena.router import DimensionRouter, reset_dimension_options, sync_framework_options_from_registry
+from app.arena.router import DimensionRouter, reset_dimension_options, sync_framework_options_from_registry, sync_model_options_from_provider
 from app.arena.runner import build_registry
+from app.config import ProviderConfig
 
 
 @pytest.fixture(autouse=True)
@@ -11,9 +12,15 @@ def _restore_framework_options():
     """确保 framework 选项回到内置 Adapter，免受其它测试的 registry 同步污染。"""
     reset_dimension_options()
     sync_framework_options_from_registry(build_registry())
+    sync_model_options_from_provider(
+        ProviderConfig(model="test-model-a", models=["test-model-b"])
+    )
     yield
     reset_dimension_options()
     sync_framework_options_from_registry(build_registry())
+    sync_model_options_from_provider(
+        ProviderConfig(model="test-model-a", models=["test-model-b"])
+    )
 
 
 @pytest.fixture
@@ -54,7 +61,17 @@ def test_duplicate_selections_deduplicated(router):
 
 
 def test_all_dimensions_route_successfully(router):
-    """所有 5 个维度均能 route 出 ≥2 条 pipeline。"""
-    for dim in ("framework", "prompt", "reasoning", "context", "harness"):
+    """所有对比维度均能 route 出 ≥2 条 pipeline。"""
+    for dim in (
+        "framework",
+        "prompt",
+        "reasoning",
+        "context",
+        "harness",
+        "temperature",
+        "model",
+        "max_steps",
+        "toolset",
+    ):
         configs = router.route(dim)  # type: ignore[arg-type]
         assert len(configs) >= 2

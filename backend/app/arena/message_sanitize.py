@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 
 __all__ = [
     "sanitize_messages_for_model",
+    "flatten_system_messages_for_provider",
     "extract_original_question",
     "reinforce_system_with_question",
     "inject_tool_result_reminder",
@@ -52,6 +53,34 @@ def sanitize_ai_message(msg: AIMessage) -> AIMessage:
     )
 
 
+def flatten_system_messages_for_provider(messages: list) -> list[BaseMessage]:
+    """合并前缀 SystemMessage，并将后续 System 转为 Human。
+
+    Anthropic Messages API 不允许非连续的多条 system（会抛
+    ``Received multiple non-consecutive system messages``）。
+    上下文摘要、向量片段、推理阶段提示若以 System 插入对话中间，必须压平。
+    """
+    out: list[BaseMessage] = []
+    in_prefix = True
+    for m in messages:
+        if in_prefix and isinstance(m, SystemMessage):
+            text = _text_from_content(m.content)
+            if out and isinstance(out[-1], SystemMessage):
+                prev = _text_from_content(out[-1].content)
+                out[-1] = SystemMessage(content=f"{prev}\n\n{text}" if prev else text)
+            else:
+                out.append(SystemMessage(content=text))
+            continue
+        in_prefix = False
+        if isinstance(m, SystemMessage):
+            text = _text_from_content(m.content).strip()
+            if text:
+                out.append(HumanMessage(content=f"[系统补充]\n{text}"))
+            continue
+        out.append(m)
+    return out
+
+
 def sanitize_messages_for_model(messages: list) -> list[BaseMessage]:
     """对即将送入 LLM 的消息做消毒（不修改 state 内原件）。"""
     out: list[BaseMessage] = []
@@ -60,7 +89,7 @@ def sanitize_messages_for_model(messages: list) -> list[BaseMessage]:
             out.append(sanitize_ai_message(m))
         else:
             out.append(m)
-    return out
+    return flatten_system_messages_for_provider(out)
 
 
 def extract_original_question(messages: list) -> str:

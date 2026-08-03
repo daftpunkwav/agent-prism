@@ -90,11 +90,38 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
     setSaving(true);
     setError(false);
     try {
-      // saveProvider 在 lib/api.ts 内部剥离 api_key — 调用方无需关心
+      // 只更新共享解码默认；接入点列表原样回传（空 key 由后端保留）
       const saved = await saveProvider({
-        ...config,
-        ...params,
+        notes: config.notes,
+        website_url: config.website_url,
+        endpoints: (config.endpoints ?? []).map((ep) => ({
+          id: ep.id,
+          label: ep.label,
+          provider_name: ep.provider_name,
+          api_key: "",
+          base_url: ep.base_url,
+          use_full_url: ep.use_full_url,
+          api_format: ep.api_format,
+          auth_field: ep.auth_field,
+          model: ep.model,
+          context_window: ep.context_window,
+          max_input_tokens: ep.max_input_tokens,
+        })),
+        default_endpoint_id: config.default_endpoint_id,
+        temperature: params.temperature,
+        top_p: params.top_p,
+        frequency_penalty: params.frequency_penalty,
+        presence_penalty: params.presence_penalty,
         max_output_tokens: params.max_tokens,
+        // 无 endpoints 时的旧路径兜底
+        provider_name: config.provider_name,
+        base_url: config.base_url,
+        use_full_url: config.use_full_url,
+        api_format: config.api_format,
+        auth_field: config.auth_field,
+        model: config.model,
+        context_window: config.context_window,
+        max_input_tokens: config.max_input_tokens,
       });
       setConfig(saved);
       setPending({
@@ -144,11 +171,14 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
     <div className="space-y-4">
       <div>
         <p className="eyebrow mb-2">实验参数</p>
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          写入共享解码默认（Arena 基线种子）。实际 run 以 Arena「控制变量基线」为准；对比多模型时各列温度 / Top P / 思考强度等保持一致。
+        </p>
       </div>
-      {/* 模型卡片：名称 + 提供商 + 上下文窗口 */}
+      {/* 默认接入点摘要 */}
       <div className="rounded-[var(--radius-sm)] border border-border bg-muted/30 p-3 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="eyebrow">模型</span>
+          <span className="eyebrow">默认接入点</span>
           {saving && <span className="text-[10px] text-muted-foreground">保存中…</span>}
           {error && <span className="text-[10px] text-destructive">保存失败</span>}
         </div>
@@ -164,6 +194,11 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
             {(config.max_output_tokens / 1000).toFixed(0)}k out
           </span>
         </div>
+        {(config.endpoints?.length ?? 0) > 1 && (
+          <p className="text-[10px] text-muted-foreground">
+            已配置 {config.endpoints!.length} 个接入点（跨厂或同连接多模型）
+          </p>
+        )}
       </div>
 
       {/* 参数滑块组：所有滑块共享 release 时保存 */}

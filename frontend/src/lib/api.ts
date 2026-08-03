@@ -1,6 +1,18 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
-export type DimensionId = "framework" | "prompt" | "reasoning" | "context" | "harness";
+export type DimensionId =
+  | "framework"
+  | "prompt"
+  | "reasoning"
+  | "context"
+  | "harness"
+  | "temperature"
+  | "model"
+  | "thinking"
+  | "max_steps"
+  | "toolset";
+
+export type ThinkingLevel = "off" | "low" | "medium" | "high";
 
 export interface DimensionOption {
   field: string;
@@ -23,11 +35,13 @@ export interface BaselineFieldOption {
 }
 
 export interface BaselineField {
-  dimension: DimensionId;
+  dimension: DimensionId | null;
   field: string;
   label: string;
   default: string;
   options: BaselineFieldOption[];
+  /** pipeline | decode | access */
+  group?: string;
 }
 
 export interface ArenaMeta {
@@ -35,6 +49,8 @@ export interface ArenaMeta {
   frameworks: Array<{ id: string; name: string; status: string }>;
   baseline_defaults?: Record<string, string>;
   baseline_fields?: BaselineField[];
+  /** Settings 中是否已配置 ≥2 个真实模型，可供模型维对比 */
+  model_compare_ready?: boolean;
 }
 
 /** 控制变量基线覆盖（不含当前对比维） */
@@ -44,12 +60,22 @@ export type BaselineOverrides = Partial<{
   context: string;
   harness: string;
   prompt_profile: string;
+  temperature: string;
+  endpoint_id: string;
+  model_id: string;
+  thinking_level: string;
+  top_p: string;
+  frequency_penalty: string;
+  presence_penalty: string;
+  max_output_tokens: string;
+  max_steps: string;
+  toolset: string;
 }>;
 
-export interface ProviderConfig {
+export interface LlmEndpointPublic {
+  id: string;
+  label: string;
   provider_name: string;
-  notes: string;
-  website_url: string;
   api_key_set: boolean;
   api_key_preview: string;
   base_url: string;
@@ -57,13 +83,37 @@ export interface ProviderConfig {
   api_format: string;
   auth_field: string;
   model: string;
+  context_window: number;
+  max_input_tokens: number;
+  max_output_tokens?: number;
+  website_url?: string;
+  thinking_capable?: boolean;
+  thinking_level?: ThinkingLevel | string;
+}
+
+export interface ProviderConfig {
+  notes: string;
+  website_url: string;
+  endpoints?: LlmEndpointPublic[];
+  default_endpoint_id?: string;
   temperature: number;
   top_p: number;
   frequency_penalty: number;
   presence_penalty: number;
+  max_output_tokens: number;
+  /** 默认接入点镜像 */
+  provider_name: string;
+  api_key_set: boolean;
+  api_key_preview: string;
+  base_url: string;
+  use_full_url: boolean;
+  api_format: string;
+  auth_field: string;
+  model: string;
+  /** 兼容旧字段 */
+  models?: string[];
   context_window: number;
   max_input_tokens: number;
-  max_output_tokens: number;
 }
 
 export interface TokenStats {
@@ -143,18 +193,36 @@ export async function fetchProvider(options?: { signal?: AbortSignal }): Promise
  * 其它所有字段均允许 PUT 更新。
  */
 export async function saveProvider(body: Record<string, unknown>): Promise<ProviderConfig> {
-  // 仅当 api_key 为空时省略该字段，让后端保留已保存的 Key；非空则必须发送（BYOK）
+  // 顶层空 api_key 省略；endpoints 内空 key 保留字段以便后端按 id 合并
   const payload = { ...body };
   const key = payload.api_key;
   if (typeof key !== "string" || !key.trim()) {
     delete payload.api_key;
+  }
+  if (Array.isArray(payload.endpoints)) {
+    payload.endpoints = (payload.endpoints as Record<string, unknown>[]).map((ep) => {
+      const next = { ...ep };
+      if (typeof next.api_key !== "string" || !String(next.api_key).trim()) {
+        next.api_key = "";
+      }
+      return next;
+    });
   }
   const res = await fetch(`${API_BASE}/api/settings/provider`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error("保存失败");
+  if (!res.ok) {
+    let detail = "保存失败";
+    try {
+      const err = await res.json();
+      if (typeof err?.detail === "string") detail = err.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
   return res.json();
 }
 

@@ -140,6 +140,7 @@ def prepare_messages_for_llm(
 
     result: list[BaseMessage] = list(systems)
     if summary_msg is not None:
+        # 摘要接在前缀 system 之后（仍属前缀连续段），由 flatten 合并
         result.append(summary_msg)
     result.extend(working)
 
@@ -153,6 +154,7 @@ def prepare_messages_for_llm(
             snippets = maybe_vector_snippets(query)
             fenced = format_retrieved_snippets(snippets)
             if fenced:
-                result.append(SystemMessage(content=fenced))
+                # 勿用尾部 SystemMessage：会导致 Anthropic 非连续 system 报错
+                result.append(HumanMessage(content=fenced))
 
     return result

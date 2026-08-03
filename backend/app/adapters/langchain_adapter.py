@@ -27,7 +27,7 @@ from app.arena.llm import (
     create_chat_model,
 )
 from app.arena.message_sanitize import sanitize_messages_for_model, with_tool_grounding
-from app.arena.tools import ARENA_TOOLS
+from app.arena.tools import clear_active_toolset, get_active_tools
 from app.arena.workspace import clear_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
@@ -56,7 +56,16 @@ class _ArenaContextMiddleware(AgentMiddleware):
         if combined and isinstance(combined[0], SystemMessage):
             system_message = combined[0]
             rest = combined[1:]
-        return request.override(messages=rest, system_message=system_message)
+        # 防御：create_agent 的 messages 侧不得再含 System（Anthropic 会报非连续 system）
+        cleaned_rest: list = []
+        for m in rest:
+            if isinstance(m, SystemMessage):
+                text = str(getattr(m, "content", "") or "").strip()
+                if text:
+                    cleaned_rest.append(HumanMessage(content=f"[系统补充]\n{text}"))
+                continue
+            cleaned_rest.append(m)
+        return request.override(messages=cleaned_rest, system_message=system_message)
 
     def wrap_model_call(self, request, handler):
         return handler(self._prepare(request))
@@ -126,7 +135,7 @@ class LangChainAdapter:
 
     async def run(self, question: str, config: PipelineConfig) -> AsyncIterator[ArenaEvent]:
         label = config.label or self.display_name
-        state = RunState(label=label)
+        state = RunState.for_pipeline(label, config)
         # workspace 创建在 try 外（失败直接抛给 runner 收敛，与原实现一致）
         state.ws_name = create_run_workspace(question, label)
 
@@ -146,20 +155,27 @@ class LangChainAdapter:
                 step=0,
                 content=(
                     f"[LangChain create_agent] Tool Calling · {config.prompt_profile} · "
-                    f"context={config.context}(真实裁剪) · harness={config.harness} · {reasoning_note}"
+                    f"context={config.context}(真实裁剪) · harness={config.harness} · "
+                    f"temp={config.temperature} · model={config.model_id} · "
+                    f"max_steps={config.max_steps} · toolset={config.toolset} · {reasoning_note}"
                 ),
             )
 
+            tools = get_active_tools()
             llm = create_chat_model(
                 temperature=config.temperature,
                 model=config.model_id or None,
+                max_tokens=config.max_output_tokens,
+                top_p=config.top_p,
+                frequency_penalty=config.frequency_penalty,
+                presence_penalty=config.presence_penalty,
             )
             agent = create_agent(
                 llm,
-                ARENA_TOOLS,
+                tools,
                 system_prompt=system,
                 middleware=[_ArenaContextMiddleware(config.context, question=question)],
-            )
+            ).with_config({"recursion_limit": max(25, int(config.max_steps) * 4)})
             initial_state: dict[str, Any] = {
                 "messages": [SystemMessage(content=system), HumanMessage(content=user)],
             }
@@ -187,4 +203,5 @@ class LangChainAdapter:
             yield finish_event(state, success=False)
         finally:
             clear_pipeline_llm_overrides()
+            clear_active_toolset()
             clear_current_workspace()

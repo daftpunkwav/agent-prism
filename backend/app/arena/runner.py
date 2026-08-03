@@ -17,7 +17,7 @@ from app.adapters.base import AdapterReservedError, FrameworkAdapterRegistry
 from app.adapters.langchain_adapter import LangChainAdapter
 from app.adapters.langgraph_adapter import LangGraphAdapter
 from app.arena.errors import sanitize_error_message
-from app.arena.router import DimensionRouter, sync_framework_options_from_registry
+from app.arena.router import DimensionRouter, sync_framework_options_from_registry, sync_model_options_from_provider
 from app.models import ArenaEvent, ArenaRunRequest, PipelineConfig
 
 logger = logging.getLogger(__name__)
@@ -27,8 +27,9 @@ def build_registry() -> FrameworkAdapterRegistry:
     registry = FrameworkAdapterRegistry()
     registry.register(LangChainAdapter())
     registry.register(LangGraphAdapter())
-    # 闭环：维度选项与 registry 同源
+    # 闭环：维度选项与 registry / Provider 同源
     sync_framework_options_from_registry(registry)
+    sync_model_options_from_provider()
     return registry
 
 
@@ -38,6 +39,7 @@ class RunnerPool:
     def __init__(self, registry: FrameworkAdapterRegistry | None = None) -> None:
         self.registry = registry or build_registry()
         sync_framework_options_from_registry(self.registry)
+        sync_model_options_from_provider()
         self.router = DimensionRouter()
 
     def configs_for(self, request: ArenaRunRequest) -> list[PipelineConfig]:
@@ -46,7 +48,7 @@ class RunnerPool:
             request.selections,
             baseline=request.baseline,
         )
-        if request.temperature is not None:
+        if request.temperature is not None and request.dimension != "temperature":
             configs = [c.model_copy(update={"temperature": request.temperature}) for c in configs]
         return configs
 

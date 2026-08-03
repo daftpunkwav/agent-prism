@@ -19,6 +19,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { ArenaModule } from "@/components/ArenaModule";
 import { ExperimentPanel } from "@/components/ExperimentPanel";
 import { TokenStatsPanel } from "@/components/TokenStatsPanel";
 import { TraceDiff } from "@/components/TraceDiff";
@@ -49,9 +50,31 @@ const DIMENSION_FIELD: Record<DimensionId, keyof BaselineOverrides> = {
   reasoning: "reasoning",
   context: "context",
   harness: "harness",
+  temperature: "temperature",
+  model: "endpoint_id",
+  thinking: "thinking_level",
+  max_steps: "max_steps",
+  toolset: "toolset",
 };
 
-const DIMENSION_IDS: DimensionId[] = ["framework", "prompt", "reasoning", "context", "harness"];
+const DIMENSION_IDS: DimensionId[] = [
+  "framework",
+  "prompt",
+  "reasoning",
+  "context",
+  "harness",
+  "temperature",
+  "model",
+  "thinking",
+  "max_steps",
+  "toolset",
+];
+
+const BASELINE_GROUP_LABEL: Record<string, string> = {
+  pipeline: "管线",
+  decode: "解码 / 思考",
+  access: "接入点",
+};
 
 type ColumnState = {
   label: string;
@@ -384,10 +407,13 @@ export function ArenaClient() {
   const [columns, setColumns] = useState<Record<string, ColumnState>>({});
   const [showPromptBanner, setShowPromptBanner] = useState(true);
   const [showLeftPanel, setShowLeftPanel] = useState(false);
-  const [showRightPanel, setShowRightPanel] = useState(true);
+  /** 工作空间默认收起，需要时再展开 */
+  const [showRightPanel, setShowRightPanel] = useState(false);
   const [metaLoading, setMetaLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>("results");
+  /** 配置类模块默认收起；结果舞台始终展开 */
+  const [configOpen, setConfigOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const [projectName, setProjectName] = useState("");
   const [savingProject, setSavingProject] = useState(false);
@@ -419,6 +445,16 @@ export function ArenaClient() {
             context: d.context,
             harness: d.harness,
             prompt_profile: d.prompt_profile,
+            temperature: d.temperature,
+            endpoint_id: d.endpoint_id,
+            model_id: d.model_id,
+            thinking_level: d.thinking_level,
+            top_p: d.top_p,
+            frequency_penalty: d.frequency_penalty,
+            presence_penalty: d.presence_penalty,
+            max_output_tokens: d.max_output_tokens,
+            max_steps: d.max_steps,
+            toolset: d.toolset,
           });
         }
       })
@@ -725,15 +761,6 @@ export function ArenaClient() {
     );
   };
 
-  const reportVisitedRef = useRef(false);
-  useEffect(() => {
-    if (allCompleted && !reportVisitedRef.current) {
-      setMainTab("report");
-      reportVisitedRef.current = true;
-    }
-    if (!allCompleted) reportVisitedRef.current = false;
-  }, [allCompleted]);
-
   // 运行完成后若使用可判分模板，自动判分所有列
   const judgedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -778,43 +805,57 @@ export function ArenaClient() {
     );
   }
 
-  return (
+    return (
     <div className="arena-shell">
-      <div className="arena-chrome">
-        <section className="arena-setup">
-          <div className="arena-setup-head">
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="eyebrow shrink-0">对比维度</p>
-                {activeDim && (
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    {activeDim.label}
-                  </span>
+      <div className="arena-chrome" data-running={running ? "true" : undefined}>
+        <ArenaModule
+          title="实验维度"
+          eyebrow="配置"
+          open={configOpen}
+          onToggle={() => setConfigOpen((v) => !v)}
+          summary={
+            <span className="arena-module-summary-stack">
+              <span className="arena-summary-chip">
+                维·{activeDim?.label ?? "未选"}
+                {activeSelections.length > 0 && (
+                  <>
+                    {" · "}
+                    {activeSelections
+                      .map(
+                        (v) =>
+                          activeDim?.options.find((o) => o.value === v)?.label ?? v,
+                      )
+                      .join(" / ")}
+                  </>
                 )}
-              </div>
-              <div className="dim-rail" role="tablist" aria-label="对比维度">
-                {meta?.dimensions.map((d, i) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={dimension === d.id}
-                    className="dim-rail-item"
-                    data-active={dimension === d.id}
-                    onClick={() => setDimension(d.id)}
-                  >
-                    <span className="dim-rail-index">
-                      {String(i + 1).padStart(2, "0")}
+              </span>
+              {meta?.baseline_fields &&
+                (["pipeline", "decode", "access"] as const).map((g) => {
+                  const items = meta.baseline_fields!.filter(
+                    (f) => (f.group || "pipeline") === g,
+                  );
+                  if (items.length === 0) return null;
+                  const bits = items.map((field) => {
+                    const locked = field.dimension === dimension;
+                    const value =
+                      baseline[field.field as keyof BaselineOverrides] ?? field.default;
+                    const lab = locked
+                      ? "对比维"
+                      : (field.options.find((o) => o.value === value)?.label ?? value);
+                    return `${field.label}:${lab}`;
+                  });
+                  return (
+                    <span
+                      key={g}
+                      className="arena-summary-chip arena-summary-chip-muted"
+                    >
+                      {BASELINE_GROUP_LABEL[g]} · {bits.join(" · ")}
                     </span>
-                    <span className="dim-rail-label">{d.label}</span>
-                  </button>
-                ))}
-              </div>
-              {activeDim?.subtitle && (
-                <p className="arena-subtitle">{activeDim.subtitle}</p>
-              )}
-            </div>
-
+                  );
+                })}
+            </span>
+          }
+          actions={
             <div className="arena-setup-tools">
               <button
                 type="button"
@@ -845,184 +886,267 @@ export function ArenaClient() {
                 )}
               </button>
             </div>
-          </div>
+          }
+        >
+          <div className="arena-config-dense">
+            <div className="arena-config-top">
+              <label className="config-select-field">
+                <span className="eyebrow">对比维度</span>
+                <select
+                  className="baseline-select config-select"
+                  value={dimension}
+                  disabled={running}
+                  onChange={(e) => setDimension(e.target.value as DimensionId)}
+                  aria-label="对比维度"
+                >
+                  {meta?.dimensions.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          {activeDim && (
-            <div className="lane-row">
-              <div className="lane-row-meta">
-                <p className="eyebrow">参与对比</p>
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {activeSelections.length} / {activeDim.max_select}
-                  {activeSelections.length < (activeDim.min_select ?? 2) && (
-                    <span className="text-warning">
-                      {" "}
-                      · 至少 {activeDim.min_select ?? 2} 项
+              {activeDim && (
+                <div className="lane-row">
+                  <div className="lane-row-meta">
+                    <p className="eyebrow">参与对比</p>
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {activeSelections.length} / {activeDim.max_select}
+                      {activeSelections.length < (activeDim.min_select ?? 2) && (
+                        <span className="text-warning">
+                          {" "}
+                          · 至少 {activeDim.min_select ?? 2} 项
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-              </div>
-              <div className="lane-pick">
-                {activeDim.options.map((opt, idx) => (
-                  <LaneTile
-                    key={opt.value}
-                    option={opt}
-                    selected={activeSelections.includes(opt.value)}
-                    onToggle={toggleSelection}
-                    lane={idx}
-                  />
-                ))}
-              </div>
+                  </div>
+                  <div className="lane-pick">
+                    {activeDim.options.map((opt, idx) => (
+                      <LaneTile
+                        key={opt.value}
+                        option={opt}
+                        selected={activeSelections.includes(opt.value)}
+                        onToggle={toggleSelection}
+                        lane={idx}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
 
-          {meta?.baseline_fields && meta.baseline_fields.length > 0 && (
-            <div className="baseline-row">
-              <div className="lane-row-meta">
-                <p className="eyebrow">控制变量基线</p>
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  非对比维可改 · 当前维锁定
-                </span>
-              </div>
-              <div className="baseline-pick">
-                {meta.baseline_fields.map((field) => {
-                  const locked = field.dimension === dimension;
-                  const value =
-                    baseline[field.field as keyof BaselineOverrides] ?? field.default;
-                  return (
-                    <label
-                      key={field.field}
-                      className="baseline-field"
-                      data-locked={locked}
-                      title={locked ? "当前对比维，由上方子项决定" : undefined}
-                    >
-                      <span className="baseline-field-label">{field.label}</span>
-                      <select
-                        className="baseline-select"
-                        disabled={locked || running}
-                        value={value}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setBaseline((prev) => ({
-                            ...prev,
-                            [field.field]: next,
-                          }));
-                        }}
-                        aria-label={`基线 ${field.label}`}
-                      >
-                        {field.options.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+            {activeDim?.subtitle && (
+              <p className="arena-subtitle">{activeDim.subtitle}</p>
+            )}
 
-          {dimension === "prompt" && showPromptBanner && (
-            <div className="flex items-start gap-2 rounded-[var(--radius-sm)] border border-border bg-muted/20 px-3 py-2 text-[11px]">
-              <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-              <p className="flex-1 leading-relaxed text-muted-foreground">
-                「CoT Prompt」只改 Prompt 文案。编排层变化见推理模式 → CoT+Tool。
+            {dimension === "model" && meta && meta.model_compare_ready === false && (
+              <div className="flex items-start gap-2 rounded-[var(--radius-sm)] border border-warning/40 bg-warning/10 px-3 py-2 text-[11px]">
+                <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+                <p className="flex-1 leading-relaxed text-muted-foreground">
+                  尚未配置足够的接入点。请到{" "}
+                  <a href="/settings" className="text-primary underline-offset-2 hover:underline">
+                    设置
+                  </a>{" "}
+                  新建跨厂接入点，或在同一接入点下「添加模型」。对比时仅切换接入点；温度 / Top P
+                  等由下方基线统一钉死。
+                </p>
+              </div>
+            )}
+            {dimension === "model" && meta && meta.model_compare_ready === true && (
+              <p className="text-[11px] text-muted-foreground leading-relaxed px-0.5">
+                模型对比：各列接入点（厂商标识 / 地址 / model）可变；温度、Top P、思考强度
+                等解码参数与控制变量基线一致。未勾选「支持思考」的接入点会强制关闭思考。
               </p>
-              <button
-                type="button"
-                className="btn-ghost !h-6 !px-1.5 shrink-0"
-                onClick={() => setShowPromptBanner(false)}
-                aria-label="关闭提示"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-        </section>
+            )}
+            {dimension === "thinking" && (
+              <p className="text-[11px] text-muted-foreground leading-relaxed px-0.5">
+                思考强度对比：钉住接入点与其它基线，仅变 off / low / medium / high。须在
+                Settings 为该模型勾选「支持思考」，否则各列都会落到关闭。
+              </p>
+            )}
 
-        <section className="composer-bar">
+            {meta?.baseline_fields && meta.baseline_fields.length > 0 && (
+              <div className="baseline-row">
+                <div className="lane-row-meta">
+                  <p className="eyebrow">控制变量基线</p>
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    非对比维可改 · 当前维锁定 · 分组展示
+                  </span>
+                </div>
+                <div className="baseline-groups">
+                  {(["pipeline", "decode", "access"] as const).map((g) => {
+                    const items = meta.baseline_fields!.filter(
+                      (f) => (f.group || "pipeline") === g,
+                    );
+                    if (items.length === 0) return null;
+                    return (
+                      <div key={g} className="baseline-group" data-group={g}>
+                        <p className="baseline-group-title">{BASELINE_GROUP_LABEL[g]}</p>
+                        <div className="baseline-pick">
+                          {items.map((field) => {
+                            const locked = field.dimension === dimension;
+                            const value =
+                              baseline[field.field as keyof BaselineOverrides] ??
+                              field.default;
+                            return (
+                              <label
+                                key={field.field}
+                                className="baseline-field"
+                                data-locked={locked}
+                                title={
+                                  locked ? "当前对比维，由上方子项决定" : undefined
+                                }
+                              >
+                                <span className="baseline-field-label">
+                                  {field.label}
+                                  {locked ? " · 对比维" : ""}
+                                </span>
+                                <select
+                                  className="baseline-select"
+                                  disabled={locked || running}
+                                  value={value}
+                                  onChange={(e) => {
+                                    const next = e.target.value;
+                                    setBaseline((prev) => ({
+                                      ...prev,
+                                      [field.field]: next,
+                                    }));
+                                  }}
+                                  aria-label={`基线 ${field.label}`}
+                                >
+                                  {field.options.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {dimension === "prompt" && showPromptBanner && (
+              <div className="flex items-start gap-2 rounded-[var(--radius-sm)] border border-border bg-muted/20 px-3 py-2 text-[11px]">
+                <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                <p className="flex-1 leading-relaxed text-muted-foreground">
+                  「CoT Prompt」只改 Prompt 文案。编排层变化见推理模式 → CoT+Tool。
+                </p>
+                <button
+                  type="button"
+                  className="btn-ghost !h-6 !px-1.5 shrink-0"
+                  onClick={() => setShowPromptBanner(false)}
+                  aria-label="关闭提示"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+          </div>
+        </ArenaModule>
+
+        <section className="composer-bar composer-bar-pinned">
           {error && (
             <p className="text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded-[var(--radius-sm)] px-3 py-1.5">
               {error}
             </p>
           )}
-          <div className="composer-templates">
-            {templates.filter((t) => (t.category ?? "scored") === "scored").length > 0 && (
-              <span className="composer-template-group" aria-hidden>
-                可判分
-              </span>
-            )}
-            {templates
-              .filter((t) => (t.category ?? "scored") === "scored")
-              .map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className="btn-ghost text-[11px]"
-                data-active={activeTemplateId === t.id}
-                title={`${t.name}（${t.description}）· 判分: ${JUDGE_TYPE_LABEL[t.judge.type] ?? t.judge.type}`}
-                onClick={() => applyTemplate(t)}
+          <div className="arena-run-strip">
+            <label className="config-select-field">
+              <span className="eyebrow">任务模板</span>
+              <select
+                className="baseline-select config-select"
+                value={activeTemplateId ?? ""}
+                disabled={running || templates.length === 0}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  if (!id) {
+                    setActiveTemplateId(null);
+                    return;
+                  }
+                  const t = templates.find((x) => x.id === id);
+                  if (t) applyTemplate(t);
+                }}
+                aria-label="任务模板"
               >
-                {t.name}
-                <span className="composer-template-badge">
-                  {JUDGE_TYPE_LABEL[t.judge.type] ?? t.judge.type}
-                </span>
-              </button>
-            ))}
-            {templates.some((t) => t.category === "quick") && (
-              <span className="composer-template-sep" aria-hidden />
-            )}
-            {templates.some((t) => t.category === "quick") && (
-              <span className="composer-template-group" aria-hidden>
-                快题
-              </span>
-            )}
-            {templates
-              .filter((t) => t.category === "quick")
-              .map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className="btn-ghost text-[11px]"
-                data-active={activeTemplateId === t.id}
-                title={t.question}
-                onClick={() => applyTemplate(t)}
-              >
-                {t.name}
-              </button>
-            ))}
-          </div>
-          <div className="composer-row">
-            <input
-              className="form-input"
-              placeholder="输入问题，折射出多条 Agent 管线…"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  runArena();
-                }
-              }}
-              disabled={running}
-              aria-label="实验问题"
-            />
-            {running ? (
-              <button type="button" className="btn-ghost composer-run" onClick={cancelRun}>
-                <Square className="h-4 w-4" />
-                停止
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={!question.trim() || activeSelections.length < 2}
-                onClick={runArena}
-              >
-                <Send className="h-4 w-4" />
-                运行
-              </button>
-            )}
+                <option value="">自定义问题</option>
+                {templates.some((t) => (t.category ?? "scored") === "scored") && (
+                  <optgroup label="可判分">
+                    {templates
+                      .filter((t) => (t.category ?? "scored") === "scored")
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                          {JUDGE_TYPE_LABEL[t.judge.type]
+                            ? `（${JUDGE_TYPE_LABEL[t.judge.type]}）`
+                            : ""}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
+                {templates.some((t) => t.category === "quick") && (
+                  <optgroup label="快题">
+                    {templates
+                      .filter((t) => t.category === "quick")
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
+              </select>
+            </label>
+            <div className="composer-row">
+              <input
+                className="form-input"
+                placeholder="输入问题，折射出多条 Agent 管线…"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    runArena();
+                  }
+                }}
+                disabled={running}
+                aria-label="实验问题"
+              />
+              {running ? (
+                <button type="button" className="btn-ghost composer-run" onClick={cancelRun}>
+                  <Square className="h-4 w-4" />
+                  停止
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!question.trim()}
+                  title={
+                    activeSelections.length < 2
+                      ? "请先展开「实验维度」并至少选择 2 项"
+                      : undefined
+                  }
+                  onClick={() => {
+                    if (activeSelections.length < 2) {
+                      setConfigOpen(true);
+                      setError("请至少选择 2 个对比项后再运行");
+                      return;
+                    }
+                    runArena();
+                  }}
+                >
+                  <Send className="h-4 w-4" />
+                  运行
+                </button>
+              )}
+            </div>
           </div>
         </section>
       </div>
@@ -1065,6 +1189,10 @@ export function ArenaClient() {
         )}
 
         <main className="arena-stage">
+          <div className="arena-stage-banner">
+            <span className="eyebrow">输出</span>
+            <span className="arena-stage-banner-title">结果 · 报告 · Trace</span>
+          </div>
           <div role="tablist" aria-label="Arena 视图切换" className="arena-stage-tabs">
             <MainTabButton
               active={mainTab === "results"}
@@ -1202,6 +1330,7 @@ export function ArenaClient() {
     </div>
   );
 }
+
 
 function MainTabButton({
   active,

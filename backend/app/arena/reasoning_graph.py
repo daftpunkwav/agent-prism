@@ -12,7 +12,6 @@ from app.arena.agent_state import AgentState
 from app.arena.context_manager import prepare_messages_for_llm
 from app.arena.llm import create_chat_model
 from app.arena.message_sanitize import sanitize_messages_for_model, with_tool_grounding
-from app.arena.tools import ARENA_TOOLS
 from app.arena.types import ReasoningMode
 
 
@@ -21,18 +20,23 @@ def _create_llm():
 
 
 def _bind_tools(llm):
-    return llm.bind_tools(ARENA_TOOLS)
+    from app.arena.tools import get_active_tools
+
+    return llm.bind_tools(get_active_tools())
 
 
 def _llm_messages(state: AgentState, extra: list | None = None) -> list:
-    """按上下文策略裁剪 → 消毒 thinking → 工具后锚定；extra 仅本次调用。"""
+    """按上下文策略裁剪 → 消毒 thinking → 工具后锚定；extra 仅本次调用。
+
+    extra 中的阶段提示若为 SystemMessage，sanitize 会压平为 Human，
+    避免 Anthropic「非连续多 system」报错。
+    """
     strategy = state.get("context_strategy") or "sliding"
     base = prepare_messages_for_llm(state.get("messages") or [], strategy)
-    base = sanitize_messages_for_model(base)
-    base = with_tool_grounding(base)
     if extra:
-        return list(base) + list(extra)
-    return list(base)
+        base = list(base) + list(extra)
+    base = sanitize_messages_for_model(base)
+    return with_tool_grounding(base)
 
 
 # ===== ReAct 模式 =====
@@ -85,7 +89,9 @@ async def _react_tool_node(state: AgentState) -> dict:
             )
             continue
 
-        tool_func = next((t for t in ARENA_TOOLS if t.name == tool_name), None)
+        from app.arena.tools import get_active_tools
+
+        tool_func = next((t for t in get_active_tools() if t.name == tool_name), None)
         if tool_func:
             result = await tool_func.ainvoke(tool_args)
             tc_count += 1

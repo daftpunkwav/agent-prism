@@ -18,6 +18,7 @@ from app.arena.llm import set_pipeline_llm_overrides
 from app.arena.prompts import build_messages
 from app.arena.stream_utils import extract_chunk_parts
 from app.arena.token_utils import TokenTracker, extract_usage
+from app.arena.tools import set_active_toolset
 from app.arena.workspace import get_workspace_mgr, set_current_workspace
 from app.models import ArenaEvent, PipelineConfig
 
@@ -37,6 +38,21 @@ class RunState:
     thinking_step: int | None = None
     ws_name: str = ""
 
+    @classmethod
+    def for_pipeline(cls, label: str, config: PipelineConfig) -> RunState:
+        """按接入点窗口元数据 + 统一基线 max_output 构造 tracker。"""
+        from app.arena.router import _lookup_endpoint
+        from app.config import load_provider_config
+
+        provider = load_provider_config()
+        ep = _lookup_endpoint(config.endpoint_id or None, provider)
+        tracker = TokenTracker(
+            context_window=ep.context_window,
+            max_input_tokens=ep.max_input_tokens,
+            max_output_tokens=config.max_output_tokens,
+        )
+        return cls(label=label, tracker=tracker)
+
 
 def create_run_workspace(question: str, label: str) -> str:
     """每个运行实例独占一个工作空间（时间戳 + uuid 后缀，避免同毫秒碰撞覆盖）。
@@ -52,11 +68,28 @@ def create_run_workspace(question: str, label: str) -> str:
 
 
 def begin_pipeline(question: str, config: PipelineConfig, label: str) -> tuple[str, str]:
-    """设置 LLM overrides 并构建 system/user prompt。返回 (system, user)。"""
+    """设置 LLM overrides / 工具集，并构建 system/user prompt。返回 (system, user)。"""
+    from app.arena.router import _lookup_endpoint
+    from app.config import load_provider_config
+
+    provider = load_provider_config()
+    ep = _lookup_endpoint(config.endpoint_id or None, provider)
     set_pipeline_llm_overrides(
+        endpoint_id=ep.id,
+        api_key=ep.api_key,
+        base_url=ep.base_url,
+        api_format=ep.api_format,
+        auth_field=ep.auth_field,
         temperature=config.temperature,
-        model=config.model_id or None,
+        model=config.model_id or ep.model,
+        max_tokens=config.max_output_tokens,
+        top_p=config.top_p,
+        frequency_penalty=config.frequency_penalty,
+        presence_penalty=config.presence_penalty,
+        thinking_capable=config.thinking_capable,
+        thinking_level=config.thinking_level,
     )
+    set_active_toolset(config.toolset)
     return build_messages(
         question, config.prompt_profile, config.reasoning, config.harness, config.context
     )

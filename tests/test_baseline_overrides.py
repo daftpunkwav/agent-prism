@@ -39,8 +39,42 @@ def test_baseline_invalid_value_raises(router):
         router.route("prompt", baseline=BaselineOverrides(reasoning="nope"))  # type: ignore[arg-type]
 
 
-def test_list_baseline_fields_covers_five_dims():
+def test_list_baseline_fields_covers_all_dims():
     fields = list_baseline_fields()
-    assert len(fields) == 5
-    dims = {f["dimension"] for f in fields}
-    assert dims == {"framework", "prompt", "reasoning", "context", "harness"}
+    dims = {f["dimension"] for f in fields if f.get("dimension")}
+    assert dims == {
+        "framework",
+        "prompt",
+        "reasoning",
+        "context",
+        "harness",
+        "temperature",
+        "model",
+        "thinking",
+        "max_steps",
+        "toolset",
+    }
+    only = {f["field"] for f in fields if f.get("dimension") is None}
+    assert "top_p" in only
+    assert "max_output_tokens" in only
+    assert "frequency_penalty" in only
+    assert "presence_penalty" in only
+
+
+def test_baseline_top_p_on_framework_dim(router):
+    configs = router.route(
+        "framework",
+        baseline=BaselineOverrides(top_p=0.8, max_output_tokens=1024),
+    )
+    assert all(c.top_p == 0.8 for c in configs)
+    assert all(c.max_output_tokens == 1024 for c in configs)
+
+
+def test_baseline_toolset_and_max_steps(router):
+    configs = router.route(
+        "framework",
+        baseline=BaselineOverrides(toolset="calc_time", max_steps=5, temperature=0.3),
+    )
+    assert all(c.toolset == "calc_time" for c in configs)
+    assert all(c.max_steps == 5 for c in configs)
+    assert all(c.temperature == 0.3 for c in configs)

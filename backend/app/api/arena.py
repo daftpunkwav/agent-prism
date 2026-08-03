@@ -23,7 +23,7 @@ _DIMENSION_META: list[dict] = [
     {
         "id": "framework",
         "label": "框架",
-        "subtitle": "编排实现不同，Prompt / 推理 / 上下文 / Harness 保持一致（可用基线覆盖）",
+        "subtitle": "编排实现不同，其余维由基线固定",
     },
     {
         "id": "prompt",
@@ -33,17 +33,42 @@ _DIMENSION_META: list[dict] = [
     {
         "id": "reasoning",
         "label": "推理模式",
-        "subtitle": "仅切换推理图节点，其余维由基线固定",
+        "subtitle": "LangGraph 切换图结构；LangChain 仅 Prompt 差异",
     },
     {
         "id": "context",
         "label": "上下文",
-        "subtitle": "仅切换 Memory 策略；滑动/摘要/向量在 LLM 调用前真实裁剪",
+        "subtitle": "滑动/摘要/向量在每次 LLM 调用前真实裁剪",
     },
     {
         "id": "harness",
         "label": "Harness",
-        "subtitle": "仅切换验证 / 反思循环，其余维由基线固定",
+        "subtitle": "验证 / 反思 / 自进化循环真实重试",
+    },
+    {
+        "id": "temperature",
+        "label": "温度",
+        "subtitle": "真实写入 LLM temperature（采样随机性）",
+    },
+    {
+        "id": "model",
+        "label": "模型",
+        "subtitle": "切换 Settings 接入点（跨厂或同连接多 model）；解码参数由基线钉死",
+    },
+    {
+        "id": "thinking",
+        "label": "思考强度",
+        "subtitle": "off/low/medium/high；模型须在 Settings 勾选「支持思考」才真正启用",
+    },
+    {
+        "id": "max_steps",
+        "label": "最大步数",
+        "subtitle": "LangGraph 业务步数上限；LangChain 同步 recursion_limit",
+    },
+    {
+        "id": "toolset",
+        "label": "工具集",
+        "subtitle": "真实过滤 bind_tools / create_agent 工具列表",
     },
 ]
 
@@ -54,6 +79,9 @@ _run_sem = asyncio.Semaphore(max(1, int(app_settings.max_concurrent_runs)))
 
 @router.get("/meta")
 async def arena_meta():
+    from app.arena.router import model_compare_ready, sync_model_options_from_provider
+
+    sync_model_options_from_provider()
     dimensions = []
     for meta in _DIMENSION_META:
         options = list_dimension_options(meta["id"])
@@ -68,8 +96,12 @@ async def arena_meta():
     return {
         "dimensions": dimensions,
         "frameworks": _pool.registry.list_available() + _pool.registry.list_reserved(),
-        "baseline_defaults": dict(DEFAULT_BASE),
+        "baseline_defaults": {
+            k: v if isinstance(v, str) else str(v)
+            for k, v in dict(DEFAULT_BASE).items()
+        },
         "baseline_fields": list_baseline_fields(),
+        "model_compare_ready": model_compare_ready(),
     }
 
 

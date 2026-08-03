@@ -21,6 +21,7 @@ import logging
 import multiprocessing as _mp
 import sys
 import threading
+from contextvars import ContextVar
 from datetime import datetime, timezone
 
 from langchain_core.tools import tool
@@ -503,3 +504,55 @@ ARENA_TOOLS = [
     # 文本摘要
     summarize_text,
 ]
+
+# 工具集预设：过滤后真实 bind_tools / create_agent（非文案）
+TOOLSET_TOOL_NAMES: dict[str, tuple[str, ...] | None] = {
+    "full": None,  # None = 全量
+    "code_file": (
+        "run_code",
+        "calculate",
+        "write_file",
+        "append_file",
+        "create_file",
+        "read_file",
+        "list_files",
+        "file_tree",
+        "delete_file",
+    ),
+    "calc_time": ("calculate", "get_current_time"),
+    "workspace_read": (
+        "read_file",
+        "list_files",
+        "file_tree",
+        "summarize_text",
+        "get_current_time",
+    ),
+}
+
+_active_toolset: ContextVar[str] = ContextVar("arena_toolset", default="full")
+
+
+def set_active_toolset(toolset: str | None) -> None:
+    """设置当前流水线工具集（ContextVar，异步栈感知）。"""
+    _active_toolset.set((toolset or "full").strip() or "full")
+
+
+def clear_active_toolset() -> None:
+    _active_toolset.set("full")
+
+
+def select_tools(toolset: str | None = None) -> list:
+    """按工具集预设过滤 ARENA_TOOLS；未知预设回退全量。"""
+    key = (toolset if toolset is not None else _active_toolset.get()) or "full"
+    names = TOOLSET_TOOL_NAMES.get(key, None)
+    if key not in TOOLSET_TOOL_NAMES:
+        names = None
+    if names is None:
+        return list(ARENA_TOOLS)
+    by_name = {t.name: t for t in ARENA_TOOLS}
+    return [by_name[n] for n in names if n in by_name]
+
+
+def get_active_tools() -> list:
+    """当前 ContextVar 工具集对应的工具列表。"""
+    return select_tools(_active_toolset.get())

@@ -14,6 +14,8 @@ from app.arena.types import (
     HarnessLevel,
     PromptProfile,
     ReasoningMode,
+    ThinkingLevel,
+    ToolsetId,
 )
 from app.arena.url_validate import validate_llm_base_url, validate_website_url
 
@@ -26,6 +28,8 @@ __all__ = [
     "ArenaRunRequest",
     "PipelineMetrics",
     "ArenaEvent",
+    "LlmEndpointPublic",
+    "LlmEndpointUpdate",
     "ProviderConfigPublic",
     "ProviderConfigUpdate",
     "ConnectionTestResult",
@@ -43,8 +47,17 @@ class PipelineConfig(BaseModel):
     context: ContextStrategy = "sliding"
     harness: HarnessLevel = "bare"
     prompt_profile: PromptProfile = "zero_shot"
+    endpoint_id: str = ""
     model_id: str = "step-3.7-flash"
     temperature: float = 0.0
+    top_p: float = 1.0
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
+    max_output_tokens: int = Field(default=2048, ge=64, le=128_000)
+    thinking_level: ThinkingLevel = "off"
+    thinking_capable: bool = False
+    max_steps: int = Field(default=10, ge=1, le=40)
+    toolset: ToolsetId = "full"
     prompt_version: str = "v1.0.0"
     label: str = ""
 
@@ -57,6 +70,16 @@ class BaselineOverrides(BaseModel):
     context: str | None = None
     harness: HarnessLevel | None = None
     prompt_profile: PromptProfile | None = None
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    endpoint_id: str | None = None
+    model_id: str | None = None  # 兼容旧客户端；优先 endpoint_id
+    thinking_level: ThinkingLevel | None = None
+    top_p: float | None = Field(default=None, ge=0.0, le=1.0)
+    frequency_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
+    presence_penalty: float | None = Field(default=None, ge=-2.0, le=2.0)
+    max_output_tokens: int | None = Field(default=None, ge=64, le=128_000)
+    max_steps: int | None = Field(default=None, ge=1, le=40)
+    toolset: ToolsetId | None = None
 
 
 class ArenaRunRequest(BaseModel):
@@ -102,12 +125,75 @@ class ArenaEvent(BaseModel):
     token_stats: dict[str, int | float] | None = None
 
 
+class LlmEndpointPublic(BaseModel):
+    """接入点公开视图（API Key 脱敏）。"""
+
+    id: str
+    label: str = ""
+    provider_name: str = ""
+    api_key_set: bool = False
+    api_key_preview: str = ""
+    base_url: str
+    use_full_url: bool = True
+    api_format: str
+    auth_field: str
+    model: str
+    context_window: int = 128_000
+    max_input_tokens: int = 120_000
+    max_output_tokens: int = 2048
+    website_url: str = ""
+    thinking_capable: bool = False
+    thinking_level: str = "off"
+
+
+class LlmEndpointUpdate(BaseModel):
+    """接入点更新；``api_key`` 空串表示保留已存 key。"""
+
+    id: str = Field(default="", max_length=64)
+    label: str = Field(default="", max_length=100)
+    provider_name: str = Field(default="", max_length=100)
+    api_key: str = Field(default="", max_length=4096)
+    base_url: str = Field(default="", max_length=500)
+    use_full_url: bool = True
+    api_format: ApiFormat = "anthropic_messages"
+    auth_field: str = Field(default="ANTHROPIC_AUTH_TOKEN", max_length=100)
+    model: str = Field(default="step-3.7-flash", max_length=200)
+    context_window: int = Field(default=128_000, ge=1024, le=10_000_000)
+    max_input_tokens: int = Field(default=120_000, ge=256, le=10_000_000)
+    max_output_tokens: int = Field(default=2048, ge=64, le=128_000)
+    website_url: str = Field(default="", max_length=500)
+    thinking_capable: bool = False
+    thinking_level: ThinkingLevel = "off"
+
+    @field_validator("base_url")
+    @classmethod
+    def _check_base_url(cls, v: str) -> str:
+        if not (v or "").strip():
+            return v
+        return validate_llm_base_url(v)
+
+    @field_validator("website_url")
+    @classmethod
+    def _check_website_url(cls, v: str) -> str:
+        if not (v or "").strip():
+            return ""
+        return validate_website_url(v)
+
+
 class ProviderConfigPublic(BaseModel):
     """返回给前端的配置（API Key 脱敏）。"""
 
-    provider_name: str
     notes: str
     website_url: str
+    endpoints: list[LlmEndpointPublic] = Field(default_factory=list)
+    default_endpoint_id: str = ""
+    temperature: float
+    top_p: float = 1.0
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
+    max_output_tokens: int
+    # 默认接入点镜像（ExperimentPanel / 旧 UI）
+    provider_name: str
     api_key_set: bool
     api_key_preview: str
     base_url: str
@@ -115,37 +201,40 @@ class ProviderConfigPublic(BaseModel):
     api_format: str
     auth_field: str
     model: str
-    temperature: float
-    top_p: float = 1.0
-    frequency_penalty: float = 0.0
-    presence_penalty: float = 0.0
+    models: list[str] = Field(default_factory=list)
     context_window: int
     max_input_tokens: int
-    max_output_tokens: int
 
 
 class ProviderConfigUpdate(BaseModel):
     """Provider 配置更新请求体。
 
-    ``api_key`` 留空 (``""``) 表示保留已保存的 key — 后端会自动从磁盘加载当前值。
+    优先使用 ``endpoints``；若为空则回退到顶层单连接字段（兼容旧客户端）。
+    接入点 / 顶层 ``api_key`` 留空表示保留已保存的 key。
     """
 
-    provider_name: str = Field(default="StepFun", max_length=100)
     notes: str = Field(default="", max_length=500)
     website_url: str = Field(default="", max_length=500)
+    endpoints: list[LlmEndpointUpdate] = Field(default_factory=list, max_length=12)
+    default_endpoint_id: str = Field(default="", max_length=64)
+    temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    top_p: float = Field(default=1.0, ge=0.0, le=1.0)
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    max_output_tokens: int = Field(default=2048, ge=64, le=128_000)
+    # 兼容旧扁平字段 / ExperimentPanel
+    provider_name: str = Field(default="StepFun", max_length=100)
     api_key: str = Field(default="", max_length=4096)
     base_url: str = Field(default="", max_length=500)
     use_full_url: bool = True
     api_format: ApiFormat = "anthropic_messages"
     auth_field: str = Field(default="ANTHROPIC_AUTH_TOKEN", max_length=100)
     model: str = Field(default="step-3.7-flash", max_length=200)
-    temperature: float = Field(default=0.0, ge=0.0, le=2.0)
-    top_p: float = Field(default=1.0, ge=0.0, le=1.0)
-    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
-    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    models: list[str] = Field(default_factory=list, max_length=12)
     context_window: int = Field(default=128_000, ge=1024, le=10_000_000)
     max_input_tokens: int = Field(default=120_000, ge=256, le=10_000_000)
-    max_output_tokens: int = Field(default=2048, ge=64, le=128_000)
+    # 测连时可指定接入点
+    test_endpoint_id: str = Field(default="", max_length=64)
 
     @field_validator("website_url")
     @classmethod
@@ -155,7 +244,24 @@ class ProviderConfigUpdate(BaseModel):
     @field_validator("base_url")
     @classmethod
     def _check_base_url(cls, v: str) -> str:
+        if not (v or "").strip():
+            return v
         return validate_llm_base_url(v)
+
+    @field_validator("models")
+    @classmethod
+    def _clean_models(cls, v: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for item in v or []:
+            mid = str(item).strip()
+            if not mid or mid in seen:
+                continue
+            if len(mid) > 200:
+                raise ValueError("模型 id 过长")
+            seen.add(mid)
+            cleaned.append(mid)
+        return cleaned
 
 
 class ConnectionTestResult(BaseModel):
