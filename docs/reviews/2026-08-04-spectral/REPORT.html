@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AgentPrism 光谱审查 · 2026-08-04</title>
+<style>
+  /* ===== Spectral tokens — derived from AgentPrism brand but distinct ===== */
+  :root {
+    --bg: #0a0a0a;
+    --bg-soft: #111113;
+    --bg-elev: #16161a;
+    --bg-card: #13131780;
+    --line: #1f1f24;
+    --line-soft: #1a1a1f;
+    --text: #f5f5f5;
+    --text-soft: #c4c4c8;
+    --text-muted: #88888e;
+    --text-faint: #5a5a62;
+
+    /* Spectrum lanes — severity → wavelength (red→violet, low→infra) */
+    --spectrum-red:    #ff5a5f;   /* HIGH: 真红，醒目但不刺眼 */
+    --spectrum-orange: #ff9442;   /* MEDIUM: 琥珀偏橙 */
+    --spectrum-amber:  #f5c451;   /* LOW: 暖琥珀 */
+    --spectrum-green:  #5ce5a3;   /* POSITIVE: 翠绿 */
+    --spectrum-cyan:   #50e3c2;   /* 已落实：青色 */
+    --spectrum-violet: #b48bff;   /* DESIGN: 紫，架构观察 */
+
+    --spectrum-red-soft:    #ff5a5f1a;
+    --spectrum-orange-soft: #ff94421a;
+    --spectrum-amber-soft:  #f5c4511a;
+    --spectrum-green-soft:  #5ce5a31a;
+    --spectrum-cyan-soft:   #50e3c21a;
+    --spectrum-violet-soft: #b48bff1a;
+
+    --font-display: "Geist Mono", ui-monospace, "JetBrains Mono", "SF Mono", Consolas, monospace;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, "JetBrains Mono", "SF Mono", Consolas, monospace;
+
+    --radius: 10px;
+    --radius-sm: 6px;
+    --radius-lg: 16px;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* Prism gradient — 5 stops, gentle */
+    --prism: linear-gradient(
+      90deg,
+      var(--spectrum-red),
+      var(--spectrum-orange),
+      var(--spectrum-amber),
+      var(--spectrum-green),
+      var(--spectrum-cyan),
+      var(--spectrum-violet)
+    );
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #fafaf7;
+      --bg-soft: #f3f1eb;
+      --bg-elev: #ffffff;
+      --bg-card: #ffffff;
+      --line: #e7e4dc;
+      --line-soft: #efece4;
+      --text: #0a0a0a;
+      --text-soft: #2a2a2e;
+      --text-muted: #6b6b71;
+      --text-faint: #98989e;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: var(--font-body);
+    font-size: 15.5px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Subtle paper texture using radial gradient — no images */
+    background-image:
+      radial-gradient(circle at 18% 12%, rgba(255,255,255,0.025) 0%, transparent 40%),
+      radial-gradient(circle at 88% 88%, rgba(255,255,255,0.02) 0%, transparent 40%);
+  }
+
+  a { color: var(--spectrum-cyan); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--spectrum-cyan) 35%, transparent); }
+  a:hover { border-bottom-color: var(--spectrum-cyan); }
+  code { font-family: var(--font-mono); font-size: 0.9em; background: var(--bg-soft); padding: 1px 6px; border-radius: 4px; color: var(--spectrum-amber); }
+  pre { font-family: var(--font-mono); font-size: 0.85em; line-height: 1.6; background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 16px; overflow-x: auto; color: var(--text-soft); }
+  pre code { background: none; padding: 0; color: inherit; }
+
+  /* ===== Layout ===== */
+  .wrap { max-width: 920px; margin: 0 auto; padding: 56px 24px 96px; }
+
+  /* ===== Header — spectral signature ===== */
+  .prism {
+    position: relative;
+    height: 4px;
+    background: var(--prism);
+    border-radius: 2px;
+    margin-bottom: 64px;
+    box-shadow: 0 0 40px color-mix(in srgb, var(--spectrum-cyan) 25%, transparent);
+  }
+  .prism::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: inherit;
+    filter: blur(8px);
+    opacity: 0.5;
+    border-radius: inherit;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 12px;
+  }
+
+  h1.title {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 0 12px;
+  }
+  h1.title .sep { color: var(--text-faint); padding: 0 6px; font-weight: 300; }
+  h1.title .date { color: var(--text-muted); font-size: 0.7em; font-weight: 400; }
+
+  .lede {
+    font-size: 17px;
+    line-height: 1.7;
+    color: var(--text-soft);
+    max-width: 64ch;
+    margin: 24px 0 0;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin: 40px 0 0;
+    overflow: hidden;
+  }
+  .meta-cell {
+    background: var(--bg-soft);
+    padding: 14px 16px;
+  }
+  .meta-cell .k {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+  }
+  .meta-cell .v {
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    color: var(--text);
+  }
+
+  /* ===== TL;DR — spectrum card matrix ===== */
+  .tldr {
+    margin: 64px 0 0;
+    padding: 28px 32px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    position: relative;
+    overflow: hidden;
+  }
+  .tldr::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--prism);
+  }
+  .tldr h2 {
+    font-family: var(--font-display);
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 0 0 16px;
+    color: var(--text-soft);
+  }
+  .tldr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .tldr-cell {
+    background: var(--bg-elev);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    border: 1px solid var(--line-soft);
+  }
+  .tldr-cell .num {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .tldr-cell .lbl {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    letter-spacing: 0.04em;
+  }
+  .tldr-cell.high .num { color: var(--spectrum-red); }
+  .tldr-cell.med .num { color: var(--spectrum-orange); }
+  .tldr-cell.low .num { color: var(--spectrum-amber); }
+  .tldr-cell.pos .num { color: var(--spectrum-green); }
+  .tldr-cell.des .num { color: var(--spectrum-violet); }
+
+  /* ===== Section heading ===== */
+  h2.section {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 72px 0 8px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  h2.section .num {
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+  }
+  h2.section + .sub {
+    font-size: 14.5px;
+    color: var(--text-muted);
+    margin: 0 0 28px;
+    max-width: 70ch;
+  }
+
+  h3.finding {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    margin: 36px 0 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  h3.finding .id {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    color: var(--text-soft);
+  }
+  h4.sub {
+    font-size: 14.5px;
+    font-weight: 600;
+    margin: 24px 0 6px;
+    color: var(--text-soft);
+  }
+
+  /* ===== Finding card — spectral band ===== */
+  .finding-card {
+    position: relative;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px 26px 22px;
+    margin: 16px 0 0;
+    overflow: hidden;
+  }
+  .finding-card::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+  .finding-card.high::before { background: var(--spectrum-red); box-shadow: 0 0 18px var(--spectrum-red-soft); }
+  .finding-card.med::before  { background: var(--spectrum-orange); box-shadow: 0 0 18px var(--spectrum-orange-soft); }
+  .finding-card.low::before  { background: var(--spectrum-amber); box-shadow: 0 0 18px var(--spectrum-amber-soft); }
+  .finding-card.pos::before  { background: var(--spectrum-green); box-shadow: 0 0 18px var(--spectrum-green-soft); }
+  .finding-card.des::before  { background: var(--spectrum-violet); box-shadow: 0 0 18px var(--spectrum-violet-soft); }
+  .finding-card.cy::before   { background: var(--spectrum-cyan); box-shadow: 0 0 18px var(--spectrum-cyan-soft); }
+
+  .finding-card .where {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 4px 0 12px;
+  }
+  .finding-card .where .file { color: var(--spectrum-cyan); }
+  .finding-card .where .file-cy { color: var(--spectrum-amber); }
+
+  .finding-card p { margin: 10px 0; }
+  .finding-card p, .finding-card li { color: var(--text-soft); }
+  .finding-card strong { color: var(--text); font-weight: 600; }
+  .finding-card ul { margin: 8px 0 0; padding-left: 22px; }
+  .finding-card li { margin: 4px 0; }
+  .finding-card li::marker { color: var(--text-faint); }
+  .finding-card ol { margin: 8px 0 0; padding-left: 22px; }
+  .finding-card ol li { margin: 4px 0; }
+  .finding-card ol li::marker { color: var(--text-faint); }
+
+  /* ===== Tables ===== */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 8px;
+    font-size: 13.5px;
+  }
+  th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    background: var(--bg-soft);
+    font-weight: 500;
+  }
+  tbody tr:hover { background: var(--bg-soft); }
+  td .check { color: var(--spectrum-green); font-weight: 600; }
+  td .cross { color: var(--spectrum-red); font-weight: 600; }
+  td .partial { color: var(--spectrum-amber); font-weight: 600; }
+
+  /* ===== Legend ===== */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 24px 0 0;
+    padding: 16px 20px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-soft); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ===== Footer ===== */
+  .foot {
+    margin: 96px 0 0;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+  .foot .spectrum {
+    display: inline-block;
+    width: 80px;
+    height: 2px;
+    background: var(--prism);
+    vertical-align: middle;
+    margin: 0 10px;
+  }
+
+  /* ===== Misc ===== */
+  hr { border: 0; border-top: 1px solid var(--line); margin: 48px 0; }
+  blockquote {
+    margin: 14px 0;
+    padding: 8px 0 8px 18px;
+    border-left: 3px solid var(--spectrum-cyan);
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .small { font-size: 12.5px; color: var(--text-muted); }
+  .note-box {
+    background: var(--spectrum-cyan-soft);
+    border: 1px solid color-mix(in srgb, var(--spectrum-cyan) 25%, transparent);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 13.5px;
+    color: var(--text-soft);
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 32px 16px 64px; }
+    h1.title { font-size: 28px; }
+    .finding-card { padding: 18px 18px 16px; }
+    .meta-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="prism" aria-hidden="true"></div>
+
+<div class="eyebrow">Spectral Code Review · 独立第三方审查</div>
+<h1 class="title">AgentPrism<span class="sep">/</span><span style="color:var(--spectrum-cyan)">光谱审查</span><br><span class="date">2026 · 08 · 04</span></h1>
+<p class="lede">
+  同一份代码，多个波长分光。AgentPrism 是一座棱镜，将一个用户问题折射为多条 Agent 管线；
+  本报告以同样的方式，将代码库分光为 6 条波长带（红/橙/琥珀/翠/青/紫），每条带代表一种严重度。
+  你看到的不只是问题清单，是一张差异图。
+</p>
+
+<div class="meta-grid">
+  <div class="meta-cell"><div class="k">审查范围</div><div class="v">backend/app/ + frontend/src/ + tests/</div></div>
+  <div class="meta-cell"><div class="k">代码体量</div><div class="v">后端 6,679 行 · 前端 ≈7,800 行</div></div>
+  <div class="meta-cell"><div class="k">测试覆盖</div><div class="v">38 文件 / 344 用例</div></div>
+  <div class="meta-cell"><div class="k">基线 commit</div><div class="v">d04b431 (main)</div></div>
+  <div class="meta-cell"><div class="k">审查者</div><div class="v">独立第三方</div></div>
+  <div class="meta-cell"><div class="k">方法论</div><div class="v">通读 + 既有审查复核 + 现场验证</div></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="legend-dot" style="background:var(--spectrum-red)"></span>🔴 HIGH · 安全/正确性/稳定性</div>
+  <div class="legend-item"><span class="legend-dot" style="background:var(--spectrum-orange)"></span>🟠 MEDIUM · 可维护性/健壮性</div>
+  <div class="legend-item"><span class="legend-dot" style="background:var(--spectrum-amber)"></span>🟡 LOW · 一致性/小重构</div>
+  <div class="legend-item"><span class="legend-dot" style="background:var(--spectrum-cyan)"></span>🟢 POSITIVE · 已落实/设计良好</div>
+  <div class="legend-item"><span class="legend-dot" style="background:var(--spectrum-violet)"></span>🟣 DESIGN · 架构观察</div>
+</div>
+
+<div class="tldr">
+  <h2>光谱总览</h2>
+  <div class="tldr-grid">
+    <div class="tldr-cell high"><div class="num">1</div><div class="lbl">🔴 HIGH 问题</div></div>
+    <div class="tldr-cell med"><div class="num">7</div><div class="lbl">🟠 MEDIUM 建议</div></div>
+    <div class="tldr-cell low"><div class="num">10</div><div class="lbl">🟡 LOW 可选</div></div>
+    <div class="tldr-cell pos"><div class="num">19+</div><div class="lbl">🟢 亮点 / 已修复</div></div>
+    <div class="tldr-cell des"><div class="num">3</div><div class="lbl">🟣 架构观察</div></div>
+  </div>
+  <p class="small" style="margin-top:16px">
+    既有 <code>docs/AGENT_CODE_REVIEW.md</code> 标记的 4 个 HIGH 严重项<strong>全部已修</strong>。
+    本报告是<strong>补充而非重复</strong>：聚焦 H1（Key 泄露）+ D1-D3（架构层）+ 10 个 LOW 改进。
+  </p>
+</div>
+
+<h2 class="section"><span class="num">00</span>总体评价</h2>
+<p class="sub">
+  工程水平明显高于同体量 Side-Project：模块边界清晰、单一来源的 Literal 类型、
+  可控变量法的对比维度设计、上下文策略与 Harness 引擎实现了真正差异化的可观测效果、
+  测试覆盖面 38 文件 / 344 用例。视觉系统完整（Vercel 调性 + 光谱 lane 色板 + 4000 行 globals.css 体系）。
+</p>
+<p>
+  上轮 <code>AGENT_CODE_REVIEW.md</code> 中标记的 HIGH 严重项几乎全部已在 main 分支修复。
+  本轮仍存在的问题集中在：<strong>密钥明文残留、模块级可变全局状态、依赖文件重复、
+  前端 <code>ArenaClient.tsx</code> 巨型组件</strong>。下表按严重度分级，全部带文件:行号与可执行修复建议。
+</p>
+
+<!-- ============ 1 SECURITY ============ -->
+<h2 class="section"><span class="num">01</span>安全性</h2>
+<p class="sub">
+  项目对<strong>对抗性安全</strong>的覆盖度<strong>令人意外地高</strong>——远超个人 Playground 水平。
+  沙箱/消毒/脱敏/锚定/SSRF 拦截/CSP 头俱全。唯一真问题是 H1 物理泄露到工作区。
+</p>
+
+<div class="finding-card high">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-red);border-color:var(--spectrum-red-soft);background:var(--spectrum-red-soft)">H1</span>.env 包含真实 API Key</h3>
+  <div class="where">位置 · <span class="file">.env:1-13</span> · 完整 64 字符明文（已 <em>脱敏展示</em>：<code>LLM_API_KEY=7kaS8nK...PZx7I</code>）</div>
+  <p>
+    <strong>事实</strong>：<code>.gitignore:10</code> 正确忽略 <code>.env</code>（含 <code>!.env.example</code> 豁免）——
+    <strong>未提交到 git</strong>，但工作区当前存在该文件，未跟踪。
+  </p>
+  <p>
+    <strong>风险</strong>：密钥明文落地是安全事件的常见入口。
+    若在编辑器、终端命令误用（如 <code>cat .env</code> 截图、IDE 同步到云端）会泄露。
+  </p>
+  <h4 class="sub">修复步骤</h4>
+  <ol>
+    <li>立即撤销该 Key：登录 StepFun 控制台轮换 <code>LLM_API_KEY</code></li>
+    <li>从工作区物理删除：<code>rm .env</code>（有 <code>.env.example</code> 模板）</li>
+    <li>未来从 Settings 页面填写（应用已支持「本地保存到 <code>data/provider_config.json</code>」）</li>
+    <li>必须保留本地 Key 时，<code>chmod 600 .env</code>（已正确被 .gitignore）</li>
+    <li>文档 <code>CLAUDE.md</code> 加一条「严禁将真实 API Key 写入 <code>.env</code>」</li>
+  </ol>
+  <p class="small">
+    与既有审查的差异：既有审查未涉及工作区文件检查，仅关注代码层。密钥管理是<strong>流程 + 代码</strong>双层问题。
+  </p>
+</div>
+
+<div class="finding-card med">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-orange);border-color:var(--spectrum-orange-soft);background:var(--spectrum-orange-soft)">M1</span>跨用户部署模型缺失</h3>
+  <div class="where">位置 · <span class="file">api/arena.py:122-171</span></div>
+  <p>
+    所有 workspace 端点直接接受 URL 路径参数 <code>workspace_name</code> 调 <code>_ws_mgr.get</code>，
+    无任何会话/所有权/token 校验。注释 <code>arena.py:115-117</code> 已明确「单用户本地部署模型」。
+  </p>
+  <p>
+    <strong>风险</strong>：workspace 名后缀是 <code>uuid.uuid4().hex[:6]</code>（1677 万空间，理论可枚举）。
+    若部署到 LAN/VPS，任意客户端可构造请求读/写/删他人工作空间。
+  </p>
+  <p><strong>最低限度修复</strong>：在 <code>arena.py:117</code> 注释后追加红字
+    "禁止部署到公网；若需部署，必须先实现 <code>AGENTPRISM_API_TOKEN</code> + workspace 所有权绑定"。
+  </p>
+</div>
+
+<div class="finding-card pos">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-green);border-color:var(--spectrum-green-soft);background:var(--spectrum-green-soft)">+19</span>已落实的安全加固</h3>
+  <p class="small">节选；完整列表见 Markdown 报告 §1。</p>
+  <table>
+    <thead><tr><th>措施</th><th>位置</th></tr></thead>
+    <tbody>
+      <tr><td>请求体大小限制（同时校验 Content-Length + 实际流）</td><td><span class="file">main.py:36-125</span></td></tr>
+      <tr><td>可选共享密钥 <code>AGENTPRISM_API_TOKEN</code></td><td><span class="file">main.py:127-160</span></td></tr>
+      <tr><td>并发限流 <code>asyncio.Semaphore(max_concurrent_runs)</code></td><td><span class="file">api/arena.py:77</span></td></tr>
+      <tr><td>沙箱：AST 白名单 + 11 dunder 黑名单 + 进程级 terminate/kill</td><td><span class="file">tools.py:97-260</span></td></tr>
+      <tr><td>路径规范化：拒绝对路径、<code>..</code>、控制字符、Win 保留名</td><td><span class="file">workspace.py:106-130</span></td></tr>
+      <tr><td>URL 校验：拦截元数据 IP、javascript:、仅 loopback 可走 http</td><td><span class="file">url_validate.py</span></td></tr>
+      <tr><td>错误脱敏 <code>sanitize_error_message</code> 仅暴露类型名</td><td><span class="file">errors.py</span></td></tr>
+      <tr><td>Prompt 注入：11 条正则 + NFKC 归一化统一来源</td><td><span class="file">harness.py:30-46</span></td></tr>
+      <tr><td>RAG 片段 XML fence + 「不是系统指令」声明</td><td><span class="file">context_manager.py:28-37</span></td></tr>
+      <tr><td>工具守卫：跑题检测 + 任务锚定注入</td><td><span class="file">tool_guard.py</span></td></tr>
+      <tr><td>消息消毒：thinking 剥离 + SystemMessage 压平</td><td><span class="file">message_sanitize.py</span></td></tr>
+      <tr><td>输出截断：沙箱 32KB、文件 256KB、计算 4096 位</td><td><span class="file">tools.py:39-45, 122-128</span></td></tr>
+      <tr><td>密钥脱敏：API Key 仅显示 <code>前4...后4</code></td><td><span class="file">api/settings.py:38-43</span></td></tr>
+      <tr><td>CSP 响应头：<code>default-src 'self'</code> + <code>frame-ancestors 'none'</code></td><td><span class="file">next.config.ts:13-30</span></td></tr>
+      <tr><td>前端 <code>safeHttpUrl</code> 阻止 javascript:</td><td><span class="file">lib/safeUrl.ts</span></td></tr>
+      <tr><td>前端路由级 + 全局错误边界</td><td><span class="file">app/error.tsx, global-error.tsx</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============ 2 CONCURRENCY ============ -->
+<h2 class="section"><span class="num">02</span>异步与并发</h2>
+<p class="sub">上轮审查标记的 C1/S1 高危项（同步 LLM 调用阻塞事件循环）已<strong>全部修复</strong>。
+  本轮仍存若干中等并发问题，主要是全局信号量与锁粒度。</p>
+
+<div class="finding-card pos">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-cyan);border-color:var(--spectrum-cyan-soft);background:var(--spectrum-cyan-soft)">C1 ✓</span>异步改造全部完成</h3>
+  <ul>
+    <li><code>harness.py:117,155,184</code> 三函数 <code>async def</code> + <code>await llm.ainvoke</code></li>
+    <li><code>reasoning_graph.py</code> 全部 8 个节点函数 <code>async def</code> + <code>ainvoke</code></li>
+    <li><code>api/settings.py:251,289</code> <code>_test_*</code> 包 <code>asyncio.to_thread</code></li>
+  </ul>
+</div>
+
+<div class="finding-card med">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-orange);border-color:var(--spectrum-orange-soft);background:var(--spectrum-orange-soft)">M2</span><code>_run_sem</code> 全局化导致跨请求串行</h3>
+  <div class="where">位置 · <span class="file">api/arena.py:77</span></div>
+  <p><code>max_concurrent_runs=4</code> 意味着<strong>整个后端</strong>最多 4 个并发 Arena run。
+    100 个不同浏览器用户各发 1 个 run → 第 5 个请求会被阻塞，<strong>即使前后端都健康</strong>。</p>
+  <p><strong>建议</strong>：CLAUDE.md 明确「单用户本地，故意设计」即可，无须代码改动。
+    长期若需多用户，改为请求级 Semaphore 或 <code>aiolimiter</code>。</p>
+</div>
+
+<div class="finding-card low">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-amber);border-color:var(--spectrum-amber-soft);background:var(--spectrum-amber-soft)">L1</span><code>runner.py</code> finally 中 leaked 仅日志无操作</h3>
+  <div class="where">位置 · <span class="file">arena/runner.py:96-102</span></div>
+  <p>检测到 leaked worker 仅 <code>logger.warning</code>，未 cancel 也未等待。
+    建议补 cancel + wait，与 except 分支对齐。</p>
+</div>
+
+<div class="finding-card low">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-amber);border-color:var(--spectrum-amber-soft);background:var(--spectrum-amber-soft)">L2</span><code>Workspace.rag_store()</code> 内部构建无锁</h3>
+  <div class="where">位置 · <span class="file">arena/workspace.py:84-104</span></div>
+  <p><code>WorkspaceManager</code> 用 RLock 保护，但 <code>Workspace.rag_store</code> 惰性构建无锁。
+    两 worker 在 SSE 中同时调可能各构建一次向量库（<code>add_documents</code> 重复追加）。
+    建议加 <code>threading.Lock</code> 或缓存绑定文件内容 hash。</p>
+</div>
+
+<!-- ============ 3 ARCHITECTURE ============ -->
+<h2 class="section"><span class="num">03</span>架构与设计</h2>
+<p class="sub">架构整体清晰，<code>REASONING_MODES</code> 注册表模式已示范。
+  仍有几处"模块级可变全局状态"是隐性技术债。</p>
+
+<div class="finding-card des">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-violet);border-color:var(--spectrum-violet-soft);background:var(--spectrum-violet-soft)">D1</span><code>arena/router.py</code> 全局可变字典是隐性单例</h3>
+  <div class="where">位置 · <span class="file">arena/router.py:55-187</span></div>
+  <p><code>_STATIC_DIMENSION_OPTIONS</code>、<code>DIMENSION_OPTIONS</code>、<code>_BASELINE_OPTION_VALUES</code>、
+    <code>DEFAULT_BASE</code>、<code>_ENDPOINT_CATALOG</code> 都是<strong>模块级可变</strong>全局状态。
+    通过 <code>sync_*</code> 三个函数直接 mutate。</p>
+  <p><strong>问题</strong>：测试隔离靠 fixture；运行时无锁。跨用户并发 <code>PUT /api/settings/provider</code> 时
+    与正在跑的 Arena run 数据竞争。</p>
+  <p><strong>建议</strong>：改为不可变 dataclass；或 <code>route()</code> 每次显式从 <code>ProviderConfig</code> 重建。
+    若要保留缓存，必须给 <code>sync_*</code> 加锁。</p>
+</div>
+
+<div class="finding-card des">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-violet);border-color:var(--spectrum-violet-soft);background:var(--spectrum-violet-soft)">D2</span>注册表风格不一致</h3>
+  <div class="where">位置 · <span class="file">reasoning_graph.py:357-403</span> vs <span class="file">router.py</span></div>
+  <p><code>ReasoningModeSpec</code> 注册表模式<strong>优秀</strong>，但 <code>router.py</code> 仍有 5 个平行字典
+    （<code>_STATIC_DIMENSION_OPTIONS</code> / <code>_BASELINE_ONLY_OPTIONS</code> / <code>_BASELINE_ONLY_LABELS</code> / <code>_FIELD_LABELS</code> / <code>_FIELD_GROUP</code>）。</p>
+  <p>建议抽 <code>DimensionSpec</code> dataclass，可消除 ~150 行平行数据。</p>
+</div>
+
+<div class="finding-card des">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-violet);border-color:var(--spectrum-violet-soft);background:var(--spectrum-violet-soft)">D3</span><code>FrameworkAdapter.run</code> 的 <code>if False: yield</code> hack</h3>
+  <div class="where">位置 · <span class="file">adapters/base.py:21-40</span></div>
+  <p>这是 mypy + Protocol 的已知兼容性 hack，作者已加注释。
+    改 <code>AsyncGenerator[ArenaEvent, None]</code> 显式签可避免 hack。</p>
+</div>
+
+<!-- ============ 4 REUSABILITY ============ -->
+<h2 class="section"><span class="num">04</span>代码复用度</h2>
+<p class="sub">上轮审查的 Q3（adapter 抽公共基类）已完成（<code>_common_run.py</code> 289 行）。
+  本轮发现 3 处剩余的小型重复。</p>
+
+<div class="finding-card med">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-orange);border-color:var(--spectrum-orange-soft);background:var(--spectrum-orange-soft)">M3</span>prior_tool_names 收集在两处重复</h3>
+  <div class="where">位置 · <span class="file">langchain_adapter.py:67-105</span> 与 <span class="file">reasoning_graph.py:64-79</span></div>
+  <p>两处都在做「从历史消息收集 prior tool names」，建议抽到 <code>_common_run.collect_prior_tool_names(messages)</code>。</p>
+</div>
+
+<div class="finding-card med">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-orange);border-color:var(--spectrum-orange-soft);background:var(--spectrum-orange-soft)">M4</span>向量检索入口在两处 import</h3>
+  <div class="where">位置 · <span class="file">prompts.py:62-72</span> 与 <span class="file">context_manager.py:73-108</span></div>
+  <p><code>prompts.py</code> 已 import <code>context_manager.maybe_vector_snippets</code>，但 <code>_CONTEXT_HINTS</code> 字典（prompts.py:42-49）仍属 prompts 私有。
+    建议归口 <code>context_manager</code>，让 prompts 只关心 prompt profile。</p>
+</div>
+
+<div class="finding-card low">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-amber);border-color:var(--spectrum-amber-soft);background:var(--spectrum-amber-soft)">L3</span><code>emit_*_event</code> 中 <code>streaming_step</code> 收尾 4 处重复</h3>
+  <div class="where">位置 · <span class="file">adapters/_common_run.py:140-152, 184-192, 240-252, 259-271</span></div>
+  <p>抽 <code>_close_streaming(state, label) -> list[ArenaEvent]</code> 私有函数。</p>
+</div>
+
+<!-- ============ 5 FRONTEND ============ -->
+<h2 class="section"><span class="num">05</span>前端质量</h2>
+<p class="sub">设计系统完整、TS 严格度高、CSP 与错误边界齐备。
+  主要问题是 <code>ArenaClient.tsx</code> 巨型组件与 <code>globals.css</code> 章节缺失。</p>
+
+<div class="finding-card med">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-orange);border-color:var(--spectrum-orange-soft);background:var(--spectrum-orange-soft)">M5</span><code>ArenaClient.tsx</code> 1620 行巨型组件</h3>
+  <div class="where">位置 · <span class="file">frontend/src/app/arena/ArenaClient.tsx</span></div>
+  <p>单一组件承担：URL 参数解析、Meta 拉取、模板加载、维度选择、Baseline 编辑、Chat 历史、Run 状态机、
+    SSE 解析、Trace 渲染编排、自动判分、项目创建、两个侧栏开关、12+ 内部 hook。</p>
+  <p><strong>建议</strong>（不引入新依赖）：抽 <code>useArenaRun</code> / <code>useArenaMeta</code> / <code>useChatHistory</code> / <code>useTemplates</code> 四个 hook；
+    主组件降为 800 行编排。</p>
+</div>
+
+<div class="finding-card low">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-amber);border-color:var(--spectrum-amber-soft);background:var(--spectrum-amber-soft)">L4</span><code>globals.css</code> 3998 行无章节注释</h3>
+  <div class="where">位置 · <span class="file">frontend/src/app/globals.css</span></div>
+  <p>仅 1 个顶部 17 行 doc，无章节分割。找一个类需全文 grep。
+    建议顶部加 9 个章节标题注释（不拆文件，CLAUDE.md 要求"CSS 类定义在 globals.css"）。</p>
+</div>
+
+<div class="finding-card low">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-amber);border-color:var(--spectrum-amber-soft);background:var(--spectrum-amber-soft)">L5</span>SSE 解析抽 <code>parseSSEBlock</code> 纯函数</h3>
+  <div class="where">位置 · <span class="file">lib/api.ts:227-308</span></div>
+  <p>尽管 <code>noUncheckedIndexedAccess</code> 已开启，闭包内 <code>eventName</code> / <code>dataLines</code> 状态变量作用域略绕。
+    抽纯函数 + 测试。</p>
+</div>
+
+<div class="finding-card pos">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-green);border-color:var(--spectrum-green-soft);background:var(--spectrum-green-soft)">+8</span>前端亮点</h3>
+  <ul>
+    <li><code>safeHttpUrl</code> 阻止 javascript: 点击 XSS · <code>lib/safeUrl.ts</code></li>
+    <li><code>streamArenaRun</code> AbortSignal 贯穿 · <code>lib/api.ts:227-308</code></li>
+    <li>路由级 + 全局错误边界 · <code>app/error.tsx, global-error.tsx</code></li>
+    <li>设计 token 完整（颜色/间距/圆角/缓动/阴影）· <code>globals.css:1-100</code></li>
+    <li>CSP 头 + Permissions-Policy · <code>next.config.ts:13-30</code></li>
+    <li>TS 严格度：<code>noUncheckedIndexedAccess</code> + <code>noImplicitOverride</code> · <code>tsconfig.json:11-12</code></li>
+    <li><code>tsc --noEmit</code> 进 CI · <code>ci.yml</code></li>
+    <li>同源 <code>/api/*</code> 代理 · <code>next.config.ts:35-41</code></li>
+  </ul>
+</div>
+
+<!-- ============ 6 DEPS ============ -->
+<h2 class="section"><span class="num">06</span>依赖与配置</h2>
+
+<div class="finding-card med">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-orange);border-color:var(--spectrum-orange-soft);background:var(--spectrum-orange-soft)">M6</span>依赖文件重复且版本不一致</h3>
+  <div class="where">位置 · <span class="file">backend/requirements.txt</span> 与 <span class="file">pyproject.toml</span></div>
+  <table>
+    <thead><tr><th>包</th><th>requirements.txt</th><th>pyproject.toml</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>langchain-openai</td><td><code>&gt;=0.2.0</code></td><td><code>&gt;=0.3.0</code></td><td><span class="partial">漂移</span></td></tr>
+      <tr><td>openai</td><td><code>&gt;=1.0.0</code></td><td><code>&gt;=1.40.0</code></td><td><span class="partial">漂移</span></td></tr>
+    </tbody>
+  </table>
+  <p>CI 走 <code>pip install -e ".[dev]"</code>（pyproject），本地 <code>pip install -r requirements.txt</code>。
+    <strong>建议</strong>：删除 <code>requirements.txt</code>，统一走 pyproject。</p>
+</div>
+
+<div class="finding-card low">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-amber);border-color:var(--spectrum-amber-soft);background:var(--spectrum-amber-soft)">L6</span>Python 版本声明三处不一致</h3>
+  <div class="where">位置 · <span class="file">pyproject.toml</span>、<span class="file">README.md</span>、<span class="file">CLAUDE.md</span></div>
+  <ul>
+    <li><code>pyproject.toml:6</code> <code>requires-python = "&gt;=3.11"</code></li>
+    <li><code>pyproject.toml:25</code> <code>target-version = "py310"</code> ← <span class="partial">不一致</span></li>
+    <li><code>ci.yml:11</code> <code>python-version: "3.14"</code></li>
+    <li><code>README.md</code> <code>Python 3.10+</code> ← <span class="partial">不一致</span></li>
+    <li><code>CLAUDE.md</code> <code>Python 3.11+</code></li>
+  </ul>
+</div>
+
+<div class="finding-card low">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-amber);border-color:var(--spectrum-amber-soft);background:var(--spectrum-amber-soft)">L7</span>关闭 <code>F841</code> <code>B905</code> 掩盖信号</h3>
+  <div class="where">位置 · <span class="file">pyproject.toml:28-33</span></div>
+  <p><code>F841</code>（unused var）是<strong>重要信号</strong>，批量关闭会掩盖 bug。
+    建议开 <code>F841</code>，对确实需要保留的变量加 <code># noqa</code> 注释。
+    保留 <code>F821</code> 关闭（<code>from __future__ import annotations</code> 下确有误报）。</p>
+</div>
+
+<!-- ============ 7 TESTING ============ -->
+<h2 class="section"><span class="num">07</span>测试与质量门禁</h2>
+
+<div class="finding-card pos">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-green);border-color:var(--spectrum-green-soft);background:var(--spectrum-green-soft)">+5</span>测试体系</h3>
+  <ul>
+    <li>38 文件 / 344 用例</li>
+    <li>覆盖：LLM 工厂、Provider、Workspace TTL/LRU、Tool 安全 / 沙箱逃逸、消息消毒、Tool guard、模板库、判分器、Reasoning 图、Harness Runner、Token 估算、URL 校验、请求体大小中间件、Project Manager、Router</li>
+    <li>沙箱安全 <code>test_sandbox_security.py</code>：26 用例</li>
+    <li>conftest 自动 fixture（isolated_projects_file、isolated_provider_file）</li>
+    <li>CI 5 步门禁：ruff → mypy → pytest → tsc → npm run build</li>
+  </ul>
+</div>
+
+<div class="finding-card med">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-orange);border-color:var(--spectrum-orange-soft);background:var(--spectrum-orange-soft)">M7</span><code>test_provider</code> 端点无测试</h3>
+  <div class="where">位置 · 无 <code>tests/test_settings_api.py</code></div>
+  <p>尽管 <code>_test_*</code> 已被改造为线程池（修复了 S1），但<strong>没有任何测试</strong>覆盖。
+    上轮审查发现的阻塞事件循环问题<strong>就是因无测试而漏过</strong>。</p>
+  <p><strong>建议</strong>：新增 <code>tests/test_settings_api.py</code>（约 80-120 行），覆盖 4 个路径。</p>
+</div>
+
+<div class="finding-card low">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-amber);border-color:var(--spectrum-amber-soft);background:var(--spectrum-amber-soft)">L8</span><code>stream_parallel</code> 端到端测试缺失</h3>
+  <div class="where">位置 · <span class="file">arena/runner.py</span></div>
+  <p>建议增加：并发取消、部分失败、<code>AdapterReservedError</code> 路径。</p>
+</div>
+
+<!-- ============ 8 PRIORITY ============ -->
+<h2 class="section"><span class="num">08</span>修复优先级</h2>
+<p class="sub">多数 MEDIUM 项是半小时以内可落地的"扫尾型"修复。不要因为报告长就推迟小改动。</p>
+
+<div class="finding-card high">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-red);border-color:var(--spectrum-red-soft);background:var(--spectrum-red-soft)">批次 1</span>HIGH · 立即</h3>
+  <table>
+    <thead><tr><th>编号</th><th>标题</th><th>工作量</th></tr></thead>
+    <tbody><tr><td><strong>H1</strong></td><td>撤销 .env 真实 Key、删除 .env 文件</td><td>极小</td></tr></tbody>
+  </table>
+</div>
+
+<div class="finding-card med">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-orange);border-color:var(--spectrum-orange-soft);background:var(--spectrum-orange-soft)">批次 2</span>MEDIUM · 本 PR</h3>
+  <table>
+    <thead><tr><th>编号</th><th>标题</th><th>工作量</th></tr></thead>
+    <tbody>
+      <tr><td>M1</td><td>workspace 端点增加多用户部署警告</td><td>极小</td></tr>
+      <tr><td>M2</td><td>文档化 <code>_run_sem</code> 设计意图</td><td>极小</td></tr>
+      <tr><td>M3</td><td><code>collect_prior_tool_names</code> 抽公共函数</td><td>小</td></tr>
+      <tr><td>M4</td><td><code>CONTEXT_HINTS</code> 归口 context_manager.py</td><td>小</td></tr>
+      <tr><td>M5</td><td><code>ArenaClient.tsx</code> 抽 hook</td><td>中</td></tr>
+      <tr><td>M6</td><td>删除 <code>requirements.txt</code> 走 pyproject</td><td>极小</td></tr>
+      <tr><td>M7</td><td>新增 <code>test_settings_api.py</code></td><td>小</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="finding-card low">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-amber);border-color:var(--spectrum-amber-soft);background:var(--spectrum-amber-soft)">批次 3</span>LOW · 下个 Phase</h3>
+  <p class="small">L1-L10 共 10 项；详见 Markdown 报告 §9 表格。</p>
+</div>
+
+<div class="finding-card des">
+  <h3 class="finding"><span class="id" style="color:var(--spectrum-violet);border-color:var(--spectrum-violet-soft);background:var(--spectrum-violet-soft)">批次 4</span>DESIGN · 决策后落地</h3>
+  <p class="small">D1（router 全局状态冻结）、D2（DimensionSpec 注册表）、D3（AsyncGenerator 显式签）。</p>
+</div>
+
+<!-- ============ 9 复核 ============ -->
+<h2 class="section"><span class="num">09</span>复核既有审查的修复状态</h2>
+<p class="sub">本表是给执行型 AI 的修复状态总览，对应 <code>docs/AGENT_CODE_REVIEW.md</code> 与 <code>docs/CODE_REVIEW.md</code> 的全部 HIGH/MEDIUM 项。</p>
+
+<table>
+  <thead><tr><th>编号</th><th>标题</th><th>状态</th><th>证据</th></tr></thead>
+  <tbody>
+    <tr><td>S1</td><td>test_provider 同步阻塞</td><td><span class="check">✓ 已修</span></td><td><code>api/settings.py:251,289</code></td></tr>
+    <tr><td>C1</td><td>LLM 同步调用阻塞事件循环</td><td><span class="check">✓ 已修</span></td><td><code>harness.py:117,155,184</code></td></tr>
+    <tr><td>S2</td><td>workspace 多点/Win 保留名</td><td><span class="check">✓ 已修</span></td><td><code>workspace.py:52,121</code></td></tr>
+    <tr><td>Q1</td><td>EventType 重复</td><td><span class="check">✓ 设计意图</span></td><td><code>types.py:43-58</code></td></tr>
+    <tr><td>Q3</td><td>adapter run() 抽公共基类</td><td><span class="check">✓ 已抽</span></td><td><code>adapters/_common_run.py</code> 289 行</td></tr>
+    <tr><td>S3</td><td>workspace API 越权</td><td><span class="partial">~ 文档化已做</span></td><td><code>arena.py:115-117</code> 注释</td></tr>
+    <tr><td>S4</td><td>_check_regex ReDoS</td><td><span class="check">✓ 已有截断</span></td><td><code>judging.py:171-178</code></td></tr>
+    <tr><td>E2</td><td>推理模式注册表统一</td><td><span class="check">✓ 已抽</span></td><td><code>ReasoningModeSpec</code></td></tr>
+    <tr><td>D1</td><td>Python 版本声明对齐</td><td><span class="partial">~ 仍漂移</span></td><td>见 L6</td></tr>
+    <tr><td>T3</td><td>settings API 测试</td><td><span class="cross">✗ 仍无</span></td><td>无 <code>test_settings_api.py</code></td></tr>
+  </tbody>
+</table>
+
+<p class="note-box">
+  <strong>结论</strong>：既有审查标记的 4 个 HIGH 全部修复，6 个 MEDIUM 中 4 个修复，2 个部分（仅文档化）。
+  本份报告是<strong>补充而非重复</strong>——聚焦 H1（Key 泄露）、D1-D3（架构层）、10 个 LOW 改进。
+</p>
+
+<!-- ============ 10 FINAL ============ -->
+<h2 class="section"><span class="num">10</span>给用户的最终建议</h2>
+<ol>
+  <li><strong>立即</strong>：处理 H1（撤销 Key + 删 <code>.env</code>），这是唯一对外暴露的真实风险</li>
+  <li><strong>本 PR</strong>：处理 M1 / M2 / M6（极小改动 + 文档化）</li>
+  <li><strong>下个 Phase</strong>：处理 M3 / M4 / M5 / M7（中等重构 + 测试）</li>
+  <li><strong>下次大重构</strong>：处理 D1 / D2（架构层）</li>
+</ol>
+<p>
+  不要因为报告长就推迟小改动 — 多数 MEDIUM 项是<strong>半小时以内</strong>可落地的扫尾型修复。
+</p>
+
+<div class="foot">
+  <span class="spectrum" aria-hidden="true"></span>
+  报告生成于 2026-08-04 · 仅作审查 · 本报告未修改任何项目代码 · 与既有 <code>AGENT_CODE_REVIEW.md</code> 互补
+  <span class="spectrum" aria-hidden="true"></span>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AgentPrism 工程审计 · 2026-08-04</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg-soft: #111113;
+    --bg-elev: #16161a;
+    --line: #1f1f24;
+    --line-soft: #1a1a1f;
+    --text: #f5f5f5;
+    --text-soft: #c4c4c8;
+    --text-muted: #88888e;
+    --text-faint: #5a5a62;
+
+    --red:    #ff5a5f;
+    --orange: #ff9442;
+    --amber:  #f5c451;
+    --green:  #5ce5a3;
+    --cyan:   #50e3c2;
+    --violet: #b48bff;
+
+    --red-soft:    #ff5a5f1a;
+    --orange-soft: #ff94421a;
+    --amber-soft:  #f5c4511a;
+    --green-soft:  #5ce5a31a;
+    --cyan-soft:   #50e3c21a;
+    --violet-soft: #b48bff1a;
+
+    --font-display: "Geist Mono", ui-monospace, "JetBrains Mono", "SF Mono", Consolas, monospace;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, "JetBrains Mono", "SF Mono", Consolas, monospace;
+
+    --radius: 8px;
+    --radius-sm: 5px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #fafaf7;
+      --bg-soft: #f3f1eb;
+      --bg-elev: #ffffff;
+      --line: #e7e4dc;
+      --line-soft: #efece4;
+      --text: #0a0a0a;
+      --text-soft: #2a2a2e;
+      --text-muted: #6b6b71;
+      --text-faint: #98989e;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(80,227,194,0.04) 0%, transparent 50%),
+      radial-gradient(circle at 80% 90%, rgba(255,90,95,0.03) 0%, transparent 50%);
+  }
+  a { color: var(--cyan); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent); }
+  code { font-family: var(--font-mono); font-size: 0.88em; background: var(--bg-soft); padding: 1px 6px; border-radius: 4px; color: var(--amber); }
+  pre { font-family: var(--font-mono); font-size: 0.83em; line-height: 1.6; background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; overflow-x: auto; color: var(--text-soft); }
+  pre code { background: none; padding: 0; color: inherit; }
+
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ===== Header ===== */
+  .prism-bar {
+    height: 3px;
+    background: linear-gradient(90deg, var(--red), var(--orange), var(--amber), var(--green), var(--cyan), var(--violet));
+    border-radius: 2px;
+    margin-bottom: 32px;
+    box-shadow: 0 0 24px color-mix(in srgb, var(--cyan) 25%, transparent);
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+  }
+  h1.title {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4.5vw, 40px);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 0 8px;
+  }
+  h1.title .accent { color: var(--cyan); }
+  h1.title .date { color: var(--text-muted); font-size: 0.65em; font-weight: 400; }
+  .lede { color: var(--text-soft); max-width: 70ch; margin: 16px 0 0; font-size: 16px; }
+
+  /* ===== Verdict grid (top) ===== */
+  .verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin: 32px 0 0;
+    overflow: hidden;
+  }
+  .verdict-cell {
+    background: var(--bg-soft);
+    padding: 14px 16px;
+  }
+  .verdict-cell .k {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+  }
+  .verdict-cell .v {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .verdict-cell .v.red { color: var(--red); }
+  .verdict-cell .v.green { color: var(--green); }
+  .verdict-cell .v.amber { color: var(--amber); }
+  .verdict-cell .v.cyan { color: var(--cyan); }
+
+  /* ===== Section ===== */
+  h2.section {
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 56px 0 8px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  h2.section .num {
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+  }
+  h2.section + .sub {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    margin: 0 0 20px;
+    max-width: 72ch;
+  }
+
+  /* ===== Finding cards ===== */
+  .finding {
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px 16px;
+    margin: 14px 0 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .finding::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+  .finding.red::before { background: var(--red); box-shadow: 0 0 12px var(--red-soft); }
+  .finding.orange::before { background: var(--orange); box-shadow: 0 0 12px var(--orange-soft); }
+  .finding.amber::before { background: var(--amber); box-shadow: 0 0 12px var(--amber-soft); }
+  .finding.green::before { background: var(--green); box-shadow: 0 0 12px var(--green-soft); }
+  .finding.cyan::before { background: var(--cyan); box-shadow: 0 0 12px var(--cyan-soft); }
+  .finding.violet::before { background: var(--violet); box-shadow: 0 0 12px var(--violet-soft); }
+
+  .finding h3 {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .finding h3 .id {
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    color: var(--text-soft);
+  }
+  .finding p { margin: 8px 0; color: var(--text-soft); }
+  .finding strong { color: var(--text); font-weight: 600; }
+  .finding ul, .finding ol { margin: 6px 0 0; padding-left: 20px; color: var(--text-soft); }
+  .finding li { margin: 3px 0; }
+  .finding .where {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin: 4px 0 8px;
+  }
+  .finding .where .file { color: var(--cyan); }
+
+  /* ===== Tables ===== */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    background: var(--bg-soft);
+    font-weight: 500;
+  }
+  td .check { color: var(--green); font-weight: 600; }
+  td .cross { color: var(--red); font-weight: 600; }
+  td .partial { color: var(--amber); font-weight: 600; }
+  td .na { color: var(--text-faint); }
+
+  /* ===== Inline badges ===== */
+  .badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    color: var(--text-soft);
+    margin: 0 2px;
+  }
+  .badge.red    { color: var(--red);    background: var(--red-soft);    border-color: var(--red-soft); }
+  .badge.green  { color: var(--green);  background: var(--green-soft);  border-color: var(--green-soft); }
+  .badge.cyan   { color: var(--cyan);   background: var(--cyan-soft);   border-color: var(--cyan-soft); }
+  .badge.orange { color: var(--orange); background: var(--orange-soft); border-color: var(--orange-soft); }
+  .badge.amber  { color: var(--amber);  background: var(--amber-soft);  border-color: var(--amber-soft); }
+
+  /* ===== Note box ===== */
+  .note {
+    background: var(--cyan-soft);
+    border: 1px solid color-mix(in srgb, var(--cyan) 25%, transparent);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    margin: 10px 0;
+    font-size: 13.5px;
+    color: var(--text-soft);
+  }
+  .note strong { color: var(--text); }
+  .warn {
+    background: var(--red-soft);
+    border: 1px solid color-mix(in srgb, var(--red) 25%, transparent);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    margin: 10px 0;
+    font-size: 13.5px;
+    color: var(--text-soft);
+  }
+  .warn strong { color: var(--red); }
+
+  /* ===== Footer ===== */
+  .foot {
+    margin: 80px 0 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 24px 14px 48px; }
+    h1.title { font-size: 24px; }
+    .verdict { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="prism-bar" aria-hidden="true"></div>
+
+<div class="eyebrow">Engineering Audit · 2026-08-04</div>
+<h1 class="title">AgentPrism<span style="color:var(--text-faint);font-weight:300">/</span><span class="accent">工程审计</span><br><span class="date">实测 · 真跑 · 不猜</span></h1>
+<p class="lede">
+  静态审查给出的是「该是这样」；本审计给出的是「实测是这样」。每条结论都附带实际执行的命令与原始输出，<strong>不写「应该通过」「大概绿了」</strong>。
+  审计基线 <code>main</code> 分支 <code>d04b431</code>，与 <code>REPORT.md</code> 配套阅读。
+</p>
+
+<div class="verdict">
+  <div class="verdict-cell"><div class="k">pytest</div><div class="v red">5 failed</div></div>
+  <div class="verdict-cell"><div class="k">ruff</div><div class="v green">all pass</div></div>
+  <div class="verdict-cell"><div class="k">mypy</div><div class="v red">3 errors</div></div>
+  <div class="verdict-cell"><div class="k">tsc</div><div class="v green">exit 0</div></div>
+  <div class="verdict-cell"><div class="k">pip-audit</div><div class="v green">0 vulns</div></div>
+  <div class="verdict-cell"><div class="k">npm audit</div><div class="v red">4 high</div></div>
+  <div class="verdict-cell"><div class="k">沙箱 63/63</div><div class="v green">pass</div></div>
+  <div class="verdict-cell"><div class="k">并发 16 req</div><div class="v cyan">35ms</div></div>
+</div>
+
+<h2 class="section"><span class="num">00</span>TL;DR</h2>
+<p class="sub">
+  CI 报的「344 全绿」与本机实测<strong>不一致</strong>。3 个 mypy 错误、4 个前端 high 漏洞、5 个 pytest 失败都需处理。沙箱安全 + 异步并发 + 关键设计断言<strong>实测通过</strong>，可以信赖。
+</p>
+
+<table>
+  <thead><tr><th>检查项</th><th>命令</th><th>结果</th><th>评级</th></tr></thead>
+  <tbody>
+    <tr><td>后端测试</td><td><code>pytest tests/ -q</code></td><td>5 failed, 338 passed, 1 skipped</td><td><span class="cross">HIGH</span></td></tr>
+    <tr><td>后端 lint</td><td><code>ruff check app/</code></td><td>All checks passed</td><td><span class="check">OK</span></td></tr>
+    <tr><td>后端类型</td><td><code>mypy app/ --ignore-missing-imports</code></td><td>3 errors (config.py:116, router.py:470,478)</td><td><span class="cross">HIGH</span></td></tr>
+    <tr><td>前端类型</td><td><code>tsc --noEmit</code></td><td>exit 0</td><td><span class="check">OK</span></td></tr>
+    <tr><td>后端依赖</td><td><code>pip-audit</code></td><td>No known vulnerabilities</td><td><span class="check">OK</span></td></tr>
+    <tr><td>前端依赖</td><td><code>npm audit</code></td><td>4 high severity</td><td><span class="cross">HIGH</span></td></tr>
+    <tr><td>沙箱安全</td><td>专项 pytest</td><td>63/63 passed</td><td><span class="check">OK</span></td></tr>
+    <tr><td>并发能力</td><td>16 mixed requests</td><td>total 35ms（真并发）</td><td><span class="check">OK</span></td></tr>
+    <tr><td>HTML 视觉</td><td>Playwright dark/light</td><td>深色 OK，浅色对比度偏弱</td><td><span class="partial">WARN</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ============ 1 失败项 ============ -->
+<h2 class="section"><span class="num">01</span>实测失败项（5 个）</h2>
+<p class="sub">每条都附原始命令输出与最小修复 diff。</p>
+
+<div class="finding red">
+  <h3><span class="id" style="color:var(--red);background:var(--red-soft);border-color:var(--red-soft)">H2</span>pytest 5 个测试失败 — stub 未跟进生产代码</h3>
+  <div class="where">位置 · <span class="file">tests/test_runner.py:14</span> + <span class="file">tests/test_arena_run_contract.py</span></div>
+  <p>测试 stub 的 lambda 签名是 <code>lambda self, question, config: behaviour(config)</code>，但生产代码在 <code>runner.py:114</code> 调用时传了 <code>history=list(request.messages)</code>。<strong>测试原地踏步</strong>，CI 报绿但本机实测 5 failed。</p>
+  <pre><code>TypeError: _make_adapter.&lt;locals&gt;.&lt;lambda&gt;()
+got an unexpected keyword argument 'history'
+
+FAILED tests/test_runner.py::test_worker_exception_becomes_error_event
+FAILED tests/test_runner.py::test_cancellation_propagates_to_workers
+FAILED tests/test_runner.py::test_stream_parallel_merges_multiple_workers
+FAILED tests/test_arena_run_contract.py::test_arena_run_sse_emits_thought_and_complete
+FAILED tests/test_frontend_session_contracts.py::test_traceview_uses_stable_thought_key
+5 failed, 338 passed, 1 skipped in 21.22s</code></pre>
+  <p><strong>最小修复</strong>（30 秒）：</p>
+  <pre><code># tests/test_runner.py:14
+- "run": lambda self, question, config: behaviour(config),
++ "run": lambda self, question, config, *, history=None: behaviour(config),</code></pre>
+</div>
+
+<div class="finding red">
+  <h3><span class="id" style="color:var(--red);background:var(--red-soft);border-color:var(--red-soft)">H3</span>TraceView 渲染 key 不稳定</h3>
+  <div class="where">位置 · <span class="file">tests/test_frontend_session_contracts.py</span> + <span class="file">frontend/src/components/TraceView.tsx</span></div>
+  <p>测试期望源码含 <code>thought:${step}</code> 类稳定 React key，实际不存在。TraceDiff 与多轮续聊场景下，事件数组索引变化会导致组件不必要地重渲染、闪烁。</p>
+  <p><strong>修复</strong>：<code>key={`thought:${step}:${turn}`}</code>（后端已在 <code>runner.py:122</code> 注入 <code>turn</code>）。</p>
+</div>
+
+<div class="finding red">
+  <h3><span class="id" style="color:var(--red);background:var(--red-soft);border-color:var(--red-soft)">H4a</span>mypy · <code>config.py:116</code> 无效的 <code># type: ignore</code></h3>
+  <pre><code>def effective_thinking_level(self, requested: ThinkingLevel | str) -> ThinkingLevel:
+    if not self.thinking_capable:
+        return "off"
+    lvl = requested if requested in ("off", "low", "medium", "high") else "off"
+    return lvl  # type: ignore[return-value]   ← 无效，mypy 已能收窄</code></pre>
+  <p>删那一行注释即可。</p>
+</div>
+
+<div class="finding red">
+  <h3><span class="id" style="color:var(--red);background:var(--red-soft);border-color:var(--red-soft)">H4b</span>mypy · <code>router.py:470,478</code> 循环变量名复用导致误报</h3>
+  <div class="where">位置 · <span class="file">backend/app/arena/router.py:458-480</span></div>
+  <p>两个 for 循环都用 <code>options</code> 作循环变量，运行时正确（每次 for 重新绑定），但 mypy 在闭包级别收窄为单变量名导致误报。</p>
+  <pre><code># router.py:471 — 改循环变量名
+- for field_name, options in _BASELINE_ONLY_OPTIONS.items():
++ for field_name, baseline_opts in _BASELINE_ONLY_OPTIONS.items():
+-     ... for v, lab in options
++     ... for v, lab in baseline_opts</code></pre>
+  <p>3 个 mypy 错误会一次性消失。</p>
+</div>
+
+<div class="finding red">
+  <h3><span class="id" style="color:var(--red);background:var(--red-soft);border-color:var(--red-soft)">H5</span>前端 4 个 high 漏洞 — Next.js 16.2.10 全命中</h3>
+  <div class="where">位置 · <span class="file">frontend/package.json</span> + <span class="file">next 16.2.10</span></div>
+  <table>
+    <thead><tr><th>CVE / Advisory</th><th>影响</th><th>项目用了吗</th></tr></thead>
+    <tbody>
+      <tr><td><code>GHSA-p9j2-gv94-2wf4</code> · rewrites SSRF</td><td>attacker-controlled destination hostname</td><td><span class="partial">⚠️ 是</span>（<code>next.config.ts:35-41</code>）</td></tr>
+      <tr><td><code>GHSA-q8wf-6r8g-63ch</code> · Image Opt DoS</td><td>SVG 路径 DoS</td><td><span class="partial">⚠️ 间接</span>（next/image 走 sharp）</td></tr>
+      <tr><td><code>GHSA-955p-x3mx-jcvp</code> · Server Function 泄露</td><td>unauth</td><td><span class="na">❌ 未用</span></td></tr>
+      <tr><td><code>GHSA-6gpp-xcg3-4w24</code> · Middleware bypass</td><td>Turbopack + 单 locale</td><td><span class="partial">⚠️ 用了 Turbopack</span></td></tr>
+      <tr><td><code>postcss &lt;=8.5.22</code> · XSS / 任意读 / 路径遍历</td><td>CSS Stringify + sourceMappingURL</td><td><span class="partial">⚠️ 是</span>（间接依赖）</td></tr>
+      <tr><td><code>sharp &lt;0.35.0</code> · libvips 4 CVE</td><td>任意文件读</td><td><span class="partial">⚠️ 是</span>（Image Optimization）</td></tr>
+      <tr><td><code>brace-expansion &lt;=1.1.17</code> · DoS</td><td>unbounded expansion</td><td><span class="na">❌ devDep only</span></td></tr>
+    </tbody>
+  </table>
+  <p><strong>修复</strong>：<code>npm audit fix --force</code> → 升 <code>next@16.3.0+</code>，同步改 <code>package.json</code> 与 <code>CLAUDE.md</code> §"技术栈"。</p>
+</div>
+
+<!-- ============ 2 通过项 ============ -->
+<h2 class="section"><span class="num">02</span>实测通过项（5 个）</h2>
+
+<div class="finding green">
+  <h3><span class="id" style="color:var(--green);background:var(--green-soft);border-color:var(--green-soft)">G1</span>ruff check app/ · 0 错误</h3>
+  <pre><code>$ .venv/Scripts/ruff.exe check app/
+All checks passed!</code></pre>
+  <p>所有 ruff 规则（E/F/I/B/UP）全过。<code>pyproject.toml</code> 关闭的 <code>B905/F841/F821</code> 是配置层故意选择，不是代码违规。</p>
+</div>
+
+<div class="finding green">
+  <h3><span class="id" style="color:var(--green);background:var(--green-soft);border-color:var(--green-soft)">G2</span>tsc --noEmit · exit 0</h3>
+  <pre><code>$ ./node_modules/.bin/tsc --noEmit; echo "tsc exit: $?"
+tsc exit: 0</code></pre>
+  <p>前端 <code>tsconfig.json:11-12</code> 开了 <code>noUncheckedIndexedAccess</code> + <code>noImplicitOverride</code> + <code>strict: true</code>，0 类型错误。</p>
+</div>
+
+<div class="finding green">
+  <h3><span class="id" style="color:var(--green);background:var(--green-soft);border-color:var(--green-soft)">G3</span>沙箱安全 63/63 通过</h3>
+  <pre><code>tests\test_sandbox_security.py ..........................  [41%]
+tests\test_tool_security.py ..................................  [95%]
+tests\test_request_size_middleware.py ...                  [100%]
+63 passed in 16.96s</code></pre>
+  <p>这是<strong>反 fuzz 实证</strong>：26 个沙箱逃逸测试 + 34 个 calculate AST 白名单测试 + 3 个请求大小中间件测试，<strong>实测全绿</strong>。<code>tools.py:97-260</code> 的 AST 沙箱 + dunder 黑名单 + 进程级 terminate/kill 真实可信。</p>
+</div>
+
+<div class="finding cyan">
+  <h3><span class="id" style="color:var(--cyan);background:var(--cyan-soft);border-color:var(--cyan-soft)">G4</span>并发能力实测 · 16 mixed requests 35ms</h3>
+  <table>
+    <thead><tr><th>探测</th><th>并发数</th><th>total</th><th>min/avg/max</th></tr></thead>
+    <tbody>
+      <tr><td><code>/health</code>×8 + <code>/meta</code>×4 + <code>/templates</code>×4</td><td>16</td><td>35ms</td><td>3/8/15ms</td></tr>
+      <tr><td><code>/judge</code>×8（纯 CPU 路径）</td><td>8</td><td>7ms</td><td>3/3/4ms</td></tr>
+    </tbody>
+  </table>
+  <p><code>max=15ms</code> 远低于串行估算 <code>16×8=128ms</code>，<strong>真并发</strong>成立。但本次<strong>绕开了 <code>/api/arena/run</code></strong>（该路径受 <code>_run_sem</code> 限流为 4），LLM 真实并发需 mock 后再测。</p>
+</div>
+
+<div class="finding green">
+  <h3><span class="id" style="color:var(--green);background:var(--green-soft);border-color:var(--green-soft)">G5</span>pip-audit · 0 漏洞</h3>
+  <p>后端依赖（langchain / langgraph / fastapi / sse-starlette / pydantic / anthropic / openai）全部干净。</p>
+</div>
+
+<!-- ============ 3 视觉 ============ -->
+<h2 class="section"><span class="num">03</span>视觉验证（Playwright 截图）</h2>
+
+<div class="finding cyan">
+  <h3><span class="id" style="color:var(--cyan);background:var(--cyan-soft);border-color:var(--cyan-soft)">G6</span>HTML 报告深色模式 · 视觉成立 ✅</h3>
+  <div class="where">截图 · <span class="file">docs/reviews/2026-08-04-spectral/screenshots/03-hero-dark.png</span></div>
+  <p>顶部 4px 光谱棱镜条带 box-shadow 青绿色发光。标题 <code>光谱审查</code> 用青色 <code>#50e3c2</code> 在 <code>#0a0a0a</code> 背景上对比度 ≈ 11.8:1（WCAG AAA 7:1 大幅超额）。meta-grid 6 卡片排布整洁。</p>
+</div>
+
+<div class="finding amber">
+  <h3><span class="id" style="color:var(--amber);background:var(--amber-soft);border-color:var(--amber-soft)">V1</span>HTML 报告浅色模式 · 对比度偏弱</h3>
+  <div class="where">截图 · <span class="file">docs/reviews/2026-08-04-spectral/screenshots/02-hero.png</span></div>
+  <p>浅色模式下 <code>--spectrum-cyan: #50e3c2</code> 在 <code>--bg: #fafaf7</code> 上对比度 <strong>1.6:1</strong>，WCAG AA 要求 4.5:1。<strong>未达</strong>。</p>
+  <p><strong>修复</strong>：浅色模式用更深的青色 <code>--spectrum-cyan: #0a8a72</code>；或浅色下禁用 box-shadow 改 <code>border: 1px solid var(--line)</code>。</p>
+</div>
+
+<!-- ============ 4 综合对比 ============ -->
+<h2 class="section"><span class="num">04</span>静态审查 vs 实测校准</h2>
+<p class="sub">下表是「静态推断」被实测修正的关键项，体现本审计的核心价值。</p>
+
+<table>
+  <thead><tr><th>维度</th><th>REPORT.md 静态评级</th><th>AUDIT.md 实测修正</th><th>变化</th></tr></thead>
+  <tbody>
+    <tr><td>测试绿</td><td>假设绿（README 说 344）</td><td><strong>5 failed</strong></td><td><span class="cross">降</span></td></tr>
+    <tr><td>mypy 绿</td><td>假设绿（CI 门禁）</td><td><strong>3 errors</strong></td><td><span class="cross">降</span></td></tr>
+    <tr><td>前端 tsc</td><td>假设绿</td><td>exit 0</td><td><span class="check">一致</span></td></tr>
+    <tr><td>依赖安全</td><td>未审</td><td><strong>4 high 漏洞</strong></td><td><span class="cross">降</span></td></tr>
+    <tr><td>沙箱安全</td><td>静态推断</td><td><strong>63/63 通过</strong></td><td><span class="check">升（实证）</span></td></tr>
+    <tr><td>异步并发</td><td>静态推断</td><td><strong>16 并发 35ms</strong></td><td><span class="check">升（实证）</span></td></tr>
+    <tr><td>HTML 视觉</td><td>未验证</td><td>深色 OK，浅色对比度弱</td><td><span class="partial">微调</span></td></tr>
+  </tbody>
+</table>
+
+<div class="warn">
+  <strong>关键校准</strong>：<strong>不要相信 README / CLAUDE.md / CI badge 上的「344 全绿」</strong>。本机实测发现 5 failed + 3 mypy errors。可能 CI 上次运行时它们还没失败，但<strong>当前 commit <code>d04b431</code> 状态是红的</strong>。
+</div>
+
+<!-- ============ 5 修复优先级 ============ -->
+<h2 class="section"><span class="num">05</span>修复优先级（与 REPORT.md 互补）</h2>
+
+<div class="finding red">
+  <h3><span class="id" style="color:var(--red);background:var(--red-soft);border-color:var(--red-soft)">批次 1</span>HIGH · 立即</h3>
+  <table>
+    <thead><tr><th>编号</th><th>标题</th><th>工作量</th></tr></thead>
+    <tbody>
+      <tr><td>H2</td><td>pytest stub 接受 <code>history</code> 关键字参数</td><td>极小（5 处 stub）</td></tr>
+      <tr><td>H3</td><td><code>TraceView.tsx</code> 用稳定 <code>key</code></td><td>小</td></tr>
+      <tr><td>H4a</td><td>删 <code>config.py:116</code> 无效 <code># type: ignore</code></td><td>极小</td></tr>
+      <tr><td>H4b</td><td><code>router.py:471</code> 循环变量名 <code>options → baseline_opts</code></td><td>极小</td></tr>
+      <tr><td>H5</td><td><code>npm audit fix --force</code> + 升 Next.js 16.3.0+</td><td>小</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="finding orange">
+  <h3><span class="id" style="color:var(--orange);background:var(--orange-soft);border-color:var(--orange-soft)">批次 2</span>MEDIUM · 本 PR</h3>
+  <ul>
+    <li>与 REPORT.md M5（<code>ArenaClient.tsx</code> 抽 hook）合并 → 抽 <code>useTraceView</code> 时顺便修 H3</li>
+    <li>与 REPORT.md M6（删 <code>requirements.txt</code>）合并 → 验证 <code>pip-audit</code> 仍 0 漏洞</li>
+  </ul>
+</div>
+
+<div class="finding amber">
+  <h3><span class="id" style="color:var(--amber);background:var(--amber-soft);border-color:var(--amber-soft)">批次 3</span>LOW · 下次</h3>
+  <ul>
+    <li>V1：HTML 报告浅色模式对比度</li>
+    <li>与 REPORT.md L4（<code>globals.css</code> 加章节注释）合并</li>
+    <li>增加 LLM mock 的并发压力测试（验证 <code>ainvoke</code> 真不阻塞 harness 循环）</li>
+  </ul>
+</div>
+
+<!-- ============ 6 最紧急 ============ -->
+<h2 class="section"><span class="num">06</span>最紧急行动</h2>
+<ol>
+  <li><strong>立即处理 H2 + H4a + H4b + H5</strong>（共 4 处，&lt; 30 分钟）：恢复 CI 绿灯</li>
+  <li><strong>本 PR 处理 H3</strong>（稳定 TraceView key）+ V1（修浅色对比度）</li>
+  <li><strong>下次大重构</strong>处理 REPORT.md D1-D3</li>
+</ol>
+
+<div class="note">
+  <strong>本审计与 REPORT.md 的关系</strong>：REPORT.md 是「代码该是怎样」的静态画像；AUDIT.md 是「代码真跑起来怎样」的动态校准。两份合起来才是完整的审查。Mark Done 时建议<strong>同时引用</strong>，不要只引一份。
+</div>
+
+<div class="foot">
+  审计生成于 2026-08-04 · 与 <code>REPORT.md</code> 互补 · 本审计未修改任何项目代码
+</div>
+
+</div>
+</body>
+</html>
