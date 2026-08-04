@@ -351,13 +351,13 @@ function ColumnCard({
               </span>
             )}
             {col.metrics && (
-              <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+              <span className="column-metric-chip font-mono text-[10px] text-muted-foreground shrink-0">
                 {col.metrics.success ? "OK" : "FAIL"} · {col.metrics.duration_ms}ms
               </span>
             )}
           </div>
           {col.tokenStats && (
-            <div className="mt-1.5">
+            <div className="mt-1.5 column-token-enter">
               <TokenStatsPanel stats={col.tokenStats} compact />
             </div>
           )}
@@ -366,7 +366,7 @@ function ColumnCard({
           {onUseAsSeed && col.metrics && !isHistorySeed && (
             <button
               type="button"
-              className="btn-ghost !h-7 !px-2 text-[10px]"
+              className="btn-ghost column-seed-btn !h-7 !px-2 text-[10px]"
               onClick={onUseAsSeed}
               title="续聊时采用本列回复写入共享历史"
             >
@@ -376,7 +376,7 @@ function ColumnCard({
           {showStop && (
             <button
               type="button"
-              className="btn-ghost !h-7 !px-2 text-[10px]"
+              className="btn-ghost column-stop-btn !h-7 !px-2 text-[10px]"
               onClick={onStop}
             >
               <Square className="h-3 w-3" />
@@ -389,7 +389,7 @@ function ColumnCard({
         <TraceView events={col.events} running={running && !col.metrics} colorIndex={lane} />
       </div>
       {col.metrics && (
-        <div className="border-t border-border px-3 py-2 font-mono text-[10px] text-muted-foreground flex gap-3 shrink-0">
+        <div className="column-metrics-bar border-t border-border px-3 py-2 font-mono text-[10px] text-muted-foreground flex gap-3 shrink-0">
           <span>工具 {col.metrics.tool_calls}</span>
           <span>步骤 {col.metrics.steps}</span>
         </div>
@@ -397,7 +397,7 @@ function ColumnCard({
       {col.judge && (
         <div
           className={
-            "border-t px-3 py-2 text-[11px] shrink-0 flex items-start gap-1.5 " +
+            "column-judge-bar border-t px-3 py-2 text-[11px] shrink-0 flex items-start gap-1.5 " +
             (col.judge.passed
               ? "border-t-success/30 bg-success/5 text-success"
               : "border-t-destructive/30 bg-destructive/5 text-destructive")
@@ -1031,7 +1031,10 @@ export function ArenaClient() {
               <button
                 type="button"
                 className="btn-ghost !h-8 !w-8 !p-0"
-                onClick={() => setShowLeftPanel((v) => !v)}
+                onClick={() => {
+                  setShowLeftPanel((v) => !v);
+                  setShowRightPanel(false);
+                }}
                 title={showLeftPanel ? "关闭实验参数" : "实验参数"}
                 aria-label={showLeftPanel ? "关闭实验参数" : "打开实验参数"}
                 aria-pressed={showLeftPanel}
@@ -1045,9 +1048,12 @@ export function ArenaClient() {
               <button
                 type="button"
                 className="btn-ghost !h-8 !w-8 !p-0"
-                onClick={() => setShowRightPanel((v) => !v)}
-                title={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
-                aria-label={showRightPanel ? "隐藏工作空间" : "显示工作空间"}
+                onClick={() => {
+                  setShowRightPanel((v) => !v);
+                  setShowLeftPanel(false);
+                }}
+                title={showRightPanel ? "关闭工作空间" : "工作空间"}
+                aria-label={showRightPanel ? "关闭工作空间" : "打开工作空间"}
                 aria-pressed={showRightPanel}
               >
                 {showRightPanel ? (
@@ -1224,16 +1230,26 @@ export function ArenaClient() {
         </div>
 
         <section className="composer-bar">
-          {error && (
-            <p
-              role="alert"
-              className="text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded-[var(--radius-sm)] px-3 py-1.5"
-            >
-              {error}
-            </p>
-          )}
-          {(chatHistory.length > 0 || historySeedLabel) && (
-            <div className="arena-chat-history">
+          <div
+            className="soft-collapse"
+            data-open={error ? "true" : undefined}
+            aria-hidden={!error}
+          >
+            <div className="soft-collapse-inner">
+              <p
+                role={error ? "alert" : undefined}
+                className="composer-alert text-xs text-destructive border border-destructive/30 bg-destructive/5 rounded-[var(--radius-sm)] px-3 py-1.5 mb-2"
+              >
+                {error}
+              </p>
+            </div>
+          </div>
+          <div
+            className="arena-chat-history"
+            data-open={chatHistory.length > 0 || historySeedLabel ? "true" : undefined}
+            aria-hidden={!(chatHistory.length > 0 || historySeedLabel)}
+          >
+            <div className="arena-chat-history-inner">
               <div className="arena-chat-history-head">
                 <span className="eyebrow">对话历史</span>
                 <span className="font-mono text-[10px] text-muted-foreground">
@@ -1245,6 +1261,7 @@ export function ArenaClient() {
                   className="btn-ghost !h-6 !px-2 text-[10px] ml-auto"
                   onClick={clearConversation}
                   disabled={running}
+                  tabIndex={chatHistory.length > 0 || historySeedLabel ? 0 : -1}
                 >
                   新对话
                 </button>
@@ -1260,7 +1277,7 @@ export function ArenaClient() {
                 ))}
               </ol>
             </div>
-          )}
+          </div>
           <div className="arena-run-strip">
             <span className="eyebrow arena-run-strip-label" id="arena-template-label">
               任务模板
@@ -1330,74 +1347,85 @@ export function ArenaClient() {
               disabled={running}
               aria-label="实验问题"
             />
-            {running ? (
-              <button type="button" className="btn-ghost composer-run" onClick={cancelRun}>
-                <Square className="h-4 w-4" />
-                停止
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn-primary composer-run"
-                disabled={!question.trim()}
-                title={
-                  activeSelections.length < 2
+            <button
+              type="button"
+              className="composer-run"
+              data-running={running ? "true" : undefined}
+              disabled={!running && !question.trim()}
+              title={
+                running
+                  ? "停止当前运行"
+                  : activeSelections.length < 2
                     ? "请先展开「实验维度」并至少选择 2 项"
                     : undefined
+              }
+              onClick={() => {
+                if (running) {
+                  cancelRun();
+                  return;
                 }
-                onClick={() => {
-                  if (activeSelections.length < 2) {
-                    setConfigOpen(true);
-                    setError("请至少选择 2 个对比项后再运行");
-                    return;
-                  }
-                  void runArena();
-                }}
-              >
-                <Send className="h-4 w-4" />
-                运行
-              </button>
-            )}
+                if (activeSelections.length < 2) {
+                  setConfigOpen(true);
+                  setError("请至少选择 2 个对比项后再运行");
+                  return;
+                }
+                void runArena();
+              }}
+            >
+              {running ? (
+                <>
+                  <Square className="h-4 w-4" />
+                  停止
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  运行
+                </>
+              )}
+            </button>
           </div>
         </section>
       </div>
 
       <div className="arena-body">
-        {showLeftPanel && (
-          <button
-            type="button"
-            className="arena-backdrop"
-            aria-label="关闭实验参数"
-            onClick={() => setShowLeftPanel(false)}
-          />
-        )}
-        {!showLeftPanel && showRightPanel && (
-          <button
-            type="button"
-            className="arena-backdrop xl:hidden"
-            aria-label="关闭工作空间"
-            onClick={() => setShowRightPanel(false)}
-          />
-        )}
+        <button
+          type="button"
+          className="arena-backdrop"
+          data-open={showLeftPanel || showRightPanel ? "true" : undefined}
+          aria-label="关闭侧栏"
+          aria-hidden={!(showLeftPanel || showRightPanel)}
+          tabIndex={showLeftPanel || showRightPanel ? 0 : -1}
+          onClick={() => {
+            setShowLeftPanel(false);
+            setShowRightPanel(false);
+          }}
+        />
 
-        {showLeftPanel && (
-          <aside className="arena-drawer" data-side="left" aria-label="实验参数">
-            <div className="arena-drawer-head">
-              <p className="eyebrow">实验参数</p>
-              <button
-                type="button"
-                className="btn-ghost !h-7 !w-7 !p-0"
-                onClick={() => setShowLeftPanel(false)}
-                aria-label="关闭实验参数"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <div className="arena-drawer-body">
-              <ExperimentPanel dimension={dimension} columnCount={columnCount} />
-            </div>
-          </aside>
-        )}
+        <aside
+          className="arena-drawer"
+          data-side="left"
+          data-open={showLeftPanel ? "true" : undefined}
+          aria-label="实验参数"
+          aria-hidden={!showLeftPanel}
+          inert={!showLeftPanel ? true : undefined}
+        >
+          <div className="arena-drawer-head">
+            <p className="eyebrow">实验参数</p>
+            <button
+              type="button"
+              className="btn-ghost !h-7 !w-7 !p-0"
+              onClick={() => setShowLeftPanel(false)}
+              aria-label="关闭实验参数"
+              tabIndex={showLeftPanel ? 0 : -1}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="arena-drawer-body">
+            <ExperimentPanel dimension={dimension} columnCount={columnCount} />
+          </div>
+        </aside>
 
         <main className="arena-stage">
           <div className="arena-stage-toolbar">
@@ -1520,27 +1548,35 @@ export function ArenaClient() {
           </div>
         </main>
 
-        {showRightPanel && (
-          <aside className="arena-workspace" data-open="true" aria-label="工作空间">
-            <div className="arena-drawer-head xl:hidden">
-              <p className="eyebrow">工作空间</p>
-              <button
-                type="button"
-                className="btn-ghost !h-7 !w-7 !p-0"
-                onClick={() => setShowRightPanel(false)}
-                aria-label="关闭工作空间"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-              <WorkspacePanel
-                workspaceName={activeWorkspace}
-                pollInterval={running ? 1500 : 5000}
-              />
-            </div>
-          </aside>
-        )}
+        <aside
+          className="arena-drawer"
+          data-side="right"
+          data-open={showRightPanel ? "true" : undefined}
+          aria-label="工作空间"
+          aria-hidden={!showRightPanel}
+          inert={!showRightPanel ? true : undefined}
+        >
+          <div className="arena-drawer-head">
+            <p className="eyebrow">工作空间</p>
+            <button
+              type="button"
+              className="btn-ghost !h-7 !w-7 !p-0"
+              onClick={() => setShowRightPanel(false)}
+              aria-label="关闭工作空间"
+              tabIndex={showRightPanel ? 0 : -1}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="arena-drawer-body !p-0 flex flex-col overflow-hidden">
+            <WorkspacePanel
+              workspaceName={activeWorkspace}
+              pollInterval={
+                showRightPanel ? (running ? 1500 : 5000) : 0
+              }
+            />
+          </div>
+        </aside>
       </div>
     </div>
   );

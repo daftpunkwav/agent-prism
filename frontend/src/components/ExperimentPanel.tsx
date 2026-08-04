@@ -293,15 +293,20 @@ export function ExperimentPanel({ dimension, columnCount }: ExperimentPanelProps
           <Info className="h-3 w-3 text-muted-foreground" />
         </button>
 
-        {showEstimate && (
-          <div className="text-[11px] text-muted-foreground space-y-1 pt-1 border-t border-border">
-            <p>预估方式：粗略字符/token 比率（中英混合）</p>
-            <p>系统 prompt 约 150 tokens × {columnCount} 列 = ~{150 * columnCount} tokens</p>
-            <p className="text-muted-foreground/70">
-              * 实际消耗取决于模型 tokenizer 和 Agent 工具调用次数
-            </p>
+        <div
+          className="soft-collapse"
+          data-open={showEstimate ? "true" : undefined}
+          aria-hidden={!showEstimate}
+        >          <div className="soft-collapse-inner">
+            <div className="text-[11px] text-muted-foreground space-y-1 pt-1 border-t border-border">
+              <p>预估方式：粗略字符/token 比率（中英混合）</p>
+              <p>系统 prompt 约 150 tokens × {columnCount} 列 = ~{150 * columnCount} tokens</p>
+              <p className="text-muted-foreground/70">
+                * 实际消耗取决于模型 tokenizer 和 Agent 工具调用次数
+              </p>
+            </div>
           </div>
-        )}
+        </div>
 
         <div className="space-y-1">
           <div className="flex justify-between text-[10px]">

@@ -188,6 +188,8 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
       return;
     }
     loadFiles();
+    // pollInterval <= 0：抽屉关闭时暂停轮询，避免后台打 API
+    if (pollInterval <= 0) return;
     const timer = setInterval(loadFiles, pollInterval);
     return () => clearInterval(timer);
   }, [workspaceName, pollInterval, loadFiles]);
@@ -251,28 +253,32 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000 }: Workspace
           </div>
         </div>
 
-        {showNewFile && (
-          <div className="px-2 py-1.5 border-b border-border flex items-center gap-1">
-            <input
-              autoFocus
-              className="flex-1 h-7 px-2 text-xs bg-muted/30 border border-border rounded font-mono"
-              placeholder="main.py"
-              value={newFileName}
-              onChange={(e) => setNewFileName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") createFile();
-                if (e.key === "Escape") setShowNewFile(false);
-              }}
-            />
-            <button
-              type="button"
-              className="btn-ghost !h-7 !px-2 text-[10px]"
-              onClick={createFile}
-            >
-              创建
-            </button>
+        <div className="soft-collapse" data-open={showNewFile ? "true" : undefined}>
+          <div className="soft-collapse-inner">
+            <div className="px-2 py-1.5 border-b border-border flex items-center gap-1">
+              <input
+                autoFocus={showNewFile}
+                className="flex-1 h-7 px-2 text-xs bg-muted/30 border border-border rounded font-mono"
+                placeholder="main.py"
+                value={newFileName}
+                onChange={(e) => setNewFileName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") createFile();
+                  if (e.key === "Escape") setShowNewFile(false);
+                }}
+                tabIndex={showNewFile ? 0 : -1}
+              />
+              <button
+                type="button"
+                className="btn-ghost !h-7 !px-2 text-[10px]"
+                onClick={createFile}
+                tabIndex={showNewFile ? 0 : -1}
+              >
+                创建
+              </button>
+            </div>
           </div>
-        )}
+        </div>
 
         <div className="p-1">
           {tree.length === 0 && (
