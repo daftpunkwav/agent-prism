@@ -54,5 +54,13 @@ temp/
 # Playwright CLI 本地会话产物
 .playwright-cli/
 
+# 本地冒烟脚本与产物（仅作开发用，提交过的保留在历史中）
+# 匹配：_smoke_*.py / _smoke_*.sh / -smoke.* / playwright-report/ / test-results/
+_smoke_*.py
+_smoke_*.sh
+*-smoke.*
+playwright-report/
+test-results/
+
 # Git worktrees
 .worktrees/
