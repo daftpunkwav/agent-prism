@@ -65,7 +65,17 @@ export function ArenaModule({
           </button>
         )}
       </div>
-      {open && <div className="arena-module-body">{children}</div>}
+      <div
+        className="arena-module-collapse"
+        data-open={open}
+        aria-hidden={!open}
+        // 收起时禁止焦点落入折叠区内
+        {...(!open ? { inert: true } : {})}
+      >
+        <div className="arena-module-collapse-inner">
+          <div className="arena-module-body">{children}</div>
+        </div>
+      </div>
     </section>
   );
 }

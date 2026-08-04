@@ -106,7 +106,7 @@ const WEEK_PLAN = [
 
 export default function LearnPage() {
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8 learn-page">
       <div>
         <p className="eyebrow mb-2">LEARNING PATH</p>
         <h1 className="page-title">学习路径</h1>
@@ -116,17 +116,19 @@ export default function LearnPage() {
         </p>
       </div>
 
+      <div className="spectrum-line-soft" aria-hidden />
+
       <div className="grid gap-4 md:grid-cols-2 stagger-children">
         {WEEK_PLAN.map((step) => (
           <section
             key={step.week}
-            className="panel-surface panel-lift flex flex-col gap-3 p-5"
+            className="panel-surface panel-lift learn-week-card flex flex-col gap-3 p-5"
             data-lane={(step.week - 1) % 4}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <span
-                  className="font-mono text-[10px] font-semibold border border-current rounded-md px-1.5 py-0.5"
+                  className="learn-week-badge font-mono text-[10px] font-semibold border border-current rounded-md px-1.5 py-0.5"
                   aria-hidden
                 >
                   W{step.week}

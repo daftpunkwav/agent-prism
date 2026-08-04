@@ -187,7 +187,9 @@ export default function GuidePage() {
         <div className="guide-hero-grid">
           <div className="guide-hero-copy">
             <p className="eyebrow">OPTICAL BENCH · REFERENCE</p>
-            <h1 className="page-title">维度与基线说明</h1>
+            <h1 className="page-title guide-hero-title">
+              <span className="guide-hero-title-accent">维度与基线说明</span>
+            </h1>
             <p className="guide-hero-lead">
               控制变量法的结构化参考：字段如何映射、基线如何锁定、十个对比维在
               LangChain / LangGraph 上是否真实生效，以及多轮对话如何按轮次分段对比。
@@ -202,26 +204,78 @@ export default function GuidePage() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-          </div>
-          <aside className="guide-hero-aside" aria-label="速览">
-            <div className="guide-hero-stat">
-              <span className="guide-hero-stat-value">{DIMENSIONS.length}</span>
-              <span className="guide-hero-stat-label">对比维度</span>
-            </div>
-            <div className="guide-hero-stat">
-              <span className="guide-hero-stat-value">{FIELD_MATRIX.length}</span>
-              <span className="guide-hero-stat-label">字段映射</span>
-            </div>
-            <div className="guide-hero-stat">
-              <span className="guide-hero-stat-value">{TOOLSET_TABLE.length}</span>
-              <span className="guide-hero-stat-label">工具集预设</span>
-            </div>
-            <ul className="guide-hero-tags">
-              <li>管线 · 解码 · 接入点</li>
-              <li>基线锁定当前对比维</li>
-              <li>多轮共享 messages 历史</li>
-              <li>Trace 按 turn 分段对比</li>
+            <ul className="guide-hero-pillars" aria-label="阅读要点">
+              <li data-lane="0">
+                <span className="guide-hero-pillar-kicker">管线</span>
+                解码 · 接入点分层对照
+              </li>
+              <li data-lane="1">
+                <span className="guide-hero-pillar-kicker">基线</span>
+                锁定当前对比维以外的字段
+              </li>
+              <li data-lane="2">
+                <span className="guide-hero-pillar-kicker">多轮</span>
+                共享 messages，按 turn 分段
+              </li>
+              <li data-lane="3">
+                <span className="guide-hero-pillar-kicker">Trace</span>
+                列对齐对比 Thought / Action
+              </li>
             </ul>
+          </div>
+
+          <aside className="guide-hero-aside" aria-label="速览与导读">
+            <div className="guide-hero-metrics">
+              <div className="guide-hero-metric" data-lane="0">
+                <span className="guide-hero-metric-value">{DIMENSIONS.length}</span>
+                <span className="guide-hero-metric-label">对比维度</span>
+              </div>
+              <div className="guide-hero-metric" data-lane="1">
+                <span className="guide-hero-metric-value">{FIELD_MATRIX.length}</span>
+                <span className="guide-hero-metric-label">字段映射</span>
+              </div>
+              <div className="guide-hero-metric" data-lane="2">
+                <span className="guide-hero-metric-value">{TOOLSET_TABLE.length}</span>
+                <span className="guide-hero-metric-label">工具集预设</span>
+              </div>
+            </div>
+
+            <div className="guide-hero-read">
+              <div className="guide-hero-read-head">
+                <p className="eyebrow">本页导读</p>
+                <span className="guide-hero-read-hint">跳转到章节</span>
+              </div>
+              <nav className="guide-hero-read-grid" aria-label="章节快捷入口">
+                {(TOC_GROUPS[0]?.items ?? []).map((item, idx) => (
+                  <a
+                    key={item.id}
+                    href={`#${item.id}`}
+                    className="guide-hero-read-link"
+                    data-lane={idx % 4}
+                  >
+                    <span className="guide-hero-read-idx" aria-hidden>
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
+                    <span className="guide-hero-read-label">{item.label}</span>
+                  </a>
+                ))}
+              </nav>
+              <div className="guide-hero-dim-row" aria-label="对比维度一览">
+                {DIMENSIONS.slice(0, 6).map((d, idx) => (
+                  <a
+                    key={d.id}
+                    href={`#${d.id}`}
+                    className="guide-hero-dim-chip"
+                    data-lane={idx % 4}
+                  >
+                    {d.label}
+                  </a>
+                ))}
+                {DIMENSIONS.length > 6 && (
+                  <span className="guide-hero-dim-more">+{DIMENSIONS.length - 6}</span>
+                )}
+              </div>
+            </div>
           </aside>
         </div>
       </header>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLayoutEffect, useRef, useState } from "react";
 import { BookOpen, Compass, FolderOpen, Settings, Zap } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -16,6 +17,35 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isArena = pathname.startsWith("/arena");
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [indicator, setIndicator] = useState({ left: 0, width: 0, ready: false });
+
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const update = () => {
+      const active = track.querySelector<HTMLElement>('.seg-tab[data-active="true"]');
+      if (!active) {
+        setIndicator((prev) => ({ ...prev, ready: false }));
+        return;
+      }
+      setIndicator({
+        left: active.offsetLeft,
+        width: active.offsetWidth,
+        ready: true,
+      });
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(track);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [pathname]);
 
   return (
     <div
@@ -35,7 +65,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
 
           <nav className="shell-nav" aria-label="主导航">
-            <div className="shell-nav-track">
+            <div className="shell-nav-track" ref={trackRef}>
+              <span
+                className="shell-nav-indicator"
+                data-ready={indicator.ready ? "true" : undefined}
+                style={{
+                  transform: `translateX(${indicator.left}px)`,
+                  width: indicator.width,
+                }}
+                aria-hidden
+              />
               {NAV.map(({ href, label, icon: Icon }) => {
                 const active = pathname.startsWith(href);
                 return (

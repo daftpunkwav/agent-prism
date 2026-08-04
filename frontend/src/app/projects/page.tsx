@@ -93,11 +93,11 @@ export default function ProjectsPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid gap-3 stagger-children">
           {projects.map((project, idx) => (
             <article
               key={project.id}
-              className="panel-surface p-5 relative overflow-hidden group"
+              className="panel-surface panel-lift p-5 relative overflow-hidden group"
               style={{
                 ["--lane" as string]: `var(--spectrum-${(idx % 4) + 1})`,
               }}

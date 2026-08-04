@@ -296,17 +296,15 @@ function ComparisonReport({ columns }: { columns: Record<string, ColumnState> })
 
 function ColumnPlaceholder({ name, lane }: { name: string; lane: number }) {
   return (
-    <div className="column-card opacity-70 h-full" data-lane={lane % 4}>
+    <div className="column-card column-card-placeholder h-full" data-lane={lane % 4}>
       <div className="column-header">
         <span className="font-semibold text-sm">{name}</span>
       </div>
-      <div className="flex flex-1 items-center justify-center p-6">
-        <div className="empty-state !py-6">
-          <div className="empty-state-icon">
-            <Zap className="h-5 w-5" />
-          </div>
-          <p className="text-xs">等待运行</p>
-        </div>
+      <div className="flex flex-1 flex-col justify-center gap-2.5 p-5">
+        <div className="shimmer h-2.5 w-[72%]" aria-hidden />
+        <div className="shimmer h-2.5 w-[48%]" aria-hidden />
+        <div className="shimmer h-2.5 w-[84%]" aria-hidden />
+        <p className="mt-3 text-center text-[11px] text-muted-foreground">等待运行</p>
       </div>
     </div>
   );
@@ -330,7 +328,11 @@ function ColumnCard({
   onUseAsSeed?: () => void;
 }) {
   return (
-    <div className="column-card h-full min-h-0 flex flex-col" data-lane={lane % 4}>
+    <div
+      className="column-card h-full min-h-0 flex flex-col"
+      data-lane={lane % 4}
+      data-running={running && !col.metrics ? "true" : undefined}
+    >
       <div className="column-header shrink-0">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -1433,9 +1435,11 @@ export function ArenaClient() {
 
           <div className="arena-stage-body">
             {mainTab === "results" ? (
-              renderResultsTab()
+              <div key="results" className="arena-tab-pane fade-in h-full min-h-0">
+                {renderResultsTab()}
+              </div>
             ) : (
-              <div className="arena-stage-scroll">
+              <div key={mainTab} className="arena-stage-scroll arena-tab-pane fade-in">
                 {mainTab === "report" && hasMetrics && (
                   <div className="space-y-4">
                     <ComparisonReport columns={columns} />
