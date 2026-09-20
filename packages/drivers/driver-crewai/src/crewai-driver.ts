@@ -155,8 +155,18 @@ async function* runWorker(
     if (isAssistantMessage(item)) followUp = item;
     else yield item;
   }
-  if (followUp !== null) messages.push(followUp);
-  return { text: followUp?.content ?? response.content, usedTools: true };
+  if (followUp === null) return { text: response.content, usedTools: true };
+  messages.push(followUp);
+  // A follow-up that wants more tools must have them executed here: pushing an
+  // assistant message with tool calls but no tool results makes the transcript
+  // invalid and the next LLM call fails with a provider 400.
+  if ((followUp.toolCalls ?? []).length > 0) {
+    for await (const item of executeToolCalls(context, followUp, question, priorToolNames, stats)) {
+      if (isToolMessage(item)) messages.push(item);
+      else yield item;
+    }
+  }
+  return { text: followUp.content, usedTools: true };
 }
 
 /** Runs one manager delegation call (hierarchical process); yields events, returns the raw reply. */

@@ -115,6 +115,27 @@ describe("CrewAIDriver sequential process", () => {
     // would keep calling tools until the 60-step budget.
     expect(complete?.metrics?.steps).toBe(18);
   });
+
+  it("executes a follow-up turn's tool calls so the transcript never carries dangling tool calls", async () => {
+    const llm = stubLlm(
+      [],
+      [
+        { text: "checking", toolCalls: [{ id: "c1", name: "read", args: {} }] },
+        { text: "one more look", toolCalls: [{ id: "c2", name: "read", args: {} }] },
+        { text: "brief is done" },
+        { text: "final answer: verified" },
+      ],
+    );
+    const events = await collect(new CrewAIDriver(), contextWith(llm));
+    // Both the opening turn's and the follow-up turn's read calls were executed:
+    // an unexecuted follow-up tool call would leave an assistant message with
+    // tool calls and no tool results, and the next LLM call would 400.
+    const actions = events.filter((event) => event.type === "action");
+    expect(actions).toHaveLength(2);
+    const complete = events.find((event) => event.type === "complete");
+    expect(complete?.metrics?.success).toBe(true);
+    expect(complete?.metrics?.tool_calls).toBe(2);
+  });
 });
 
 describe("CrewAIDriver hierarchical process", () => {
