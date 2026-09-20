@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { PIPELINE_BANNER_PREFIX } from "@agentprism/contracts";
 import type { ArenaEvent } from "@agentprism/contracts";
-import { mergeEvents } from "@agentprism/arena-view";
+import { actorTagOf, mergeEvents } from "@agentprism/arena-view";
 
 /** Builds a minimal event carrying step/turn. */
 function ev(type: ArenaEvent["type"], step: number, extra: Partial<ArenaEvent> = {}): ArenaEvent {
@@ -180,3 +180,12 @@ describe("mergeEvents event merging", () => {
   });
 });
 
+describe("actorTagOf", () => {
+  it("resolves autogen speaker lines, crewai task dispatches, and bracket tags", () => {
+    expect(actorTagOf("reflect", "[AutoGen group chat] speaker: coder")).toBe("AutoGen coder");
+    expect(actorTagOf("reflect", "[CrewAI crew] task 1/3 → Researcher: Investigate.")).toBe("CrewAI Researcher");
+    expect(actorTagOf("thought_delta", "[AutoGen reviewer] critique body")).toBe("AutoGen reviewer");
+    expect(actorTagOf("action", "[AutoGen coder]")).toBeNull();
+    expect(actorTagOf("thought", "no label here")).toBeNull();
+  });
+});
