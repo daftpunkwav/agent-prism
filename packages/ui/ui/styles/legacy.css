@@ -229,7 +229,9 @@
 .data-table-wrap {
   border: 1px solid var(--border);
   border-radius: 0;
-  overflow: hidden;
+  /* Scroll rather than clip: an N-column compare table can exceed the container
+     width, and hidden overflow made the trailing columns unreachable. */
+  overflow-x: auto;
   background: var(--card);
   box-shadow: var(--shadow-xs);
 }

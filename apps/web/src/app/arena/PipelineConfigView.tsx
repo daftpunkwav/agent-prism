@@ -129,7 +129,7 @@ export function PipelineConfigCompare({
                         <td
                           key={`${key}-${parsed[index]?.label ?? index}`}
                           className={
-                            "text-center font-mono text-[11px] " +
+                            "text-center font-mono text-[11px] wrap-anywhere " +
                             (value === ""
                               ? "text-muted-foreground"
                               : differs
