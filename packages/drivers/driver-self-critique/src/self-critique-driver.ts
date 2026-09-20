@@ -38,12 +38,14 @@ import {
   type AgentExecutionContext,
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
-import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName } from "@agentprism/driver-registry";
+import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, stepBudgetFor } from "@agentprism/driver-registry";
 
 /** Critic verdict: numeric progress score plus a one-line next action. */
 interface CriticVerdict {
   score: number;
   note: string;
+  /** Whether the next action is the DONE token itself, so a run may end on the critic's word. */
+  done: boolean;
 }
 
 /** Maximum critic-forced redirections per run (bounded so a harsh critic cannot loop forever). */
@@ -60,6 +62,19 @@ export function criticBudgetFor(reasoning: string): number {
 /** Score below which the critic redirects the executor. */
 export const CRITIC_REDIRECT_BELOW = 4;
 
+/**
+ * Whether the critic's next action is the DONE token itself.
+ *
+ * The protocol asks for `NEXT: <one concrete next action, or DONE>`, so only a
+ * leading DONE ends a run. A substring test would also match prose that merely
+ * mentions the word ("the script is half done") and stop a low-scoring attempt
+ * that still had budget to redirect.
+ */
+function criticDeclaresDone(note: string): boolean {
+  const nextAction = /\bNEXT:\s*(.*)$/i.exec(note)?.[1] ?? note;
+  return /^DONE\b/i.test(nextAction.trim());
+}
+
 /** Parses `SCORE: <0-10>` plus a trailing note from the critic reply; null when malformed. */
 export function parseCriticVerdict(text: string): CriticVerdict | null {
   const match = text.match(/SCORE:\s*(10|[0-9])/i);
@@ -71,7 +86,7 @@ export function parseCriticVerdict(text: string): CriticVerdict | null {
     .filter((line) => line !== "" && !/^SCORE:/i.test(line))
     .slice(0, 2)
     .join(" ");
-  return { score, note: note === "" ? "(no note)" : note };
+  return { score, note: note === "" ? "(no note)" : note, done: criticDeclaresDone(note) };
 }
 
 async function criticPass(
@@ -123,7 +138,7 @@ export class SelfCritiqueDriver implements AgentDriver {
       pipeline: label,
       step: 0,
       content:
-        `${PIPELINE_BANNER_PREFIX.self_critique} react+critic · prompt=${config.prompt_profile} · ` +
+        `${PIPELINE_BANNER_PREFIX.self_critique} react+critic · reasoning=${config.reasoning} · prompt=${config.prompt_profile} · ` +
         `context=${config.context} · harness=${config.harness} · toolset=${config.toolset} · ` +
         `mcp=${String((config as Record<string, unknown>)["mcp_policy"] ?? "off")} · ` +
         `skill=${String((config as Record<string, unknown>)["skill_policy"] ?? "on_demand")} · ` +
@@ -133,7 +148,7 @@ export class SelfCritiqueDriver implements AgentDriver {
     });
 
     const messages: LlmMessage[] = buildInitialMessages(system, user, history);
-    const maxSteps = Number.isFinite(config.max_steps) ? Math.max(1, Math.trunc(config.max_steps)) : 1;
+    const maxSteps = stepBudgetFor(config.max_steps);
     const maxRedirects = criticBudgetFor(config.reasoning);
     let redirects = 0;
 
@@ -165,7 +180,7 @@ export class SelfCritiqueDriver implements AgentDriver {
       if ((response.toolCalls ?? []).length === 0) {
         // Tool-free turn: critic decides whether the run is done or drifting.
         const verdict = await criticPass(context, messages, retrieveSnippets);
-        if (verdict === null || verdict.score >= CRITIC_REDIRECT_BELOW || /DONE/i.test(verdict.note)) {
+        if (verdict === null || verdict.done || verdict.score >= CRITIC_REDIRECT_BELOW) {
           if (verdict !== null) {
             yield eventOf({ type: "reflect", pipeline: label, step: streamStep, content: `[Critic score ${verdict.score}] ${verdict.note}`, workspace: workspaceName });
           }
@@ -224,7 +239,7 @@ export class SelfCritiqueDriver implements AgentDriver {
       const verdict = await criticPass(context, messages, retrieveSnippets);
       if (verdict === null) continue;
       yield eventOf({ type: "reflect", pipeline: label, step: stats.step, content: `[Critic score ${verdict.score}] ${verdict.note}`, workspace: workspaceName });
-      if (verdict.score < CRITIC_REDIRECT_BELOW && redirects < maxRedirects && !/DONE/i.test(verdict.note)) {
+      if (verdict.score < CRITIC_REDIRECT_BELOW && redirects < maxRedirects && !verdict.done) {
         redirects += 1;
         const redirect = `[Critic redirect ${redirects}/${maxRedirects} — score ${verdict.score}] ${verdict.note}`;
         messages.push({ role: "user", content: redirect });

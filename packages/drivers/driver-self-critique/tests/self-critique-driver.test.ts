@@ -28,7 +28,7 @@ function stubLlm(invokes: string[], streams: Array<{ text?: string; toolCalls?: 
   };
 }
 
-function contextWith(llm: LlmAdapter, reasoning: string = "react"): AgentExecutionContext {
+function contextWith(llm: LlmAdapter, reasoning: string = "react", maxSteps: number = 6): AgentExecutionContext {
   const registry = new MapToolRegistry();
   registry.register({
     name: "read",
@@ -41,7 +41,7 @@ function contextWith(llm: LlmAdapter, reasoning: string = "react"): AgentExecuti
   const workspace = { name: "ws", cwd: () => "/tmp/ws", fs: {} } as unknown as AgentExecutionContext["workspace"];
   return {
     identity: { agentId: "a", runId: "r" },
-    config: PipelineConfigSchema.parse({ label: "col", harness: "bare", max_steps: 6, reasoning }),
+    config: PipelineConfigSchema.parse({ label: "col", harness: "bare", max_steps: maxSteps, reasoning }),
     question: "q",
     history: [],
     turn: 1,
@@ -67,9 +67,21 @@ async function collect(ctx: AgentExecutionContext): Promise<ArenaEvent[]> {
 
 describe("parseCriticVerdict", () => {
   it("parses scores and notes, rejecting malformed replies", () => {
-    expect(parseCriticVerdict("SCORE: 8\nNEXT: DONE")).toEqual({ score: 8, note: "NEXT: DONE" });
-    expect(parseCriticVerdict("score: 3\nnext: retry the write")).toEqual({ score: 3, note: "next: retry the write" });
+    expect(parseCriticVerdict("SCORE: 8\nNEXT: DONE")).toEqual({ score: 8, note: "NEXT: DONE", done: true });
+    expect(parseCriticVerdict("score: 3\nnext: retry the write")).toEqual({
+      score: 3,
+      note: "next: retry the write",
+      done: false,
+    });
     expect(parseCriticVerdict("looks fine")).toBeNull();
+  });
+
+  it("reads DONE only as the next action, never as a word inside prose", () => {
+    expect(parseCriticVerdict("SCORE: 2\nNEXT: the script is half done")?.done).toBe(false);
+    expect(parseCriticVerdict("SCORE: 2\nNEXT: rewrite the DONE flag in main()")?.done).toBe(false);
+    expect(parseCriticVerdict("SCORE: 5\nDONE")?.done).toBe(true);
+    expect(parseCriticVerdict("SCORE: 5\nNEXT: DONE, then summarize")?.done).toBe(true);
+    expect(parseCriticVerdict("SCORE: 5")?.done).toBe(false);
   });
 });
 
@@ -89,6 +101,15 @@ describe("SelfCritiqueDriver", () => {
     expect(events.find((e) => e.type === "complete")?.metrics?.success).toBe(true);
   });
 
+  it("keeps looping after a tool batch when max_steps is the unlimited sentinel", async () => {
+    const llm = stubLlm(["SCORE: 9\nNEXT: DONE"], [
+      { text: "writing the script", toolCalls: [{ id: "c1", name: "read", args: {} }] },
+      { text: "final answer" },
+    ]);
+    const events = await collect(contextWith(llm, "react", -1));
+    expect(events.filter((e) => e.type === "step_start")).toHaveLength(2);
+  });
+
   it("redirects on low scores within budget", async () => {
     const llm = stubLlm(
       ["SCORE: 2\nNEXT: actually write the file", "SCORE: 9\nNEXT: DONE"],
@@ -101,6 +122,17 @@ describe("SelfCritiqueDriver", () => {
     const verdicts = events.filter((e) => e.type === "reflect").map((e) => e.content);
     expect(verdicts.some((c) => c.includes("Critic redirect 1/2"))).toBe(true);
     expect(events.some((e) => e.type === "complete")).toBe(true);
+  });
+
+  it("redirects a low-scoring tool-free turn whose note merely mentions being done", async () => {
+    const llm = stubLlm(
+      ["SCORE: 2\nNEXT: the task is half done", "SCORE: 9\nNEXT: DONE"],
+      [{ text: "no work yet" }, { text: "final answer" }],
+    );
+    const events = await collect(contextWith(llm));
+    const verdicts = events.filter((e) => e.type === "reflect").map((e) => e.content);
+    expect(verdicts.some((c) => c.includes("Critic redirect 1/2"))).toBe(true);
+    expect(events.filter((e) => e.type === "step_start")).toHaveLength(2);
   });
 });
 

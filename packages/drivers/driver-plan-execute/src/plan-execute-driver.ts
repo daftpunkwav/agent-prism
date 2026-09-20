@@ -35,7 +35,7 @@ import {
   type AgentExecutionContext,
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
-import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, parseScoreVerdict, totWidth } from "@agentprism/driver-registry";
+import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, parseScoreVerdict, stepBudgetFor, totWidth } from "@agentprism/driver-registry";
 
 /** Executor state: consecutive tool-free turns plus remaining replan budgets. */
 interface ExecutorState {
@@ -219,7 +219,7 @@ export class PlanExecuteDriver implements AgentDriver {
       pipeline: label,
       step: 0,
       content:
-        `${PIPELINE_BANNER_PREFIX.plan_execute} planner+executor · prompt=${config.prompt_profile} · ` +
+        `${PIPELINE_BANNER_PREFIX.plan_execute} planner+executor · reasoning=${config.reasoning} · prompt=${config.prompt_profile} · ` +
         `context=${config.context} · harness=${config.harness} · toolset=${config.toolset} · ` +
         `mcp=${String((config as Record<string, unknown>)["mcp_policy"] ?? "off")} · ` +
         `skill=${String((config as Record<string, unknown>)["skill_policy"] ?? "on_demand")} · ` +
@@ -245,7 +245,7 @@ export class PlanExecuteDriver implements AgentDriver {
       yield eventOf({ type: "reflect", pipeline: label, step: 0, content: `[Plan-Execute plan]\n${plan}`, workspace: workspaceName });
     }
 
-    const maxSteps = Number.isFinite(config.max_steps) ? Math.max(1, Math.trunc(config.max_steps)) : 1;
+    const maxSteps = stepBudgetFor(config.max_steps);
     while (stats.turns < maxSteps) {
       let response: LlmAssistantMessage | null = null;
       for await (const item of streamExecutorTurn(context, messages, stats, retrieveSnippets)) {
