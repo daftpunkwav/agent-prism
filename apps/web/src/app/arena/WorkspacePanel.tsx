@@ -248,8 +248,8 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
 
   useEffect(() => {
     if (selectedFile) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- loadFile is a shared async loader;
-      // its synchronous setLoading trips a rule false positive; actual data updates all happen after await — no synchronous setState semantics
+      // loadFile is a shared async loader; its synchronous setLoading trips a rule
+      // false positive, since the real data updates all happen after an await.
       loadFile(selectedFile);
     }
   }, [selectedFile, loadFile]);

@@ -9,7 +9,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import type { ArenaEvent, ArenaMeta } from "@agentprism/client";
 import {
   answerArenaQuestion,
-  fetchProvider,
   streamArenaRun,
 } from "@agentprism/client";
 import { I18nProvider } from "@/i18n/I18nProvider";

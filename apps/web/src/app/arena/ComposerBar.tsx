@@ -139,7 +139,6 @@ export function ComposerBar({
     }
     return shuffled.slice(0, SUGGEST_COUNT);
     // suggestSeed re-draws a fresh hand on every focus
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pool, suggestSeed]);
 
   const query = question.trim();

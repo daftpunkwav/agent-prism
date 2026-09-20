@@ -9,9 +9,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import type { BuilderCatalog, BuilderComposition } from "@agentprism/client";
 import {
   createBuilderSession,
-  fetchBuilderCatalog,
   fetchBuilderSessionDetail,
-  fetchBuilderSessions,
   patchBuilderComposition,
   streamBuilderChat,
 } from "@agentprism/client";

@@ -5,7 +5,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { fetchColumnLogs, type ColumnLogs } from "@agentprism/client";
 import type { ColumnState } from "@agentprism/arena-view";
 import { I18nProvider } from "@/i18n/I18nProvider";

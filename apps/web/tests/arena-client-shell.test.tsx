@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ArenaMeta } from "@agentprism/client";
-import { fetchArenaMeta, fetchProvider, fetchTemplates } from "@agentprism/client";
+import { fetchArenaMeta } from "@agentprism/client";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
 import { ArenaClient } from "../src/app/arena/ArenaClient.js";

@@ -56,7 +56,6 @@ export function QuestionSuggest({ anchorRef, items, activeIndex, ariaLabel, onPi
     if (left + popW > window.innerWidth - 8) left = window.innerWidth - 8 - popW;
     if (left < 8) left = 8;
     if (left !== pos.left || top !== pos.top) setPos({ left, top, width: pos.width });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos]);
 
   // Dismiss on outside pointer press, any scroll, or resize (fixed positioning drifts).
