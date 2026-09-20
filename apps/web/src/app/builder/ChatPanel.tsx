@@ -34,6 +34,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { RunAttachment } from "@agentprism/client";
+import { useFollowScroll } from "@/hooks/useFollowScroll";
 import { groupPhases, type DisplaySegment, type PhaseCategory, type PhaseGroup } from "@agentprism/arena-view";
 import { MarkdownBlock } from "@/components/MarkdownBlock";
 import { useT } from "@/i18n/useT";
@@ -456,35 +457,15 @@ export function ChatPanel({ history, hasSession, running, liveSegments, onSend, 
   }, [attachments]);
   const [attachError, setAttachError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  // Auto-follow owns the scroll position only while the user sits at the bottom;
-  // scrolling up hands control to the user until they return to the tail.
-  const followRef = useRef(true);
-  const [showJump, setShowJump] = useState(false);
-
   // Streamed text grows the last segment without changing segment counts, so the
   // scroll signature must include the live text length, not just list lengths.
   const liveTextLength = liveSegments.reduce((sum, segment) => sum + segment.text.length, 0);
-  useEffect(() => {
-    const node = scrollRef.current;
-    if (node !== null && followRef.current) node.scrollTop = node.scrollHeight;
-  }, [history.length, liveSegments.length, liveTextLength, running]);
-
-  const handleScroll = () => {
-    const node = scrollRef.current;
-    if (node === null) return;
-    const atBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
-    followRef.current = atBottom;
-    setShowJump(!atBottom);
-  };
-
-  const jumpToBottom = () => {
-    const node = scrollRef.current;
-    if (node === null) return;
-    followRef.current = true;
-    setShowJump(false);
-    node.scrollTop = node.scrollHeight;
-  };
+  const { scrollRef, detached: showJump, handleScroll, jumpToBottom } = useFollowScroll([
+    history.length,
+    liveSegments.length,
+    liveTextLength,
+    running,
+  ]);
 
   const submit = () => {
     const message = draft.trim();

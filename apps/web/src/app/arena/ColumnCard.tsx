@@ -10,11 +10,12 @@
 
 "use client";
 
-import { Square, FolderOpen, FlaskConical, Pause, Loader2 } from "lucide-react";
+import { Square, FolderOpen, FlaskConical, Pause, Loader2, ArrowDown } from "lucide-react";
 import { TokenStatsPanel } from "@agentprism/ui";
 import { TraceView } from "./TraceView";
 import { WorkspacePanel } from "./WorkspacePanel";
 import { AskUserModal, type PendingAskBatch } from "@/components/AskUserModal";
+import { useFollowScroll } from "@/hooks/useFollowScroll";
 import { useT } from "@/i18n/useT";
 import { memo, useState } from "react";
 import type { ColumnState } from "@agentprism/arena-view";
@@ -92,6 +93,10 @@ export const ColumnCard = memo(function ColumnCard({
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const stopped = isColumnStopped(col);
   const columnRunning = running && !col.metrics && !stopped;
+  // Per-column auto-follow: state lives in this card instance, so columns never
+  // affect each other's scrolling. Every streamed delta is a new event element,
+  // so the array length is a sufficient growth signal.
+  const { scrollRef, detached, handleScroll, jumpToBottom } = useFollowScroll([col.events.length, columnRunning]);
   return (
     <div
       className="column-card h-full min-h-0 flex flex-col"
@@ -195,13 +200,21 @@ export const ColumnCard = memo(function ColumnCard({
           )}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
-        <TraceView
-          events={col.events}
-          running={columnRunning}
-          colorIndex={lane}
-          frameworkId={col.frameworkId}
-        />
+      <div className="relative flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain" ref={scrollRef} onScroll={handleScroll}>
+          <TraceView
+            events={col.events}
+            running={columnRunning}
+            colorIndex={lane}
+            frameworkId={col.frameworkId}
+          />
+        </div>
+        {detached && (
+          <button type="button" className="arena-jump-bottom" onClick={jumpToBottom}>
+            <ArrowDown size={12} aria-hidden />
+            {t("arena.results.jumpBottom")}
+          </button>
+        )}
       </div>
       {workspaceOpen && col.workspace && (
         <div className="column-workspace border-t border-border shrink-0">

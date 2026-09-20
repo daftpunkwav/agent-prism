@@ -116,6 +116,7 @@ export const arena = {
     stoppedShort: "暂停",
     stoppedTitle: "该列已被手动暂停，其他列继续运行",
     stoppedHint: "该列已手动暂停，对比时以已产出内容为准。",
+    jumpBottom: "回到底部",
     stopColumnTitle: "仅停止这一列（其他列继续）",
     stopping: "停止中…",
     waitingRun: "等待运行",

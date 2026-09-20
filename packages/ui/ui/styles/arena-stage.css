@@ -331,6 +331,36 @@
   flex-shrink: 0;
 }
 
+/* Per-column jump-to-bottom affordance while the user holds scroll position
+   (builder ChatPanel parity): floating chip anchored inside the trace column. */
+.arena-jump-bottom {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.75rem;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.55rem;
+  padding: 0 0.55rem;
+  border-radius: 0;
+  border: 1px solid var(--ring);
+  background: color-mix(in srgb, var(--muted) 78%, transparent);
+  backdrop-filter: blur(8px);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  animation: fade-up var(--dur-fast) var(--ease-out) both;
+  transition: transform var(--dur-fast) ease, box-shadow var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.arena-jump-bottom:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-sm);
+  color: var(--foreground);
+}
+
 /* Column identity: the lane color owns the card's top rail, header underline, status
    dot and trace rail — one hue per agent across tiles, cards and diff views. */
 .column-title {

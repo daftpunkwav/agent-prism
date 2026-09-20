@@ -117,6 +117,7 @@ export const arena = {
     stoppedShort: "Paused",
     stoppedTitle: "This column was manually paused; other columns keep running",
     stoppedHint: "This column was manually paused; the comparison uses whatever it produced.",
+    jumpBottom: "Jump to bottom",
     stopColumnTitle: "Stop only this column (others keep running)",
     stopping: "Stopping…",
     waitingRun: "Waiting to run",
