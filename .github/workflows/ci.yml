@@ -36,9 +36,61 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # Builds packages, then typechecks packages, apps, and the test projects.
-      - name: Typecheck
-        run: pnpm typecheck
+      # Environment snapshot, emitted as an annotation because the raw job log
+      # cannot be read through the API without repository admin rights.
+      - name: Environment
+        shell: pwsh
+        run: |
+          $info = @(
+            "node=$(node --version)"
+            "pnpm=$(pnpm --version)"
+            "SHELL=$env:SHELL"
+            "ComSpec=$env:ComSpec"
+            "shell-emulator=$(pnpm config get shell-emulator 2>&1)"
+            "cwd=$(Get-Location)"
+          ) -join ' | '
+          Write-Output $info
+          Write-Output "::notice title=CI environment::$info"
+
+      # Builds the publishable packages (everything except the two apps), then
+      # typechecks packages, apps, and the test projects. Each stage is its own
+      # step so a failure names the stage that broke, and the failing tail is
+      # re-emitted as an annotation for the same reason as the snapshot above.
+      - name: Build packages
+        shell: pwsh
+        run: |
+          $output = pnpm -r --filter=!@agentprism/web --filter=!@agentprism/server build 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          Write-Output $output
+          if ($code -ne 0) {
+            $tail = (($output -split "`r?`n" | Where-Object { $_.Trim() -ne '' }) | Select-Object -Last 8) -join ' || '
+            Write-Output "::error title=Build packages failed::$($tail -replace '%', '%25')"
+            exit $code
+          }
+
+      - name: Typecheck packages and apps
+        shell: pwsh
+        run: |
+          $output = pnpm -r typecheck 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          Write-Output $output
+          if ($code -ne 0) {
+            $tail = (($output -split "`r?`n" | Where-Object { $_.Trim() -ne '' }) | Select-Object -Last 8) -join ' || '
+            Write-Output "::error title=Typecheck packages and apps failed::$($tail -replace '%', '%25')"
+            exit $code
+          }
+
+      - name: Typecheck tests
+        shell: pwsh
+        run: |
+          $output = pnpm typecheck:tests 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          Write-Output $output
+          if ($code -ne 0) {
+            $tail = (($output -split "`r?`n" | Where-Object { $_.Trim() -ne '' }) | Select-Object -Last 8) -join ' || '
+            Write-Output "::error title=Typecheck tests failed::$($tail -replace '%', '%25')"
+            exit $code
+          }
 
       # Next.js ESLint over the web app (fails on errors; warnings stay advisory).
       - name: Web lint
@@ -93,26 +145,53 @@ jobs:
       - name: Build
         run: pnpm -r build
 
-      - name: Start server
+      # Boot, probe, and tear down inside a single step. The runner tears down the
+      # process tree when a step ends, so a host started in one step is already
+      # gone by the next one -- which is exactly how this probe used to fail with
+      # "unreachable" while the boot log showed a healthy listener.
+      - name: Smoke
         shell: pwsh
         run: |
           $env:BACKEND_HOST = "127.0.0.1"
           $env:BACKEND_PORT = "8291"
-          Start-Process -FilePath "node" `
+          $env:SMOKE_PORT = "8291"
+          $env:SMOKE_TIMEOUT_MS = "60000"
+
+          $proc = Start-Process -FilePath "node" `
             -ArgumentList "apps/server/dist/main.js" `
             -RedirectStandardOutput "server.log" `
             -RedirectStandardError "server.err.log" `
-            -NoNewWindow
+            -NoNewWindow -PassThru
 
-      - name: Smoke
-        env:
-          SMOKE_PORT: "8291"
-          SMOKE_TIMEOUT_MS: "60000"
-        run: node scripts/smoke.mjs
+          $code = 1
+          try {
+            $output = node scripts/smoke.mjs 2>&1 | Out-String
+            $code = $LASTEXITCODE
+            Write-Output $output
+          } finally {
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
 
-      - name: Server logs
-        if: failure()
-        shell: pwsh
-        run: |
-          if (Test-Path server.log) { Write-Output "--- stdout ---"; Get-Content server.log }
-          if (Test-Path server.err.log) { Write-Output "--- stderr ---"; Get-Content server.err.log }
+            $parts = @()
+            foreach ($pair in @(@('server.log', 'STDOUT'), @('server.err.log', 'STDERR'))) {
+              if (Test-Path $pair[0]) {
+                $body = (((Get-Content $pair[0] -Raw) -replace "`r?`n", " | ")).Trim()
+                if ($body -ne '') { $parts += "$($pair[1]): $body" }
+              }
+            }
+            if ($parts.Count -eq 0) { $parts += "no server log files in $(Get-Location)" }
+            $joined = $parts -join ' ### '
+            if ($joined.Length -gt 1200) { $joined = $joined.Substring(0, 1200) }
+            Write-Output "--- server logs ---"
+            Write-Output $joined
+
+            # Re-emitted as an annotation: the raw job log needs repository admin
+            # rights to read through the API, annotations do not.
+            if ($code -ne 0) {
+              Write-Output "::error title=Server logs::$($joined -replace '%', '%25')"
+            }
+          }
+
+          if ($code -ne 0) {
+            Write-Output "::error title=Smoke failed::exit code $code"
+            exit $code
+          }
