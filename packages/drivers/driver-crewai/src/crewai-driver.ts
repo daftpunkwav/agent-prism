@@ -36,6 +36,7 @@ import {
   eventOf,
   executeToolCalls,
   formatCapabilityPluginIds,
+  stepBudgetFor,
 } from "@agentprism/driver-registry";
 import {
   MANAGER_INSTRUCTION,
@@ -235,11 +236,7 @@ export class CrewAIDriver implements AgentDriver {
       workspace: workspaceName,
     });
 
-    const maxSteps = Number.isFinite(config.max_steps)
-      ? config.max_steps < 0
-        ? Number.POSITIVE_INFINITY
-        : Math.max(1, Math.trunc(config.max_steps))
-      : 1;
+    const maxSteps = stepBudgetFor(config.max_steps);
     const messages: LlmMessage[] = buildInitialMessages(system, user, history);
     const taskTurnCap = taskTurnCapFor(config.reasoning);
 

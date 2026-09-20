@@ -24,7 +24,7 @@ import {
 } from "@agentprism/harness";
 import { afterLlm, createReasoningState, isFinished } from "./reasoning-state.js";
 import { runSelfConsistencyLoop } from "./self-consistency.js";
-import { eventOf, formatCapabilityPluginIds, totWidth } from "@agentprism/driver-registry";
+import { eventOf, formatCapabilityPluginIds, stepBudgetFor, totWidth } from "@agentprism/driver-registry";
 import { executeToolCalls, collectPriorToolNames } from "./tool-batch.js";
 import { streamLlmTurn } from "./stream-turn.js";
 
@@ -71,16 +71,9 @@ export class NativeDriver implements AgentDriver {
     });
 
     const messages: LlmMessage[] = buildInitialMessages(system, user, history);
-    // Clamp defensively: NaN max_steps would otherwise skip the loop and report success with zero work.
-    // max_steps < 0 means "no step budget": the contract sentinel is -1, but any
-    // negative value is treated the same (persisted configs may arrive
-    // unvalidated), so the loop runs until the model stops calling tools, the
-    // run is aborted, or a call times out.
-    const maxSteps = Number.isFinite(config.max_steps)
-      ? config.max_steps < 0
-        ? Number.POSITIVE_INFINITY
-        : Math.max(1, Math.trunc(config.max_steps))
-      : 1;
+    // An unlimited budget keeps the loop running until the model stops calling
+    // tools, the run is aborted, or a call times out.
+    const maxSteps = stepBudgetFor(config.max_steps);
 
     if (config.reasoning === "self_consistency") {
       // N independent react attempts (fresh message lists) then a majority vote;
