@@ -278,17 +278,13 @@ const TraceStep = memo(function TraceStep({
         style={{ borderLeftColor: interim ? "var(--border)" : accentColor }}
       >
         <span className="trace-tag flex items-center gap-1.5 flex-wrap">
-          {interim ? (
-            <span className="trace-kind-badge" data-kind="interim">
-              <Lightbulb className="h-3 w-3" aria-hidden />
-              {t("arena.trace.interimAnswer")}
-            </span>
-          ) : (
-            <span className="trace-kind-badge" data-kind={seg.final ? "final" : "answer"} style={{ borderColor: `color-mix(in srgb, ${accentColor} 45%, transparent)`, color: accentColor }}>
-              <Lightbulb className="h-3 w-3" aria-hidden />
-              {seg.final ? t("arena.trace.finalReply") : t("arena.trace.answer")}
-            </span>
-          )}
+          <span className="trace-kind-badge" data-kind={interim ? "interim" : seg.final ? "final" : "answer"} style={{ borderColor: interim ? undefined : `color-mix(in srgb, ${accentColor} 45%, transparent)`, color: interim ? undefined : accentColor }}>
+            <Lightbulb className="h-3 w-3" aria-hidden />
+            {/* One stable label for every model-output segment: multi-turn agents
+                produce many turns, and a "final" badge that keeps jumping between
+                segments reads as flicker, not as information. */}
+            {t("arena.trace.output")}
+          </span>
           <span className="font-mono text-muted-foreground">{t("arena.trace.stepAnswer", { step: seg.step })}</span>
           {streaming && <span className="ml-1 text-muted-foreground">{t("arena.trace.thinkingStreaming")}<span className="trace-cursor" /></span>}
         </span>

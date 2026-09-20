@@ -122,16 +122,18 @@ describe("TraceView", () => {
     expect(screen.getByText(getCatalog("en").arena.trace.modelCallStep.replace("{step}", "2"))).toBeDefined();
   });
 
-  it("marks every answer except the last as interim", () => {
+  it("labels every model-output segment with the single stable output badge", () => {
     renderTrace({
       events: [
         { type: "thought", content: "first pass", turn: 1, step: 1 },
         { type: "thought", content: "settled final text", turn: 1, step: 2 },
       ] as unknown as ArenaEvent[],
     });
-    // Only the last settled answer is final; earlier ones read as interim.
-    expect(screen.getByText(getCatalog("en").arena.trace.interimAnswer)).toBeDefined();
-    expect(screen.getByText(getCatalog("en").arena.trace.finalReply)).toBeDefined();
+    // Multi-turn agents produce many output segments; the badge must stay
+    // stable ("Output") instead of flickering between interim/final labels.
+    // The interim visual de-emphasis still distinguishes earlier segments.
+    expect(screen.getAllByText(getCatalog("en").arena.trace.output)).toHaveLength(2);
+    expect(screen.getByText("settled final text")).toBeDefined();
   });
 
   it("shows the waiting row while running with no events", () => {
