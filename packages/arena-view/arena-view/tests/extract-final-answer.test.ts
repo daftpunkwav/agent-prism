@@ -72,6 +72,20 @@ describe("extractFinalAnswer final answer extraction", () => {
     expect(extractFinalAnswer(events)).toBe("observation two");
   });
 
+  it("a tool-only round's empty thought_end keeps the previous text sequence", () => {
+    const events = [
+      ev({ type: "thought_delta", content: "I will create the file now." }),
+      ev({ type: "thought_end" }),
+      ev({ type: "action", tool: "write" }),
+      ev({ type: "observation", result: "Wrote: hello.txt" }),
+      // A pure tool call round: the model emits no text, the sequence closes empty.
+      ev({ type: "thought_end" }),
+      ev({ type: "action", tool: "read" }),
+      ev({ type: "observation", result: "hi" }),
+    ];
+    expect(extractFinalAnswer(events)).toBe("I will create the file now.");
+  });
+
   it("keeps the tail when exceeding 4000 characters", () => {
     const long = "x".repeat(5000) + "tail answer";
     const extracted = extractFinalAnswer([ev({ type: "thought", content: long })]);

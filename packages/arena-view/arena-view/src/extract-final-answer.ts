@@ -49,9 +49,12 @@ export function extractFinalAnswer(events: ArenaEvent[], turn?: number): string 
     } else if (ev.type === "thought_end") {
       if (ev.content) {
         lastThought = ev.content;
-      } else {
+      } else if (streamingThought) {
         lastThought = streamingThought;
       }
+      // An empty end (a tool-only round closes its sequence with no text) must
+      // not erase the previous text sequence — the last spoken text still is
+      // the column's final answer.
       streamingThought = "";
     } else if (ev.type === "observation") {
       lastObs = ev.result ?? "";
