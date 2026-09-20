@@ -1,0 +1,37 @@
+{
+  "name": "@agentprism/harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@agentprism/context-analytics": "workspace:*",
+    "@agentprism/context-budget": "workspace:*",
+    "@agentprism/context-chunking": "workspace:*",
+    "@agentprism/context-compaction": "workspace:*",
+    "@agentprism/context-instructions": "workspace:*",
+    "@agentprism/context-mentions": "workspace:*",
+    "@agentprism/context-retrieval": "workspace:*",
+    "@agentprism/context-time": "workspace:*",
+    "@agentprism/contracts": "workspace:*",
+    "@agentprism/environment": "workspace:*",
+    "@agentprism/runtime": "workspace:*",
+    "@agentprism/telemetry": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentprism/tool-registry": "workspace:*",
+    "@types/node": "^24"
+  }
+}

@@ -1,0 +1,54 @@
+/* Tailwind v4 preflight no longer sets pointer cursors on buttons; restore the
+   affordance globally so custom buttons without a system class stay clickable. */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted-foreground) 45%, transparent);
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted-foreground) 65%, transparent);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+  /* Inherited by every element: gives Firefox the same thin square scrollbar
+     the WebKit rules below paint. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 45%, transparent) transparent;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--atmosphere);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  min-height: 100vh;
+  letter-spacing: -0.02em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--dur) ease, color var(--dur) ease;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}

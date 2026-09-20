@@ -1,0 +1,344 @@
+/* ===== Panels / Arena layout ===== */
+:root {
+  --arena-gap: clamp(0.3rem, 0.7vh, 0.5rem);
+  --arena-pad: clamp(0.35rem, 0.9vw, 0.65rem);
+}
+
+.panel-surface {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease,
+    transform var(--dur-fast) ease;
+}
+
+a.panel-surface:hover,
+.panel-surface.panel-lift:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
+}
+
+.arena-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--shell-header-h));
+  max-height: calc(100dvh - var(--shell-header-h));
+  overflow: hidden;
+  gap: var(--arena-gap);
+  padding: var(--arena-pad);
+  padding-bottom: max(var(--arena-pad), env(safe-area-inset-bottom, 0px));
+}
+
+/* Config + input: keep the input bar outside the scroll area so max-height never clips it into a dead Run click */
+.arena-setup {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arena-drawer,
+  .arena-backdrop,
+  .arena-chat-history,
+  .soft-collapse {
+    transition: none !important;
+  }
+
+  .arena-drawer[data-open="true"],
+  .arena-backdrop[data-open="true"] {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    pointer-events: auto !important;
+  }
+
+  .soft-collapse[data-open="true"] {
+    grid-template-rows: 1fr;
+  }
+
+  .soft-collapse-inner {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Only the config module scrolls; when collapsed it grows with content and does not clip the input bar */
+.arena-chrome {
+  --chrome-pad: 0.5rem;
+  position: relative;
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  max-height: none;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.arena-chrome > .arena-module {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.arena-module {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.arena-module-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem var(--chrome-pad, 0.5rem);
+}
+
+/* Participants strip: always visible one-row column picker (replaces the old
+   collapsed-summary + dimension select; the setup area stays two rows tall) */
+.arena-participants {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+}
+
+.arena-config-dense {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.arena-setup-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+/* Persistent compact toggles: labeled chips with a visible pressed state, so every
+   stage control (baseline / params / workspace / history) stays reachable without
+   expanding anything. */
+.chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.55rem;
+  border-radius: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  /* 21th labels read near-black; muted gray only for secondary hints. */
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) ease,
+    background var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    transform var(--dur-fast) ease;
+}
+
+.chip-toggle:hover:not(:disabled) {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--muted) 72%, transparent);
+}
+
+.chip-toggle:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.chip-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chip-toggle[data-open="true"],
+.chip-toggle[aria-pressed="true"],
+.chip-toggle[aria-expanded="true"] {
+  color: var(--foreground);
+  background: var(--muted);
+  border-color: var(--ring);
+  box-shadow: var(--shadow-xs);
+}
+
+.chip-toggle-count {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--accent);
+}
+
+.chip-toggle-chevron {
+  transition: transform var(--dur-fast) ease;
+}
+
+.chip-toggle[data-open="true"] .chip-toggle-chevron,
+.chip-toggle[aria-expanded="true"] .chip-toggle-chevron {
+  transform: rotate(180deg);
+}
+
+/* Run-strip variant: conversation toggles match the input bar height */
+.chip-toggle-strip {
+  height: var(--run-control-h, 2.5rem);
+  min-height: var(--run-control-h, 2.5rem);
+  border-color: var(--border);
+  background: var(--input);
+}
+
+/* Input wrapper: relative anchor for the portal suggestion listbox */
+.composer-input-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
+.composer-input-wrap .arena-run-strip-input {
+  flex: 1 1 auto;
+}
+
+/* Question suggestions: square portal dropdown, hard shadow */
+.composer-suggest {
+  position: fixed;
+  z-index: 70;
+  max-width: min(34rem, 92vw);
+  max-height: 17rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 4px;
+  background: var(--popover);
+  border: 1px solid var(--ring);
+  border-radius: 0;
+  box-shadow: var(--shadow-lg);
+  animation: fade-up var(--dur) var(--ease-out) both;
+}
+
+.composer-suggest-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.composer-suggest-item[data-active="true"],
+.composer-suggest-item:hover {
+  background: var(--muted);
+}
+
+.composer-suggest-icon {
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.composer-suggest-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.composer-suggest-question {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-suggest-name {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+}
+
+/* Attachment chips between history and the run strip */
+.composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 0.1rem;
+  margin-bottom: 0.35rem;
+}
+
+.composer-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 1.65rem;
+  padding: 0 0.3rem 0 0.55rem;
+  border-radius: 0;
+  border: 1px solid var(--ring);
+  background: var(--muted);
+  font-size: 0.6875rem;
+  color: var(--foreground);
+}
+
+.composer-attachment-name {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-attachment-size {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+.composer-attachment-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 24px minimum hit target; the 10px glyph stays visually compact. */
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: -0.15rem -0.1rem -0.15rem -0.15rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+
+.composer-attachment-remove:hover {
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+}

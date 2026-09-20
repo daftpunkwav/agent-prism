@@ -1,0 +1,33 @@
+{
+  "name": "@agentprism/driver-langchain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@agentprism/contracts": "workspace:*",
+    "@agentprism/driver-registry": "workspace:*",
+    "@agentprism/harness": "workspace:*",
+    "@langchain/core": "^1.0.0",
+    "langchain": "^1.0.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@agentprism/runtime": "workspace:*",
+    "@agentprism/telemetry": "workspace:*",
+    "@agentprism/tool-builtins": "workspace:*"
+  }
+}

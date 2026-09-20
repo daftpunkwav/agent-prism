@@ -1,0 +1,110 @@
+/* ===== Markdown ===== */
+.prose {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+
+.prose pre {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0.75rem;
+  overflow-x: auto;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  background: var(--muted);
+  padding: 0.15rem 0.35rem;
+  border-radius: 0;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.2rem;
+}
+
+.prose li {
+  margin: 0.15rem 0;
+}
+
+.prose p {
+  margin: 0.35rem 0;
+}
+
+.prose a {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--dur-fast) ease;
+}
+
+.prose a:hover {
+  color: var(--accent);
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.92rem;
+  letter-spacing: var(--tracking-normal);
+}
+
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.78rem;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+}
+
+.prose th {
+  background: var(--muted);
+  font-weight: 700;
+}
+
+/* ===== Code highlighting ===== */
+.hl-keyword {
+  color: #3b5bdb;
+  font-weight: 500;
+}
+.hl-string {
+  color: #2b8a3e;
+}
+.hl-number {
+  color: #b45309;
+}
+.hl-comment {
+  color: #6b7280;
+  font-style: italic;
+}
+.dark .hl-keyword {
+  color: #8b8fd4;
+}
+.dark .hl-string {
+  color: #6bb89a;
+}
+.dark .hl-number {
+  color: #c4a06a;
+}
+.dark .hl-comment {
+  color: #6a7388;
+}

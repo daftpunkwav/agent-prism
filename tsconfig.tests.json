@@ -1,0 +1,213 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": [
+      "node"
+    ],
+    "noEmit": true,
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "paths": {
+      "@agentprism/driver-registry": [
+        "./packages/drivers/driver-registry/src/index.ts"
+      ],
+      "@agentprism/driver-native": [
+        "./packages/drivers/driver-native/src/index.ts"
+      ],
+      "@agentprism/driver-plan-execute": [
+        "./packages/drivers/driver-plan-execute/src/index.ts"
+      ],
+      "@agentprism/driver-self-critique": [
+        "./packages/drivers/driver-self-critique/src/index.ts"
+      ],
+      "@agentprism/driver-langchain": [
+        "./packages/drivers/driver-langchain/src/index.ts"
+      ],
+      "@agentprism/driver-langgraph": [
+        "./packages/drivers/driver-langgraph/src/index.ts"
+      ],
+      "@agentprism/driver-autogen": [
+        "./packages/drivers/driver-autogen/src/index.ts"
+      ],
+      "@agentprism/driver-crewai": [
+        "./packages/drivers/driver-crewai/src/index.ts"
+      ],
+      "@agentprism/tool-registry": [
+        "./packages/tools/tool-registry/src/index.ts"
+      ],
+      "@agentprism/tool-builtins": [
+        "./packages/tools/tool-builtins/src/index.ts"
+      ],
+      "@agentprism/tool-mcp": [
+        "./packages/tools/tool-mcp/src/index.ts"
+      ],
+      "@agentprism/context-mentions": [
+        "./packages/context/context-mentions/src/index.ts"
+      ],
+      "@agentprism/context-instructions": [
+        "./packages/context/context-instructions/src/index.ts"
+      ],
+      "@agentprism/context-chunking": [
+        "./packages/context/context-chunking/src/index.ts"
+      ],
+      "@agentprism/context-retrieval": [
+        "./packages/context/context-retrieval/src/index.ts"
+      ],
+      "@agentprism/context-compaction": [
+        "./packages/context/context-compaction/src/index.ts"
+      ],
+      "@agentprism/context-budget": [
+        "./packages/context/context-budget/src/index.ts"
+      ],
+      "@agentprism/context-time": [
+        "./packages/context/context-time/src/index.ts"
+      ],
+      "@agentprism/context-analytics": [
+        "./packages/context/context-analytics/src/index.ts"
+      ],
+      "@agentprism/session-format": [
+        "./packages/session/session-format/src/index.ts"
+      ],
+      "@agentprism/session-query": [
+        "./packages/session/session-query/src/index.ts"
+      ],
+      "@agentprism/session-title": [
+        "./packages/session/session-title/src/index.ts"
+      ],
+      "@agentprism/session-outline": [
+        "./packages/session/session-outline/src/index.ts"
+      ],
+      "@agentprism/session-telemetry": [
+        "./packages/session/session-telemetry/src/index.ts"
+      ],
+      "@agentprism/session-projection": [
+        "./packages/session/session-projection/src/index.ts"
+      ],
+      "@agentprism/tool-symbols": [
+        "./packages/tools/tool-symbols/src/index.ts"
+      ],
+      "@agentprism/provider-capability": [
+        "./packages/providers/provider-capability/src/index.ts"
+      ],
+      "@agentprism/provider-langchain": [
+        "./packages/providers/provider-langchain/src/index.ts"
+      ],
+      "@agentprism/http-runtime": [
+        "./packages/transport/http-runtime/src/index.ts"
+      ],
+      "@agentprism/route-arena": [
+        "./packages/transport/route-arena/src/index.ts"
+      ],
+      "@agentprism/route-builder": [
+        "./packages/transport/route-builder/src/index.ts"
+      ],
+      "@agentprism/route-projects": [
+        "./packages/transport/route-projects/src/index.ts"
+      ],
+      "@agentprism/route-provider": [
+        "./packages/transport/route-provider/src/index.ts"
+      ],
+      "@agentprism/route-workspace": [
+        "./packages/transport/route-workspace/src/index.ts"
+      ],
+      "@agentprism/arena-routing": [
+        "./packages/arena/arena-routing/src/index.ts"
+      ],
+      "@agentprism/arena-runner": [
+        "./packages/arena/arena-runner/src/index.ts"
+      ],
+      "@agentprism/builder-service": [
+        "./packages/builder/builder-service/src/index.ts"
+      ],
+      "@agentprism/builder-turns": [
+        "./packages/builder/builder-turns/src/index.ts"
+      ],
+      "@agentprism/agent": [
+        "./packages/agent/agent/src/index.ts"
+      ],
+      "@agentprism/application": [
+        "./packages/application/application/src/index.ts"
+      ],
+      "@agentprism/arena-view": [
+        "./packages/arena-view/arena-view/src/index.ts"
+      ],
+      "@agentprism/client": [
+        "./packages/client/client/src/index.ts"
+      ],
+      "@agentprism/config": [
+        "./packages/config/config/src/index.ts"
+      ],
+      "@agentprism/contracts": [
+        "./packages/contracts/contracts/src/index.ts"
+      ],
+      "@agentprism/dimensions": [
+        "./packages/dimensions/dimensions/src/index.ts"
+      ],
+      "@agentprism/environment": [
+        "./packages/environment/environment/src/index.ts"
+      ],
+      "@agentprism/evaluation": [
+        "./packages/evaluation/evaluation/src/index.ts"
+      ],
+      "@agentprism/harness": [
+        "./packages/harness/harness/src/index.ts"
+      ],
+      "@agentprism/memory-store": [
+        "./packages/memory/memory-store/src/index.ts"
+      ],
+      "@agentprism/memory-episodic": [
+        "./packages/memory/memory-episodic/src/index.ts"
+      ],
+      "@agentprism/memory-semantic": [
+        "./packages/memory/memory-semantic/src/index.ts"
+      ],
+      "@agentprism/memory-service": [
+        "./packages/memory/memory-service/src/index.ts"
+      ],
+      "@agentprism/persistence": [
+        "./packages/persistence/persistence/src/index.ts"
+      ],
+      "@agentprism/runtime": [
+        "./packages/runtime/runtime/src/index.ts"
+      ],
+      "@agentprism/telemetry": [
+        "./packages/telemetry/telemetry/src/index.ts"
+      ],
+      "@agentprism/ui": [
+        "./packages/ui/ui/src/index.ts"
+      ],
+      "@agentprism/session": [
+        "./packages/session/session/src/index.ts"
+      ],
+      "@agentprism/session-persistence": [
+        "./packages/session/session-persistence/src/index.ts"
+      ],
+      "@agentprism/route-sessions": [
+        "./packages/transport/route-sessions/src/index.ts"
+      ],
+      "@agentprism/route-threads": [
+        "./packages/transport/route-threads/src/index.ts"
+      ],
+      "@agentprism/route-settings": [
+        "./packages/transport/route-settings/src/index.ts"
+      ],
+      "@agentprism/sandbox": [
+        "./packages/sandbox/sandbox/src/index.ts"
+      ],
+      "@/*": [
+        "./apps/web/src/*"
+      ]
+    },
+    "jsx": "react-jsx",
+    "module": "ES2022",
+    "moduleResolution": "bundler"
+  },
+  "include": [
+    "tests",
+    "packages/*/*/tests",
+    "apps/*/tests"
+  ]
+}

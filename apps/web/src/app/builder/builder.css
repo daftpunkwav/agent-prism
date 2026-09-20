@@ -1,0 +1,1275 @@
+/**
+ * @file builder.css
+ * @description Agent Builder styles: block board, chat panel, and observability panels.
+ *
+ * Responsibilities:
+ * - Lay out the /builder three-column shell (board / chat / trace)
+ * - Style block chips, session rows, message bubbles, and trace entries
+ *
+ * Consumed only by the /builder route; design tokens come from the shared
+ * design system in @agentprism/ui styles. No component logic here.
+ */
+
+.builder-shell {
+  display: grid;
+  /* Side widths arrive as --builder-left/--builder-right ("NNNpx" or "auto"
+     when collapsed); the chat column always takes the remainder. */
+  grid-template-columns: var(--builder-left, minmax(280px, 320px)) minmax(0, 1fr) var(--builder-right, minmax(360px, 460px));
+  /* One row must fill the fixed shell height: an auto row sizes to the tallest
+     column's content and leaves the rest of the shell as dead blank space. */
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-2);
+  height: calc(100dvh - var(--shell-header-h));
+  max-height: calc(100dvh - var(--shell-header-h));
+  padding: var(--space-2);
+  overflow: hidden;
+}
+
+.builder-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+
+.builder-col-board,
+.builder-col-trace {
+  position: relative;
+}
+
+.builder-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.builder-col-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Collapsed side: only the drag line remains (no rail card). Click expands;
+   dragging pulls the column open at the dragged width. */
+.builder-edge-line {
+  position: relative;
+  width: 10px;
+  cursor: col-resize;
+  touch-action: none;
+  /* A drag starting here must not begin a text selection. */
+  user-select: none;
+}
+
+.builder-edge-line::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 4px;
+  width: 2px;
+  border-radius: 1px;
+  /* Faintly visible at rest so the line is discoverable while collapsed. */
+  background: var(--border);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.builder-edge-line:hover::after {
+  background: var(--spectrum-1);
+}
+
+/* Drag strip on the inner edge of each side column. */
+.builder-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;
+  /* A drag starting here must not begin a text selection. */
+  user-select: none;
+}
+
+.builder-resize-handle[data-side="left"] {
+  right: -5px;
+}
+
+.builder-resize-handle[data-side="right"] {
+  left: -5px;
+}
+
+.builder-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.builder-resize-handle:hover::after {
+  background: var(--spectrum-1);
+}
+
+/* --- sessions --- */
+.builder-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-2) 0;
+  max-height: 168px;
+  overflow-y: auto;
+  flex: 0 0 auto;
+}
+
+.builder-session-error {
+  margin: 0 var(--space-2) var(--space-1);
+  padding: 0.3rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--destructive) 45%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--destructive) 7%, var(--card));
+  color: var(--destructive);
+  font-size: 0.6875rem;
+  word-break: break-word;
+}
+
+.builder-session {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.builder-session[data-active="true"] {
+  border-color: var(--ring);
+  background: color-mix(in srgb, var(--spectrum-1) 6%, var(--card));
+}
+
+.builder-session-main {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.builder-session-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.builder-session-meta {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+.builder-session[data-running="true"] .builder-session-meta {
+  color: var(--spectrum-2);
+}
+
+.builder-session-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 24px minimum hit target for a destructive action. */
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.builder-session-delete:hover:not(:disabled) {
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+.builder-session-delete:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* --- board --- */
+.builder-board-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.builder-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+}
+
+.builder-board-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.builder-assembled {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.builder-assembled-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--ring);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  box-shadow: var(--shadow-xs);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--foreground);
+}
+
+/* Absolute "+" needs a positioned item plus room in the gap; otherwise every
+   separator stacks at the nearest positioned ancestor instead of between items. */
+.builder-assembled-item + .builder-assembled-item {
+  margin-left: 8px;
+}
+
+.builder-assembled-item + .builder-assembled-item::before {
+  content: "+";
+  position: absolute;
+  left: -9px;
+  color: var(--muted-foreground);
+  font-size: 0.625rem;
+}
+
+.builder-apply {
+  align-self: flex-start;
+  height: 30px;
+  padding: 0 0.8rem;
+  font-size: 0.8125rem;
+}
+
+.builder-dirty-dot {
+  width: 6px;
+  height: 6px;
+  margin-left: 4px;
+  /* Status dot: semantic roundness, like .column-status-dot. */
+  border-radius: 50%;
+  background: var(--warning);
+}
+
+.builder-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.builder-slot-title {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.builder-slot-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.builder-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.builder-select {
+  flex: 0 0 46%;
+  height: 34px;
+}
+
+.builder-model-input {
+  flex: 1;
+  height: 34px;
+  font-size: 0.8125rem;
+}
+
+.builder-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.builder-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 1.6rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.builder-chip:hover:not(:disabled) {
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--border) 45%, var(--foreground));
+}
+
+.builder-chip:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.builder-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.builder-chip[data-selected="true"] {
+  color: var(--spectrum-1);
+  border-color: var(--ring);
+  background: color-mix(in srgb, var(--spectrum-1) 8%, var(--card));
+}
+
+/* Mutating tools keep their amber accent; the black border marks selection. */
+.builder-chip-tool[data-mutating="true"][data-selected="true"] {
+  color: var(--spectrum-2);
+  background: color-mix(in srgb, var(--spectrum-2) 9%, var(--card));
+}
+
+.builder-prompt {
+  height: auto;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.8125rem;
+  resize: vertical;
+}
+
+.builder-decode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.builder-decode label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+.builder-num {
+  height: 30px;
+  padding: 0 0.45rem;
+  font-size: 0.75rem;
+}
+
+/* --- chat --- */
+.builder-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  /* Anchor for the jump-to-bottom affordance (absolute, above the composer). */
+  position: relative;
+}
+
+.builder-chat-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  overflow-y: auto;
+}
+
+/* Bottom-pinning lives on an inner block via margin-top:auto, NOT on the flex
+   scroller: justify-content:flex-end makes Chrome report a wrong scrollHeight
+   and the conversation becomes unscrollable once it exceeds the viewport. */
+.builder-chat-content {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.builder-chat-empty,
+.builder-trace-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.builder-msg {
+  max-width: 86%;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--background);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.builder-msg[data-role="user"] {
+  align-self: flex-end;
+  border-color: color-mix(in srgb, var(--spectrum-1) 40%, var(--border));
+  background: color-mix(in srgb, var(--spectrum-1) 8%, var(--card));
+}
+
+.builder-msg[data-role="assistant"] {
+  align-self: flex-start;
+}
+
+.builder-live {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px dashed color-mix(in srgb, var(--spectrum-1) 45%, var(--border));
+  border-radius: var(--radius-md);
+}
+
+.builder-live-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.builder-segments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.builder-seg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+}
+
+.builder-seg-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--foreground);
+  cursor: pointer;
+  list-style: none;
+}
+
+.builder-seg-summary::-webkit-details-marker {
+  display: none;
+}
+
+.builder-seg-summary > svg:first-child {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+details[open] > .builder-seg-summary > svg:first-child {
+  transform: rotate(90deg);
+}
+
+.builder-seg-pending {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  border-style: dashed;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.builder-seg-thinking {
+  border-left: 3px solid var(--muted-foreground);
+}
+
+.builder-seg-banner {
+  border-left: 3px solid var(--muted-foreground);
+  opacity: 0.85;
+}
+
+.builder-seg-thought {
+  border-left: 3px solid var(--spectrum-1);
+}
+
+.builder-seg-action {
+  border-left: 3px solid var(--spectrum-2);
+}
+
+.builder-seg-observation {
+  border-left: 3px solid var(--spectrum-3);
+}
+
+.builder-seg-error {
+  border-left: 3px solid var(--destructive);
+  color: var(--destructive);
+}
+
+.builder-seg-meta {
+  border-left: 3px solid var(--spectrum-5);
+  color: var(--muted-foreground);
+}
+
+.builder-seg-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.builder-seg-tool {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.builder-seg-detail {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+.builder-seg-live-hint {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+.builder-seg-done {
+  margin-left: auto;
+  color: var(--success);
+  font-weight: 400;
+}
+
+.builder-seg-meta-text {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+.builder-seg-cursor::after {
+  content: "▋";
+  animation: builder-cursor-blink 1s step-end infinite;
+  color: var(--muted-foreground);
+}
+
+/* Settled bubble trail: collapsed by default, compact one-line step rows. */
+.builder-turn-trace {
+  margin-top: 0.45rem;
+  border-top: 1px dashed var(--border);
+  padding-top: 0.35rem;
+}
+
+.builder-turn-trace-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.builder-turn-trace-summary::-webkit-details-marker {
+  display: none;
+}
+
+.builder-turn-trace-summary > svg:first-child {
+  flex-shrink: 0;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+details[open] > .builder-turn-trace-summary > svg:first-child {
+  transform: rotate(90deg);
+}
+
+.builder-turn-trace-count {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+/* Flat agent turn: no bubble chrome; trail above, final answer below. */
+.builder-turn {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.builder-answer {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+@keyframes builder-cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.builder-seg-prose {
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.builder-seg-pre {
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.builder-seg-pre-thinking,
+.builder-seg-pre-banner {
+  color: var(--muted-foreground);
+}
+
+.builder-seg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border);
+}
+
+.builder-seg-body-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+}
+
+/* Timeline rows share the chat segment card treatment so the trace tab reads
+   like the live conversation instead of bare unstyled lines. */
+.builder-segment {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+}
+
+.builder-segment[data-meta="true"] .builder-segment-head {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+.builder-segment[data-kind="action"] .builder-segment-head {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--spectrum-2);
+}
+
+.builder-segment[data-kind="thinking"] .builder-segment-head {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.builder-segment-step {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  padding-top: 2px;
+}
+
+.builder-segment-head {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.builder-segment-result {
+  margin: 0.25rem 0 0;
+  padding: 0.4rem 0.5rem;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.builder-composer {
+  height: auto;
+  resize: none;
+  font-size: 0.875rem;
+}
+
+.builder-chat .composer-input-wrap {
+  /* The arena composer grows (flex:1 1 auto from global.css); here only the
+     message list may grow — a growing input wrap would stack blank space
+     above the input row. */
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.builder-chat .composer-input-wrap .form-input {
+  flex: 1;
+}
+
+/* --- trace --- */
+.builder-trace {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.builder-trace-tabs {
+  display: flex;
+  gap: 2px;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.builder-log-capped {
+  margin: 0 0 0.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Workspace tab: fixed-height frame so the file panel's internal scroll works. */
+.builder-workspace-tab {
+  height: 100%;
+  min-height: 24rem;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.builder-workspace-tab > * {
+  flex: 1;
+  min-height: 0;
+}
+
+.builder-trace-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.builder-rounds,
+.builder-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.builder-round {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: var(--background);
+}
+
+.builder-round-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.builder-round-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--ring);
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: var(--shadow-xs);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--foreground);
+  white-space: nowrap;
+}
+
+.builder-round-meta {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+/* One wire message inside a round: request and response carry opposite lane accents
+   so direction survives scanning (blue = outbound request, teal = inbound response). */
+.builder-msg-block {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--spectrum-1);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.builder-msg-block[data-side="response"] {
+  border-left-color: var(--spectrum-3);
+}
+
+.builder-msg-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.35rem 0.55rem;
+  min-height: 1.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--foreground);
+  cursor: pointer;
+  list-style: none;
+}
+
+.builder-msg-summary::-webkit-details-marker {
+  display: none;
+}
+
+.builder-msg-summary::before {
+  content: "▸";
+  color: var(--muted-foreground);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+details[open] > .builder-msg-summary::before {
+  transform: rotate(90deg);
+}
+
+.builder-msg-arrow {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--spectrum-1);
+}
+
+.builder-msg-block[data-side="response"] .builder-msg-arrow {
+  color: var(--spectrum-3);
+}
+
+.builder-msg-label {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.builder-msg-block[data-side="response"] .builder-msg-label {
+  color: var(--spectrum-3);
+}
+
+.builder-msg-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+
+.builder-msg-block .builder-json-wrap {
+  margin-top: 0;
+  padding: 0 0.55rem 0.45rem;
+}
+
+.builder-log-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--foreground);
+  cursor: pointer;
+  list-style: none;
+}
+
+.builder-log-summary::-webkit-details-marker {
+  display: none;
+}
+
+.builder-log-summary::before {
+  content: "▸";
+  color: var(--muted-foreground);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+details[open] > .builder-log-summary::before {
+  transform: rotate(90deg);
+}
+
+.builder-log-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.5rem;
+  background: var(--background);
+}
+
+.builder-log-kind {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.builder-log-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+
+.builder-json-wrap {
+  margin-top: 0.3rem;
+}
+
+.builder-json-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: 0.2rem;
+}
+
+.builder-json {
+  margin: 0;
+  padding: 0.5rem;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 1100px) {
+  .builder-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 1fr) minmax(300px, 1.4fr) minmax(240px, 1fr);
+    /* The workspace main clips overflow: stacked columns scroll inside the shell. */
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  /* Stacked layout: no edge dragging; the collapsed line lies flat. */
+  .builder-resize-handle {
+    display: none;
+  }
+
+  .builder-edge-line {
+    width: auto;
+    height: 12px;
+  }
+
+  .builder-edge-line::after {
+    top: 5px;
+    bottom: auto;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    height: 2px;
+  }
+}
+
+.builder-session-rename {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.builder-rename-input {
+  height: 22px;
+  width: 130px;
+  padding: 0 6px;
+  font-size: 12px;
+  border: 1px solid var(--ring);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--background);
+  color: var(--foreground);
+  outline: none;
+}
+
+.builder-phase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.builder-phase-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.builder-phase-row:hover {
+  background: color-mix(in srgb, var(--muted) 40%, transparent);
+  color: var(--foreground);
+}
+
+.builder-phase-chevron {
+  transition: transform 120ms ease;
+}
+
+.builder-phase-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.builder-phase-label {
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.builder-phase-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.builder-phase-duration {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+/* --- timeline: accumulated execution trail --- */
+.builder-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.builder-timeline-turn {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  background: color-mix(in srgb, var(--card) 60%, transparent);
+}
+
+.builder-timeline-turn-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.builder-timeline-turn-label {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--spectrum-1);
+}
+
+.builder-timeline-turn-user {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.builder-swap-banner {
+  border: 1px dashed color-mix(in srgb, var(--spectrum-5) 55%, var(--border));
+  border-radius: var(--radius-md);
+  padding: 0.4rem 0.6rem;
+}
+
+.builder-swap-banner-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 12px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--spectrum-5);
+}
+
+.builder-swap-banner-summary::-webkit-details-marker {
+  display: none;
+}
+
+.builder-swap-banner-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+
+.builder-timeline-live {
+  border: 1px dashed color-mix(in srgb, var(--spectrum-1) 45%, var(--border));
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* --- chat: jump-to-bottom affordance while the user holds the scroll position ---
+   Same square chip language as the header toggles (radius 0, --ring border),
+   translucent over the chat with a blur so content stays readable underneath. */
+.builder-jump-bottom {
+  position: absolute;
+  right: 1rem;
+  bottom: 7.5rem;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.65rem;
+  padding: 0 0.55rem;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--muted) 78%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--ring);
+  box-shadow: var(--shadow-xs);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--dur) ease, color var(--dur) ease,
+    transform var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+
+.builder-jump-bottom:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-sm);
+  color: var(--foreground);
+}
+
+/* --- todo_write structured preview --- */
+.builder-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.builder-todo-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.builder-todo-item[data-status="completed"] > svg {
+  color: var(--spectrum-3);
+}
+
+.builder-todo-item[data-status="in_progress"] > svg {
+  color: var(--spectrum-1);
+}
+
+.builder-todo-item > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+}
+
+.builder-todo-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}

@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+.env
+.env.local
+data/
+docs-local/
+openapi/
+*.log
+next-env.d.ts
+.vscode/
+.zcode/
+.claude/
+/_review_*
+
+# local agent-instruction overlays (AGENTS.local.md / CLAUDE.local.md)
+*.local.md
+
+# playwright mcp session artifacts
+.playwright-mcp/
+coverage/
+cov-report/
+
+# local read-only mirror of an external repository, never committed
+/reference/

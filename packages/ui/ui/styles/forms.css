@@ -1,0 +1,225 @@
+/* ===== Forms / buttons ===== */
+.form-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--space-3);
+  background-color: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  box-shadow: var(--shadow-xs);
+  transition:
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    background var(--dur-fast) ease;
+}
+
+.form-input:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--border) 40%, var(--foreground));
+}
+
+.form-input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Invalid state must survive focus: declared after :focus so the destructive
+   border wins while the user edits a bad value. */
+.form-input[aria-invalid="true"] {
+  border-color: var(--destructive);
+}
+
+.form-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: 0;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+  border: 1px solid var(--ring);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: var(--shadow-xs);
+  transition-duration: var(--dur-fast);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Destructive action variant (stop/cancel while a run is in flight). Pair with
+   .btn-primary for shape/motion; the color swap lands after it in the cascade. */
+.btn-danger {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+}
+
+/* Arena primary run: the one electric-blue action per row */
+.btn-run,
+.composer-bar .btn-primary {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.btn-run:hover:not(:disabled),
+.composer-bar .btn-primary:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition:
+    color var(--dur-fast) ease,
+    background var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    transform var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--foreground);
+  background: var(--muted);
+  border-color: var(--ring);
+  box-shadow: var(--shadow-xs);
+}
+
+.btn-ghost:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: var(--dur-fast);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.seg-tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    color var(--dur-fast) ease,
+    background var(--dur-fast) ease;
+}
+
+.seg-tab:hover {
+  color: var(--foreground);
+}
+
+.seg-tab[data-active="true"] {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Inside the shell nav the sliding indicator paints the block; the tab itself
+   stays transparent so the animation reads as one moving square. */
+.shell-nav-track .seg-tab[data-active="true"] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.seg-tab[data-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Range sliders: one global skin for both engines. The input keeps a tall
+   transparent hit area; the visible track is drawn by the pseudo-elements. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 1rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.375rem;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--muted-foreground) 25%, transparent);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 0;
+  background: var(--primary);
+  border: 2px solid var(--ring);
+  /* Center the 14px thumb on the 6px track. */
+  margin-top: -0.25rem;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 0;
+  background: var(--primary);
+  border: 2px solid var(--ring);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 0.375rem;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--muted-foreground) 25%, transparent);
+}

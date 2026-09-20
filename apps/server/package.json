@@ -1,0 +1,72 @@
+{
+  "name": "@agentprism/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agent-prism-server": "./dist/main.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "predev": "tsc -p tsconfig.json",
+    "dev": "node --watch dist/main.js",
+    "prestart": "tsc -p tsconfig.json",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@agentprism/application": "workspace:*",
+    "@agentprism/arena-routing": "workspace:*",
+    "@agentprism/arena-runner": "workspace:*",
+    "@agentprism/builder-service": "workspace:*",
+    "@agentprism/builder-turns": "workspace:*",
+    "@agentprism/config": "workspace:*",
+    "@agentprism/contracts": "workspace:*",
+    "@agentprism/dimensions": "workspace:*",
+    "@agentprism/driver-autogen": "workspace:*",
+    "@agentprism/driver-crewai": "workspace:*",
+    "@agentprism/driver-langchain": "workspace:*",
+    "@agentprism/driver-langgraph": "workspace:*",
+    "@agentprism/driver-native": "workspace:*",
+    "@agentprism/driver-plan-execute": "workspace:*",
+    "@agentprism/driver-registry": "workspace:*",
+    "@agentprism/driver-self-critique": "workspace:*",
+    "@agentprism/evaluation": "workspace:*",
+    "@agentprism/harness": "workspace:*",
+    "@agentprism/http-runtime": "workspace:*",
+    "@agentprism/memory-episodic": "workspace:*",
+    "@agentprism/memory-semantic": "workspace:*",
+    "@agentprism/memory-service": "workspace:*",
+    "@agentprism/persistence": "workspace:*",
+    "@agentprism/provider-capability": "workspace:*",
+    "@agentprism/provider-langchain": "workspace:*",
+    "@agentprism/route-arena": "workspace:*",
+    "@agentprism/route-builder": "workspace:*",
+    "@agentprism/route-projects": "workspace:*",
+    "@agentprism/route-provider": "workspace:*",
+    "@agentprism/route-settings": "workspace:*",
+    "@agentprism/route-sessions": "workspace:*",
+    "@agentprism/route-threads": "workspace:*",
+    "@agentprism/route-workspace": "workspace:*",
+    "@agentprism/runtime": "workspace:*",
+    "@agentprism/session-persistence": "workspace:*",
+    "@agentprism/tool-builtins": "workspace:*",
+    "@agentprism/tool-mcp": "workspace:*",
+    "@hono/node-server": "^1.13.0",
+    "@langchain/core": "^1.0.0",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@agentprism/session": "workspace:*",
+    "@types/node": "^24"
+  }
+}

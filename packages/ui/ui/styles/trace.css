@@ -1,0 +1,383 @@
+/* ===== Trace ===== */
+.trace-system {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+  padding: 2px 4px;
+}
+
+.trace-seg {
+  padding: 9px 11px;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--muted) 42%, transparent);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  border-left: 2px solid color-mix(in srgb, var(--border) 70%, transparent);
+  animation: fade-up var(--dur-panel) var(--ease-out) both;
+}
+
+.trace-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  margin-bottom: 6px;
+}
+
+.trace-thought {
+  border-left-color: var(--lane, var(--foreground));
+}
+
+/* Interim reasoning step (ToT candidates, reflections): muted so it reads as
+   process output, visually distinct from the turn's final reply */
+.trace-interim {
+  border-left-color: var(--border);
+  background: color-mix(in srgb, var(--muted) 28%, transparent);
+}
+
+.trace-thinking {
+  border-left-color: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  opacity: 0.92;
+}
+
+.trace-thinking summary {
+  margin-bottom: 0;
+}
+
+.trace-action {
+  border-left-color: var(--lane, var(--foreground));
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-left-width: 2px;
+  border-left-style: solid;
+}
+
+.trace-observation {
+  border-left-color: var(--border);
+}
+
+.trace-error {
+  border-left-color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+.trace-cursor {
+  display: inline-block;
+  width: 0.45em;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: trace-blink 1s steps(2, start) infinite;
+}
+
+/* Timeline layout: one vertical rail, rows hang off it */
+.trace-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-left: 0.35rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+/* Collapsible rows (thinking / tool call / banner): hide the native marker, rotate the chevron when open */
+details.trace-seg > summary {
+  list-style: none;
+}
+
+details.trace-seg > summary::-webkit-details-marker {
+  display: none;
+}
+
+.trace-chevron {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+details[open] > summary .trace-chevron {
+  transform: rotate(90deg);
+}
+
+.trace-step-pending {
+  border-left-color: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+  background: transparent;
+  padding: 4px 12px;
+}
+
+.trace-banner {
+  background: transparent;
+  border-left-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+}
+
+.trace-banner summary {
+  margin-bottom: 0;
+}
+
+/* Trace legend: one glance at the four segment families */
+.trace-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 2px 6px;
+}
+.trace-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--muted) 40%, transparent);
+}
+.trace-legend-item[data-kind="thinking"] { border-style: dashed; }
+.trace-legend-item[data-kind="answer"] { color: var(--lane, var(--foreground)); }
+.trace-legend-item[data-kind="tool"] { color: var(--chart-1); border-style: dashed; }
+.trace-legend-item[data-kind="result"] { color: var(--success); }
+
+/* Kind badge inside each trace row: icon + label pill */
+.trace-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 1px 8px;
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+}
+.trace-kind-badge[data-kind="thinking"] {
+  color: var(--muted-foreground);
+  border-style: dashed;
+  background: transparent;
+}
+.trace-kind-badge[data-kind="answer"] {
+  background: color-mix(in srgb, var(--lane, var(--primary)) 10%, transparent);
+}
+.trace-kind-badge[data-kind="interim"] {
+  color: var(--muted-foreground);
+  border-style: dashed;
+  background: transparent;
+}
+.trace-kind-badge[data-kind="final"] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.trace-kind-badge[data-kind="result"] {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+.trace-kind-badge[data-kind="error"] {
+  color: var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+.trace-kind-badge[data-category] {
+  background: transparent;
+}
+
+/* Gap verdict strip: one chip per differing metric so winners read at a glance */
+.report-verdict {
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: var(--shadow-xs);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.report-verdict-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.report-verdict-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 7%, transparent);
+  border-radius: 0;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+}
+.report-verdict-chip[data-tone="bad"] {
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+.report-verdict-key {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.report-verdict-winner {
+  font-weight: 700;
+}
+.report-verdict-detail {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+/* Pipeline config: framework badge + mode pills + key=value chips */
+.pipeline-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.pipeline-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pipeline-framework {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: 0;
+  padding: 1px 8px;
+}
+.pipeline-mode {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  border: 1px dashed var(--border);
+  border-radius: 0;
+  padding: 1px 8px;
+}
+.pipeline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 1px 6px;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+.pipeline-field-key {
+  color: var(--muted-foreground);
+}
+.pipeline-field-value {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.pipeline-diff-mark {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border-radius: 0;
+  padding: 1px 8px;
+}
+.pipeline-cell-diff {
+  color: var(--warning) !important;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
+}
+
+/* Diff step rows: kind pill + one-line excerpt */
+.diff-step-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.72rem;
+  padding: 3px 6px;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+}
+.diff-step-row[data-kind="error"] {
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+.diff-step-kind {
+  flex-shrink: 0;
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+}
+.diff-step-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+/* Segment families: distinct left-border + background so thinking / answer / tool / result never blend */
+.trace-seg[data-kind="thinking"] {
+  border-left-color: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+  border-left-style: dashed;
+  background: transparent;
+}
+.trace-seg[data-kind="answer"] {
+  background: color-mix(in srgb, var(--muted) 42%, transparent);
+}
+.trace-seg[data-kind="tool"] {
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+.trace-seg[data-kind="result"] {
+  background: color-mix(in srgb, var(--success) 5%, transparent);
+}
+.trace-seg[data-kind="error"] {
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+@keyframes trace-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.token-bar {
+  height: 4px;
+  border-radius: 0;
+  /* Visible neutral track: --border is white/near-card in light mode and
+     disappears against card surfaces. */
+  background: color-mix(in srgb, var(--muted-foreground) 22%, transparent);
+  overflow: hidden;
+}
+
+/* Fill animates transform only: full-width bar scaled on X, so progress updates
+   never trigger layout. */
+.token-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--chart-1);
+  transform-origin: left center;
+  transition: transform var(--dur) var(--ease-out);
+}

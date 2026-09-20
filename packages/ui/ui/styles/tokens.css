@@ -1,0 +1,203 @@
+
+/*
+  AgentPrism × 21th neo-brutalist
+  — square-first corners (radius 0), bright borders, hard offset shadows
+  — monochrome surfaces; electric blue (--accent) reserved for one primary action
+    per row and for data elements only
+  — Geist Mono carries the whole UI; motion is snappy (140–240ms) and honors
+    prefers-reduced-motion
+  — 21th token source: design library "21th" (colors_and_type.css / css.json)
+*/
+
+:root {
+  --background: #c5c9c9;
+  --foreground: #111111;
+  --card: #d8dada;
+  --card-foreground: #111111;
+  --popover: #d8dada;
+  --popover-foreground: #111111;
+  --muted: #d8dada;
+  /* Accessibility: measured 4.5:1+ on every surface this token sits on
+     (card/muted #d8dada and page #c5c9c9); the 21th reference gray (#888)
+     only survives at display sizes, and the app renders 10-13px mono body
+     text in this token. */
+  --muted-foreground: #4a4a4a;
+  --border: #ffffff;
+  --input: #ffffff;
+  --primary: #111111;
+  --primary-foreground: #ffffff;
+  --secondary: #111111;
+  --secondary-foreground: #ffffff;
+  --accent: #0040ff;
+  --accent-foreground: #ffffff;
+  --ring: #000000;
+  --destructive: #d73333;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --warning: #b45309;
+
+  /* Spectrum lanes: 21th chart palette. Light mode keeps the blue scale inside
+     data elements; lane identity is carried by borders, labels and shadows. */
+  --spectrum-1: #0140ff;
+  --spectrum-2: #386aff;
+  --spectrum-3: #6b90ff;
+  --spectrum-4: #94afff;
+  --spectrum-5: #bdcdff;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Square-first: every surface radius collapses to zero. Dots and spinners
+     keep their own 50% radii where roundness is semantic. */
+  --radius: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Hard offset shadows: flat black, no blur, 2px down-right. */
+  --shadow-xs: 2px 2px 0px 0px hsl(0 0% 0% / 0.5);
+  --shadow-sm: 2px 2px 0px 0px hsl(0 0% 0% / 1);
+  --shadow-md: 2px 2px 0px 0px hsl(0 0% 0% / 1), 2px 2px 4px -1px hsl(0 0% 0% / 1);
+  --shadow-lg: 2px 2px 0px 0px hsl(0 0% 0% / 1), 2px 4px 6px -1px hsl(0 0% 0% / 1);
+  --shadow-xl: 2px 2px 0px 0px hsl(0 0% 0% / 1), 2px 8px 10px -1px hsl(0 0% 0% / 1);
+
+  --ease-out: cubic-bezier(0.3, 0.9, 0.4, 1);
+  --dur-fast: 140ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
+  --dur-panel: 240ms;
+
+  /* 21th: Geist Mono is the UI voice. Display sizes keep the full -0.05em
+     tracking; body copy uses a slightly gentler value so CJK strings stay legible.
+     CJK fallback: Geist Mono carries no CJK glyphs. Without an explicit CJK step
+     every Chinese string falls through to the generic monospace default, which
+     renders as SimSun (serif) on Windows. PingFang/YaHei/Noto keep the sans voice;
+     Latin glyphs still resolve at Geist Mono because matching is per-glyph.
+     The family is named literally instead of via var(--font-geist-mono) because
+     the geist/font variable expands to a stack that already ends in the generic
+     `monospace` keyword — generic always matches, so any family appended after
+     that var (our CJK step) would never be reached. When the @font-face is
+     absent (tests, previews, other apps) matching simply walks on to the rest
+     of the stack, which is exactly the old fallback behavior. */
+  --font-cjk: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC";
+  --font-display: "GeistMono", ui-monospace, "SF Mono", Consolas, var(--font-cjk), monospace;
+  --font-sans: "GeistMono", ui-monospace, "SF Mono", Consolas, var(--font-cjk), monospace;
+  --font-mono: "GeistMono", ui-monospace, "SF Mono", Consolas, var(--font-cjk), monospace;
+  --tracking-normal: -0.05em;
+
+  --shell-header-h: 3.25rem;
+  --atmosphere: var(--background);
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ffffff;
+  --card: #1a1a1a;
+  --card-foreground: #ffffff;
+  --popover: #1a1a1a;
+  --popover-foreground: #ffffff;
+  --muted: #333333;
+  --muted-foreground: #b4b4b4;
+  --border: #333333;
+  --input: #1a1a1a;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #333333;
+  --secondary-foreground: #ffffff;
+  --accent: #0040ff;
+  --accent-foreground: #ffffff;
+  --ring: #333333;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --success: #34d399;
+  --warning: #fbbf24;
+
+  /* Dark lanes: 21th dark chart palette — full hue separation for simultaneous
+     comparison columns. */
+  --spectrum-1: #60a5fa;
+  --spectrum-2: #f472b6;
+  --spectrum-3: #34d399;
+  --spectrum-4: #fbbf24;
+  --spectrum-5: #818cf8;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Dark hard offsets: pure black vanishes on #0a0a0a (≈1.06:1), so the offset
+     voice flips to a faint light edge while #333 borders keep carrying structure.
+     Hover lifts (translate + shadow) stay readable in both themes. */
+  --shadow-xs: 2px 2px 0px 0px hsl(0 0% 100% / 0.10);
+  --shadow-sm: 2px 2px 0px 0px hsl(0 0% 100% / 0.16);
+  --shadow-md: 2px 2px 0px 0px hsl(0 0% 100% / 0.16), 2px 2px 4px -1px hsl(0 0% 100% / 0.10);
+  --shadow-lg: 2px 2px 0px 0px hsl(0 0% 100% / 0.18), 2px 4px 6px -1px hsl(0 0% 100% / 0.12);
+  --shadow-xl: 2px 2px 0px 0px hsl(0 0% 100% / 0.20), 2px 8px 10px -1px hsl(0 0% 100% / 0.14);
+
+  --atmosphere: var(--background);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-spectrum-1: var(--spectrum-1);
+  --color-spectrum-2: var(--spectrum-2);
+  --color-spectrum-3: var(--spectrum-3);
+  --color-spectrum-4: var(--spectrum-4);
+  --color-spectrum-5: var(--spectrum-5);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+
+  /* Radius utilities collapse to zero: rounded-sm/md/lg/xl in TSX all resolve
+     square. rounded-full stays a static Tailwind utility so dots/spinners keep
+     their semantic roundness. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+
+  /* Shadow utilities resolve to the runtime tokens: shadow-sm/md/lg/xl in TSX
+     go brutalist and follow the .dark overrides instead of baking in black. */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
+}

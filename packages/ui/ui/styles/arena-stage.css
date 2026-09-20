@@ -1,0 +1,609 @@
+/* Template chips · dropdown · question · run: single-row equal height */
+.arena-run-strip {
+  --run-control-h: 2.5rem;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+  min-width: 0;
+}
+
+/* Template picker: wrapper sizing only; visuals come from .ui-select-trigger */
+.arena-run-strip-select {
+  flex: 0 0 12rem;
+  width: 12rem;
+  max-width: 14rem;
+  height: var(--run-control-h);
+  min-height: var(--run-control-h);
+  font-size: 0.875rem;
+}
+
+.arena-run-strip-input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: var(--run-control-h);
+  min-height: var(--run-control-h);
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+.arena-run-strip-input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 720px) {
+  .arena-run-strip {
+    flex-wrap: wrap;
+  }
+
+  .arena-run-strip-input {
+    flex: 1 1 100%;
+    max-width: none;
+    order: 3;
+  }
+
+  .arena-run-strip .composer-run {
+    order: 4;
+    margin-left: auto;
+  }
+}
+
+.arena-run-strip .composer-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  height: var(--run-control-h, 2.5rem);
+  min-height: var(--run-control-h, 2.5rem);
+  flex-shrink: 0;
+  padding: 0 clamp(0.95rem, 1.8vw, 1.25rem);
+  border-radius: 0;
+  border: 1px solid var(--ring);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    transform var(--dur-fast) ease;
+}
+
+.arena-run-strip .composer-run:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
+}
+
+.arena-run-strip .composer-run:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.arena-run-strip .composer-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.arena-run-strip .composer-run[data-running="true"] {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border-color: var(--ring);
+}
+
+.arena-run-strip .composer-run[data-running="true"]:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
+}
+
+.composer-templates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Judgeable template group label */
+.composer-template-group {
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  padding-right: 0.25rem;
+}
+
+/* Judgeable template badge (scoring method) */
+.composer-template-badge {
+  font-size: 0.625rem;
+  line-height: 1;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 0;
+  padding: 2px 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.composer-templates .btn-ghost[data-active="true"] {
+  border-color: var(--ring);
+  color: var(--foreground);
+}
+
+/* Divider between template groups */
+.composer-template-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin-inline: 0.25rem;
+}
+
+.composer-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.composer-row .form-input {
+  flex: 1;
+  min-width: 0;
+  height: clamp(2.5rem, 5.5vh, 2.85rem);
+}
+
+.composer-row .btn-primary,
+.composer-row .btn-ghost.composer-run {
+  height: clamp(2.5rem, 5.5vh, 2.85rem);
+  flex-shrink: 0;
+  padding-inline: clamp(0.9rem, 2vw, 1.25rem);
+}
+
+/* Main stage: prefer remaining viewport height */
+.arena-body {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  gap: var(--arena-gap);
+  overflow: hidden;
+}
+
+.arena-stage {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.arena-stage-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.85rem;
+  padding: 0.45rem 0.7rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.arena-stage-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 0;
+  background: var(--muted);
+  border: 1px solid var(--ring);
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  max-width: 100%;
+}
+
+.arena-stage-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: clamp(0.4rem, 1vw, 0.7rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.arena-stage-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+/* Result columns: equal share when wide; horizontal scroll when narrow/zoomed, scroll inside each column */
+.arena-columns {
+  display: flex;
+  gap: 0.65rem;
+  height: 100%;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+
+.arena-columns > * {
+  flex: 1 1 0;
+  min-width: max(16rem, calc((100% - 1.95rem) / 4));
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
+  scroll-snap-align: start;
+  animation: fade-up var(--dur-slow) var(--ease-out) both;
+}
+
+.arena-columns > *:nth-child(1) { animation-delay: 0ms; }
+.arena-columns > *:nth-child(2) { animation-delay: 50ms; }
+.arena-columns > *:nth-child(3) { animation-delay: 100ms; }
+.arena-columns > *:nth-child(4) { animation-delay: 150ms; }
+
+.arena-columns[data-count="2"] > * {
+  min-width: max(16rem, calc((100% - 0.65rem) / 2));
+}
+
+.arena-columns[data-count="3"] > * {
+  min-width: max(15rem, calc((100% - 1.3rem) / 3));
+}
+
+.column-card {
+  --lane: var(--spectrum-1);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  box-shadow: var(--shadow-xs);
+  animation: column-enter var(--dur-panel) var(--ease-out) both;
+}
+
+.column-card[data-lane="0"] { --lane: var(--spectrum-1); }
+.column-card[data-lane="1"] { --lane: var(--spectrum-2); }
+.column-card[data-lane="2"] { --lane: var(--spectrum-3); }
+.column-card[data-lane="3"] { --lane: var(--spectrum-4); }
+
+/* Running state: flat lane-colored rail across the card's top edge */
+.column-card[data-running="true"] {
+  box-shadow: inset 0 3px 0 0 var(--lane), var(--shadow-xs);
+}
+
+.column-card-placeholder {
+  background: color-mix(in srgb, var(--muted) 40%, var(--card));
+}
+
+.column-workspace {
+  max-height: 14rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--muted) 28%, transparent);
+}
+
+.arena-chat-history-note {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  padding: 0 0.15rem 0.4rem;
+  line-height: 1.45;
+}
+
+@keyframes column-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.column-header {
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--lane, var(--border)) 40%, var(--border));
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+/* Column identity: the lane color owns the card's top rail, header underline, status
+   dot and trace rail — one hue per agent across tiles, cards and diff views. */
+.column-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-normal);
+}
+
+.column-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.column-status-dot.running {
+  background: var(--lane, var(--spectrum-1));
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.column-status-dot.done {
+  background: var(--success);
+}
+
+.column-status-dot.error {
+  background: var(--destructive);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+
+/* Params / workspace: dual-side drawer overlays that do not squeeze the main stage */
+.arena-drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  width: min(18.5rem, 86vw);
+  background: var(--card);
+  border: 1px solid var(--ring);
+  border-radius: 0;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-12px);
+  transition:
+    opacity var(--dur-panel) var(--ease-out),
+    transform var(--dur-panel) var(--ease-out),
+    visibility var(--dur-panel) var(--ease-out);
+}
+
+.arena-drawer[data-side="left"] {
+  left: 0;
+}
+
+.arena-drawer[data-side="right"] {
+  right: 0;
+  width: min(20rem, 88vw);
+  transform: translateX(12px);
+}
+
+.arena-drawer[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.arena-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 26%, transparent);
+  flex-shrink: 0;
+}
+
+.arena-drawer-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.75rem;
+  scrollbar-width: thin;
+}
+
+.arena-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  background: color-mix(in srgb, var(--background) 55%, transparent);
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--dur) var(--ease-out),
+    visibility var(--dur) var(--ease-out);
+}
+
+.arena-backdrop[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+@media (max-height: 860px) {
+  :root {
+    --arena-gap: 0.3rem;
+    --arena-pad: 0.35rem;
+  }
+
+  .composer-bar {
+    padding-block: 0.35rem 0.4rem;
+  }
+
+  .composer-row .form-input {
+    height: 2.35rem;
+    min-height: 2.35rem;
+  }
+
+  .arena-run-strip {
+    --run-control-h: 2.35rem;
+  }
+
+  /* Same specificity as the setup-scale rule below so the short-viewport
+     compaction actually wins inside the setup strip. */
+  .arena-setup .arena-run-strip {
+    --run-control-h: calc(2.35rem * var(--setup-k));
+  }
+}
+
+@media (max-height: 760px) {
+  :root {
+    --arena-gap: 0.25rem;
+    --arena-pad: 0.3rem;
+  }
+
+  .dim-rail-item {
+    min-height: 2.25rem;
+    padding: 0.3rem 0.25rem;
+  }
+
+  .dim-rail-index {
+    display: none;
+  }
+
+  .composer-templates {
+    display: none;
+  }
+
+  .lane-tile {
+    min-height: 2.25rem;
+    padding: 0.4rem 0.6rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .dim-rail {
+    grid-template-columns: repeat(5, minmax(4.5rem, 1fr));
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .arena-columns > * {
+    min-width: min(100%, 17rem);
+    flex: 0 0 min(100%, 17rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .dim-rail {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .dim-rail-item {
+    flex: 0 0 auto;
+    min-width: 4.75rem;
+    scroll-snap-align: start;
+  }
+
+  .composer-row {
+    flex-wrap: wrap;
+  }
+
+  .composer-row .btn-primary,
+  .composer-row .btn-ghost.composer-run {
+    width: 100%;
+  }
+}
+
+/* ===== Setup strip compact scale =====
+   The whole setup strip (participants, chips, composer) renders at a reduced
+   scale so the comparison stage keeps the visual weight. One knob: --setup-k. */
+.arena-setup {
+  --setup-k: 0.8;
+  --run-control-h: calc(2.5rem * var(--setup-k));
+}
+
+.arena-setup .arena-run-strip {
+  --run-control-h: calc(2.5rem * var(--setup-k));
+  gap: calc(0.45rem * var(--setup-k)) calc(0.55rem * var(--setup-k));
+}
+
+.arena-setup .chip-toggle {
+  height: calc(1.75rem * var(--setup-k));
+  padding: 0 calc(0.55rem * var(--setup-k));
+  font-size: calc(0.875rem * var(--setup-k));
+}
+
+.arena-setup .chip-toggle-strip {
+  height: var(--run-control-h);
+  min-height: var(--run-control-h);
+}
+
+.arena-setup .lane-tile {
+  min-height: calc(1.9rem * var(--setup-k));
+  padding: calc(0.3rem * var(--setup-k)) calc(0.6rem * var(--setup-k));
+  font-size: calc(0.8125rem * var(--setup-k));
+  gap: calc(0.38rem * var(--setup-k));
+}
+
+.arena-setup .arena-run-strip .composer-run {
+  font-size: calc(0.875rem * var(--setup-k));
+  padding: 0 calc(0.95rem * var(--setup-k));
+}
+
+.arena-setup .arena-run-strip-input {
+  font-size: calc(0.875rem * var(--setup-k));
+  padding: 0 calc(0.7rem * var(--setup-k));
+}
+
+.arena-setup .composer-attachment-chip {
+  height: calc(1.65rem * var(--setup-k));
+  font-size: calc(0.8125rem * var(--setup-k));
+}
+
+/* Dimension switcher: a UiSelect dressed as a chip-toggle in the tools row.
+   Reads in the chip voice (near-black label + leading icon), like 基线/实验参数. */
+.arena-setup .dim-select .ui-select-trigger {
+  height: calc(1.75rem * var(--setup-k));
+  min-height: calc(1.75rem * var(--setup-k));
+  padding: 0 calc(0.55rem * var(--setup-k));
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0;
+  color: var(--foreground);
+  font-size: calc(0.875rem * var(--setup-k));
+  font-weight: 550;
+  box-shadow: none;
+}
+
+.arena-setup .dim-select .ui-select-trigger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--muted) 72%, transparent);
+  border-color: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+.arena-setup .dim-select .ui-select-trigger[aria-expanded="true"] {
+  color: var(--foreground);
+  background: var(--muted);
+  border-color: var(--ring);
+  box-shadow: var(--shadow-xs);
+}

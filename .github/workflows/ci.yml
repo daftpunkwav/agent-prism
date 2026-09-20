@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Deterministic pnpm store location is not needed; caching keys off the lockfile.
+  CI: "true"
+
+jobs:
+  verify:
+    # Windows is the reference platform. The restricted-token sandbox, the
+    # process-runner suite, and the PowerShell 5.1 cold-start budgets in
+    # vitest.config.ts are Windows-specific: another runner would skip the
+    # security-relevant sandbox cases and drop coverage under the gate.
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from package.json#packageManager.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Builds packages, then typechecks packages, apps, and the test projects.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Next.js ESLint over the web app (fails on errors; warnings stay advisory).
+      - name: Web lint
+        run: pnpm --filter @agentprism/web lint
+
+      # Catalog key parity (via the web vitest suite) plus the inline-CJK copy sweep.
+      - name: Web i18n gate
+        run: pnpm --filter @agentprism/web check:i18n
+
+      # Enforces the coverage thresholds configured in vitest.config.ts.
+      - name: Test with coverage
+        run: pnpm test:coverage
+
+      - name: Import boundaries
+        run: pnpm boundaries
+
+      - name: Dependency hygiene
+        run: pnpm check:deps
+
+      # Every callable public export must be referenced by a test harness file.
+      - name: Public export test coverage
+        run: pnpm check:exports
+
+      - name: Upload coverage summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-summary
+          path: cov-report/
+          if-no-files-found: ignore
+
+  smoke:
+    # Boots the real host binary and probes it over HTTP, so the composition root,
+    # the listener, and the read contracts are exercised outside the test harness.
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from package.json#packageManager, same as the verify job.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r build
+
+      - name: Start server
+        shell: pwsh
+        run: |
+          $env:BACKEND_HOST = "127.0.0.1"
+          $env:BACKEND_PORT = "8291"
+          Start-Process -FilePath "node" `
+            -ArgumentList "apps/server/dist/main.js" `
+            -RedirectStandardOutput "server.log" `
+            -RedirectStandardError "server.err.log" `
+            -NoNewWindow
+
+      - name: Smoke
+        env:
+          SMOKE_PORT: "8291"
+          SMOKE_TIMEOUT_MS: "60000"
+        run: node scripts/smoke.mjs
+
+      - name: Server logs
+        if: failure()
+        shell: pwsh
+        run: |
+          if (Test-Path server.log) { Write-Output "--- stdout ---"; Get-Content server.log }
+          if (Test-Path server.err.log) { Write-Output "--- stderr ---"; Get-Content server.err.log }

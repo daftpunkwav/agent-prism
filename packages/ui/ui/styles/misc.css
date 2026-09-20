@@ -1,0 +1,37 @@
+/* Focus visibility: 21th electric-blue outline */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Route error boundary */
+.error-boundary {
+  max-width: 36rem;
+  margin: 4rem auto;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+.error-boundary h1 {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.error-boundary p {
+  color: var(--muted-foreground, #71717a);
+  margin-bottom: 0.5rem;
+}
+.error-boundary-digest {
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+}
+.error-boundary-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}

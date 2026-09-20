@@ -1,0 +1,28 @@
+{
+  "name": "@agentprism/arena-routing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@agentprism/contracts": "workspace:*",
+    "@agentprism/dimensions": "workspace:*",
+    "@agentprism/harness": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentprism/evaluation": "workspace:*",
+    "@types/node": "^24"
+  }
+}

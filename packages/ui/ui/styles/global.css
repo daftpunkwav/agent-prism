@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/*
+  Entry stylesheet — consumers import "@agentprism/ui/styles/global.css".
+  The @import order below IS the cascade order and mirrors the original
+  monolith top-to-bottom; do not reorder, and place new imports in
+  cascade-safe positions. Section files keep their original section comments.
+*/
+
+@import "./tokens.css";
+@import "./base.css";
+@import "./header.css";
+@import "./forms.css";
+@import "./arena.css";
+@import "./ui-select.css";
+@import "./baseline.css";
+@import "./arena-stage.css";
+@import "./legacy.css";
+@import "./trace.css";
+@import "./motion.css";
+@import "./guide.css";
+@import "./guide-ledger.css";
+@import "./markdown.css";
+@import "./misc.css";

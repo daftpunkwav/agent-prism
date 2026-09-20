@@ -1,0 +1,33 @@
+{
+  "name": "agent-prism",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r --filter=!@agentprism/web --filter=!@agentprism/server build && pnpm -r typecheck && pnpm typecheck:tests",
+    "boundaries": "node scripts/check-boundaries.mjs",
+    "dev:server": "pnpm --filter @agentprism/server dev",
+    "dev:web": "pnpm --filter @agentprism/web dev",
+    "start:server": "pnpm --filter @agentprism/server start",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "smoke": "node scripts/smoke.mjs",
+    "typecheck:tests": "tsc -p tsconfig.tests.json --noEmit",
+    "verify": "pnpm -r build && pnpm -r typecheck && pnpm typecheck:tests && pnpm test:coverage && pnpm boundaries && pnpm check:deps && pnpm check:exports",
+    "check:deps": "node scripts/check-package-deps.mjs",
+    "check:exports": "node scripts/check-export-tests.mjs"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^24.13.3",
+    "@vitest/coverage-v8": "^4.1.11",
+    "jsdom": "^30.0.1",
+    "vitest": "^4.1.11"
+  }
+}

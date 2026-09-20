@@ -1,0 +1,476 @@
+/* ===== Baseline settings modal ===== */
+.arena-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: color-mix(in srgb, var(--background) 65%, transparent);
+  border: none;
+  cursor: pointer;
+  animation: fade-in var(--dur) var(--ease-out) both;
+}
+
+.arena-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 95;
+  transform: translate(-50%, -50%);
+  width: min(46rem, calc(100vw - 2rem));
+  max-height: min(80vh, 42rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--ring);
+  border-radius: 0;
+  box-shadow: var(--shadow-xl);
+  animation: modal-in var(--dur-panel) var(--ease-out) both;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 10px)) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.arena-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.arena-modal-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-normal);
+}
+
+.arena-modal-body {
+  /* basis auto: the modal is content-sized, so a zero basis would collapse the body */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 0.9rem;
+}
+
+/* Per-column ask_user overlay (arena): dims and covers one column card only, so
+   simultaneous columns each pop their own independent ask window. */
+.arena-ask-inline {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--background) 55%, transparent);
+  animation: fade-in var(--dur) var(--ease-out) both;
+}
+
+.arena-modal[data-inline="true"] {
+  position: static;
+  transform: none;
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(100% - 0.25rem);
+  min-width: 0;
+  box-sizing: border-box;
+  /* Centered modals use modal-in (translate(-50%,-50%)); inline must not inherit
+     that transform or it renders half-off the column (truncated left edge). */
+  animation: fade-in var(--dur) var(--ease-out) both;
+}
+
+/* Dimension switcher: square equal tracks, active = solid primary block */
+.dim-rail {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border-radius: 0;
+  background: var(--muted);
+  border: 1px solid var(--ring);
+  width: 100%;
+  min-width: 0;
+}
+
+.dim-rail-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-height: clamp(2.5rem, 6.5vh, 3.25rem);
+  padding: 0.45rem 0.35rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: clamp(0.72rem, 1.5vw, 0.88rem);
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  transition:
+    background var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    transform var(--dur-fast) ease;
+}
+
+.dim-rail-item:hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+}
+
+.dim-rail-item[data-active="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+.dim-rail-index {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  line-height: 1;
+}
+
+.dim-rail-item[data-active="true"] .dim-rail-index {
+  color: var(--primary-foreground);
+  opacity: 1;
+}
+
+.dim-rail-label {
+  line-height: 1.15;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Compare participants: spectrum lane tiles (compact) */
+.lane-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.lane-row-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.lane-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.lane-tile {
+  --lane: var(--spectrum-1);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 1.9rem;
+  padding: 0.3rem 0.6rem 0.3rem 0.6rem;
+  border-radius: 0;
+  border: 1px solid var(--border);
+  background: var(--input);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition:
+    border-color var(--dur-fast) ease,
+    background var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+  overflow: hidden;
+}
+
+.lane-tile[data-lane="0"] { --lane: var(--spectrum-1); }
+.lane-tile[data-lane="1"] { --lane: var(--spectrum-2); }
+.lane-tile[data-lane="2"] { --lane: var(--spectrum-3); }
+.lane-tile[data-lane="3"] { --lane: var(--spectrum-4); }
+
+.lane-tile:hover {
+  color: var(--foreground);
+  border-color: var(--lane);
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.lane-tile[data-selected="true"] {
+  color: var(--foreground);
+  border-color: var(--lane);
+  background: var(--card);
+  box-shadow: 2px 2px 0 0 var(--lane);
+  transform: translate(-1px, -1px);
+}
+
+/* Inline adder for custom numeric lane values (max steps / temperature) */
+.lane-custom {
+  display: inline-flex;
+  align-items: center;
+}
+
+.lane-custom-input {
+  min-height: 1.9rem;
+  width: 6.5rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 0;
+  border: 1px dashed var(--muted-foreground);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 500;
+  outline: none;
+  transition:
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.lane-custom-input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
+.lane-custom-input:focus {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--foreground);
+}
+
+.lane-custom-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.lane-custom-input[aria-invalid="true"] {
+  border-color: var(--destructive);
+  color: var(--destructive);
+}
+
+/* Control-variable baseline: grouped spacing so one row is not cramped */
+.baseline-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.baseline-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.baseline-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.4rem 0.5rem 0.45rem;
+  border-radius: 0;
+  /* One neutral border for every group: 21th keeps chrome monochrome; the
+     group title carries the distinction, not a per-group tint. */
+  border: 1px solid color-mix(in srgb, var(--ring) 35%, var(--border));
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+}
+
+.baseline-group-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--foreground);
+}
+
+.baseline-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.4rem;
+}
+
+.baseline-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.3rem 0.45rem;
+  border-radius: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+}
+
+.baseline-field[data-locked="true"] {
+  opacity: 0.72;
+}
+
+.baseline-field-label {
+  /* 0.7rem + weight 600: Chinese labels in this modal render at the same
+     optical weight as the uppercase Latin ones instead of dropping out. */
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.composer-bar {
+  display: flex;
+  flex-direction: column;
+  /* No flex gap: closed blocks must contribute exactly zero, visible ones carry margins */
+  gap: 0;
+  padding: 0.2rem var(--chrome-pad, 0.5rem) 0.45rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  min-width: 0;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+}
+
+.composer-bar-pinned {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--card);
+}
+
+.arena-chat-history {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-bottom: 0;
+  overflow: hidden;
+  transition:
+    grid-template-rows var(--dur-panel) var(--ease-out),
+    margin-bottom var(--dur) var(--ease-out);
+}
+
+.arena-chat-history[data-open="true"] {
+  grid-template-rows: 1fr;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  margin-bottom: 0.25rem;
+}
+
+.arena-chat-history-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.35rem 0 0.15rem;
+  max-height: 7.5rem;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--dur-panel) var(--ease-out),
+    transform var(--dur-panel) var(--ease-out);
+}
+
+/* Closed: the inner's vertical padding would still size the 0fr track — zero it out */
+.arena-chat-history:not([data-open="true"]) .arena-chat-history-inner {
+  padding-block: 0;
+}
+
+.arena-chat-history[data-open="true"] .arena-chat-history-inner {
+  opacity: 1;
+  transform: none;
+}
+
+.arena-chat-history-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.arena-chat-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.arena-chat-history-list li {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.arena-chat-history-list li[data-role="user"] .arena-chat-role {
+  color: var(--accent);
+}
+
+.arena-chat-history-list li[data-role="assistant"] .arena-chat-role {
+  color: var(--muted-foreground);
+}
+
+.arena-chat-role {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-top: 0.1rem;
+}
+
+.arena-chat-content {
+  color: var(--foreground);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.trace-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-top: 0.15rem;
+}
+
+.trace-turn + .trace-turn {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed color-mix(in srgb, var(--border) 85%, transparent);
+}
+
+.trace-turn-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}

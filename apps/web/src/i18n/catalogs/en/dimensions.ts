@@ -1,0 +1,158 @@
+/**
+ * @file catalogs/en/dimensions
+ * @description English copy for the dimension label overlay.
+ *
+ * Responsibilities:
+ * - Mirror the zh-CN dimensions namespace key-for-key
+ *
+ * Structure is compile-enforced via MessageCatalog against the zh-CN source.
+ */
+
+export const dimensions = {
+  currentSuffix: " (current)",
+  field: {
+    framework: "Framework",
+    prompt: "Prompt",
+    reasoning: "Reasoning",
+    context: "Context",
+    harness: "Harness",
+    temperature: "Temperature",
+    model: "Model",
+    thinking: "Thinking",
+    max_steps: "Max steps",
+    toolset: "Toolset",
+    mcp: "MCP",
+    skill: "Skill",
+    orchestration: "Orchestration",
+    memory: "Memory",
+  },
+  subtitle: {
+    framework: "Orchestration differs; other dims stay pinned by the baseline",
+    prompt: "Switches only the Prompt template; other dims stay pinned by the baseline",
+    reasoning: "Control-flow modes (react/cot/tot/reflexion/self-consistency); each column has its own disk workspace",
+    context: "Sliding / summary / vector actually trim before every LLM call",
+    harness: "Dimension columns pin Native: three drivers share VerificationPolicy (verify/reflect/self_evolve truly retry)",
+    temperature: "Writes the real LLM temperature (sampling randomness)",
+    model: "Switches Settings endpoints (cross-provider or multi-model on one connection); decode params stay pinned",
+    thinking: "off/low/medium/high; the model must have \"supports thinking\" checked in Settings to enable",
+    max_steps: "Native/LangGraph hard-budget LLM turns; LangChain approximates via recursion_limit only",
+    toolset: "Really filters bind_tools / create_agent tool lists",
+    mcp: "Bridges MCP filesystem/fetch servers into the tool list; off / fs / full changes what the model can call",
+    skill: "Off disables the skill tool; on-demand loads via the skill tool; preloaded injects runbooks into the prompt",
+    orchestration: "Direct runs free-form; plan-first seeds a plan doc; goal-first seeds a tracked objective",
+    memory: "Mounts cross-session memory into the prompt; none vs episodic vs semantic vs full changes what the model recalls",
+  },
+  baselineField: {
+    framework: "Framework",
+    prompt_profile: "Prompt",
+    reasoning: "Reasoning",
+    context: "Context",
+    harness: "Harness",
+    temperature: "Temperature",
+    endpoint_id: "Model",
+    model_id: "Model",
+    thinking_level: "Thinking",
+    max_steps: "Max steps",
+    toolset: "Toolset",
+    top_p: "Top P",
+    frequency_penalty: "Frequency Penalty",
+    presence_penalty: "Presence Penalty",
+    max_output_tokens: "Max output tokens",
+    mcp_policy: "MCP",
+    skill_policy: "Skill",
+    approval_mode: "Approval mode",
+    sandbox_mode: "Sandbox mode",
+    orchestration: "Orchestration",
+    memory: "Memory",
+  },
+  opt: {
+    framework: {
+      native: "Native Agent",
+      langchain: "LangChain",
+      langgraph: "LangGraph",
+      plan_execute: "Plan-Execute",
+      self_critique: "Self-Critique",
+      autogen: "AutoGen Group-Chat",
+      crewai: "CrewAI Crew",
+    },
+    prompt: {
+      zero_shot: "Zero-shot",
+      few_shot: "Few-shot",
+      cot_prompt: "CoT Prompt",
+      structured: "Structured",
+    },
+    reasoning: {
+      react: "ReAct",
+      cot_tool: "CoT+Tool",
+      tot: "ToT",
+      reflexion: "Reflexion",
+      self_consistency: "Self-Consistency",
+    },
+    context: {
+      sliding: "Sliding window",
+      summary: "Summary compression",
+      vector: "Vector retrieval",
+      hybrid: "Hybrid strategy",
+    },
+    harness: {
+      bare: "Bare run",
+      verify: "Verify loop",
+      reflect: "Reflect loop",
+      self_evolve: "Self-evolve",
+    },
+    toolset: {
+      full: "Full tools",
+      edit_run: "Read/write + run",
+      read_only: "Read-only",
+    },
+    thinking: {
+      off: "Off",
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+    },
+    temperature: {
+      "0": "0 (deterministic)",
+      "0_3": "0.3",
+      "0_7": "0.7",
+      "1": "1.0",
+    },
+    max_steps: {
+      "5": "5 steps",
+      "10": "10 steps",
+      "15": "15 steps",
+      "20": "20 steps",
+    },
+    mcp: {
+      off: "MCP off (builtins only)",
+      fs: "MCP filesystem server",
+      full: "MCP filesystem + fetch",
+    },
+    skill: {
+      off: "Skills disabled",
+      on_demand: "On-demand via skill tool",
+      preloaded: "Preloaded into prompt",
+    },
+    orchestration: {
+      direct: "Direct execution",
+      plan_first: "Plan-first (plan tool up front)",
+      goal_first: "Goal-first (goal tool up front)",
+    },
+    memory: {
+      none: "No memory (stateless)",
+      episodic: "Episodic (past task experience)",
+      semantic: "Semantic (project facts)",
+      full: "Full (episodic + semantic)",
+    },
+  },
+  baselineOpt: {
+    approval_mode: {
+      auto: "Auto (deny catastrophic commands only)",
+      unless_trusted: "Known-safe commands only",
+    },
+    sandbox_mode: {
+      off: "Off (analysis and approval only)",
+      os: "OS write sandbox (workspace-only writes)",
+    },
+  },
+};

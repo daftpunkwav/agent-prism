@@ -1,0 +1,148 @@
+/* ===== Motion ===== */
+.page-enter {
+  animation: page-enter var(--dur-slow) var(--ease-out) both;
+}
+
+.animate-in {
+  animation: animate-in var(--dur) var(--ease-out) both;
+}
+
+.fade-in {
+  animation: fade-in var(--dur-slow) var(--ease-out) both;
+}
+
+.arena-tab-pane.fade-in {
+  animation: tab-pane-in var(--dur-panel) var(--ease-out) both;
+}
+
+.slide-in-from-bottom-4 {
+  animation: slide-in-from-bottom-4 var(--dur-slow) var(--ease-out) both;
+}
+
+.stagger-children > * {
+  animation: fade-up var(--dur-slow) var(--ease-out) both;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+.stagger-children > *:nth-child(9) { animation-delay: 400ms; }
+.stagger-children > *:nth-child(10) { animation-delay: 450ms; }
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes animate-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tab-pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slide-in-from-bottom-4 {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Loading block: square accent frame with a stepped opacity pulse — no glow,
+   no gradient shimmer. */
+.loading-prism {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0;
+  background: var(--card);
+  border: 2px solid var(--accent);
+  box-shadow: var(--shadow-sm);
+  margin-inline: auto;
+  animation: loading-pulse 0.9s steps(2, start) infinite;
+}
+
+@keyframes loading-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Skeleton: flat muted block with a stepped blink — no gradient sweep. */
+.shimmer {
+  background: var(--muted);
+  animation: loading-pulse 1.2s steps(2, start) infinite;
+  border-radius: 0;
+}
+
+.learn-week-card[data-lane="0"] { --lane: var(--spectrum-1); }
+.learn-week-card[data-lane="1"] { --lane: var(--spectrum-2); }
+.learn-week-card[data-lane="2"] { --lane: var(--spectrum-3); }
+.learn-week-card[data-lane="3"] { --lane: var(--spectrum-4); }
+
+.learn-week-badge {
+  color: var(--lane, var(--foreground));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .page-enter,
+  .fade-in,
+  .animate-in,
+  .slide-in-from-bottom-4,
+  .stagger-children > *,
+  .trace-seg,
+  .column-card,
+  .arena-tab-pane {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .shell-nav-indicator {
+    opacity: 1;
+  }
+}
