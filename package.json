@@ -19,7 +19,7 @@
     "test:coverage": "vitest run --coverage",
     "smoke": "node scripts/smoke.mjs",
     "typecheck:tests": "tsc -p tsconfig.tests.json --noEmit",
-    "verify": "pnpm -r build && pnpm -r typecheck && pnpm typecheck:tests && pnpm test:coverage && pnpm boundaries && pnpm check:deps && pnpm check:exports",
+    "verify": "pnpm -r build && pnpm -r typecheck && pnpm typecheck:tests && pnpm --filter @agentprism/web lint && pnpm --filter @agentprism/web check:i18n && pnpm test:coverage && pnpm boundaries && pnpm check:deps && pnpm check:exports",
     "check:deps": "node scripts/check-package-deps.mjs",
     "check:exports": "node scripts/check-export-tests.mjs"
   },

@@ -182,7 +182,11 @@ for (const pkg of pkgs) {
   }
 }
 
-const stale = PENDING.filter((name) => !failures.some((f) => f.endsWith(`: ${name}`)));
+// The list must only ever shrink: a PENDING symbol that a harness file now imports
+// has gained its test, so its line has to be deleted. Comparing against `failures`
+// cannot see that -- pending names are skipped before they can reach `failures` --
+// so match the referenced set instead.
+const stale = PENDING.filter((name) => referenced.has(name));
 
 console.log(`[check-export-tests] packages=${pkgs.length} harness files=${harnessFiles.length} callable exports=${callableTotal}`);
 console.log(`[check-export-tests] pending (no test yet)=${PENDING.length}`);
@@ -191,6 +195,12 @@ if (failures.length > 0) {
   console.error(`\n[check-export-tests] ${failures.length} callable export(s) have no test and are not listed as pending:`);
   for (const line of failures) console.error(`  ${line}`);
   console.error("\nAdd a test, or add the symbol to PENDING in scripts/check-export-tests.mjs.");
+  process.exit(1);
+}
+
+if (stale.length > 0) {
+  console.error(`\n[check-export-tests] ${stale.length} PENDING entry(ies) already have a test; delete these lines:`);
+  for (const name of stale) console.error(`  ${name}`);
   process.exit(1);
 }
 
