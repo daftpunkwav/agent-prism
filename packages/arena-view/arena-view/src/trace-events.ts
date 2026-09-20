@@ -57,6 +57,30 @@ export interface DisplaySegment {
    * the run settles).
    */
   final?: boolean;
+  /**
+   * Multi-agent identity carried by framework drivers (AutoGen coder/reviewer,
+   * CrewAI role crew): parsed from the drivers' stable event labels and sticky
+   * across the segments of one agent's turn until the next label appears.
+   * Absent for single-agent flows, which need no attribution.
+   */
+  actor?: string;
+}
+
+/**
+ * Resolves the multi-agent identity announced by one event's text, or null.
+ * Recognizes the framework drivers' stable labels: AutoGen's speaker-selection
+ * line (`speaker: coder`), CrewAI's task dispatch (`task 1/3 → Researcher`),
+ * and any bracketed `[AutoGen …]` / `[CrewAI …]` role tag.
+ */
+export function actorTagOf(eventType: string, content: string): string | null {
+  if (eventType !== "reflect" && eventType !== "thought" && eventType !== "thought_delta") return null;
+  const speaker = /\bspeaker:\s*(coder|reviewer)\b/.exec(content);
+  if (speaker !== null) return `AutoGen ${speaker[1]}`;
+  const task = /\btask\s+\d+\/\d+\s*→\s*([A-Za-z][A-Za-z ]*?)(?::|$)/m.exec(content);
+  if (task !== null) return `CrewAI ${(task[1] ?? "").trim()}`;
+  const tag = /^\[(AutoGen|CrewAI)[^\]]*\]/.exec(content);
+  if (tag !== null) return tag[0].slice(1, -1);
+  return null;
 }
 
 /** Event turn. The contract (ArenaEventBase) guarantees all variants carry step/turn; 0 = unannotated. */
@@ -75,12 +99,21 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
   let openActionIdx: number | null = null;
   // Sticky producing-tool name for orphan observations (stray output without a paired action)
   let lastTool = "";
+  // Sticky multi-agent identity: once a framework driver announces who acts, every
+  // following segment belongs to that actor until the next announcement.
+  let currentActor: string | undefined;
   for (const ev of events) {
     const step = ev.step ?? 0;
     const turn = eventTurn(ev);
     const ts = ev.timestamp || undefined;
     const prevLen = segs.length;
     const key = `${turn}:${ev.type}:${step}`;
+    const announced = actorTagOf(ev.type, ev.content || "");
+    // Banner-shaped thoughts must not seed the sticky actor; CrewAI's dispatch
+    // reflects share the banner's "[CrewAI crew]" prefix by design, so the guard
+    // applies to thoughts only (reflects have no banner concept).
+    const bannerBlocked = ev.type !== "reflect" && isPipelineConfigBanner(ev.content || "");
+    if (announced !== null && !bannerBlocked) currentActor = announced;
     if (ev.type === "step_start") {
       openActionIdx = null;
       const pendingKey = `stepstart:${turn}:${step}`;
@@ -92,6 +125,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
         turn,
         text: "",
         completed: false,
+        actor: currentActor,
       });
       segIndex.set(pendingKey, segs.length - 1);
     } else if (ev.type === "thought") {
@@ -110,6 +144,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
         text: ev.content || "",
         completed: true,
         meta: isPipelineConfigBanner(ev.content) || undefined,
+        actor: currentActor,
       };
       segs.push(s);
       if (isPipelineConfigBanner(ev.content)) {
@@ -137,6 +172,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
           meta: true,
           tsStart: ts,
           tsEnd: ts,
+          actor: currentActor,
         };
         segs.push(s);
         segIndex.set(metaKey, segs.length - 1);
@@ -155,6 +191,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
           turn,
           text: chunk,
           completed: false,
+          actor: currentActor,
         };
         segs.push(s);
         segIndex.set(streamKey, segs.length - 1);
@@ -182,6 +219,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
           turn,
           text: ev.content || "",
           completed: true,
+          actor: currentActor,
         };
         segs.push(s);
         segIndex.set(thinkKey, segs.length - 1);
@@ -199,6 +237,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
         result: "",
         resultDone: true,
         completed: true,
+        actor: currentActor,
       });
       openActionIdx = segs.length - 1;
       lastTool = ev.tool ?? "";
@@ -220,6 +259,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
         text: ev.result || "",
         tool: lastTool,
         completed: true,
+        actor: currentActor,
       });
     } else if (ev.type === "tool_progress") {
       const progKey = `tool_progress:${turn}:${step}`;
@@ -241,6 +281,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
           turn,
           text: ev.content || "",
           completed: false,
+          actor: currentActor,
         };
         segs.push(s);
         segIndex.set(progKey, segs.length - 1);
@@ -258,6 +299,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
         turn,
         text: ev.content || "",
         completed: true,
+        actor: currentActor,
       });
     } else if (ev.type === "error") {
       openActionIdx = null;
@@ -269,6 +311,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
         turn,
         text: ev.message || "",
         completed: true,
+        actor: currentActor,
       });
     } else if (ev.type === "verify" || ev.type === "reflect" || ev.type === "harness_edit") {
       openActionIdx = null;
@@ -280,6 +323,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
         turn,
         text: ev.content || "",
         completed: true,
+        actor: currentActor,
       });
     }
     // Stamp created segments with the event time (streaming folds updated tsEnd above)

@@ -31,6 +31,7 @@ export const builder = {
   phaseSummary: {
     thinking: "{count} 段推理",
     answer: "最终回复",
+    answerMid: "回复",
     error: "运行错误",
   },
   renameConfirm: "保存名称",

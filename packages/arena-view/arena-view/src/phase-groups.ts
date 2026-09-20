@@ -67,6 +67,8 @@ export interface PhaseGroup {
   durationMs: number | null;
   /** True when the phase carries the turn's final answer segment. */
   final: boolean;
+  /** Multi-agent identity (framework drivers); undefined for single-agent flows. */
+  actor?: string;
 }
 
 interface MutablePhase extends Omit<PhaseGroup, "durationMs"> {
@@ -95,7 +97,14 @@ export function groupPhases(segments: readonly DisplaySegment[]): PhaseGroup[] {
     const category = segmentCategory(seg);
     const prev = mutable[mutable.length - 1];
     let phase: MutablePhase;
-    if (prev !== undefined && prev.category === category && category !== "answer") {
+    // A different multi-agent actor always opens a new phase: folding a coder's
+    // work and a reviewer's work into one row would hide who did what.
+    if (
+      prev !== undefined &&
+      prev.category === category &&
+      category !== "answer" &&
+      prev.actor === seg.actor
+    ) {
       phase = prev;
     } else {
       phase = {
@@ -105,6 +114,7 @@ export function groupPhases(segments: readonly DisplaySegment[]): PhaseGroup[] {
         tools: [],
         thinkingCount: 0,
         final: false,
+        actor: seg.actor,
       };
       mutable.push(phase);
     }

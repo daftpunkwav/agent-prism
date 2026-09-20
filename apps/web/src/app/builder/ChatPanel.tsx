@@ -118,7 +118,7 @@ export function PhaseGroups({
   const activeOpen = pinnedId !== null ? pinnedId : tailId;
   return (
     <ul className="builder-phase-list">
-      {phases.map((phase: PhaseGroup) => {
+      {phases.map((phase: PhaseGroup, phaseIndex: number) => {
         const Icon = PHASE_ICONS[phase.category] ?? ChevronRight;
         const open = activeOpen === phase.id;
         const subset = segments.filter((segment) => phase.segmentIds.includes(segment.id));
@@ -143,11 +143,16 @@ export function PhaseGroups({
               />
               <Icon size={12} aria-hidden />
               <span className="builder-phase-label">{t(`builder.phase.${phase.category}` as const)}</span>
+              {phase.actor && <span className="builder-phase-actor">{phase.actor}</span>}
               <span className="builder-phase-summary">
                 {phase.category === "thinking"
                   ? t("builder.phaseSummary.thinking", { count: phase.thinkingCount })
                   : phase.category === "answer"
-                    ? t("builder.phaseSummary.answer")
+                    ? // Only the tail answer phase is the turn's final reply; mid-turn
+                      // answer segments are process narration, not the final reply.
+                      phaseIndex === phases.length - 1
+                      ? t("builder.phaseSummary.answer")
+                      : t("builder.phaseSummary.answerMid")
                     : phase.category === "error"
                       ? t("builder.phaseSummary.error")
                       : phase.tools.map((tc) => `${tc.count}× ${tc.tool}`).join(" · ")}
@@ -416,7 +421,9 @@ function SegmentRow({
       segment.kind === "verify"
         ? t("builder.verify")
         : segment.kind === "reflect"
-          ? t("builder.reflect")
+          ? // Multi-agent flows announce speaker turns, dispatches, and critiques
+            // over reflect — the actor's name is the honest label there.
+            (segment.actor ?? t("builder.reflect"))
           : t("builder.harnessEdit");
     return (
       <div className="builder-seg builder-seg-meta">

@@ -1113,6 +1113,19 @@ details[open] > .builder-log-summary::before {
   color: var(--foreground);
 }
 
+/* Multi-agent identity chip (framework drivers): names who owns the phase. */
+.builder-phase-actor {
+  flex-shrink: 0;
+  padding: 0 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, var(--muted-foreground));
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+  color: var(--muted-foreground);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 .builder-phase-summary {
   flex: 1;
   min-width: 0;

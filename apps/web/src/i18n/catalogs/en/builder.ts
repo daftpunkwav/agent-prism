@@ -31,6 +31,7 @@ export const builder = {
   phaseSummary: {
     thinking: "{count} reasoning step(s)",
     answer: "Final answer",
+    answerMid: "Reply",
     error: "Run error",
   },
   renameConfirm: "Save name",
