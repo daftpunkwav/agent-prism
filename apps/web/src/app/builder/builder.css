@@ -1194,7 +1194,10 @@ details[open] > .builder-log-summary::before {
   font-size: 12px;
   cursor: pointer;
   list-style: none;
-  color: var(--spectrum-5);
+  /* Raw --spectrum-5 sits below 1.5:1 on light surfaces (it is a data-element
+     tint, not a text voice); blending toward the foreground keeps the lane hue
+     while restoring readable contrast in both themes. */
+  color: color-mix(in srgb, var(--spectrum-5) 35%, var(--foreground));
 }
 
 .builder-swap-banner-summary::-webkit-details-marker {

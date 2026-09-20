@@ -197,7 +197,9 @@
   }
 }
 
-/* Language toggle: compact square chip (labels injected by the host) */
+/* Language toggle: compact square chip (labels injected by the host).
+   The chip carries the single offset shadow, theme-toggle parity; the inner
+   trigger must stay shadow-free or its own offset edge reads as a stray line. */
 .lang-toggle {
   position: relative;
   display: inline-flex;
@@ -235,7 +237,9 @@
   flex-shrink: 0;
 }
 
-/* Language toggle: the UiSelect trigger blends into the header chip */
+/* Language toggle: the UiSelect trigger blends into the header chip.
+   box-shadow must go too: the trigger keeps the base trigger's 2px hard offset
+   shadow, whose right edge reads as a stray line inside the chip. */
 .lang-toggle-select .ui-select-trigger {
   height: 1.65rem;
   min-height: 1.65rem;
@@ -243,6 +247,7 @@
   background: transparent;
   border: none;
   border-radius: 0;
+  box-shadow: none;
   color: var(--muted-foreground);
   font-size: 0.7rem;
   font-weight: 500;
