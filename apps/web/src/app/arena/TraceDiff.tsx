@@ -23,6 +23,7 @@ import type { ColumnState } from "@agentprism/arena-view";
 import { buildTraceComparison, mergeEvents, type TraceCompareColumn } from "@agentprism/arena-view";
 import { useT } from "@/i18n/useT";
 import { CopyButton } from "./CopyButton";
+import { AnswerAlignment, EntityOverlap } from "./AnswerCompare";
 import { PipelineConfigCompare } from "./PipelineConfigView";
 
 interface TraceDiffProps {
@@ -161,6 +162,32 @@ function ColumnStepDetail({ events, frameworkId }: { events: ArenaEvent[]; frame
         </pre>
       </details>
     </div>
+  );
+}
+
+/** Shared tool-call prefix rendered once, with the divergence point called out. */
+function SharedPrefixSummary({ columns, prefix, diverged }: { columns: TraceCompareColumn[]; prefix: number; diverged: boolean }) {
+  const t = useT();
+  if (prefix === 0 || columns.length < 2) return null;
+  return (
+    <section className="panel-surface !shadow-none p-3 space-y-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <GitCommitHorizontal className="h-4 w-4 text-primary" aria-hidden />
+        <h4 className="text-sm font-semibold">{t("arena.diff.sharedPrefixTitle")}</h4>
+        {diverged && (
+          <span className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[11px] font-mono text-warning">
+            {t("arena.diff.divergeAt", { count: prefix + 1 })}
+          </span>
+        )}
+      </div>
+      <ol className="space-y-0.5 pt-1">
+        {columns[0]!.toolCalls.slice(0, prefix).map((call, index) => (
+          <li key={index} className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+            <span className="w-5 shrink-0 text-right">{t("arena.diff.sharedPrefixStep", { index: index + 1, tool: call.tool, detail: call.detail })}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -331,6 +358,14 @@ export function TraceDiff({ columns, resolveLabel }: TraceDiffProps) {
       </div>
 
       <PipelineConfigCompare columns={columns} resolveLabel={show} />
+
+      {!single && (
+        <>
+          <AnswerAlignment columns={comparison.columns} states={comparison.columns.map((col) => columns.find((c) => c.label === col.label))} resolveLabel={show} />
+          <SharedPrefixSummary columns={comparison.columns} prefix={divergeIndex >= 0 ? divergeIndex : comparison.commonToolPrefix} diverged={divergeIndex >= 0} />
+          <EntityOverlap columns={comparison.columns} resolveLabel={show} />
+        </>
+      )}
 
       <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, 260px), 1fr))` }}>
         {comparison.columns.map((col) => {

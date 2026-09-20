@@ -23,6 +23,7 @@ import {
 import type { ComparisonReportPayload } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 import { CopyButton } from "./CopyButton";
+import { AnswerAlignment, EntityOverlap } from "./AnswerCompare";
 import { PipelineConfigCompare } from "./PipelineConfigView";
 import { cleanNarrativeBody, splitNarrative } from "./narrative";
 
@@ -169,12 +170,24 @@ export function ComparisonReport({
                 <span className="report-verdict-winner font-mono">
                   {judgePassed} / {judged.length}
                 </span>
-                <span className="report-verdict-detail">{t("arena.report.autoJudgePassNote")}</span>
+                <span className="report-verdict-detail">
+                  {judgePassed === judged.length
+                    ? t("arena.report.autoJudgePassNote")
+                    : // Surface WHY columns failed instead of a bare count: the first
+                      // failing judge reason is the fastest signal for the reader.
+                      (judged.find((c) => !c.judge?.passed)?.judge?.reason ?? "").slice(0, 120)}
+                </span>
               </span>
             )}
           </div>
         )}
       </section>
+
+      <AnswerAlignment
+        columns={comparison.columns}
+        states={comparison.columns.map((col) => columnList.find((c) => c.label === col.label))}
+        resolveLabel={show}
+      />
 
       <PipelineConfigCompare columns={columnList} resolveLabel={show} />
 
@@ -318,6 +331,7 @@ export function ComparisonReport({
           <MessageSquareText className="h-4 w-4 text-primary" />
           <h4 className="text-sm font-semibold">{t("arena.report.answersTitle")}</h4>
         </div>
+        <EntityOverlap columns={comparison.columns} resolveLabel={show} />
         <div className="grid gap-3 md:grid-cols-2">
           {answers.map((row) => (
             <div key={row.label} className="rounded-none border border-border bg-muted/20 p-3 space-y-1.5">

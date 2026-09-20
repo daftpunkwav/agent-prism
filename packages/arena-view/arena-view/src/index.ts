@@ -10,4 +10,5 @@
 export * from "./trace-events.js";
 export * from "./phase-groups.js";
 export * from "./extract-final-answer.js";
+export * from "./answer-compare.js";
 export * from "./column-state.js";
