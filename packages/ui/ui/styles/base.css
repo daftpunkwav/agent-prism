@@ -25,6 +25,10 @@ button:not(:disabled) {
 html {
   color-scheme: light;
   scroll-behavior: smooth;
+  /* Reserve the scrollbar track even when a page does not scroll: without it,
+     centered layouts shift by the scrollbar width whenever a taller tab or view
+     toggles the document between scrollable and not (settings section switch). */
+  scrollbar-gutter: stable;
   /* Inherited by every element: gives Firefox the same thin square scrollbar
      the WebKit rules below paint. */
   scrollbar-width: thin;
