@@ -130,7 +130,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 
 | 变量 | 读取方 | 用途 |
 |---|---|---|
-| `MCP_SERVERS` | `apps/server/src/assemble.ts` 到 `tool-mcp/src/config.ts` | stdio MCP server 的 JSON 数组 `{command, args?, env?, timeoutMs?, tools?}`；`timeoutMs` 默认 `MCP_REQUEST_TIMEOUT_MS`；格式错误的 JSON 告警一次并被忽略，启动继续 |
+| `MCP_SERVERS` | `apps/server/src/assemble.ts` 到 `tool-mcp/src/config.ts` | stdio MCP server 的 JSON 数组 `{command, args?, env?, timeoutMs?, tools?, name?, enabled?}`；`timeoutMs` 默认 `MCP_REQUEST_TIMEOUT_MS`；仅在 `data/mcp_servers.json` 尚不存在时播种托管 store——运维经 settings API 保存后以文件为准；格式错误的 env JSON 告警一次并被忽略，启动继续 |
 | `DRIVERS` | `apps/server/src/load-drivers.ts` | 可选逗号分隔的 driver allowlist，大小写不敏感，如 `native,plan_execute,self_critique`；未设或空白表示全部内置；未知名称告警并忽略 |
 | `SEARCH_PROVIDER` | `tool-builtins/src/definitions/web-search.ts` | `exa` 或 `tavily`；其他任何值失败关闭并给出设置提示 |
 | `SEARCH_API_KEY` | 同上 | provider key；缺失则失败关闭 |
@@ -147,6 +147,16 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 重试预算、tool 预算与 driver knobs。`RuntimeKnobsStore` 在启动时加载它们，并经
 `GET` 与 `PUT /api/settings/knobs` 热应用更新，因此保存 settings 无需重启即可生效。
 文件缺失则保留 env 默认值。
+
+## 技能与 MCP 管理
+
+设置页另有两个托管 store，均无需重启即热应用。
+`GET/POST /api/settings/skills`、`PUT/DELETE /api/settings/skills/:name` 与
+`PUT /api/settings/skills/:name/enabled` 管理技能目录：内置技能只读（写入以 409
+拒绝），自定义技能保存在 `data/skills/<name>/SKILL.md`，停用名单持久化在
+`data/skill_settings.json` 并从下一轮运行起过滤生效目录。`GET` 与
+`PUT /api/settings/mcp` 整体替换托管 MCP 服务器列表；store 持有共享内存数组供
+每次运行读取，保存后立即对下一轮运行生效。
 
 ## 凭证引用
 
@@ -170,6 +180,9 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 | `data/memory_episodic.json` | episodic 记忆条目 | 原子写 `.bak` 恢复 |
 | `data/memory_semantic.json` | semantic 记忆事实 | 原子写 `.bak` 恢复 |
 | `data/runtime_knobs.json` | 文件级 runtime knob 覆盖 | 原子写 `.bak` 恢复 |
+| `data/mcp_servers.json` | 托管 MCP 服务器列表（settings API） | 文件损坏时以 `[mcp-store]` 告警，启动回退到 `MCP_SERVERS` env 播种，文件保持原样 |
+| `data/skill_settings.json` | 停用技能名单（settings API） | 读取失败降级为“全部技能启用” |
+| `data/skills/<name>/SKILL.md` | 运维创建的自定义技能 | 删除技能时同时清理目录；损坏文件在发现时跳过 |
 | `data/runs/<runId>/<workspace>/` | 每列临时 workspace | 重启后重水化，上限 `MAX_WORKSPACES`，TTL 为 `WORKSPACE_TTL_SECONDS`，带 run 中保护的 LRU 淘汰 |
 | `data/runs/…/.spills/` | tool 结果与 job 输出 dump，命名为 `spill-*.txt` 与 `NNNNNN-<jobId>.log` | 20 文件轮转 |
 

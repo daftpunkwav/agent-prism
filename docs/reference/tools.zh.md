@@ -38,7 +38,7 @@
 | `run_job` | 后台 job，含 `start`、`poll`、`kill`、`list`；每 workspace 8 个活跃 job；poll 只返回 delta；输出超过 32 K spill 到 `.spills/*.log`；进程作用域，重启后出现孤儿 | full, edit_run |
 | `bash_session` | 每 workspace 一个持久 POSIX shell，`cd` 与 `export` 存活；哨兵分隔帧；Windows 失败关闭并转向 `run` 与 `run_job` | full, edit_run |
 | `subagent` | 嵌套委派，`spawn` 为空白历史或 `fork` 为父 transcript；子级 step 默认 8，范围 1 至 10；深度上限 1；token 折叠进父级 | all |
-| `skill` | `list` 与 `read` runbook，来自内置集合加 workspace `.skills/<name>/SKILL.md` 覆盖；kebab-case 命名 | all |
+| `skill` | `list` 与 `read` runbook，来自内置集合、全局用户目录（`data/skills/`）与 workspace `.skills/<name>/SKILL.md` 覆盖（优先级 workspace > 用户 > 内置）；在 settings 中停用的名称被过滤；kebab-case 命名 | all |
 | `goal` | `.agent-goal.json` 中一个持久目标；状态 `active`、`paused`、`blocked`、`completed`；blocked 需要原因 | full, edit_run |
 | `ralph_loop` | 固定轮次循环；轮次默认 3，范围 1 至 8；读取一行 `STATUS:`，其余透传，上限 4 000 字符 | all |
 | `plan` | 提案并记录文档 `.agent-plan.md`，必须以 `#` 开头；至多 8 000 字符；只记录，绝不提交 | full, edit_run |

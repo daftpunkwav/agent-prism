@@ -16,3 +16,9 @@ MCP 挂接 seam：把进程内文件系统与 fetch 能力服务器桥接为 too
 - `config`：解析 `MCP_SERVERS` env JSON，输入非法时抛错。本地 runtime 尽力把已配置
   server 挂到 arena 顶层 column；宕机 server 告警并跳过；嵌套 run 继承文件而不继承
   进程。
+- `mcp-servers-store`：`GET`/`PUT /api/settings/mcp` 背后的运维托管 registry。仅在
+  `data/mcp_servers.json` 尚不存在时用 env 解析结果播种，之后以文件为准。每次保存
+  都经共享 env parser 重新校验，并原地变更同一个共享数组实现热应用，每次运行的
+  消费方无需重启即可重载。store 文件损坏时以 `[mcp-store]` 告警并回退到 env 播种。
+  server 条目在 env 形态之外接受两个展示字段：`name`（settings 视图显示名）与
+  `enabled`（停用的 server 持久保留但不挂接到运行）。

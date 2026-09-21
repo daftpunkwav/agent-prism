@@ -135,7 +135,7 @@ These are deliberately not env-tunable.
 
 | Variable | Read by | Purpose |
 |---|---|---|
-| `MCP_SERVERS` | `apps/server/src/assemble.ts` to `tool-mcp/src/config.ts` | JSON array of stdio MCP servers `{command, args?, env?, timeoutMs?, tools?}`; `timeoutMs` defaults to `MCP_REQUEST_TIMEOUT_MS`; malformed JSON warns once and is ignored, and startup continues |
+| `MCP_SERVERS` | `apps/server/src/assemble.ts` to `tool-mcp/src/config.ts` | JSON array of stdio MCP servers `{command, args?, env?, timeoutMs?, tools?, name?, enabled?}`; `timeoutMs` defaults to `MCP_REQUEST_TIMEOUT_MS`; it seeds the managed store (`data/mcp_servers.json`) only while that file does not exist yet — once an operator saves through the settings API the file wins; malformed env JSON warns once and is ignored, and startup continues |
 | `DRIVERS` | `apps/server/src/load-drivers.ts` | optional comma-separated driver allowlist, case-insensitive, such as `native,plan_execute,self_critique`; unset or blank means all builtins; unknown names warn and are ignored |
 | `SEARCH_PROVIDER` | `tool-builtins/src/definitions/web-search.ts` | `exa` or `tavily`; anything else fails closed with a setup hint |
 | `SEARCH_API_KEY` | same | provider key; missing fails closed |
@@ -153,6 +153,17 @@ tuning, harness retry budgets, tool budgets, and driver knobs. `RuntimeKnobsStor
 them at startup and hot-applies updates through `GET` and `PUT /api/settings/knobs`, so a
 settings save takes effect without a restart. An absent file keeps the environment
 defaults.
+
+## Skill and MCP management
+
+The settings page also exposes two managed stores, both hot-applied without a restart.
+`GET/POST /api/settings/skills`, `PUT/DELETE /api/settings/skills/:name`, and
+`PUT /api/settings/skills/:name/enabled` manage the skill catalog: bundled skills are
+read-only (writes reject with 409), user skills live in `data/skills/<name>/SKILL.md`,
+and the disabled-name list persists in `data/skill_settings.json` and filters the
+effective catalog from the next turn on. `GET` and `PUT /api/settings/mcp` replace the
+whole managed MCP server list; the store keeps a shared in-memory array that per-run
+consumers read, so a save reaches the next run immediately.
 
 ## Credential references
 
@@ -178,6 +189,9 @@ Paths are defined in `config/src/paths.ts`.
 | `data/memory_episodic.json` | episodic memory entries | atomic-write `.bak` recovery |
 | `data/memory_semantic.json` | semantic memory facts | atomic-write `.bak` recovery |
 | `data/runtime_knobs.json` | file-backed runtime knob overrides | atomic-write `.bak` recovery |
+| `data/mcp_servers.json` | managed MCP server list (settings API) | a corrupt file warns with `[mcp-store]` and startup falls back to the `MCP_SERVERS` env seed, leaving the file untouched |
+| `data/skill_settings.json` | disabled skill names (settings API) | read failure degrades to "all skills enabled" |
+| `data/skills/<name>/SKILL.md` | operator-created user skills | deleted skills drop their folder; malformed files are skipped during discovery |
 | `data/runs/<runId>/<workspace>/` | per-column scratch workspaces | rehydrated after restart with `MAX_WORKSPACES` as the cap, `WORKSPACE_TTL_SECONDS` as the TTL, and LRU eviction with in-run protection |
 | `data/runs/…/.spills/` | tool-result and job output dumps named `spill-*.txt` and `NNNNNN-<jobId>.log` | 20-file rotation |
 

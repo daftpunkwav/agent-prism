@@ -64,6 +64,7 @@ Operational notes:
 | Backend port busy or out of range | the host entry logs the typed error and exits 1, with no fallback |
 | Non-loopback bind with empty `API_TOKEN` | startup refuses; loopback with an empty token only warns |
 | Malformed `MCP_SERVERS` | warns once with `[assemble] MCP_SERVERS ignored`, and startup continues without MCP |
+| Corrupt `data/mcp_servers.json` | warns with `[mcp-store] store file unreadable`, startup falls back to the `MCP_SERVERS` env seed, and the file is left untouched for inspection |
 | Zero drivers registered | startup fails fast |
 | Capability dimension with zero options | startup fails fast for `prompt`, `reasoning`, `context`, `harness`, or `toolset` |
 | Unconfigured `web_search` | the tool fails closed with setup guidance |

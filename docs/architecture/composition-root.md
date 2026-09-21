@@ -45,8 +45,14 @@ Abbreviated walk of `apps/server/src/assemble.ts`:
     `SessionService` and `BuilderService`.
 11. Capability-seam check: `prompt`, `reasoning`, `context`, `harness`, and `toolset` must
     each expose at least one option or startup throws.
-12. `MCP_SERVERS` resolution through `parseMcpServersEnv`. A malformed config warns once
-    with `[assemble] MCP_SERVERS ignored` and startup continues with an empty list.
+12. MCP server resolution: `MCP_SERVERS` parses through `parseMcpServersEnv` and
+    seeds the managed `McpServersStore`; once `data/mcp_servers.json` exists the file
+    wins, and a malformed env config still warns once with
+    `[assemble] MCP_SERVERS ignored` and startup continues with an empty seed. The
+    store mutates one shared array in place so per-run consumers hot-reload after a
+    settings save. The user-skills layer (`configureUserSkills`) wires the global
+    `data/skills/` directory and the `data/skill_settings.json` disabled-name store
+    with the same hot-apply shape.
 13. Services: `ArenaService`, `MatrixService`, `ProviderService`, `WorkspaceFileService`,
     and `ProjectStore` over `AtomicJsonFile(data/projects.json)`.
 14. `mountDomainRoutes(deps)` and a best-effort `router.syncModelOptionsFromProvider()`.

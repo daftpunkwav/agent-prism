@@ -47,8 +47,12 @@ registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf �
     `SessionService` 与 `BuilderService`。
 11. 能力 seam 检查：`prompt`、`reasoning`、`context`、`harness`、`toolset` 各自必须
     暴露至少一个选项，否则启动抛错。
-12. `MCP_SERVERS` 解析，经 `parseMcpServersEnv`。格式错误的配置告警一次，消息为
-    `[assemble] MCP_SERVERS ignored`，启动以空列表继续。
+12. MCP server 解析：`MCP_SERVERS` 经 `parseMcpServersEnv` 解析并播种托管的
+    `McpServersStore`；`data/mcp_servers.json` 一旦存在则以文件为准，格式错误的
+    env 配置仍告警一次，消息为 `[assemble] MCP_SERVERS ignored`，启动以空 seed
+    继续。store 原地变更同一个共享数组，每次运行的消费方在 settings 保存后
+    热重载。用户技能层（`configureUserSkills`）以相同的热应用形态接入全局
+    `data/skills/` 目录与 `data/skill_settings.json` 停用名单 store。
 13. Services：`ArenaService`、`MatrixService`、`ProviderService`、
     `WorkspaceFileService`，以及基于 `AtomicJsonFile(data/projects.json)` 的
     `ProjectStore`。

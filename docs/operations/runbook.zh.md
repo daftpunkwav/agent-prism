@@ -64,6 +64,7 @@ tools 与每列 verdict。cell 会消耗真实模型调用。
 | Backend 端口被占用或越界 | 宿主入口记录类型化错误并 exit 1，无回退 |
 | 非 loopback 绑定且 `API_TOKEN` 为空 | 启动拒绝；loopback 且空 token 只告警 |
 | 格式错误的 `MCP_SERVERS` | 告警一次，消息为 `[assemble] MCP_SERVERS ignored`，启动无 MCP 继续 |
+| 损坏的 `data/mcp_servers.json` | 以 `[mcp-store] store file unreadable` 告警，启动回退到 `MCP_SERVERS` env 播种，文件保持原样供检查 |
 | 注册了零个 driver | 启动快速失败 |
 | 能力 dimension 零选项 | 对 `prompt`、`reasoning`、`context`、`harness`、`toolset` 启动快速失败 |
 | 未配置 `web_search` | tool 失败关闭并给出设置指引 |

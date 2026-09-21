@@ -36,7 +36,7 @@ to `edit_run` and `calc_time` or `workspace_read` to `read_only`.
 | `run_job` | background jobs with `start`, `poll`, `kill`, and `list`; 8 live jobs per workspace; poll returns the delta only; output over 32 K spills to `.spills/*.log`; process-scoped, so orphans appear after restart | full, edit_run |
 | `bash_session` | one persistent POSIX shell per workspace, so `cd` and `export` survive; sentinel-delimited frames; Windows fails closed toward `run` and `run_job` | full, edit_run |
 | `subagent` | nested delegation with `spawn` for a blank history or `fork` for the parent transcript; child steps default to 8 within 1 to 10; depth cap 1; tokens fold into the parent | all |
-| `skill` | `list` and `read` runbooks from the bundled set plus workspace `.skills/<name>/SKILL.md` overrides; kebab-case names | all |
+| `skill` | `list` and `read` runbooks from the bundled set, the global user directory (`data/skills/`), and workspace `.skills/<name>/SKILL.md` overrides (workspace wins over user over bundled); names disabled in settings are filtered out; kebab-case names | all |
 | `goal` | one durable objective in `.agent-goal.json`; statuses `active`, `paused`, `blocked`, `completed`; a block requires a reason | full, edit_run |
 | `ralph_loop` | fixed-round loop; rounds default to 3 within 1 to 8; reads a `STATUS:` line and passes the rest through with a 4 000-character cap | all |
 | `plan` | propose-and-record document `.agent-plan.md` that must start with `#`; at most 8 000 characters; records and never submits | full, edit_run |
