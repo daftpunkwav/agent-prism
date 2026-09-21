@@ -44,11 +44,11 @@ import {
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import { buildMetrics, TokenTracker } from "@agentprism/telemetry";
 import {
-  BUNDLED_SKILLS,
   GOAL_STORE_FILE,
   PLAN_STORE_FILE,
   RALPH_HANDOFF_CHARS,
   RALPH_TOOL_NAME,
+  effectiveSkills,
   renderBundledSkillsBlock,
   SCATTER_MAX_CONCURRENCY,
   SCATTER_TOOL_NAME,
@@ -500,7 +500,17 @@ export async function* runAgentExecution(
     const mcpPolicy = String((spec.config as Record<string, unknown>)["mcp_policy"] ?? "off");
     const approvalMode = (spec.config as Record<string, unknown>)["approval_mode"];
     const sandboxMode = (spec.config as Record<string, unknown>)["sandbox_mode"];
-    const skillPreloadBlock = skillPolicy === "preloaded" ? renderBundledSkillsBlock(BUNDLED_SKILLS) : "";
+    // Preloaded injects the effective catalog (bundled + user dir + workspace,
+    // disabled filtered), not just the bundled set, so settings changes apply.
+    const skillPreloadBlock =
+      skillPolicy === "preloaded"
+        ? renderBundledSkillsBlock(
+            effectiveSkills(
+              (filePath) => workspace.fs.readFile(filePath),
+              (dir) => workspace.fs.listFiles(dir, { recursive: true }),
+            ).skills,
+          )
+        : "";
     // Cross-session memory mounts top-level only: nested delegation turns share
     // files, never recalled context (their parent already carries the recall).
     // (memoryService/memoryPolicy/subagentDepth are hoisted above the try.)

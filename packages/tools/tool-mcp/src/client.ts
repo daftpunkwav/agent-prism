@@ -53,6 +53,10 @@ export interface McpServerConfig {
   timeoutMs?: number;
   /** Allowlisted remote tool names (default: all). */
   tools?: readonly string[];
+  /** Settings-view display name (defaults to the command basename). */
+  name?: string;
+  /** Disabled servers persist but never attach to runs (default true). */
+  enabled?: boolean;
 }
 
 /** Default per-request timeout in ms. */

@@ -10,6 +10,8 @@
  */
 
 import path from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import {
   ArenaLogsService,
   ArenaService,
@@ -23,7 +25,15 @@ import {
 import { buildComparisonReport, extractNarrativeText, judgeAnswers, judgeAnswersAsync, type ReportDeps } from "@agentprism/evaluation";
 import type { ContextTuning } from "@agentprism/harness";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { createBuiltinToolRegistry } from "@agentprism/tool-builtins";
+import {
+  configureUserSkills,
+  createBuiltinToolRegistry,
+  createUserSkill,
+  deleteUserSkill,
+  listSkillsForSettings,
+  setSkillEnabled,
+  updateUserSkill,
+} from "@agentprism/tool-builtins";
 import { DimensionCatalog } from "@agentprism/dimensions";
 import {
   DimensionRouter,
@@ -31,7 +41,7 @@ import {
   buildCapabilityOptionProjection,
 } from "@agentprism/arena-routing";
 import { ArenaRunner } from "@agentprism/arena-runner";
-import { parseMcpServersEnv } from "@agentprism/tool-mcp";
+import { McpServersStore, parseMcpServersEnv, type McpServerConfig } from "@agentprism/tool-mcp";
 import type { HttpApp } from "@agentprism/http-runtime";
 import { mountDomainRoutes } from "./mount-routes.js";
 import { registerFrameworkDrivers } from "./load-drivers.js";
@@ -55,7 +65,7 @@ import {
 import { EpisodicMemory } from "@agentprism/memory-episodic";
 import { SemanticMemory } from "@agentprism/memory-semantic";
 import { MemoryServiceAdapter } from "@agentprism/memory-service";
-import { AtomicJsonFile, NodeAppendFile } from "@agentprism/persistence";
+import { AtomicJsonFile, NodeAppendFile, readJsonFile } from "@agentprism/persistence";
 import { withRetry, withTimeout } from "@agentprism/runtime";
 import { SessionService } from "@agentprism/application";
 import { FileBlobStore, FileSessionStore } from "@agentprism/session-persistence";
@@ -63,11 +73,15 @@ import { RandomIdGenerator, SystemClock, WorkspaceRegistry } from "@agentprism/r
 import {
   BUILDER_SESSIONS_PATH,
   BUILDER_TRACES_DIR,
+  DATA_DIR,
+  MCP_SERVERS_PATH,
   MEMORY_EPISODIC_PATH,
   MEMORY_SEMANTIC_PATH,
   RUNTIME_KNOBS_PATH,
   SESSIONS_PATH,
+  SKILL_SETTINGS_PATH,
   THREADS_PATH,
+  USER_SKILLS_DIR,
   defaultRuntimeKnobs,
   RUNTIME_KNOB_FIELDS,
   RuntimeKnobsStore,
@@ -373,13 +387,74 @@ export async function assemble(): Promise<RuntimeComponents> {
   }
 
   // Operator MCP servers attach to arena columns (best-effort per run).
-  // Malformed config warns once here instead of failing every column run.
-  let mcpServers: ReturnType<typeof parseMcpServersEnv> = [];
+  // The managed store file wins once it exists; otherwise the env parse seeds
+  // it (backward compatible). `mcpServers` is the store's stable shared array,
+  // mutated in place on settings saves, so every per-run consumer hot-reloads.
+  let mcpEnvSeed: McpServerConfig[] = [];
   try {
-    mcpServers = parseMcpServersEnv(process.env["MCP_SERVERS"], { defaultTimeoutMs: settings.mcpRequestTimeoutMs });
+    mcpEnvSeed = parseMcpServersEnv(process.env["MCP_SERVERS"], { defaultTimeoutMs: settings.mcpRequestTimeoutMs });
   } catch (error) {
     console.warn(`[assemble] MCP_SERVERS ignored: ${error instanceof Error ? error.message : String(error)}`);
   }
+  const mcpServersStore = new McpServersStore({
+    file: {
+      exists: () => existsSync(MCP_SERVERS_PATH),
+      read: () => readFileSync(MCP_SERVERS_PATH, "utf8"),
+      write: (value: unknown) => {
+        mkdirSync(DATA_DIR, { recursive: true });
+        writeFileSync(MCP_SERVERS_PATH, JSON.stringify(value, null, 2), "utf8");
+      },
+    },
+    seed: mcpEnvSeed,
+  });
+  const mcpServers = mcpServersStore.servers;
+
+  // User skills: global data/skills directory + disabled-name list. The skill
+  // tool discovers per call, so settings writes reach the next turn directly.
+  configureUserSkills({
+    fs: {
+      readFile: (path) => readFileSync(path, "utf8"),
+      writeFile: (path, content) => {
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, content, "utf8");
+      },
+      deleteFile: (path) => {
+        rmSync(path, { force: true });
+        // Also drop the now-empty skill folder so listings stay clean.
+        const dir = dirname(path);
+        try {
+          rmSync(dir, { recursive: true, force: true });
+        } catch {
+          // A non-empty dir means the operator keeps other files there; leave it.
+        }
+      },
+      listDir: (dir) => {
+        try {
+          return readdirSync(dir, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => entry.name);
+        } catch {
+          return [];
+        }
+      },
+      exists: (path) => existsSync(path),
+    },
+    dir: USER_SKILLS_DIR,
+    settings: {
+      read: () => {
+        try {
+          const raw = readJsonFile<unknown>(SKILL_SETTINGS_PATH);
+          return Array.isArray(raw) ? (raw as string[]) : [];
+        } catch {
+          return [];
+        }
+      },
+      write: (value) => {
+        mkdirSync(DATA_DIR, { recursive: true });
+        writeFileSync(SKILL_SETTINGS_PATH, JSON.stringify(value, null, 2), "utf8");
+      },
+    },
+  });
   // Cross-session memory: one file-backed singleton shared by every arena run.
   // The memory dimension (episodic/semantic/full) recalls from and writes back to
   // these stores; a failed store degrades to stateless inside the agent layer.
@@ -499,6 +574,18 @@ export async function assemble(): Promise<RuntimeComponents> {
         episodicMemory.clear();
         semanticMemory.clear();
       },
+    },
+    skills: {
+      list: () => listSkillsForSettings(),
+      create: (input) => ({ name: createUserSkill(input).name }),
+      update: (name, patch) => ({ name: updateUserSkill(name, patch).name }),
+      remove: (name) => deleteUserSkill(name),
+      setEnabled: (name, enabled) => setSkillEnabled(name, enabled),
+    },
+    mcp: {
+      list: () => mcpServersStore.list() as unknown as ReadonlyArray<Record<string, unknown>>,
+      replace: (input: unknown) =>
+        mcpServersStore.replace(input as McpServerConfig[]) as unknown as ReadonlyArray<Record<string, unknown>>,
     },
   });
 

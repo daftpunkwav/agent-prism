@@ -31,6 +31,22 @@ export interface RuntimeKnobsController {
   update(raw: unknown): RuntimeKnobs;
 }
 
+/** Skill management controller backing the settings/skills routes (composition root provides). */
+export interface SkillsController {
+  list(): Array<{ name: string; description: string; source: string; enabled: boolean }>;
+  create(input: { name: string; description: string; body: string }): { name: string };
+  update(name: string, patch: { description?: string; body?: string }): { name: string };
+  remove(name: string): void;
+  setEnabled(name: string, enabled: boolean): void;
+}
+
+/** Managed MCP server list controller backing the settings/mcp routes. */
+export interface McpController {
+  list(): ReadonlyArray<Record<string, unknown>>;
+  /** Full-list replace; throws McpStoreError-shaped Errors on invalid input. */
+  replace(input: unknown): ReadonlyArray<Record<string, unknown>>;
+}
+
 /** Memory store status snapshot + maintenance action. */
 export interface MemoryStatusController {
   status(): { episodicCount: number; semanticCount: number; episodicPath: string; semanticPath: string };
@@ -54,6 +70,10 @@ export interface HttpApplicationDeps {
   runtimeKnobs?: RuntimeKnobsController;
   /** Memory status controller (absent = memory routes not registered). */
   memoryStatus?: MemoryStatusController;
+  /** Skill management controller (absent = skills routes not registered). */
+  skills?: SkillsController;
+  /** Managed MCP server list controller (absent = mcp routes not registered). */
+  mcp?: McpController;
 }
 
 /** API token auth: /api/health and /health are exempt. */

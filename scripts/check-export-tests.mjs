@@ -40,7 +40,7 @@ const PENDING = [
   // packages/client/client
   "exportSession", "getSessionStats", "isAbortError", "responseDetail",
   // packages/tools/tool-builtins
-  "parseSkillFile", "renderBundledSkillsBlock", "setWebSearchEnvReader", "utf8Bytes",
+  "parseSkillFile", "setWebSearchEnvReader", "utf8Bytes",
   // packages/drivers/driver-autogen
   "isTerminationMessage", "parseSpeakerSelection", "speakerSelectionPrompt",
   // packages/providers/provider-langchain

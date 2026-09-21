@@ -12,3 +12,9 @@ export * from "./transport.js";
 export * from "./client.js";
 export * from "./remote-tools.js";
 export * from "./config.js";
+export {
+  McpServersStore,
+  McpStoreError,
+  type McpStoreFile,
+  type McpStoreCodec,
+} from "./mcp-servers-store.js";

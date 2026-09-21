@@ -18,7 +18,7 @@ export interface Skill {
   name: string;
   description: string;
   body: string;
-  source: "bundled" | "workspace";
+  source: "bundled" | "workspace" | "user";
 }
 
 /** DSH skill-name grammar: kebab-case, shared so registries never drift. */

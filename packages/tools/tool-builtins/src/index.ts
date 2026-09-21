@@ -28,6 +28,18 @@ export {
   ASK_USER_JSON_SCHEMA,
   ASK_USER_STORE_FILE,
 } from "./definitions/ask-user.js";
+export {
+  configureUserSkills,
+  createUserSkill,
+  updateUserSkill,
+  deleteUserSkill,
+  setSkillEnabled,
+  listSkillsForSettings,
+  disabledSkillNames,
+  effectiveSkills,
+  type UserSkillsFs,
+  type SkillsSettingsFile,
+} from "./definitions/user-skills.js";
 export { webSearchTool, WEB_SEARCH_JSON_SCHEMA, setWebSearchEnvReader } from "./definitions/web-search.js";
 export { runJobTool, RUN_JOB_JSON_SCHEMA } from "./definitions/run-job.js";
 export { bashSessionTool, BASH_SESSION_JSON_SCHEMA } from "./definitions/bash-session.js";

@@ -74,5 +74,15 @@ function parseOne(entry: unknown, index: number, options: { defaultTimeoutMs?: n
     }
     config.tools = [...(record.tools as string[])];
   }
+  if (record.name !== undefined) {
+    if (typeof record.name !== "string" || record.name.trim() === "") {
+      throw new Error(`${where}.name must be a non-empty string when present`);
+    }
+    config.name = record.name.trim();
+  }
+  if (record.enabled !== undefined) {
+    if (typeof record.enabled !== "boolean") throw new Error(`${where}.enabled must be a boolean when present`);
+    config.enabled = record.enabled;
+  }
   return config;
 }

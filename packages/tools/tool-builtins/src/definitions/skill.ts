@@ -17,13 +17,12 @@ import { WorkspaceError } from "@agentprism/environment";
 import { boundText } from "./spill.js";
 import { asWorkspaceView } from "./workspace-view.js";
 import {
-  BUNDLED_SKILLS,
   SKILL_FILE,
   SKILL_NAME_RE,
-  WORKSPACE_SKILLS_DIR,
   parseSkillFile,
   type Skill,
 } from "./skills.js";
+import { effectiveSkills } from "./user-skills.js";
 
 export const SKILL_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -37,42 +36,12 @@ export const SKILL_JSON_SCHEMA: Record<string, unknown> = {
 
 const ACTIONS = ["list", "read"] as const;
 
-/** Merges bundled skills with valid workspace `.skills/<name>/SKILL.md` files. */
+/**
+ * Merges bundled, user-directory, and workspace `.skills/<name>/SKILL.md` files
+ * into the effective catalog (workspace wins; disabled names filter out).
+ */
 function discoverSkills(readFile: (path: string) => string, listFiles: (dir: string) => string[]): { skills: Skill[]; skipped: number } {
-  const merged = new Map<string, Skill>();
-  for (const skill of BUNDLED_SKILLS) merged.set(skill.name, skill);
-  let skipped = 0;
-  let entries: string[];
-  try {
-    // Recursive: non-recursive listings omit directories, so skill folders
-    // would never appear; match exactly `.skills/<name>/SKILL.md` instead.
-    entries = listFiles(WORKSPACE_SKILLS_DIR);
-  } catch {
-    return { skills: [...merged.values()], skipped };
-  }
-  for (const entry of entries) {
-    const parts = entry.split("/");
-    if (parts.length !== 3 || parts[0] !== WORKSPACE_SKILLS_DIR || parts[2] !== SKILL_FILE) continue;
-    const name = parts[1] ?? "";
-    if (!SKILL_NAME_RE.test(name)) {
-      skipped += 1;
-      continue;
-    }
-    let text: string;
-    try {
-      text = readFile(entry);
-    } catch {
-      skipped += 1;
-      continue;
-    }
-    const parsed = parseSkillFile(text);
-    if (parsed === null) {
-      skipped += 1;
-      continue;
-    }
-    merged.set(name, { name, ...parsed, source: "workspace" });
-  }
-  return { skills: [...merged.values()].sort((a, b) => a.name.localeCompare(b.name)), skipped };
+  return effectiveSkills(readFile, listFiles);
 }
 
 async function executeSkill(workspace: ToolWorkspace, args: ToolArgs): Promise<ToolExecutionResult> {

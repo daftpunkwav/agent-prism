@@ -28,3 +28,6 @@ export const THREADS_PATH = path.join(DATA_DIR, "threads.json");
 export const MEMORY_EPISODIC_PATH = path.join(DATA_DIR, "memory_episodic.json");
 export const MEMORY_SEMANTIC_PATH = path.join(DATA_DIR, "memory_semantic.json");
 export const RUNTIME_KNOBS_PATH = path.join(DATA_DIR, "runtime_knobs.json");
+export const SKILL_SETTINGS_PATH = path.join(DATA_DIR, "skill_settings.json");
+export const USER_SKILLS_DIR = path.join(DATA_DIR, "skills");
+export const MCP_SERVERS_PATH = path.join(DATA_DIR, "mcp_servers.json");
