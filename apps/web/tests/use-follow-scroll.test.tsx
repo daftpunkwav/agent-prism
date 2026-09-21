@@ -98,7 +98,7 @@ describe("useFollowScroll", () => {
   });
 
   it("jumpToBottom re-pins immediately and clears the detach state", () => {
-    const { box, fire, grow, hook, stream } = setup();
+    const { box, fire, grow, hook } = setup();
     grow(1600);
     fire();
     act(() => {

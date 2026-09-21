@@ -264,18 +264,16 @@ export function McpSection({ onFlash }: { onFlash: (message: string) => void }) 
     const key = server.name ?? server.command;
     setBusyKey(key);
     const next = servers.map((entry) => (entry === server ? { ...entry, enabled: !(entry.enabled ?? true) } : entry));
-    const ok = await replaceList(next);
-    if (!ok) setBusyKey(null);
-    else setBusyKey(null);
+    await replaceList(next);
+    setBusyKey(null);
   };
 
   const remove = async (server: McpServerEntry): Promise<void> => {
     if (!window.confirm(t("settings.mcp.deleteConfirm", { name: displayName(server) }))) return;
     const key = server.name ?? server.command;
     setBusyKey(key);
-    const ok = await replaceList(servers.filter((entry) => entry !== server));
-    if (!ok) setBusyKey(null);
-    else setBusyKey(null);
+    await replaceList(servers.filter((entry) => entry !== server));
+    setBusyKey(null);
   };
 
   if (loading) {
