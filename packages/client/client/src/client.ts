@@ -473,3 +473,94 @@ export async function clearMemory(options?: { signal?: AbortSignal }): Promise<M
   if (!res.ok) throw new ApiError("Failed to clear memory", "http", res.status);
   return res.json();
 }
+
+/** One skill in the settings catalog. */
+export interface SkillEntry {
+  name: string;
+  description: string;
+  source: string;
+  enabled: boolean;
+}
+
+/** Loads the full skill catalog (bundled + user + enabled flags). */
+export async function fetchSkills(options?: { signal?: AbortSignal }): Promise<SkillEntry[]> {
+  const res = await apiFetch(`${API_BASE}/api/settings/skills`, {
+    cache: "no-store",
+    signal: options?.signal,
+  });
+  if (!res.ok) throw new ApiError("Failed to load skills", "http", res.status);
+  const data = (await res.json()) as { skills: SkillEntry[] };
+  return data.skills;
+}
+
+/** Creates one user skill; rejects with the server detail on defect. */
+export async function createSkill(input: { name: string; description: string; body: string }): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/api/settings/skills`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new ApiError(await responseDetail(res, "Failed to create skill"), "http", res.status);
+}
+
+/** Updates one user skill's description and/or body. */
+export async function updateSkill(name: string, patch: { description?: string; body?: string }): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/api/settings/skills/${encodeURIComponent(name)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new ApiError(await responseDetail(res, "Failed to update skill"), "http", res.status);
+}
+
+/** Deletes one user skill (bundled skills reject with 409). */
+export async function deleteSkill(name: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/api/settings/skills/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new ApiError(await responseDetail(res, "Failed to delete skill"), "http", res.status);
+}
+
+/** Enables or disables one skill by name. */
+export async function setSkillEnabled(name: string, enabled: boolean): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/api/settings/skills/${encodeURIComponent(name)}/enabled`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) throw new ApiError(await responseDetail(res, "Failed to update skill state"), "http", res.status);
+}
+
+/** One managed MCP server row (shape mirrors the backend McpServerConfig). */
+export interface McpServerEntry {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  timeoutMs?: number;
+  tools?: string[];
+  name?: string;
+  enabled?: boolean;
+}
+
+/** Loads the managed MCP server list. */
+export async function fetchMcpServers(options?: { signal?: AbortSignal }): Promise<McpServerEntry[]> {
+  const res = await apiFetch(`${API_BASE}/api/settings/mcp`, {
+    cache: "no-store",
+    signal: options?.signal,
+  });
+  if (!res.ok) throw new ApiError("Failed to load MCP servers", "http", res.status);
+  const data = (await res.json()) as { servers: McpServerEntry[] };
+  return data.servers;
+}
+
+/** Replaces the whole MCP server list (normalized + persisted + hot-applied). */
+export async function saveMcpServers(servers: McpServerEntry[]): Promise<McpServerEntry[]> {
+  const res = await apiFetch(`${API_BASE}/api/settings/mcp`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ servers }),
+  });
+  if (!res.ok) throw new ApiError(await responseDetail(res, "Failed to save MCP servers"), "http", res.status);
+  const data = (await res.json()) as { servers: McpServerEntry[] };
+  return data.servers;
+}

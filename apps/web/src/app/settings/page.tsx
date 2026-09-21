@@ -13,7 +13,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Brain, Cable, Gauge, Loader2, SlidersHorizontal } from "lucide-react";
+import { Brain, Cable, Gauge, Loader2, Plug, SlidersHorizontal, Sparkles } from "lucide-react";
 import { ProviderConfig, fetchProvider, saveProvider } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 import {
@@ -26,11 +26,13 @@ import {
   isLocalModelId,
 } from "./settingsConnectionModel";
 import { ConnectionsSection } from "./ConnectionsSection";
+import { McpSection } from "./McpSection";
+import { SkillsSection } from "./SkillsSection";
 import { DecodeDefaultsSection } from "./DecodeDefaultsSection";
 import { MemorySection } from "./MemorySection";
 import { RuntimeKnobsSection } from "./RuntimeKnobsSection";
 
-type SectionId = "connections" | "decode" | "runtime" | "memory";
+type SectionId = "connections" | "decode" | "runtime" | "memory" | "skills" | "mcp";
 
 /** Settings route: sectioned provider/runtime/memory configuration. */
 export default function SettingsPage() {
@@ -166,6 +168,8 @@ export default function SettingsPage() {
     { id: "decode", label: t("settings.section.decode"), icon: SlidersHorizontal },
     { id: "runtime", label: t("settings.section.runtime"), icon: Gauge },
     { id: "memory", label: t("settings.section.memory"), icon: Brain },
+    { id: "skills", label: t("settings.section.skills"), icon: Sparkles },
+    { id: "mcp", label: t("settings.section.mcp"), icon: Plug },
   ];
 
   if (loading) {
@@ -288,6 +292,8 @@ export default function SettingsPage() {
 
           {section === "runtime" && <RuntimeKnobsSection onFlash={flash} />}
           {section === "memory" && <MemorySection onFlash={flash} />}
+          {section === "skills" && <SkillsSection onFlash={flash} />}
+          {section === "mcp" && <McpSection onFlash={flash} />}
         </div>
       </div>
 
