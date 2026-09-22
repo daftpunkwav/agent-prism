@@ -50,6 +50,45 @@ describe("McpServersStore", () => {
     expect(store.servers[0]?.timeoutMs).toBe(1_000);
   });
 
+  it("replace rejects duplicate identities (explicit name, else command)", () => {
+    const file = memoryFile();
+    const store = new McpServersStore({ file, seed: [] });
+    expect(() =>
+      store.replace([
+        { command: "node", name: "dup" },
+        { command: "deno", name: "dup" },
+      ]),
+    ).toThrow(/duplicate MCP server identity "dup"/);
+    expect(() =>
+      store.replace([
+        { command: "same" },
+        { command: "same" },
+      ]),
+    ).toThrow(/duplicate MCP server identity "same"/);
+    // Distinct commands without names stay valid.
+    expect(() =>
+      store.replace([
+        { command: "a" },
+        { command: "b" },
+      ]),
+    ).not.toThrow();
+  });
+
+  it("a failed write leaves the shared list untouched (persist before hot-apply)", () => {
+    const store = new McpServersStore({
+      file: {
+        exists: () => false,
+        read: () => undefined,
+        write: () => {
+          throw new Error("disk full");
+        },
+      },
+      seed: [{ command: "kept" }],
+    });
+    expect(() => store.replace([{ command: "next" }])).toThrow("disk full");
+    expect(store.servers.map((server) => server.command)).toEqual(["kept"]);
+  });
+
   it("keeps the shared array identity so per-run consumers hot-reload", () => {
     const file = memoryFile();
     const store = new McpServersStore({ file, seed: [{ command: "first" }] });

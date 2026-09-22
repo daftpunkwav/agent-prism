@@ -65,7 +65,7 @@ import {
 import { EpisodicMemory } from "@agentprism/memory-episodic";
 import { SemanticMemory } from "@agentprism/memory-semantic";
 import { MemoryServiceAdapter } from "@agentprism/memory-service";
-import { AtomicJsonFile, NodeAppendFile, readJsonFile } from "@agentprism/persistence";
+import { AtomicJsonFile, NodeAppendFile, atomicWriteJson, readJsonFile } from "@agentprism/persistence";
 import { withRetry, withTimeout } from "@agentprism/runtime";
 import { SessionService } from "@agentprism/application";
 import { FileBlobStore, FileSessionStore } from "@agentprism/session-persistence";
@@ -400,9 +400,11 @@ export async function assemble(): Promise<RuntimeComponents> {
     file: {
       exists: () => existsSync(MCP_SERVERS_PATH),
       read: () => readFileSync(MCP_SERVERS_PATH, "utf8"),
+      // Atomic (tmp + .bak + rename): a crash mid-write must not leave a truncated
+      // store that silently regresses the managed list to the env seed on next boot.
       write: (value: unknown) => {
         mkdirSync(DATA_DIR, { recursive: true });
-        writeFileSync(MCP_SERVERS_PATH, JSON.stringify(value, null, 2), "utf8");
+        atomicWriteJson(MCP_SERVERS_PATH, value);
       },
     },
     seed: mcpEnvSeed,
@@ -451,7 +453,7 @@ export async function assemble(): Promise<RuntimeComponents> {
       },
       write: (value) => {
         mkdirSync(DATA_DIR, { recursive: true });
-        writeFileSync(SKILL_SETTINGS_PATH, JSON.stringify(value, null, 2), "utf8");
+        atomicWriteJson(SKILL_SETTINGS_PATH, value);
       },
     },
   });

@@ -74,20 +74,37 @@ export class McpServersStore {
     this.servers.push(...options.seed);
   }
 
-  /** Validates one serialized list through the shared env parser. */
+  /** Validates one serialized list through the shared env parser, then enforces identity uniqueness. */
   private parseList(text: string): McpServerConfig[] {
+    let parsed: McpServerConfig[];
     try {
-      return parseMcpServersEnv(text);
+      parsed = parseMcpServersEnv(text);
     } catch (error) {
       throw new McpStoreError(error instanceof Error ? error.message : String(error));
     }
+    // Identity matches the settings UI's edit/toggle keying (explicit name, else
+    // command): duplicates would collide there and make one identity ambiguous.
+    const seen = new Set<string>();
+    for (const server of parsed) {
+      const key = server.name ?? server.command;
+      if (seen.has(key)) {
+        throw new McpStoreError(`duplicate MCP server identity "${key}" (explicit name, else command)`);
+      }
+      seen.add(key);
+    }
+    return parsed;
   }
 
-  /** Replaces the whole list (normalized, persisted, hot-applied in place). */
+  /**
+   * Replaces the whole list (normalized, persisted, hot-applied in place).
+   * Persistence lands before the hot-apply: a failed write throws (the route
+   * answers 400) and leaves the shared list untouched, so the runtime state
+   * never diverges from what the next server start would load.
+   */
   replace(input: readonly McpServerConfig[]): McpServerConfig[] {
     const next = this.parseList(this.codec.encode(input));
-    this.servers.splice(0, this.servers.length, ...next);
     this.file.write(next);
+    this.servers.splice(0, this.servers.length, ...next);
     return [...this.servers];
   }
 
