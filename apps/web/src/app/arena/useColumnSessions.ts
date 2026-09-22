@@ -11,7 +11,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { MAX_HISTORY_CHARS, type ChatMessage, type ColumnSession } from "@agentprism/client";
+import { MAX_COLUMN_SESSION_MESSAGES, MAX_HISTORY_CHARS, type ChatMessage, type ColumnSession } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 
 export type ColumnSessionState = {
@@ -29,7 +29,11 @@ function trimToBudget(messages: ChatMessage[], question: string): ChatMessage[] 
     keepFrom = i;
   }
   if (keepFrom % 2 === 1) keepFrom += 1;
-  return keepFrom === 0 ? messages : messages.slice(keepFrom);
+  const kept = keepFrom === 0 ? messages : messages.slice(keepFrom);
+  // The backend zod caps a session transcript at MAX_COLUMN_SESSION_MESSAGES rows;
+  // histories are always appended in user/assistant pairs (even length), so the
+  // tail slice keeps the pairing and the user-first alternation intact.
+  return kept.length > MAX_COLUMN_SESSION_MESSAGES ? kept.slice(-MAX_COLUMN_SESSION_MESSAGES) : kept;
 }
 
 function clipAnswer(text: string): string {

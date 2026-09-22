@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MAX_HISTORY_CHARS } from "@agentprism/client";
+import { MAX_COLUMN_SESSION_MESSAGES, MAX_HISTORY_CHARS } from "@agentprism/client";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
 import { deriveTurn, useColumnSessions } from "../src/app/arena/useColumnSessions.js";
@@ -64,6 +64,20 @@ describe("useColumnSessions", () => {
     expect(messages[0]?.role).toBe("user");
     const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
     expect(totalChars).toBeLessThan(MAX_HISTORY_CHARS);
+  });
+
+  it("caps transcripts at the backend's message ceiling, keeping whole latest turns", () => {
+    const { result } = renderSessions();
+    // Short turns never hit the char budget; the row cap is the binding limit.
+    for (let turn = 1; turn <= MAX_COLUMN_SESSION_MESSAGES / 2 + 2; turn += 1) {
+      act(() => result.current.pushColumnTurn("Native", `q${turn}`, `a${turn}`));
+    }
+    const messages = result.current.sessions.Native!.messages;
+    expect(messages).toHaveLength(MAX_COLUMN_SESSION_MESSAGES);
+    // The tail slice starts at an even index, so the oldest kept row is the user turn.
+    expect(messages[0]?.role).toBe("user");
+    expect(messages[0]?.content).toBe("q3");
+    expect(messages[messages.length - 1]?.content).toBe("a14");
   });
 
   it("remembers workspaces, ignoring blank values and unchanged rewrites", () => {

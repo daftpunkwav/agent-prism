@@ -31,6 +31,9 @@ import { PipelineMetricsSchema, TokenStatsSchema } from "./events.js";
 /** Total character budget over chat history plus the current question (one shared source for backend validation and frontend trimming). */
 export const MAX_HISTORY_CHARS = 24_000;
 
+/** Per-session message cap (one shared source: backend zod caps and the frontend trimmer must stay identical). */
+export const MAX_COLUMN_SESSION_MESSAGES = 24;
+
 /** Minimum number of selected options per comparison (one shared source for route validation and the meta contract). Single-column runs are allowed for debugging; the UI may also sit at zero selections (empty state, run disabled). */
 export const ARENA_MIN_SELECT = 1;
 
@@ -124,7 +127,7 @@ export type ChatMessage = z.infer<typeof ChatMessageSchema>;
  */
 export const ColumnSessionSchema = z.object({
   workspace: z.string().min(1).max(96).optional(),
-  messages: z.array(ChatMessageSchema).max(24).default([]),
+  messages: z.array(ChatMessageSchema).max(MAX_COLUMN_SESSION_MESSAGES).default([]),
 });
 export type ColumnSession = z.infer<typeof ColumnSessionSchema>;
 
@@ -196,7 +199,7 @@ export const ArenaRunRequestSchema = z
     temperature: z.number().min(0).max(2).nullish(),
     baseline: BaselineOverridesSchema.nullish(),
     /** Fallback transcript when a column has no entry in column_sessions (legacy clients). */
-    messages: z.array(ChatMessageSchema).max(24).default([]),
+    messages: z.array(ChatMessageSchema).max(MAX_COLUMN_SESSION_MESSAGES).default([]),
     /**
      * Independent per-column sessions. When present, each column continues from
      * its own messages and reuses its own workspace; shared `messages` is only

@@ -94,7 +94,7 @@ export { DIMENSION_FIELD, DIMENSION_IDS } from "@agentprism/contracts";
 export { DECODE_FIELD_RANGES } from "@agentprism/contracts";
 
 /** Session character budget and the tool registry: contract single source, consumed by frontend trimming and Trace classification. */
-export { MAX_HISTORY_CHARS, TOOL_NAMES_BY_TOOLSET } from "@agentprism/contracts";
+export { MAX_HISTORY_CHARS, MAX_COLUMN_SESSION_MESSAGES, TOOL_NAMES_BY_TOOLSET } from "@agentprism/contracts";
 
 /** Brand constants such as the default provider name: contract single source (contracts/provider), consumed by frontend placeholder copy — hardcoding is forbidden. */
 export { DEFAULT_PROVIDER_NAME, DEFAULT_MODEL_ID } from "@agentprism/contracts";
