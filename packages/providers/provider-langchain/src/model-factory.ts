@@ -17,6 +17,7 @@ import { ConfigurationError, effectiveThinkingLevel, validateLlmBaseUrl } from "
 import { resolveCredentialReference, resolveDefaultEndpoint } from "@agentprism/provider-capability";
 import { lookupEndpoint, type EndpointCatalog } from "@agentprism/provider-capability";
 import { buildThinkingClientOptions } from "@agentprism/provider-capability";
+import { createResponsesCompatFetch } from "./openai-responses-compat.js";
 import { toLlmAdapter } from "./chat-model-adapter.js";
 
 /** Explicit overrides for a single model construction (highest priority). */
@@ -120,6 +121,9 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
         ...(authField !== "Authorization" && authField !== ""
           ? { defaultHeaders: { [authField]: apiKey } }
           : {}),
+        // Vendor Responses payloads (MiniMax: annotations:null on output_text)
+        // crash the SDK converter; normalize them at the transport seam.
+        ...(apiFormat === "openai_responses" ? { fetch: createResponsesCompatFetch() } : {}),
       },
       ...(overrides.topP !== undefined ? { top_p: overrides.topP } : {}),
       ...(overrides.frequencyPenalty !== undefined ? { frequency_penalty: overrides.frequencyPenalty } : {}),

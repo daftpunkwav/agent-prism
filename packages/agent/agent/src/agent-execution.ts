@@ -746,6 +746,7 @@ export async function* runAgentExecution(
       });
     }
   } catch (error) {
+    console.error(`[agent-execution] run failed (${spec.config.framework}/${spec.config.model_id}):`, error);
     const failureMessage = sanitizeErrorMessage(error);
     if (subagentDepth === 0) {
       await recordEpisodicExperience(memoryService, memoryPolicy, {

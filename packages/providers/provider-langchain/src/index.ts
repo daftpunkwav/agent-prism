@@ -8,6 +8,7 @@
  */
 
 export * from "./model-factory.js";
+export * from "./openai-responses-compat.js";
 export * from "./connection-test.js";
 export * from "./chat-model-adapter.js";
 export * from "./llm-trace.js";
