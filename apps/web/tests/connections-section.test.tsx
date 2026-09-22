@@ -17,6 +17,7 @@ function slot(overrides?: Partial<ModelSlot>): ModelSlot {
     label: "Main",
     model: "glm-5.3",
     thinking_level: "off",
+    thinking_levels: [],
     thinking_capable: false,
     context_window: 128000,
     max_input_tokens: 120000,
@@ -95,6 +96,8 @@ describe("ConnectionsSection", () => {
 
   it("hands connection field edits to the parent", () => {
     const handlers = renderSection([conn("conn-1")]);
+    const summary = screen.getByText(/openai_chat · api\.example\.com · Key/);
+    expect(summary.textContent).not.toContain("· ·");
     const provider = screen.getByLabelText(en().connection.provider) as HTMLInputElement;
     expect(provider.value).toBe("z.ai");
     fireEvent.change(provider, { target: { value: "zhipu" } });
@@ -138,6 +141,34 @@ describe("ConnectionsSection", () => {
     fireEvent.click(screen.getByRole("button", { name: en().rail.add }));
     expect(handlers.onAddProvider).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: en().connection.addModel }));
-    expect(handlers.onAddModel).toHaveBeenCalledWith("conn-1");
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
+
+  it("adds a model through the dialog and submits the draft", () => {
+    const handlers = renderSection([conn("conn-1")]);
+    fireEvent.click(screen.getByRole("button", { name: en().connection.addModel }));
+    fireEvent.change(screen.getByLabelText(en().model.modelIdAria.replace("{index}", "1")), {
+      target: { value: "glm-5.3" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: en().model.modalSave }));
+    expect(handlers.onAddModel).toHaveBeenCalledWith("conn-1", expect.objectContaining({ model: "glm-5.3" }));
+  });
+
+  it("edits a model through the dialog and submits the patch", () => {
+    const handlers = renderSection([conn("conn-1")]);
+    fireEvent.click(screen.getByRole("button", { name: en().model.editAria }));
+    expect(screen.getByText(en().model.editTitle)).toBeDefined();
+    fireEvent.change(screen.getByLabelText(en().model.modelIdAria.replace("{index}", "1")), {
+      target: { value: "glm-4.7" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: en().model.modalSave }));
+    expect(handlers.onUpdateModel).toHaveBeenCalledWith("conn-1", "ep-1", expect.objectContaining({ model: "glm-4.7" }));
+  });
+
+  it("shows sixteen stars for a stored key until it is edited", () => {
+    renderSection([conn("conn-1", { api_key: "", api_key_set: true })]);
+    const input = screen.getByLabelText("API Key") as HTMLInputElement;
+    expect(input.value).toBe("****************");
+    expect(input.value).toHaveLength(16);
   });
 });

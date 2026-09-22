@@ -92,6 +92,24 @@ describe("settings connection model", () => {
     expect(endpoints[0]?.thinking_level).toBe("off");
   });
 
+  it("round-trips vendor-defined thinking档位 through flatten and grouping", () => {
+    const group = blankConnection();
+    group.models[0] = {
+      ...blankModel(),
+      model: "gpt-x",
+      thinking_capable: true,
+      thinking_level: "xhigh",
+      thinking_levels: ["low", "xhigh"],
+    };
+    const [out] = flattenConnections([group]);
+    expect(out?.thinking_level).toBe("xhigh");
+    expect(out?.thinking_levels).toEqual(["low", "xhigh"]);
+    const regrouped = groupEndpoints(
+      config([endpoint({ thinking_level: "xhigh", thinking_levels: ["low", "xhigh"] })]),
+    );
+    expect(regrouped[0]?.models[0]).toMatchObject({ thinking_level: "xhigh", thinking_levels: ["low", "xhigh"] });
+  });
+
   it("keeps non-local ids and disables thinking level for incapable models", () => {
     const group = blankConnection();
     group.models[0] = {

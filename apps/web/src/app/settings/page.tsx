@@ -24,6 +24,7 @@ import {
   flattenConnections,
   groupEndpoints,
   isLocalModelId,
+  newLocalId,
 } from "./settingsConnectionModel";
 import { ConnectionsSection } from "./ConnectionsSection";
 import { McpSection } from "./McpSection";
@@ -201,14 +202,14 @@ export default function SettingsPage() {
               aria-current={section === id ? "true" : undefined}
               onClick={() => setSection(id)}
               className={
-                "shrink-0 flex items-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-sm transition-colors " +
+                "shrink-0 flex items-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-sm text-left transition-colors " +
                 (section === id
                   ? "bg-primary/10 text-primary font-medium"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/30")
               }
             >
-              <Icon className="h-4 w-4" />
-              <span className="whitespace-nowrap">{label}</span>
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="whitespace-nowrap md:whitespace-normal">{label}</span>
             </button>
           ))}
         </nav>
@@ -257,10 +258,10 @@ export default function SettingsPage() {
                   });
                   setSelectedConnKey(null);
                 }}
-                onAddModel={(connKey) => {
+                onAddModel={(connKey, draft) => {
                   const c = form.connections.find((x) => x.key === connKey);
                   if (c === undefined || modelCount >= 12) return;
-                  updateConn(connKey, { models: [...c.models, { ...blankConnection().models[0]! }] });
+                  updateConn(connKey, { models: [...c.models, { ...draft, id: newLocalId("m") }] });
                 }}
                 onAddProvider={() => {
                   const c = blankConnection();

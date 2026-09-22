@@ -5,7 +5,7 @@
  * Responsibilities:
  * - Render the connection rail (providers with status dots) and one detail pane
  * - Edit connection fields, model rows (per-model test/enable/delete), and the JSON config
- * - Own local test/json/editing state; every durable mutation flows through callbacks
+ * - Host the model add/edit dialog; every durable mutation flows through callbacks
  *
  * Presentational section: the page owns the form state and the save call.
  */
@@ -28,8 +28,8 @@ import { UiSelect } from "@agentprism/ui";
 import { DEFAULT_PROVIDER_NAME, safeHttpUrl, testProvider } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 import type { ConnectionGroup, ModelSlot } from "./settingsConnectionModel";
-import { isLocalModelId, newLocalId } from "./settingsConnectionModel";
-import { ModelCard } from "./ModelCard";
+import { API_KEY_SENTINEL, blankModel, isLocalModelId, newLocalId } from "./settingsConnectionModel";
+import { ModelModal } from "./ModelModal";
 import { Field } from "./Field";
 
 interface ConnectionsSectionProps {
@@ -44,7 +44,7 @@ interface ConnectionsSectionProps {
   onSetDefault(modelId: string): void;
   onDeleteModel(connKey: string, modelId: string): void;
   onDeleteConn(key: string): void;
-  onAddModel(connKey: string): void;
+  onAddModel(connKey: string, draft: ModelSlot): void;
   onAddProvider(): void;
   onSave(): void;
   onFlash(message: string): void;
@@ -94,7 +94,8 @@ export function ConnectionsSection({
 }: ConnectionsSectionProps) {
   const t = useT();
   const [showKey, setShowKey] = useState(false);
-  const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({});
+  const [keyEdited, setKeyEdited] = useState<Record<string, boolean>>({});
+  const [modelModal, setModelModal] = useState<{ connKey: string; draft: ModelSlot; isNew: boolean } | null>(null);
   const [testingKey, setTestingKey] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<Record<string, TestOutcome>>({});
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -167,18 +168,19 @@ export function ConnectionsSection({
         website_url: c.website_url,
         // Empty string keeps the stored key (backend inherits by id/fingerprint).
         api_key: "",
-        models: c.models.map((m) => ({
-          label: m.label,
-          model: m.model,
-          enabled: m.enabled !== false,
-          context_window: m.context_window,
-          max_input_tokens: m.max_input_tokens,
-          max_output_tokens: m.max_output_tokens,
-          thinking_capable: m.thinking_capable,
-          thinking_level: m.thinking_level,
-          image_input: m.image_input,
-          video_input: m.video_input,
-        })),
+          models: c.models.map((m) => ({
+            label: m.label,
+            model: m.model,
+            enabled: m.enabled !== false,
+            context_window: m.context_window,
+            max_input_tokens: m.max_input_tokens,
+            max_output_tokens: m.max_output_tokens,
+            thinking_capable: m.thinking_capable,
+            thinking_level: m.thinking_level,
+            thinking_levels: [...m.thinking_levels],
+            image_input: m.image_input,
+            video_input: m.video_input,
+          })),
       },
       null,
       2,
@@ -200,6 +202,14 @@ export function ConnectionsSection({
         ? c.models
         : parsedModels.map((m, index) => {
             const base = c.models[index] ?? { ...c.models[c.models.length - 1]!, id: newLocalId("m") };
+            const levels = Array.isArray(m.thinking_levels)
+              ? (m.thinking_levels as unknown[])
+                  .filter((l): l is string => typeof l === "string" && l.trim() !== "")
+                  .map((l) => l.trim().slice(0, 32))
+                  .filter((l, i, arr) => arr.indexOf(l) === i)
+                  .slice(0, 16)
+              : base.thinking_levels;
+            const level = typeof m.thinking_level === "string" ? m.thinking_level.trim().slice(0, 32) : "off";
             return {
               id: base.id,
               label: str(m.label, ""),
@@ -211,9 +221,10 @@ export function ConnectionsSection({
                 typeof m.max_output_tokens === "number" ? m.max_output_tokens : base.max_output_tokens,
               thinking_capable: m.thinking_capable === true,
               thinking_level:
-                m.thinking_level === "low" || m.thinking_level === "medium" || m.thinking_level === "high"
-                  ? m.thinking_level
+                level === "off" || levels.includes(level) || ["low", "medium", "high"].includes(level)
+                  ? level
                   : "off",
+              thinking_levels: levels,
               image_input: m.image_input === true,
               video_input: m.video_input === true,
               enabled: m.enabled !== false,
@@ -304,7 +315,7 @@ export function ConnectionsSection({
                   <div className="min-w-0">
                     <h2 className="text-lg font-semibold truncate">{connectionLabel(c)}</h2>
                     <p className="text-xs font-mono text-muted-foreground mt-1 truncate">
-                      {c.api_format} · {hostOf(c.base_url)} ·{" "}
+                      {c.api_format} · {hostOf(c.base_url)}
                       {hasKey ? t("settings.connection.keySet") : t("settings.connection.keyMissing")}
                     </p>
                   </div>
@@ -378,8 +389,18 @@ export function ConnectionsSection({
                             ? t("settings.connection.keyPlaceholderSaved")
                             : t("settings.connection.keyPlaceholder")
                         }
-                        value={c.api_key}
-                        onChange={(e) => onUpdateConn(c.key, { api_key: e.target.value })}
+                        value={c.api_key !== "" || keyEdited[c.key] ? c.api_key : c.api_key_set ? API_KEY_SENTINEL : ""}
+                        onFocus={() => {
+                          // The sentinel is display-only: focus clears it so typing starts fresh,
+                          // and form state stays "" (meaning "keep the stored key").
+                          if (c.api_key === "" && !keyEdited[c.key]) {
+                            setKeyEdited((s) => ({ ...s, [c.key]: true }));
+                          }
+                        }}
+                        onChange={(e) => {
+                          setKeyEdited((s) => ({ ...s, [c.key]: true }));
+                          onUpdateConn(c.key, { api_key: e.target.value });
+                        }}
                         autoComplete="off"
                       />
                       <button
@@ -414,25 +435,13 @@ export function ConnectionsSection({
                       </a>
                     </div>
                   </Field>
-                  <details className="text-xs">
-                    <summary className="cursor-pointer text-muted-foreground">
-                      {t("settings.connection.advancedAuth")}
-                    </summary>
-                    <div className="mt-2">
-                      <input
-                        className="form-input font-mono text-sm"
-                        value={c.auth_field}
-                        onChange={(e) => onUpdateConn(c.key, { auth_field: e.target.value })}
-                      />
-                    </div>
-                  </details>
                 </div>
 
                 {/* models */}
                 <div className="rounded-[var(--radius-sm)] border border-border/70 p-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="eyebrow">{t("settings.group.models")}</p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         className="btn-ghost !h-8 text-[11px]"
@@ -452,7 +461,7 @@ export function ConnectionsSection({
                         type="button"
                         className="btn-ghost !h-8 !px-2 text-xs"
                         disabled={modelCount >= 12}
-                        onClick={() => onAddModel(c.key)}
+                        onClick={() => setModelModal({ connKey: c.key, draft: blankModel(), isNew: true })}
                       >
                         <Plus className="h-3.5 w-3.5" />
                         {t("settings.connection.addModel")}
@@ -467,7 +476,6 @@ export function ConnectionsSection({
                       const resultKey = `${c.key}:${m.id}`;
                       const outcome = outcomes[resultKey];
                       const testing = testingKey === resultKey;
-                      const expanded = !!expandedModels[m.id];
                       const ctxBadge = formatTokens(m.context_window);
                       return (
                         <li
@@ -530,9 +538,14 @@ export function ConnectionsSection({
                               <button
                                 type="button"
                                 className="btn-ghost !h-8 !w-8 !p-0"
-                                aria-expanded={expanded}
                                 aria-label={t("settings.model.editAria")}
-                                onClick={() => setExpandedModels((s) => ({ ...s, [m.id]: !s[m.id] }))}
+                                onClick={() =>
+                                  setModelModal({
+                                    connKey: c.key,
+                                    draft: { ...m, thinking_levels: [...m.thinking_levels] },
+                                    isNew: false,
+                                  })
+                                }
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
@@ -575,21 +588,6 @@ export function ConnectionsSection({
                               {outcome.ok ? "✓ " : "✕ "}
                               {outcome.message}
                             </p>
-                          )}
-                          {expanded && (
-                            <div className="border-t border-border/60 px-3 py-3">
-                              <ModelCard
-                                model={m}
-                                index={c.models.indexOf(m)}
-                                isDefault={isDefault}
-                                expanded
-                                onToggleExpand={() => setExpandedModels((s) => ({ ...s, [m.id]: false }))}
-                                onUpdate={(patch) => onUpdateModel(c.key, m.id, patch)}
-                                onSetDefault={() => onSetDefault(m.id)}
-                                onDelete={() => onDeleteModel(c.key, m.id)}
-                                canDelete={c.models.length > 1}
-                              />
-                            </div>
                           )}
                         </li>
                       );
@@ -646,6 +644,24 @@ export function ConnectionsSection({
                     {t("settings.page.save")}
                   </button>
                 </div>
+                {modelModal !== null && (
+                  <ModelModal
+                    initial={modelModal.draft}
+                    isNew={modelModal.isNew}
+                    apiFormat={c.api_format}
+                    defaultEndpointId={defaultEndpointId}
+                    onSetDefault={onSetDefault}
+                    onClose={() => setModelModal(null)}
+                    onSave={(draft) => {
+                      if (modelModal.isNew) {
+                        onAddModel(modelModal.connKey, draft);
+                      } else {
+                        onUpdateModel(modelModal.connKey, modelModal.draft.id, draft);
+                      }
+                      setModelModal(null);
+                    }}
+                  />
+                )}
               </>
             );
           })()}

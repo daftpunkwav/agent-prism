@@ -7,7 +7,10 @@
  * - Provide blank factories and local-id helpers for form rows
  */
 
-import type { LlmEndpointUpdate, ProviderConfig, ThinkingLevel } from "@agentprism/client";
+import type { LlmEndpointUpdate, ProviderConfig } from "@agentprism/client";
+
+/** Displayed in place of a stored API key; never enters form state (empty means "keep stored"). */
+export const API_KEY_SENTINEL = "****************";
 
 /** A single model slot under one connection (matching one backend LlmEndpoint) */
 export type ModelSlot = {
@@ -18,7 +21,9 @@ export type ModelSlot = {
   max_input_tokens: number;
   max_output_tokens: number;
   thinking_capable: boolean;
-  thinking_level: ThinkingLevel;
+  thinking_level: string;
+  /** Vendor-defined thinking档位 (OpenAI-compatible only); empty means the standard low/medium/high set. */
+  thinking_levels: string[];
   image_input: boolean;
   video_input: boolean;
   enabled: boolean;
@@ -88,6 +93,7 @@ export function blankModel(): ModelSlot {
     max_output_tokens: 2048,
     thinking_capable: false,
     thinking_level: "off",
+    thinking_levels: [],
     image_input: false,
     video_input: false,
     enabled: true,
@@ -131,6 +137,7 @@ export function groupEndpoints(cfg: ProviderConfig): ConnectionGroup[] {
         max_output_tokens: cfg.max_output_tokens,
         thinking_capable: false,
         thinking_level: "off",
+        thinking_levels: [],
         image_input: false,
         video_input: false,
         enabled: true,
@@ -175,8 +182,9 @@ export function groupEndpoints(cfg: ProviderConfig): ConnectionGroup[] {
       image_input: !!ep.image_input,
       video_input: !!ep.video_input,
       enabled: ep.enabled !== false,
-      // The public view is a string; illegal values are rejected by the backend zod — a single-point assertion narrows it to the contract enum here
-      thinking_level: (ep.thinking_level || "off") as ThinkingLevel,
+      // The public view is a string; illegal values are rejected by the backend zod — pass through, storage clamps
+      thinking_level: ep.thinking_level || "off",
+      thinking_levels: Array.isArray(ep.thinking_levels) ? ep.thinking_levels.filter((l): l is string => typeof l === "string") : [],
     });
   }
   const groups: ConnectionGroup[] = [];
@@ -212,6 +220,7 @@ export function flattenConnections(connections: ConnectionGroup[]): LlmEndpointU
         image_input: m.image_input,
         video_input: m.video_input,
         thinking_level: m.thinking_capable ? m.thinking_level : "off",
+        thinking_levels: m.thinking_levels.filter((l) => l.trim() !== ""),
         enabled: m.enabled !== false,
       });
     }
