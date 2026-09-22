@@ -26,12 +26,12 @@ describe("FileSessionStore", () => {
   it("round-trips records plus entries across instances", async () => {
     const file = tempFile();
     const first = new FileSessionStore(testDeps(file));
-    const created = await first.create({ kind: "arena", title: "run", metadata: { selections: 2 } });
+    const created = await first.create({ kind: "arena", title: "bash", metadata: { selections: 2 } });
     await first.appendEntry(created.id, { kind: "verdict", content: "column A wins" });
     await first.complete(created.id, { summary: "done" });
 
     const second = new FileSessionStore(testDeps(file));
-    expect(await second.get(created.id)).toMatchObject({ title: "run", status: "completed", summary: "done" });
+    expect(await second.get(created.id)).toMatchObject({ title: "bash", status: "completed", summary: "done" });
     expect(await second.listEntries(created.id)).toHaveLength(1);
     expect(await second.list({ kind: "arena" })).toHaveLength(1);
   });
@@ -39,7 +39,7 @@ describe("FileSessionStore", () => {
   it("persists cancellation across instances", async () => {
     const file = tempFile();
     const first = new FileSessionStore(testDeps(file));
-    const created = await first.create({ kind: "agent", title: "run" });
+    const created = await first.create({ kind: "agent", title: "bash" });
     await first.cancel(created.id, "user stop");
     const second = new FileSessionStore(testDeps(file));
     expect((await second.get(created.id))?.status).toBe("cancelled");

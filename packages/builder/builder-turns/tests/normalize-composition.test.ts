@@ -16,6 +16,11 @@ describe("normalizeComposition", () => {
     expect(composition.max_output_tokens).toBe(64_000);
   });
 
+  it("migrates the pre-rename run tool name to bash on parse", () => {
+    const composition = normalizeComposition({ tools: ["run", "read", "run"] });
+    expect(composition.tools).toEqual(["bash", "read"]);
+  });
+
   it("rejects out-of-range values", () => {
     expect(() => normalizeComposition({ max_steps: 0 })).toThrow(BuilderError);
     expect(() => normalizeComposition({ temperature: 5 })).toThrow(BuilderError);

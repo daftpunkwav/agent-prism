@@ -15,7 +15,7 @@ import { captureDriver, collect, testDeps, testSpec } from "./run-fixtures.js";
 
 function specWith(sandboxMode: "off" | "os") {
   return {
-    toolNames: ["run"],
+    toolNames: ["bash"],
     config: PipelineConfigSchema.parse({ label: "col", harness: "bare", sandbox_mode: sandboxMode }),
   };
 }
@@ -29,7 +29,7 @@ async function executeRun(command: string, sandboxMode: "off" | "os"): Promise<T
     deps,
     testSpec(
       captureDriver((ctx) => {
-        pending = ctx.tools.execute("run", { command });
+        pending = ctx.tools.execute("bash", { command });
       }),
       specWith(sandboxMode),
     ),

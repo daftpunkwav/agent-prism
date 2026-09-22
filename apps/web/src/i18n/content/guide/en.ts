@@ -173,7 +173,7 @@ const PIPELINE_STAGES: Array<{
   {
     title: "Workspace",
     detail:
-      "Each column owns a private disk directory data/runs/<run_id>/<label>/; read/write/edit/run paths are jailed to that cwd.",
+      "Each column owns a private disk directory data/runs/<run_id>/<label>/; read/write/edit/bash paths are jailed to that cwd.",
     module: "agent/run-workspace.ts · environment/scoped-filesystem.ts",
   },
   {
@@ -237,12 +237,12 @@ const toolsetTable: Array<{
   {
     id: "full",
     label: "All tools",
-    tools: "read, write, edit, ls, run, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter (the coding-agent default surface)",
+    tools: "read, write, edit, ls, bash, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter (the coding-agent default surface)",
   },
   {
     id: "edit_run",
     label: "Edit + run",
-    tools: "read, write, edit, run, apply_patch, glob, grep, todo_write, ask_user, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter",
+    tools: "read, write, edit, bash, apply_patch, glob, grep, todo_write, ask_user, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter",
   },
   {
     id: "read_only",
@@ -300,7 +300,7 @@ const dimensions: DimDoc[] = [
     path: [
       "Non-framework dimensions force framework=native in the router, avoiding prompt-only reasoning differences on LangChain.",
       "ArenaRunner fetches the AgentDriver from the DriverLookup port by config.framework.",
-      "Each column's cwd = data/runs/<run_id>/<label>/ on disk; tools read/write/edit/run are all jailed to that directory.",
+      "Each column's cwd = data/runs/<run_id>/<label>/ on disk; tools read/write/edit/bash are all jailed to that directory.",
     ],
     langChain: "LangChainDriver: a thin create_agent wrapper, same tool registry → LC tools.",
     langGraph: "LangGraphDriver: a minimal ReAct graph + the same tool registry.",

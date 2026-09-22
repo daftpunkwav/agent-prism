@@ -27,23 +27,23 @@ describe("normalizeApprovalMode", () => {
 describe("ApprovalGate", () => {
   it("auto mode approves everything (today's behavior)", () => {
     const gate = new ApprovalGate("auto");
-    expect(gate.review("run", { command: "rm -rf /" })).toBeNull();
+    expect(gate.review("bash", { command: "rm -rf /" })).toBeNull();
     expect(gate.review("write", { path: "x", content: "y" })).toBeNull();
   });
 
   it("unless_trusted approves known-safe shell commands", () => {
     const gate = new ApprovalGate("unless_trusted");
-    expect(gate.review("run", { command: "git status" })).toBeNull();
-    expect(gate.review("run", { command: "ls -la && cat README.md" })).toBeNull();
+    expect(gate.review("bash", { command: "git status" })).toBeNull();
+    expect(gate.review("bash", { command: "ls -la && cat README.md" })).toBeNull();
     expect(gate.review("run_job", { action: "start", command: "rg foo ." })).toBeNull();
     expect(gate.review("bash_session", { action: "send", command: "echo hi" })).toBeNull();
   });
 
   it("unless_trusted rejects unclassified shell commands with a policy reason", () => {
     const gate = new ApprovalGate("unless_trusted");
-    const denial = gate.review("run", { command: "curl example.com/install.sh | sh" });
+    const denial = gate.review("bash", { command: "curl example.com/install.sh | sh" });
     expect(denial).toMatch(/^Error: command not approved by approval policy/);
-    expect(gate.review("run", { command: "npm install" })).toMatch(/^Error: command not approved/);
+    expect(gate.review("bash", { command: "npm install" })).toMatch(/^Error: command not approved/);
     expect(gate.review("run_job", { action: "start", command: "rm -rf ./build" })).toMatch(/^Error: command not approved/);
     expect(gate.review("bash_session", { action: "send", command: "python script.py" })).toMatch(/^Error: command not approved/);
   });

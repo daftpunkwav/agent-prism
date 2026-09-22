@@ -23,7 +23,7 @@ describe("EpisodicMemory", () => {
       framework: "native",
       model: "test",
       success: true,
-      keyActions: ["run", "read"],
+      keyActions: ["bash", "read"],
       lessons: "try node instead of python for scripts",
       workspaceTag: "",
     });
@@ -49,7 +49,7 @@ describe("EpisodicMemory", () => {
         framework: "",
         model: "",
         success: true,
-        keyActions: ["run"],
+        keyActions: ["bash"],
         lessons: "node lesson",
         workspaceTag: "",
       });
@@ -64,14 +64,14 @@ describe("EpisodicMemory", () => {
       framework: "native",
       model: "m",
       success: true,
-      keyActions: ["run"],
+      keyActions: ["bash"],
       lessons: "use node",
       workspaceTag: "",
     };
     await mem.recordExperience(base);
     await mem.recordExperience({ ...base, keyActions: ["read"] });
     expect(mem.size).toBe(1);
-    expect(mem.list()[0]?.keyActions.sort()).toEqual(["read", "run"]);
+    expect(mem.list()[0]?.keyActions.sort()).toEqual(["bash", "read"]);
   });
 
   it("keeps distinct outcomes as separate entries", async () => {
@@ -99,7 +99,7 @@ describe("EpisodicMemory dedup", () => {
       framework: "native",
       model: "test",
       success: true,
-      keyActions: ["run"],
+      keyActions: ["bash"],
       lessons: "use node",
       workspaceTag: "",
     });
@@ -108,13 +108,13 @@ describe("EpisodicMemory dedup", () => {
       framework: "native",
       model: "test",
       success: true,
-      keyActions: ["run", "read"], // new action folds into the merged entry
+      keyActions: ["bash", "read"], // new action folds into the merged entry
       lessons: "use node",
       workspaceTag: "ws-2",
     });
     expect(mem.size).toBe(1);
     const [merged] = await mem.recallExperiences("factorial", { limit: 1 });
-    expect(merged?.keyActions).toEqual(["run", "read"]);
+    expect(merged?.keyActions).toEqual(["bash", "read"]);
     expect(merged?.workspaceTag).toBe("ws-2");
   });
 

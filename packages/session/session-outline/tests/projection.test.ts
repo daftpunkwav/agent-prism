@@ -20,13 +20,13 @@ describe("outlineTurns", () => {
       thought(1, "working on login"),
       action(1, "read"),
       action(1, "read"),
-      action(1, "run"),
+      action(1, "bash"),
       { ...thought(1, ""), type: "complete", metrics: { success: true } },
       thought(2, "x".repeat(500)),
     ] as unknown as ArenaEvent[];
     const outlines = outlineTurns(events, { 1: "Fix the login bug please", 2: "   " });
     expect(outlines).toHaveLength(2);
-    expect(outlines[0]).toMatchObject({ turn: 1, prompt: "Fix the login bug please", tools: ["read", "run"], verdict: "completed" });
+    expect(outlines[0]).toMatchObject({ turn: 1, prompt: "Fix the login bug please", tools: ["read", "bash"], verdict: "completed" });
     expect(outlines[0]!.response).toContain("working on login");
     expect(outlines[1]!.prompt).toBeNull();
     expect(outlines[1]!.response!.length).toBeLessThanOrEqual(240);

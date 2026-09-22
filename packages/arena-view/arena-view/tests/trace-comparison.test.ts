@@ -20,7 +20,7 @@ describe("buildTraceComparison cross-column comparison", () => {
       ev("thought_delta", 1, { content: "Answer A" }),
       ev("thought_end", 1),
       ev("action", 2, { tool: "write", args: { path: "a.py", content: "x" } }),
-      ev("action", 3, { tool: "run", args: { command: "python a.py\nsecond line" } }),
+      ev("action", 3, { tool: "bash", args: { command: "python a.py\nsecond line" } }),
     ];
     const b = [
       ev("thought_delta", 1, { content: "Answer B" }),
@@ -35,7 +35,7 @@ describe("buildTraceComparison cross-column comparison", () => {
     expect(cmp.columns[1]!.finalAnswer).toBe("Answer B");
     expect(cmp.columns[0]!.toolCalls).toEqual([
       { tool: "write", detail: "a.py" },
-      { tool: "run", detail: "python a.py" },
+      { tool: "bash", detail: "python a.py" },
     ]);
     expect(cmp.columns[0]!.files).toEqual(["a.py"]);
     expect(cmp.columns[0]!.success).toBe(true);
@@ -48,7 +48,7 @@ describe("buildTraceComparison cross-column comparison", () => {
     const cmp = buildTraceComparison([
       { label: "A", events: [mk("ls", "x"), mk("read", "x"), mk("write", "a")] },
       { label: "B", events: [mk("ls", "x"), mk("read", "x"), mk("write", "b")] },
-      { label: "C", events: [mk("ls", "x"), mk("read", "x"), mk("run", "y")] },
+      { label: "C", events: [mk("ls", "x"), mk("read", "x"), mk("bash", "y")] },
     ]);
     expect(cmp.commonToolPrefix).toBe(2);
   });

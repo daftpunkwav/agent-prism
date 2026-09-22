@@ -18,7 +18,7 @@ import {
   type BuilderCompositionInput,
   type ToolsetId,
 } from "@agentprism/contracts";
-import { BuilderCompositionSchema } from "@agentprism/contracts";
+import { BuilderCompositionSchema, migrateLegacyToolNames } from "@agentprism/contracts";
 import { BuilderError } from "./errors.js";
 
 /** Default session tool set (contracts single source; the schema default for omitted `tools`). */
@@ -31,7 +31,9 @@ export function normalizeComposition(input: BuilderCompositionInput): BuilderCom
     throw BuilderError.invalid(`Invalid composition: ${parsed.error.issues[0]?.message ?? "schema mismatch"}`);
   }
   const composition = parsed.data;
-  return { ...composition, tools: dedupe(composition.tools) };
+  // Persisted pre-rename compositions carry "run"; normalize on every parse so
+  // configure-time validation and tool binding see the current name.
+  return { ...composition, tools: dedupe(migrateLegacyToolNames(composition.tools)) };
 }
 
 function dedupe(names: string[]): string[] {

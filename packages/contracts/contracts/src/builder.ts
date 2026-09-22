@@ -51,7 +51,7 @@ export const DEFAULT_BUILDER_TOOLS: readonly string[] = [
   "write",
   "edit",
   "ls",
-  "run",
+  "bash",
   "glob",
   "grep",
   "todo_write",
@@ -62,6 +62,17 @@ export const DEFAULT_BUILDER_TOOLS: readonly string[] = [
  * The agent composition: one selection per block slot. Every field is a swappable
  * block; an empty `tools` list means the agent runs with no tool capability at all.
  */
+/**
+ * Pre-rename shell tool name. Persisted builder compositions may still carry it;
+ * map it to "bash" whenever a stored composition is loaded or re-normalized.
+ */
+export const LEGACY_BASH_TOOL_NAME = "run";
+
+/** Maps pre-rename tool names onto their current names (run -> bash; others pass through). */
+export function migrateLegacyToolNames(tools: readonly string[]): string[] {
+  return tools.map((name) => (name === LEGACY_BASH_TOOL_NAME ? "bash" : name));
+}
+
 export const BuilderCompositionSchema = z.object({
   /** Runtime framework block (driver id, e.g. native / langchain / langgraph). */
   framework: z.string().min(1).max(64).default("native"),

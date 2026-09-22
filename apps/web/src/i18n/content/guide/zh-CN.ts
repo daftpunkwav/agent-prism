@@ -172,7 +172,7 @@ const PIPELINE_STAGES: Array<{
   {
     title: "工作空间",
     detail:
-      "每列独占磁盘目录 data/runs/<run_id>/<label>/；read/write/edit/run 路径 jail 在该 cwd。",
+      "每列独占磁盘目录 data/runs/<run_id>/<label>/；read/write/edit/bash 路径 jail 在该 cwd。",
     module: "agent/run-workspace.ts · environment/scoped-filesystem.ts",
   },
   {
@@ -236,12 +236,12 @@ const toolsetTable: Array<{
   {
     id: "full",
     label: "全工具",
-    tools: "read, write, edit, ls, run, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter（coding agent 默认面）",
+    tools: "read, write, edit, ls, bash, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter（coding agent 默认面）",
   },
   {
     id: "edit_run",
     label: "编辑+运行",
-    tools: "read, write, edit, run, apply_patch, glob, grep, todo_write, ask_user, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter",
+    tools: "read, write, edit, bash, apply_patch, glob, grep, todo_write, ask_user, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter",
   },
   {
     id: "read_only",
@@ -299,7 +299,7 @@ const dimensions: DimDoc[] = [
     path: [
       "非框架维：router 强制 framework=native，避免 LangChain 上推理仅 Prompt 差异。",
       "ArenaRunner 按 config.framework 从 DriverLookup 端口取 AgentDriver。",
-      "每列 cwd = data/runs/<run_id>/<label>/ 磁盘目录，工具 read/write/edit/run 均 jail 在该目录。",
+      "每列 cwd = data/runs/<run_id>/<label>/ 磁盘目录，工具 read/write/edit/bash 均 jail 在该目录。",
     ],
     langChain: "LangChainDriver：create_agent 薄包装，同一工具注册表 → LC tools。",
     langGraph: "LangGraphDriver：最小 ReAct 图 + 同一工具注册表。",

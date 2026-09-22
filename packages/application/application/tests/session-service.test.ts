@@ -22,10 +22,10 @@ function testService() {
 describe("SessionService", () => {
   it("starts, notes, completes, and serves detail", async () => {
     const service = testService();
-    const record = await service.startSession("arena", "run", { dimension: "framework" });
+    const record = await service.startSession("arena", "bash", { dimension: "framework" });
     await service.appendEntry(record.id, "lifecycle", "columns launched");
     const detail = await service.getSession(record.id);
-    expect(detail?.record.title).toBe("run");
+    expect(detail?.record.title).toBe("bash");
     expect(detail?.entries).toHaveLength(1);
     await service.completeSession(record.id, "all columns answered");
     expect((await service.getSession(record.id))?.record.status).toBe("completed");
@@ -33,7 +33,7 @@ describe("SessionService", () => {
 
   it("serves spilled blobs and nulls missing or unsupported backends", async () => {
     const service = testService();
-    const record = await service.startSession("agent", "run");
+    const record = await service.startSession("agent", "bash");
     const big = "v".repeat(9000);
     const entry = await service.appendEntry(record.id, "note", big);
     expect(entry.content).toMatch(/^\[ledger blob:/);

@@ -7,9 +7,9 @@ import { canonicalArgsKey, matchToolPattern, RepeatTracker } from "../src/contro
 
 describe("matchToolPattern", () => {
   it("supports wildcards with * matching everything", () => {
-    expect(matchToolPattern("*", "run")).toBe(true);
+    expect(matchToolPattern("*", "bash")).toBe(true);
     expect(matchToolPattern("mcp_*", "mcp__fs_read")).toBe(true);
-    expect(matchToolPattern("mcp_*", "run")).toBe(false);
+    expect(matchToolPattern("mcp_*", "bash")).toBe(false);
     expect(matchToolPattern("read", "read")).toBe(true);
   });
 });
@@ -36,7 +36,7 @@ describe("RepeatTracker", () => {
     expect(tracker.record("read", { path: "a" })).toBeNull();
     expect(tracker.record("read", { path: "b" })).toBeNull();
     expect(tracker.record("read", { path: "b" })).toContain("2x");
-    expect(tracker.record("run", { cmd: "ls" })).toBeNull();
+    expect(tracker.record("bash", { cmd: "ls" })).toBeNull();
   });
 
   it("honors include/exclude patterns and rejects bad thresholds", () => {

@@ -1,6 +1,6 @@
 # Sandbox enforcement layers
 
-The runtime contains what shell tools such as `run`, `run_job`, and on POSIX
+The runtime contains what shell tools such as `bash`, `run_job`, and on POSIX
 `bash_session` can do through three independent layers between a model-issued command and
 the operating system. Each layer may only add denials. The deepest layer enforces at the
 OS level rather than by inspecting the command text.
@@ -64,7 +64,7 @@ as baseline-only control fields in Arena comparisons through `BASELINE_ONLY_OPTI
   warning in `normalizeSandboxMode`, so containment is opt-in and never silently enabled.
 
 With `sandbox_mode: os`, `agent-execution` attaches a sandbox hint to the workspace handed
-to tools, where the writable root is the workspace root. `run` and `run_job` forward it
+to tools, where the writable root is the workspace root. `bash` and `run_job` forward it
 into every spawn. Nested runs inherit the config and therefore the hint.
 
 ## Boundaries

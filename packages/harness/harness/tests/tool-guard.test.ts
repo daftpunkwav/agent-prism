@@ -14,7 +14,7 @@ import { assessToolRelevance, blockedToolMessageContent } from "@agentprism/harn
 
 describe("toolset single source of truth", () => {
   it("toolset is derived from contracts with stable sort", () => {
-    expect(selectToolNames("full")).toEqual(["apply_patch", "ask_user", "bash_session", "edit", "glob", "goal", "grep", "ls", "plan", "ralph_loop", "read", "run", "run_job", "scatter", "session_query", "skill", "subagent", "symbols", "todo_write", "web_search", "webfetch", "write"]);
+    expect(selectToolNames("full")).toEqual(["apply_patch", "ask_user", "bash", "bash_session", "edit", "glob", "goal", "grep", "ls", "plan", "ralph_loop", "read", "run_job", "scatter", "session_query", "skill", "subagent", "symbols", "todo_write", "web_search", "webfetch", "write"]);
     expect(selectToolNames("read_only")).toEqual(["glob", "grep", "ls", "ralph_loop", "read", "scatter", "session_query", "skill", "subagent", "symbols"]);
     expect(Object.keys(TOOL_NAMES_BY_TOOLSET)).toEqual(["full", "edit_run", "read_only"]);
   });
@@ -36,7 +36,7 @@ describe("tool guard aligns with real tool names", () => {
   const weatherQ = "\u4eca\u5929\u5929\u6c14\u5982\u4f55";
 
   it("time-like questions are no longer unconditionally blocked (get_current_time branch removed)", () => {
-    const verdict = assessToolRelevance("What time is it now?", "run", { command: "date" }, []);
+    const verdict = assessToolRelevance("What time is it now?", "bash", { command: "date" }, []);
     expect(verdict.allowed).toBe(true);
   });
 

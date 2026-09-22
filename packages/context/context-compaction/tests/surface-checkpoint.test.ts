@@ -25,7 +25,7 @@ describe("selectSpan", () => {
       frame({ id: "sys", role: "system", text: "s", compactable: false }),
       frame({ id: "u1", text: "hello world, this is a long first question here" }),
       frame({ id: "a1", role: "assistant", text: "working on it now, please wait a moment" }),
-      frame({ id: "t1", role: "tool", text: "result payload here", tool: "run" }),
+      frame({ id: "t1", role: "tool", text: "result payload here", tool: "bash" }),
       frame({ id: "u2", text: "fresh question" }),
     ];
     const span = selectSpan(frames, 10);
@@ -38,7 +38,7 @@ describe("selectSpan", () => {
 
   it("never starts on a tool frame or ends before its tool result", () => {
     const frames = [
-      frame({ id: "t0", role: "tool", text: "orphan result data here", tool: "run" }),
+      frame({ id: "t0", role: "tool", text: "orphan result data here", tool: "bash" }),
       frame({ id: "a1", role: "assistant", text: "assistant text without tools here" }),
     ];
     const span = selectSpan(frames, 4);
@@ -51,7 +51,7 @@ describe("checkpoints", () => {
   const frames = [
     frame({ id: "u1", role: "user", text: "Fix the login bug in src/auth.ts" }),
     frame({ id: "a1", role: "assistant", text: "I called read and run to reproduce" }),
-    frame({ id: "t1", role: "tool", text: "ERROR: null pointer\nat src/auth.ts:12", tool: "run" }),
+    frame({ id: "t1", role: "tool", text: "ERROR: null pointer\nat src/auth.ts:12", tool: "bash" }),
   ];
   it("fills sections extractively with entities", () => {
     const fill = extractiveFill(frames);

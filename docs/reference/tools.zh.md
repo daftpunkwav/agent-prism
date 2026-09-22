@@ -11,7 +11,7 @@
 
 | Toolset | Tools，22 / 19 / 10 |
 |---|---|
-| `full` | read, write, edit, ls, run, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter |
+| `full` | read, write, edit, ls, bash, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter |
 | `edit_run` | `full` 减去 `ls`、`webfetch`、`web_search`，保留 glob 与 grep |
 | `read_only` | read, ls, glob, grep, subagent, skill, ralph_loop, session_query, symbols, scatter |
 
@@ -27,7 +27,7 @@
 | `write` | 创建或覆盖；拒绝超过 256 K 字符的内容，而非截断 | full, edit_run |
 | `edit` | 精确 `old_text` 到 `new_text` 替换；`new_text` 超过 256 K 字符被拒绝 | full, edit_run |
 | `ls` | 列举，或空 path 加 recursive 时的完整 workspace 树 | all |
-| `run` | workspace cwd 中的 shell；超时钳制 1 至 120 秒，默认 30；Windows 上使用 PowerShell 5.1；长输出 spill | full, edit_run |
+| `bash` | workspace cwd 中的 shell；超时钳制 1 至 120 秒，默认 30；Windows 上使用 PowerShell 5.1；长输出 spill | full, edit_run |
 | `apply_patch` | V4A 多文件 patch，含 `*** Begin Patch` 与 Add、Update、Delete、Move-to 指令；非原子，早先的 hunk 会持久 | full, edit_run |
 | `glob` | glob 搜索，支持 `**`、`*`、`?`、`[abc]`、`{a,b}` | all |
 | `grep` | regex 内容搜索，返回 `path:line: text`；最多 200 匹配行；每行窗口 20 000 字符 | all |

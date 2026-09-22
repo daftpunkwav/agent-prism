@@ -21,9 +21,9 @@ function stubAdapter(response: string): { adapter: LlmAdapter; invoke: ReturnTyp
 
 describe("finalizeStructuredAnswer", () => {
   it("canonicalizes a valid JSON reply and sends the response format", async () => {
-    const { adapter, invoke } = stubAdapter('{"plan":"p","files":["a.py"],"how_to_run":"run"}');
+    const { adapter, invoke } = stubAdapter('{"plan":"p","files":["a.py"],"how_to_run":"bash"}');
     const result = await finalizeStructuredAnswer(contextWith(adapter), "raw answer");
-    expect(result).toBe('{"plan":"p","files":["a.py"],"how_to_run":"run"}');
+    expect(result).toBe('{"plan":"p","files":["a.py"],"how_to_run":"bash"}');
     const options = invoke.mock.calls[0]?.[1] as { responseFormat?: { name: string }; signal?: unknown };
     expect(options.responseFormat?.name).toBe("final_answer");
   });

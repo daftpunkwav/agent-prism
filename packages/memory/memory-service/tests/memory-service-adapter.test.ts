@@ -36,7 +36,7 @@ describe("MemoryServiceAdapter", () => {
       framework: "native",
       model: "test",
       success: true,
-      keyActions: ["write", "run"],
+      keyActions: ["write", "bash"],
       lessons: "Ran the script to verify.",
       workspaceTag: "",
     });

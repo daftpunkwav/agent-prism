@@ -150,7 +150,7 @@ export function toBeforeExecute(
   policy: SandboxPolicy = new LayeredSandboxPolicy(),
 ): (name: string, args: ToolArgs) => string | null {
   return (name: string, args: ToolArgs) => {
-    if (name !== "run" && name !== "run_job" && name !== "bash_session") return null;
+    if (name !== "bash" && name !== "run_job" && name !== "bash_session") return null;
     const command = typeof args.command === "string" ? args.command : "";
     if (command.trim() === "") return null;
     return policy.reviewShellCommand(command);

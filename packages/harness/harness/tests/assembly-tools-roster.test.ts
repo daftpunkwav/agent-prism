@@ -48,8 +48,8 @@ function contextWith(tools: { names: string[]; systemPromptOverride?: string }):
 
 describe("buildSystemUser tool roster", () => {
   it("renders only the actually-registered tool names", () => {
-    const { system } = buildSystemUser(contextWith({ names: ["read", "run"] }));
-    expect(system).toContain("Available tools: read, run.");
+    const { system } = buildSystemUser(contextWith({ names: ["read", "bash"] }));
+    expect(system).toContain("Available tools: read, bash.");
     // The stale hardcoded roster must not leak back in.
     expect(system).not.toContain("apply_patch");
     expect(system).not.toContain("web_search");

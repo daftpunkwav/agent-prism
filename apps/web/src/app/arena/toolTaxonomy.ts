@@ -14,7 +14,8 @@ export type ToolCategory = "read" | "write" | "code" | "ask" | "plan" | "net" | 
 
 const READ_TOOLS: ReadonlySet<string> = new Set(["read", "ls", "glob", "grep", "symbols"]);
 const WRITE_TOOLS: ReadonlySet<string> = new Set(["write", "edit", "apply_patch"]);
-const CODE_TOOLS: ReadonlySet<string> = new Set(["run", "run_job", "bash_session"]);
+// "run" stays recognized for pre-rename journals (display only).
+const CODE_TOOLS: ReadonlySet<string> = new Set(["bash", "run", "run_job", "bash_session"]);
 const PLAN_TOOLS: ReadonlySet<string> = new Set(["todo_write", "plan", "goal", "ralph_loop"]);
 const NET_TOOLS: ReadonlySet<string> = new Set(["webfetch", "web_search"]);
 const AGENT_TOOLS: ReadonlySet<string> = new Set(["subagent", "skill", "session_query", "scatter"]);

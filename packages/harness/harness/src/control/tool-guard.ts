@@ -109,7 +109,7 @@ export function assessToolRelevance(
     const overlap = charOverlapRatio(q, `${toolName}${blob}`);
     const needsFile = FILE_HINTS.some((hint) => lowerQ.includes(hint.toLowerCase()));
     const needsCalc = SUM_HINTS.some((hint) => lowerQ.includes(hint.toLowerCase()));
-    if (toolName === "run" && needsCalc) {
+    if (toolName === "bash" && needsCalc) {
       return { allowed: true, reason: "" };
     }
     if ((toolName === "write" || toolName === "edit") && needsFile) {

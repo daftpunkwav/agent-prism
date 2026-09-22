@@ -136,7 +136,7 @@ export function emitToolOutcomeEvents(
   outcome: Pick<ToolExecutionResult, "result" | "fileDiff">,
 ): ArenaEvent[] {
   const events: ArenaEvent[] = [];
-  if (toolName === "run") {
+  if (toolName === "bash") {
     const result = outcome.result;
     for (let i = 0; i < result.length; i += 400) {
       events.push(

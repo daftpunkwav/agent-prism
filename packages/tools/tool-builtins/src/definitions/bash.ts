@@ -1,6 +1,6 @@
 /**
- * @file tools/run
- * @description Builtin run tool: command lines (no shell on POSIX; spawns argv directly) inside the workspace cwd.
+ * @file tools/bash
+ * @description Builtin bash tool: command lines (no shell on POSIX; spawns argv directly) inside the workspace cwd.
  *
  * Responsibilities:
  * - Declare the tool's JSON schema
@@ -18,7 +18,7 @@ import { readInt } from "./caps.js";
 import { boundText } from "./spill.js";
 import { asWorkspaceView } from "./workspace-view.js";
 
-export const RUN_JSON_SCHEMA: Record<string, unknown> = {
+export const BASH_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
   properties: {
     command: { type: "string" },
@@ -39,7 +39,7 @@ const WIN32_SHELL_ARGS = ["-NoLogo", "-NoProfile", "-NonInteractive", "-Executio
  */
 const WIN32_UTF8_PREAMBLE = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); ";
 
-async function executeRun(
+async function executeBash(
   workspace: ToolWorkspace,
   args: ToolArgs,
   signal?: AbortSignal,
@@ -92,7 +92,7 @@ async function executeRun(
     if (finished.exitCode !== 0) {
       out = `[exit ${finished.exitCode}]\n${out}`;
     }
-    return { result: boundText(workspace, "run", out), fileDiff: null, ok: true };
+    return { result: boundText(workspace, "bash", out), fileDiff: null, ok: true };
   } catch (error) {
     if ((error as Error)?.name === "AbortError") throw error;
     if (error instanceof WorkspaceError) {
@@ -102,12 +102,12 @@ async function executeRun(
   }
 }
 
-/** Builtin run tool definition. */
-export const runTool: ToolDefinition = {
-  name: "run",
+/** Builtin bash tool definition. */
+export const bashTool: ToolDefinition = {
+  name: "bash",
   description:
     "Run a shell command in the workspace cwd (PowerShell on Windows, e.g. python snake.py, git status, npm test). Separate statements with `;` (PowerShell 5.1 has no `&&`/`||` chains).",
-  jsonSchema: RUN_JSON_SCHEMA,
+  jsonSchema: BASH_JSON_SCHEMA,
   mutatesWorkspace: true,
-  execute: executeRun,
+  execute: executeBash,
 };

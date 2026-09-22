@@ -28,7 +28,7 @@ function tempWorkspace() {
 describe("ToolRegistry", () => {
   it("registers builtins and selects by toolset", () => {
     const full = createBuiltinToolRegistry();
-    expect([...full.authorizedNames()].sort()).toEqual(["apply_patch", "ask_user", "bash_session", "edit", "glob", "goal", "grep", "ls", "plan", "ralph_loop", "read", "run", "run_job", "scatter", "session_query", "skill", "subagent", "symbols", "todo_write", "web_search", "webfetch", "write"]);
+    expect([...full.authorizedNames()].sort()).toEqual(["apply_patch", "ask_user", "bash", "bash_session", "edit", "glob", "goal", "grep", "ls", "plan", "ralph_loop", "read", "run_job", "scatter", "session_query", "skill", "subagent", "symbols", "todo_write", "web_search", "webfetch", "write"]);
     const readOnly = selectToolRegistry(full, "read_only");
     expect([...readOnly.authorizedNames()].sort()).toEqual(["glob", "grep", "ls", "ralph_loop", "read", "scatter", "session_query", "skill", "subagent", "symbols"]);
   });

@@ -17,6 +17,7 @@ import {
   BUILDER_MESSAGE_MAX_CHARS,
   BuilderChatMessageSchema,
   BuilderCompositionSchema,
+  migrateLegacyToolNames,
   type BuilderChatMessage,
   type BuilderComposition,
   type BuilderSessionView,
@@ -145,7 +146,8 @@ export class BuilderSessionStore {
         name: item.name,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
-        composition: item.composition,
+        // Persisted compositions may predate the run->bash tool rename.
+        composition: { ...item.composition, tools: migrateLegacyToolNames(item.composition.tools) },
         history: item.history,
         workspaceName: item.workspaceName,
         turnCount: item.turnCount,

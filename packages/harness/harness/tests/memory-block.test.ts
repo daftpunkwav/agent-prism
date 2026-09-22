@@ -22,7 +22,7 @@ describe("renderMemoryBlock", () => {
           framework: "native",
           model: "m",
           success: true,
-          keyActions: ["run", "read"],
+          keyActions: ["bash", "read"],
           lessons: "try node instead of python",
           timestamp: 1,
           workspaceTag: "",

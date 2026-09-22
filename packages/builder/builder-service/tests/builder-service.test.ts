@@ -284,7 +284,7 @@ describe("BuilderService.chatTurn", () => {
     const service = makeService(harness);
     const view = service.createSession(BuilderCreateRequestSchema.parse({ composition: { framework: "fake" } }));
     const detail = await service.getSessionDetail(view.id);
-    for (const name of ["read", "write", "edit", "ls", "run", "glob", "grep", "todo_write", "ask_user"]) {
+    for (const name of ["read", "write", "edit", "ls", "bash", "glob", "grep", "todo_write", "ask_user"]) {
       expect(detail.session.composition.tools).toContain(name);
     }
     const bare = service.createSession(

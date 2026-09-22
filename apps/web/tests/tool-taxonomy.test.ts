@@ -25,7 +25,7 @@ describe("toolCategory", () => {
   });
 
   it("classifies code-execution tools", () => {
-    for (const tool of ["run", "run_job", "bash_session"]) {
+    for (const tool of ["bash", "run_job", "bash_session"]) {
       expect(toolCategory(tool)).toBe("code");
     }
   });

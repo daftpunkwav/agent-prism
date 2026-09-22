@@ -31,7 +31,7 @@ function stubMemory(): MemoryServicePort & {
           framework: "native",
           model: "m",
           success: true,
-          keyActions: ["run"],
+          keyActions: ["bash"],
           lessons: "try node instead of python",
           timestamp: 1,
           workspaceTag: "",

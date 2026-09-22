@@ -40,7 +40,7 @@ describe("FileSessionStore ledger spill", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-ledger-"));
     try {
       const first = new FileSessionStore(fileDeps(dir));
-      const record = await first.create({ kind: "agent", title: "run" });
+      const record = await first.create({ kind: "agent", title: "bash" });
       const entry = await first.appendEntry(record.id, { kind: "note", content: BIG });
       expect(entry.content).toMatch(/^\[ledger blob:/);
       expect(fs.existsSync(path.join(dir, "sessions.json.blobs"))).toBe(true);
@@ -60,7 +60,7 @@ describe("FileSessionStore ledger spill", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-ledger-"));
     try {
       const store = new FileSessionStore(fileDeps(dir));
-      const record = await store.create({ kind: "agent", title: "run" });
+      const record = await store.create({ kind: "agent", title: "bash" });
       await store.appendEntry(record.id, { kind: "note", content: BIG });
       expect(await store.delete(record.id)).toBe(true);
       expect(fs.readdirSync(path.join(dir, "sessions.json.blobs"))).toHaveLength(0);
@@ -75,7 +75,7 @@ describe("FileSessionStore ledger spill", () => {
     try {
       const deps = fileDeps(dir);
       const store = new FileSessionStore({ file: deps.file, idGenerator: deps.idGenerator, clock: deps.clock });
-      const record = await store.create({ kind: "agent", title: "run" });
+      const record = await store.create({ kind: "agent", title: "bash" });
       const entry = await store.appendEntry(record.id, { kind: "note", content: BIG });
       expect(entry.content).toMatch(/^\[ledger blob:/);
       expect(await store.readBlob(record.id, entry.seq)).toBe(BIG);
@@ -90,7 +90,7 @@ describe("JsonlSessionStore ledger spill", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-ledger-"));
     try {
       const first = new JsonlSessionStore(jsonlDeps(dir));
-      const record = await first.create({ kind: "agent", title: "run" });
+      const record = await first.create({ kind: "agent", title: "bash" });
       await first.appendEntry(record.id, { kind: "note", content: BIG });
       await first.checkpoint();
 
@@ -108,7 +108,7 @@ describe("JsonlSessionStore ledger spill", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-ledger-"));
     try {
       const store = new JsonlSessionStore(jsonlDeps(dir));
-      const record = await store.create({ kind: "agent", title: "run" });
+      const record = await store.create({ kind: "agent", title: "bash" });
       await store.appendEntry(record.id, { kind: "note", content: BIG });
       expect(await store.delete(record.id)).toBe(true);
       expect(fs.readdirSync(path.join(dir, "sessions.jsonl.blobs"))).toHaveLength(0);

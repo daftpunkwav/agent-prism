@@ -19,9 +19,9 @@ async function executeViaDriver(command: string): Promise<ToolExecutionResult> {
     deps,
     testSpec(
       captureDriver((ctx) => {
-        pending = ctx.tools.execute("run", { command });
+        pending = ctx.tools.execute("bash", { command });
       }),
-      { toolNames: ["run"] },
+      { toolNames: ["bash"] },
     ),
   );
   if (pending === null) throw new Error("driver never ran");

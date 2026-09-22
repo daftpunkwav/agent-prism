@@ -12,7 +12,7 @@ export { readTool } from "./definitions/read.js";
 export { writeTool } from "./definitions/write.js";
 export { editTool } from "./definitions/edit.js";
 export { lsTool } from "./definitions/ls.js";
-export { runTool } from "./definitions/run.js";
+export { bashTool } from "./definitions/bash.js";
 export { applyPatchTool, parseV4aPatch, applyChunks } from "./definitions/apply-patch.js";
 export { globTool, globToRegExp } from "./definitions/glob.js";
 export { readInt } from "./definitions/caps.js";

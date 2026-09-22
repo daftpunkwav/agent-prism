@@ -38,7 +38,7 @@ describe("SessionStore lifecycle", () => {
 
   it("completes with summary and merges metadata", async () => {
     const store = testStore();
-    const created = await store.create({ kind: "arena", title: "run", metadata: { a: 1 } });
+    const created = await store.create({ kind: "arena", title: "bash", metadata: { a: 1 } });
     const done = await store.complete(created.id, { summary: "ok", metadata: { eventsYielded: 3 } });
     expect(done.status).toBe("completed");
     expect(done.summary).toBe("ok");
@@ -47,7 +47,7 @@ describe("SessionStore lifecycle", () => {
 
   it("fails with a reason and throws on unknown ids", async () => {
     const store = testStore();
-    const created = await store.create({ kind: "agent", title: "run" });
+    const created = await store.create({ kind: "agent", title: "bash" });
     const failed = await store.fail(created.id, "boom");
     expect(failed.status).toBe("failed");
     expect(failed.summary).toBe("boom");
@@ -83,7 +83,7 @@ describe("SessionStore lifecycle", () => {
 
   it("cancels by requester with default reason", async () => {
     const store = testStore();
-    const created = await store.create({ kind: "arena", title: "run" });
+    const created = await store.create({ kind: "arena", title: "bash" });
     const cancelled = await store.cancel(created.id);
     expect(cancelled.status).toBe("cancelled");
     expect(cancelled.summary).toBe("cancelled by client");

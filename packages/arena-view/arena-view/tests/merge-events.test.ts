@@ -36,7 +36,7 @@ describe("mergeEvents event merging", () => {
 
   it("a new LLM-side event closes the open action so later observations stay standalone", () => {
     const segs = mergeEvents([
-      ev("action", 2, { tool: "run" }),
+      ev("action", 2, { tool: "bash" }),
       ev("step_start", 3),
       ev("observation", 3, { result: "stale output" }),
     ]);
@@ -47,7 +47,7 @@ describe("mergeEvents event merging", () => {
 
   it("tool_progress streams into the action result; the following observation finalizes it", () => {
     const segs = mergeEvents([
-      ev("action", 2, { tool: "run", args: { command: "pytest" } }),
+      ev("action", 2, { tool: "bash", args: { command: "pytest" } }),
       ev("tool_progress", 2, { content: "1 passed" }),
       ev("tool_progress", 2, { content: " in 1s" }),
       ev("observation", 2, { result: "" }),

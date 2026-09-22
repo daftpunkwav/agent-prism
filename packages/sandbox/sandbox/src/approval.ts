@@ -23,12 +23,12 @@ export type { ApprovalMode };
 export type ApprovalVerdict = string | null;
 
 /** Tools whose args carry a shell command subject to shell review. */
-const SHELL_TOOLS = new Set(["run", "run_job", "bash_session"]);
+const SHELL_TOOLS = new Set(["bash", "run_job", "bash_session"]);
 
 /** Extracts the shell command from a tool's args using each tool's own shape; empty when none. */
 function shellCommandOf(name: string, args: ToolArgs): string {
   const action = typeof args.action === "string" ? args.action : "";
-  if (name === "run") return typeof args.command === "string" ? args.command : "";
+  if (name === "bash") return typeof args.command === "string" ? args.command : "";
   if (name === "run_job") return action === "start" && typeof args.command === "string" ? args.command : "";
   if (name === "bash_session") return action === "send" && typeof args.command === "string" ? args.command : "";
   return "";

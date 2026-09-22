@@ -16,12 +16,12 @@ function toolMsg(name: string, content: string): LlmMessage {
 
 describe("pruneToolResult", () => {
   it("passes short results through and keeps error tails of long ones", () => {
-    expect(pruneToolResult("ok", "run")).toBe("ok");
+    expect(pruneToolResult("ok", "bash")).toBe("ok");
     const body = `${"setup log line\n".repeat(500)}FATAL: null pointer in main.go:42`;
-    const pruned = pruneToolResult(body, "run");
+    const pruned = pruneToolResult(body, "bash");
     expect(pruned.length).toBeLessThan(body.length);
     expect(pruned).toContain("FATAL: null pointer in main.go:42");
-    expect(pruned).toContain("tool_tail pruned run");
+    expect(pruned).toContain("tool_tail pruned bash");
   });
 
   it("keeps listing heads for ls/glob", () => {
@@ -38,8 +38,8 @@ describe("applyToolTail", () => {
     const messages: LlmMessage[] = [
       { role: "system", content: "sys" },
       { role: "user", content: "do it" },
-      { role: "assistant", content: "reasoning here", toolCalls: [{ id: "1", name: "run", args: {} }] },
-      toolMsg("run", big),
+      { role: "assistant", content: "reasoning here", toolCalls: [{ id: "1", name: "bash", args: {} }] },
+      toolMsg("bash", big),
     ];
     const out = applyToolTail(messages);
     expect(out.length).toBe(messages.length);
@@ -53,11 +53,11 @@ describe("applyTokenBudget", () => {
     const messages: LlmMessage[] = [
       { role: "system", content: "sys" },
       { role: "user", content: "q0" },
-      { role: "assistant", content: "a0", toolCalls: [{ id: "0", name: "run", args: {} }] },
-      toolMsg("run", "old-output\n".repeat(2000)),
+      { role: "assistant", content: "a0", toolCalls: [{ id: "0", name: "bash", args: {} }] },
+      toolMsg("bash", "old-output\n".repeat(2000)),
       { role: "user", content: "q1" },
       { role: "assistant", content: "recent reasoning" },
-      toolMsg("run", "new-output"),
+      toolMsg("bash", "new-output"),
       { role: "user", content: "latest question" },
     ];
     const out = applyTokenBudget(messages, { budget: 2000, keepTurns: 3 });

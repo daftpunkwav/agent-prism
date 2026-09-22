@@ -40,9 +40,9 @@ describe("DenyListSandboxPolicy allows legitimate work", () => {
   it("toBeforeExecute only judges the run tool", () => {
     const guard = toBeforeExecute();
     expect(guard("read", { path: "x" })).toBeNull();
-    expect(guard("run", { command: "echo hi" })).toBeNull();
-    expect(guard("run", { command: "rm -rf /" })).toMatch(/^Blocked by sandbox policy/);
-    expect(guard("run", {})).toBeNull();
+    expect(guard("bash", { command: "echo hi" })).toBeNull();
+    expect(guard("bash", { command: "rm -rf /" })).toMatch(/^Blocked by sandbox policy/);
+    expect(guard("bash", {})).toBeNull();
   });
 
   it("toBeforeExecute judges bash_session sends by their command", () => {

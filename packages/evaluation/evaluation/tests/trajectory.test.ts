@@ -102,11 +102,11 @@ describe("evaluateTrajectory", () => {
   it("recognizes self-healing and error recovery when agent recovers from failures", () => {
     const events: ArenaEvent[] = [
       thought("Attempting primary method."),
-      action("run", { command: "python script.py" }),
+      action("bash", { command: "python script.py" }),
       observation("Error: python not found"),
       reflect("Python is not installed. Let me switch to node script.js instead."),
       thought("Running with Node.js fallback."),
-      action("run", { command: "node script.js" }),
+      action("bash", { command: "node script.js" }),
       observation("Success: computed 42"),
       thought("Calculation succeeded with the fallback."),
       complete(true, 4, 2),

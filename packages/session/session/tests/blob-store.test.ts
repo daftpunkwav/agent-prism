@@ -85,7 +85,7 @@ describe("spillOversizedEntry", () => {
 describe("memory store ledger spill wiring", () => {
   it("stores previews and serves full text via readBlob", async () => {
     const store = testStore();
-    const record = await store.create({ kind: "agent", title: "run" });
+    const record = await store.create({ kind: "agent", title: "bash" });
     const big = "v".repeat(MAX_ENTRY_CONTENT_CHARS + 500);
     const entry = await store.appendEntry(record.id, { kind: "note", content: big });
     expect(entry.content).toMatch(/^\[ledger blob:/);
@@ -97,7 +97,7 @@ describe("memory store ledger spill wiring", () => {
 
   it("keeps small entries inline with no blob", async () => {
     const store = testStore();
-    const record = await store.create({ kind: "agent", title: "run" });
+    const record = await store.create({ kind: "agent", title: "bash" });
     const entry = await store.appendEntry(record.id, { kind: "note", content: "small" });
     expect(entry.content).toBe("small");
     expect(await store.readBlob(record.id, entry.seq)).toBeNull();
@@ -106,7 +106,7 @@ describe("memory store ledger spill wiring", () => {
   it("purges blobs on delete", async () => {
     const blobs = new InMemoryBlobStore();
     const store = testStore(blobs);
-    const record = await store.create({ kind: "agent", title: "run" });
+    const record = await store.create({ kind: "agent", title: "bash" });
     await store.appendEntry(record.id, { kind: "note", content: "v".repeat(MAX_ENTRY_CONTENT_CHARS + 10) });
     expect(await store.delete(record.id)).toBe(true);
     expect(await blobs.loadBlob(record.id, 0)).toBeNull();

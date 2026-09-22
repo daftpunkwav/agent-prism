@@ -37,12 +37,12 @@ describe("patchResponsesEvent", () => {
     const event = {
       output: [
         { type: "message", content: [{ type: "output_text", text: "x", annotations: [{ text: "cite" }] }] },
-        { type: "function_call", name: "run", arguments: "{}" },
+        { type: "function_call", name: "bash", arguments: "{}" },
       ],
     };
     patchResponsesEvent(event);
     expect((event.output[0] as any).content[0].annotations).toEqual([{ text: "cite" }]);
-    expect(event.output[1]).toEqual({ type: "function_call", name: "run", arguments: "{}" });
+    expect(event.output[1]).toEqual({ type: "function_call", name: "bash", arguments: "{}" });
     expect(patchResponsesEvent("raw")).toBe("raw");
     expect(patchResponsesEvent(null)).toBe(null);
     // Null/absent output and non-message items must not throw.

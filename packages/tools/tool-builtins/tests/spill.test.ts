@@ -14,7 +14,7 @@ import {
   SPILL_DIR,
   SPILL_THRESHOLD_BYTES,
 } from "@agentprism/tool-builtins";
-import { runTool } from "@agentprism/tool-builtins";
+import { bashTool } from "@agentprism/tool-builtins";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -35,7 +35,7 @@ describe("boundText", () => {
   it("passes small results through exactly like truncate", () => {
     const ws = tempWorkspace();
     try {
-      expect(boundText(ws, "run", "hello")).toBe("hello");
+      expect(boundText(ws, "bash", "hello")).toBe("hello");
       expect(ws.fs.exists(SPILL_DIR)).toBe(false);
     } finally {
       ws.cleanup();
@@ -48,8 +48,8 @@ describe("boundText", () => {
       const body = `line-${"x".repeat(4000)}\n`;
       const big = body.repeat(12);
       if (Buffer.byteLength(big, "utf-8") <= SPILL_THRESHOLD_BYTES) throw new Error("fixture too small");
-      const out = boundText(ws, "run", big);
-      expect(out).toMatch(/^\[output spilled: \d+ chars total; full text at \.spills\/spill-000001-run-[a-z0-9]{6}\.txt/);
+      const out = boundText(ws, "bash", big);
+      expect(out).toMatch(/^\[output spilled: \d+ chars total; full text at \.spills\/spill-000001-bash-[a-z0-9]{6}\.txt/);
       const files = ws.fs.listFiles(SPILL_DIR, { recursive: false });
       expect(files).toHaveLength(1);
       expect(ws.fs.readFile(files[0] as string)).toBe(big);
@@ -93,14 +93,14 @@ describe("boundText", () => {
         listFiles: () => ["spill-000007-run.txt"],
       },
     };
-    const out = boundText(broken, "run", "q".repeat(SPILL_THRESHOLD_BYTES + 100));
+    const out = boundText(broken, "bash", "q".repeat(SPILL_THRESHOLD_BYTES + 100));
     expect(out).toMatch(/middle pruned/);
     expect(out).toContain("(spill failed: disk gone)");
   });
 
   it("falls back to truncate when the workspace has no usable fs", () => {
     const bare = { name: "ws", root: "/tmp", cwd: () => "/tmp", fs: null };
-    expect(boundText(bare, "run", "ok")).toBe("ok");
+    expect(boundText(bare, "bash", "ok")).toBe("ok");
   });
 });
 
@@ -113,9 +113,9 @@ describe("run tool spill wiring", () => {
       // `1..20000`/`seq` pipelines made the case measure shell pipeline speed
       // instead of spill behavior, timing out under parallel suite load.
       const command = `${process.execPath} -e "for(let i=0;i<20000;i++)console.log(i)"`;
-      const out = await runTool.execute(ws, { command, timeout: 120 });
+      const out = await bashTool.execute(ws, { command, timeout: 120 });
       expect(out.ok).toBe(true);
-      expect(out.result).toMatch(/\[output spilled: \d+ chars total; full text at \.spills\/spill-\d+-run-[a-z0-9]{6}\.txt/);
+      expect(out.result).toMatch(/\[output spilled: \d+ chars total; full text at \.spills\/spill-\d+-bash-[a-z0-9]{6}\.txt/);
       const files = ws.fs.listFiles(SPILL_DIR, { recursive: false });
       expect(files).toHaveLength(1);
       expect(ws.fs.readFile(files[0] as string)).toContain("19999");

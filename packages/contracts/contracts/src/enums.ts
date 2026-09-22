@@ -78,8 +78,8 @@ export type SandboxMode = z.infer<typeof SandboxModeSchema>;
 
 /** Tool names bound to each toolset (system-wide single source of truth: tool definitions, guards, and mode descriptions derive from this). */
 export const TOOL_NAMES_BY_TOOLSET: Record<ToolsetId, readonly string[]> = {
-  full: ["read", "write", "edit", "ls", "run", "apply_patch", "glob", "grep", "webfetch", "todo_write", "ask_user", "web_search", "run_job", "bash_session", "subagent", "skill", "goal", "ralph_loop", "plan", "session_query", "symbols", "scatter"],
-  edit_run: ["read", "write", "edit", "run", "apply_patch", "glob", "grep", "todo_write", "ask_user", "run_job", "bash_session", "subagent", "skill", "goal", "ralph_loop", "plan", "session_query", "symbols", "scatter"],
+  full: ["read", "write", "edit", "ls", "bash", "apply_patch", "glob", "grep", "webfetch", "todo_write", "ask_user", "web_search", "run_job", "bash_session", "subagent", "skill", "goal", "ralph_loop", "plan", "session_query", "symbols", "scatter"],
+  edit_run: ["read", "write", "edit", "bash", "apply_patch", "glob", "grep", "todo_write", "ask_user", "run_job", "bash_session", "subagent", "skill", "goal", "ralph_loop", "plan", "session_query", "symbols", "scatter"],
   read_only: ["read", "ls", "glob", "grep", "subagent", "skill", "ralph_loop", "session_query", "symbols", "scatter"],
 };
 

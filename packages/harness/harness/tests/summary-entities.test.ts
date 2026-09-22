@@ -14,7 +14,7 @@ function toolMsg(name: string, content: string): LlmMessage {
 describe("summarizeMessages", () => {
   it("preserves error tails, signals, and paths that head-cuts drop", () => {
     const log = [`building src/main.go`, ...Array.from({ length: 100 }, (_, i) => `step ${i} ok`), `FATAL: nil deref in src/main.go:42`].join("\n");
-    const summary = summarizeMessages([toolMsg("run", log)]);
+    const summary = summarizeMessages([toolMsg("bash", log)]);
     expect(summary).toContain("FATAL: nil deref in src/main.go:42");
     expect(summary).toContain("src/main.go");
     expect(summary).toContain("102 lines");
@@ -22,16 +22,16 @@ describe("summarizeMessages", () => {
 
   it("keeps assistant tool-call names and skips nested summaries", () => {
     const summary = summarizeMessages([
-      { role: "assistant", content: "let me check", toolCalls: [{ id: "1", name: "read", args: {} }, { id: "2", name: "run", args: {} }] },
+      { role: "assistant", content: "let me check", toolCalls: [{ id: "1", name: "read", args: {} }, { id: "2", name: "bash", args: {} }] },
       { role: "system", content: "[Context summary]\nold stuff" },
       { role: "user", content: "go" },
     ]);
-    expect(summary).toContain("[called: read, run]");
+    expect(summary).toContain("[called: read, bash]");
     expect(summary).not.toContain("old stuff");
   });
 
   it("caps huge overflows loudly", () => {
-    const messages: LlmMessage[] = Array.from({ length: 200 }, (_, i) => toolMsg("run", `output block ${i}\n`.repeat(50)));
+    const messages: LlmMessage[] = Array.from({ length: 200 }, (_, i) => toolMsg("bash", `output block ${i}\n`.repeat(50)));
     const summary = summarizeMessages(messages);
     expect(summary.length).toBeLessThanOrEqual(4100);
     expect(summary).toContain("summary capped");

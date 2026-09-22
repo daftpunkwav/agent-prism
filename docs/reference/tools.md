@@ -9,7 +9,7 @@ Sources of truth: toolset membership in `TOOL_NAMES_BY_TOOLSET` in
 
 | Toolset | Tools, 22 / 19 / 10 |
 |---|---|
-| `full` | read, write, edit, ls, run, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter |
+| `full` | read, write, edit, ls, bash, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter |
 | `edit_run` | `full` minus `ls`, `webfetch`, and `web_search`, keeping glob and grep |
 | `read_only` | read, ls, glob, grep, subagent, skill, ralph_loop, session_query, symbols, scatter |
 
@@ -25,7 +25,7 @@ to `edit_run` and `calc_time` or `workspace_read` to `read_only`.
 | `write` | create or overwrite; refuses content over 256 K characters rather than truncating | full, edit_run |
 | `edit` | exact `old_text` to `new_text` replace; `new_text` over 256 K characters is refused | full, edit_run |
 | `ls` | listing, or the full workspace tree with an empty path and recursive | all |
-| `run` | shell in the workspace cwd; timeout clamped to 1 to 120 seconds with a default of 30; PowerShell 5.1 on Windows; long output spilled | full, edit_run |
+| `bash` | shell in the workspace cwd; timeout clamped to 1 to 120 seconds with a default of 30; PowerShell 5.1 on Windows; long output spilled | full, edit_run |
 | `apply_patch` | V4A multi-file patch with `*** Begin Patch` and Add, Update, Delete, and Move-to directives; not atomic, so earlier hunks persist | full, edit_run |
 | `glob` | glob search with `**`, `*`, `?`, `[abc]`, and `{a,b}` | all |
 | `grep` | regex content search returning `path:line: text`; at most 200 match lines; per-line window of 20 000 characters | all |
@@ -34,7 +34,7 @@ to `edit_run` and `calc_time` or `workspace_read` to `read_only`.
 | `ask_user` | records questions to `.agent-questions.json`, at most 5 per call and 50 stored; never blocks and instructs the model to continue | full, edit_run |
 | `web_search` | Exa or Tavily through `SEARCH_PROVIDER` and `SEARCH_API_KEY`; unconfigured fails closed with a setup hint; 15-second timeout; 1 to 10 results with a default of 5 | full |
 | `run_job` | background jobs with `start`, `poll`, `kill`, and `list`; 8 live jobs per workspace; poll returns the delta only; output over 32 K spills to `.spills/*.log`; process-scoped, so orphans appear after restart | full, edit_run |
-| `bash_session` | one persistent POSIX shell per workspace, so `cd` and `export` survive; sentinel-delimited frames; Windows fails closed toward `run` and `run_job` | full, edit_run |
+| `bash_session` | one persistent POSIX shell per workspace, so `cd` and `export` survive; sentinel-delimited frames; Windows fails closed toward `bash` and `run_job` | full, edit_run |
 | `subagent` | nested delegation with `spawn` for a blank history or `fork` for the parent transcript; child steps default to 8 within 1 to 10; depth cap 1; tokens fold into the parent | all |
 | `skill` | `list` and `read` runbooks from the bundled set, the global user directory (`data/skills/`), and workspace `.skills/<name>/SKILL.md` overrides (workspace wins over user over bundled); names disabled in settings are filtered out; kebab-case names | all |
 | `goal` | one durable objective in `.agent-goal.json`; statuses `active`, `paused`, `blocked`, `completed`; a block requires a reason | full, edit_run |

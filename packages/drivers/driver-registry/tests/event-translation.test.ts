@@ -38,7 +38,7 @@ describe("emitToolOutcomeEvents", () => {
   });
 
   it("streams run output as 400-char progress chunks", () => {
-    const events = emitToolOutcomeEvents("col", "ws", 1, "run", { result: "x".repeat(900), fileDiff: null });
+    const events = emitToolOutcomeEvents("col", "ws", 1, "bash", { result: "x".repeat(900), fileDiff: null });
     expect(events).toHaveLength(3);
     expect(events.every((event) => event.type === "tool_progress")).toBe(true);
     expect(events.map((event) => event.content).join("")).toBe("x".repeat(900));

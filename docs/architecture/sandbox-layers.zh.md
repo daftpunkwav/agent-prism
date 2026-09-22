@@ -2,7 +2,7 @@
 
 > 语言：**简体中文** | [English](sandbox-layers.md)
 
-运行时通过三层相互独立的机制，约束 shell 工具能做什么，包括 `run`、`run_job`，
+运行时通过三层相互独立的机制，约束 shell 工具能做什么，包括 `bash`、`run_job`，
 以及 POSIX 上的 `bash_session`。这三层位于模型发出的命令与操作系统之间。每一层
 只能增加拒绝。最深的一层在 OS 层强制，而非通过检查命令文本判断。
 
@@ -58,7 +58,7 @@ Arena 对比中的 baseline-only 控制字段设置，即 `dimensions` 中的
   `off` 并告警，因此 containment 是选择加入，绝不静默启用。
 
 启用 `sandbox_mode: os` 时，`agent-execution` 会向交给工具的 workspace 附加一个
-sandbox 提示，可写根为 workspace 根。`run` 与 `run_job` 把它转发进每次 spawn。
+sandbox 提示，可写根为 workspace 根。`bash` 与 `run_job` 把它转发进每次 spawn。
 嵌套 run 继承该配置，因而继承该提示。
 
 ## 边界
