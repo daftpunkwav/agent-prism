@@ -254,6 +254,7 @@ function SegmentRow({
           <ChevronRight size={12} aria-hidden />
           <BrainCircuit size={12} aria-hidden />
           <span>{t("builder.thinkingTitle")}</span>
+          {segment.actor && <span className="builder-phase-actor">{segment.actor}</span>}
           {live ? (
             <span className="builder-seg-live-hint">{t("builder.thinkingStreaming")}</span>
           ) : (
@@ -318,6 +319,7 @@ function SegmentRow({
           <ChevronRight size={12} aria-hidden />
           <Zap size={12} aria-hidden />
           <span className="builder-seg-tool">{segment.tool || "unknown"}</span>
+          {segment.actor && <span className="builder-phase-actor">{segment.actor}</span>}
           {detail !== "" && <span className="builder-seg-detail">{detail}</span>}
           {executing ? (
             <span className="builder-seg-live-hint inline-flex items-center gap-1">
