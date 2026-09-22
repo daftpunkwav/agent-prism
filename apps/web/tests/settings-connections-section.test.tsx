@@ -115,4 +115,25 @@ describe("ConnectionsSection", () => {
     expect(patch.models).toHaveLength(1);
     expect(patch.models[0]?.model).toBe("m2");
   });
+
+  it("gives each JSON row past the current list its own fresh id", () => {
+    const props = makeProps();
+    renderSection(props);
+    fireEvent.click(screen.getByRole("button", { name: getCatalog("en").settings.config.edit }));
+    fireEvent.change(jsonTextarea(), {
+      target: { value: '{"models": [{}, {}, {}]}' },
+    });
+    fireEvent.click(screen.getByRole("button", { name: getCatalog("en").settings.config.apply }));
+    expect(props.onUpdateConn).toHaveBeenCalledTimes(1);
+    const [, patch] = props.onUpdateConn.mock.calls[0] as unknown as [
+      string,
+      { models: Array<{ id: string; model: string }> },
+    ];
+    // Shared fallback ids would collide in the React list key and the
+    // update/delete-by-id handlers.
+    const ids = patch.models.map((m) => m.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(patch.models[1]?.model).toBe("alpha-model");
+    expect(patch.models[2]?.model).toBe("alpha-model");
+  });
 });

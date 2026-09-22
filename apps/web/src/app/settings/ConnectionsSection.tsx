@@ -206,15 +206,18 @@ export function ConnectionsSection({
       onFlash(t("settings.config.emptyModels"));
       return;
     }
-    // Fallback for rows beyond the current list: clone the last row with a fresh id
-    // (blankModel keeps this total even in the never-reachable empty-list case).
+    // Fallback for rows beyond the current list: clone the last row with a fresh
+    // id per row (rows must not share an id: it keys the React list and the
+    // update/delete handlers). blankModel keeps this total even in the
+    // never-reachable empty-list case.
     const lastModel = c.models[c.models.length - 1];
-    const fallbackBase = lastModel !== undefined ? { ...lastModel, id: newLocalId("m") } : blankModel();
+    const fallbackBase = (): ModelSlot =>
+      lastModel !== undefined ? { ...lastModel, id: newLocalId("m") } : blankModel();
     const nextModels: ModelSlot[] =
       parsedModels === null
         ? c.models
         : parsedModels.map((m, index) => {
-            const base = c.models[index] ?? fallbackBase;
+            const base = c.models[index] ?? fallbackBase();
             const levels = Array.isArray(m.thinking_levels)
               ? (m.thinking_levels as unknown[])
                   .filter((l): l is string => typeof l === "string" && l.trim() !== "")
