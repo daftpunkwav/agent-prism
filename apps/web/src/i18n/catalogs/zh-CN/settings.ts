@@ -134,6 +134,7 @@ export const settings = {
     apply: "应用配置",
     hint: "当前连接的 JSON。api_key 留空表示保留已存 Key；models 会按顺序替换当前模型列表。",
     invalidJson: "配置不是合法 JSON",
+    emptyModels: "每个连接至少要保留一个模型",
     applied: "已应用到该连接（尚未保存）",
   },
   runtime: {

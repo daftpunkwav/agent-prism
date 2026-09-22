@@ -98,7 +98,10 @@ export function ConnectionsSection({
   const [modelModal, setModelModal] = useState<{ connKey: string; draft: ModelSlot; isNew: boolean } | null>(null);
   const [testingKey, setTestingKey] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<Record<string, TestOutcome>>({});
-  const [jsonOpen, setJsonOpen] = useState(false);
+  // Which connection's JSON draft is open (null = closed). Keyed by connection so
+  // switching the selection inherently closes it — Apply can never land one
+  // connection's JSON onto another.
+  const [jsonEditorKey, setJsonEditorKey] = useState<string | null>(null);
   const [jsonDraft, setJsonDraft] = useState("");
 
   const selected = connections.find((c) => c.key === selectedKey) ?? null;
@@ -168,19 +171,19 @@ export function ConnectionsSection({
         website_url: c.website_url,
         // Empty string keeps the stored key (backend inherits by id/fingerprint).
         api_key: "",
-          models: c.models.map((m) => ({
-            label: m.label,
-            model: m.model,
-            enabled: m.enabled !== false,
-            context_window: m.context_window,
-            max_input_tokens: m.max_input_tokens,
-            max_output_tokens: m.max_output_tokens,
-            thinking_capable: m.thinking_capable,
-            thinking_level: m.thinking_level,
-            thinking_levels: [...m.thinking_levels],
-            image_input: m.image_input,
-            video_input: m.video_input,
-          })),
+        models: c.models.map((m) => ({
+          label: m.label,
+          model: m.model,
+          enabled: m.enabled !== false,
+          context_window: m.context_window,
+          max_input_tokens: m.max_input_tokens,
+          max_output_tokens: m.max_output_tokens,
+          thinking_capable: m.thinking_capable,
+          thinking_level: m.thinking_level,
+          thinking_levels: [...m.thinking_levels],
+          image_input: m.image_input,
+          video_input: m.video_input,
+        })),
       },
       null,
       2,
@@ -197,11 +200,21 @@ export function ConnectionsSection({
     const str = (value: unknown, fallback: string): string =>
       typeof value === "string" && value.trim() !== "" ? value : fallback;
     const parsedModels = Array.isArray(parsed.models) ? (parsed.models as Record<string, unknown>[]) : null;
+    if (parsedModels !== null && parsedModels.length === 0) {
+      // The UI never allows deleting a connection's last model row; the JSON door
+      // must not bypass that invariant (an empty group would only be fixable via JSON again).
+      onFlash(t("settings.config.emptyModels"));
+      return;
+    }
+    // Fallback for rows beyond the current list: clone the last row with a fresh id
+    // (blankModel keeps this total even in the never-reachable empty-list case).
+    const lastModel = c.models[c.models.length - 1];
+    const fallbackBase = lastModel !== undefined ? { ...lastModel, id: newLocalId("m") } : blankModel();
     const nextModels: ModelSlot[] =
       parsedModels === null
         ? c.models
         : parsedModels.map((m, index) => {
-            const base = c.models[index] ?? { ...c.models[c.models.length - 1]!, id: newLocalId("m") };
+            const base = c.models[index] ?? fallbackBase;
             const levels = Array.isArray(m.thinking_levels)
               ? (m.thinking_levels as unknown[])
                   .filter((l): l is string => typeof l === "string" && l.trim() !== "")
@@ -243,7 +256,7 @@ export function ConnectionsSection({
       models: nextModels,
     });
     onFlash(t("settings.config.applied"));
-    setJsonOpen(false);
+    setJsonEditorKey(null);
   };
 
   return (
@@ -606,14 +619,18 @@ export function ConnectionsSection({
                       type="button"
                       className="btn-ghost !h-8 text-xs"
                       onClick={() => {
-                        setJsonOpen((open) => !open);
+                        if (jsonEditorKey === c.key) {
+                          setJsonEditorKey(null);
+                          return;
+                        }
+                        setJsonEditorKey(c.key);
                         setJsonDraft(serializeGroup(selected));
                       }}
                     >
-                      {jsonOpen ? t("settings.config.cancel") : t("settings.config.edit")}
+                      {jsonEditorKey === c.key ? t("settings.config.cancel") : t("settings.config.edit")}
                     </button>
                   </div>
-                  {jsonOpen && (
+                  {jsonEditorKey === c.key && (
                     <div className="space-y-2">
                       <textarea
                         className="form-input font-mono text-xs min-h-[220px]"
@@ -629,7 +646,7 @@ export function ConnectionsSection({
                         <button
                           type="button"
                           className="btn-ghost !h-9 text-xs"
-                          onClick={() => setJsonOpen(false)}
+                          onClick={() => setJsonEditorKey(null)}
                         >
                           {t("settings.config.cancel")}
                         </button>

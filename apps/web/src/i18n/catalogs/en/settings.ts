@@ -135,6 +135,7 @@ export const settings = {
     apply: "Apply config",
     hint: "JSON for this connection. An empty api_key keeps the stored key; models replace the current list in order.",
     invalidJson: "Config is not valid JSON",
+    emptyModels: "Config must keep at least one model per connection",
     applied: "Config applied to this connection (not yet saved)",
   },
   runtime: {
