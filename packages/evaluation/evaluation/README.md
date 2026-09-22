@@ -4,4 +4,4 @@ Judging and comparison reports.
 
 ## Dependencies
 
-- Runtime: `contracts / runtime`, plus `@langchain/core` (judge-model message types).
+- Runtime: `contracts / runtime` (no third-party SDK dependencies by design).

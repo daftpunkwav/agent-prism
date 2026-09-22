@@ -18,8 +18,7 @@
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/runtime": "workspace:*",
-    "@langchain/core": "^1.0.0"
+    "@agentprism/runtime": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24"

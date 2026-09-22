@@ -6,4 +6,4 @@
 
 ## 依赖
 
-- Runtime：`contracts / runtime`，加上 `@langchain/core`，用于 judge-model 消息类型。
+- Runtime：`contracts / runtime`（设计上无第三方 SDK 依赖）。
