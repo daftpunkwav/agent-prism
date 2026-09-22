@@ -245,7 +245,14 @@ export async function* runBuilderTurn(
       });
     } catch (error) {
       const message = sanitizeErrorMessage(error);
-      emitTrace("session", `Turn failed: ${message.slice(0, 200)}`, { error: message });
+      // The output promise must settle on every path: a throwing trace sink in
+      // the failure handler would otherwise strand the consumer on
+      // `await outputPromise` forever (turn hang, no cleanup).
+      try {
+        emitTrace("session", `Turn failed: ${message.slice(0, 200)}`, { error: message });
+      } catch {
+        // Trace persistence already degrades best-effort; losing the failure line is acceptable, hanging is not.
+      }
       channel.push({ stream: "error", message, fatal: true });
       resolveOutput({
         answer: "",

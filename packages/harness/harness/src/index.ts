@@ -19,6 +19,7 @@ export * from "./context/pipeline.js";
 export * from "./context/analytics.js";
 export * from "./context/remaining.js";
 export * from "./context/budget-strategy.js";
+export * from "./context/pair-safety.js";
 export * from "./context/checkpoint-strategy.js";
 export * from "./context/policy-registry.js";
 export * from "./context/tuning.js";

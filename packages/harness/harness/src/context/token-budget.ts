@@ -17,6 +17,7 @@
 
 import type { LlmMessage } from "@agentprism/contracts";
 import { messageText } from "./message-text.js";
+import { stripUnpairedToolTurns } from "./pair-safety.js";
 
 /** Default total character budget across the assembled messages. */
 export const TOKEN_BUDGET_CHARS = 24_000;
@@ -91,5 +92,8 @@ export function applyTokenBudget(messages: LlmMessage[], options: TokenBudgetOpt
   const tail = [...kept, ...pinned];
   let start = 0;
   while (start < tail.length && tail[start]?.role === "tool") start += 1;
-  return [...systems, ledger, ...tail.slice(start)];
+  // The mirror orphan (a kept assistant whose tool results were cut) is equally
+  // rejected by providers; the pair-safety pass strips both directions so the
+  // trimmed transcript stays lossy-but-valid instead of failing the call.
+  return stripUnpairedToolTurns([...systems, ledger, ...tail.slice(start)]);
 }

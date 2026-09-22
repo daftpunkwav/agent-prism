@@ -163,6 +163,8 @@ export function AskUserModal({ pending, submitting, onAnswer, onClose, variant =
   useEffect(() => {
     // Escape-to-skip is a window-modal affordance only: inline (per-column) dialogs
     // must not let a global keypress skip a batch the user is answering elsewhere.
+    // `answered` stays in the deps so Escape reads the current flags: a stale set
+    // would re-submit "" over answers the user already gave.
     if (pending === null || variant !== "centered") return;
     dialogRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
@@ -170,8 +172,9 @@ export function AskUserModal({ pending, submitting, onAnswer, onClose, variant =
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // dismiss is re-created every render; `answered` is the dependency that matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, onClose, variant]);
+  }, [pending, answered, onClose, variant]);
 
   // The tool settles the batch only when every question has an answer; once the
   // last one is submitted here, ask the host to close (the run then continues).

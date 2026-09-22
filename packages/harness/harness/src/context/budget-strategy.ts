@@ -16,6 +16,7 @@
 import { allocateBudget, renderBudgetLedger, type BudgetSourceName, type SourceDemand } from "@agentprism/context-budget";
 import type { LlmMessage } from "@agentprism/contracts";
 import { CHARS_PER_TOKEN, estimateMessageTokens } from "./message-text.js";
+import { stripUnpairedToolTurns } from "./pair-safety.js";
 
 /** Default context budget in estimated tokens (matches token_budget's char budget scale). */
 export const BUDGET_STRATEGY_TOKENS = 6_000;
@@ -56,6 +57,11 @@ export function applySourceBudget(
     }
   }
   const ledger = renderBudgetLedger(result);
-  const messages = ledger === "" ? kept : [...kept, { role: "system" as const, content: ledger }];
+  // Per-source shedding can split an assistant/tool pair (the kept halves are
+  // invalid wire shapes providers reject with 400); strip the orphans so the
+  // cut transcript stays lossy-but-valid. An unshed transcript passes through
+  // untouched: nothing here rewrote it, so its shapes stay the caller's own.
+  const pairSafe = result.totalDeficit > 0 ? stripUnpairedToolTurns(kept) : kept;
+  const messages = ledger === "" ? pairSafe : [...pairSafe, { role: "system" as const, content: ledger }];
   return { messages, ledgerEmitted: ledger !== "" };
 }
