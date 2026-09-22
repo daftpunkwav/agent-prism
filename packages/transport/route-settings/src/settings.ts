@@ -10,12 +10,28 @@
  *
  * The controllers arrive on HttpApplicationDeps (composition root owns the
  * stores); absent controllers skip registration so a host without the seams
- * keeps booting. Skill writes reject bundled names with 409 (read-only);
+ * keeps booting. Skill writes reject bundled names and duplicate creates with
+ * 409; unknown names and invalid input answer 400 (see skillErrorStatus).
  * MCP replace failures parse as 400 with the parser's message.
  */
 
 import type { HttpApplicationDeps } from "@agentprism/http-runtime";
 import { readJsonRaw, type HttpApp } from "@agentprism/http-runtime";
+
+/**
+ * Skill store errors are plain Errors with operator-readable messages; the two
+ * identity sentinels ("read-only" bundled skills, "already exists" name
+ * collisions) map to 409 Conflict, every other defect (unknown name, invalid
+ * input) maps to 400.
+ */
+function skillErrorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function skillErrorStatus(error: unknown): 400 | 409 {
+  const message = skillErrorDetail(error);
+  return message.includes("read-only") || message.includes("already exists") ? 409 : 400;
+}
 
 /** Registers the settings knob, memory, skill, and MCP routes. */
 export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps): void {
@@ -26,7 +42,7 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
     );
     app.put("/api/settings/knobs", async (c) => {
       const body = await readJsonRaw(c);
-      return c.json({ knobs: runtimeKnobs.update(body), fields: runtimeKnobs.fields() });
+      return c.json({ knobs: await runtimeKnobs.update(body), fields: runtimeKnobs.fields() });
     });
   }
   if (memoryStatus !== undefined) {
@@ -46,7 +62,7 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
       try {
         return c.json({ skill: skills.create({ name, description, body: bodyText }) }, 201);
       } catch (error) {
-        return c.json({ detail: error instanceof Error ? error.message : String(error) }, 409);
+        return c.json({ detail: skillErrorDetail(error) }, skillErrorStatus(error));
       }
     });
     app.put("/api/settings/skills/:name", async (c) => {
@@ -60,9 +76,7 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
           }),
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        // Read-only bundled names collide; unknown names and invalid input are bad requests.
-        return c.json({ detail: message }, message.includes("read-only") ? 409 : 400);
+        return c.json({ detail: skillErrorDetail(error) }, skillErrorStatus(error));
       }
     });
     app.delete("/api/settings/skills/:name", (c) => {
@@ -70,8 +84,7 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
         skills.remove(c.req.param("name"));
         return c.json({ ok: true });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return c.json({ detail: message }, message.includes("read-only") ? 409 : 400);
+        return c.json({ detail: skillErrorDetail(error) }, skillErrorStatus(error));
       }
     });
     app.put("/api/settings/skills/:name/enabled", async (c) => {

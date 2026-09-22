@@ -48,7 +48,7 @@ export function mockRuntimeKnobs() {
   return {
     current: () => knobs,
     fields: () => [{ key: "contextWindowMessages", group: "context", kind: "number" }],
-    update: (raw: unknown) => {
+    update: async (raw: unknown) => {
       knobs = { ...knobs, ...(raw as Record<string, unknown>) };
       return knobs;
     },
@@ -69,6 +69,65 @@ export function mockMemoryStatus() {
     clear: () => {
       episodicCount = 0;
       semanticCount = 0;
+    },
+  } as any;
+}
+
+/**
+ * Stateful skill-store double mirroring the real message-based error contract:
+ * "bundled skills are read-only" (409) and "already exists" (409) sentinels,
+ * everything else a plain defect (400).
+ */
+export function mockSkills() {
+  const skills: Array<{ name: string; description: string; source: string; enabled: boolean }> = [
+    { name: "bundled-a", description: "bundled", source: "bundled", enabled: true },
+    { name: "user-a", description: "user", source: "user", enabled: true },
+  ];
+  return {
+    list: () => skills.map((skill) => ({ ...skill })),
+    create: (input: { name: string; description: string; body: string }) => {
+      const name = input.name.trim();
+      if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) throw new Error("name must be kebab-case (lowercase letters, digits, dashes)");
+      if (skills.some((skill) => skill.name === name)) throw new Error(`skill ${JSON.stringify(name)} already exists`);
+      skills.push({ name, description: input.description, source: "user", enabled: true });
+      return { name };
+    },
+    update: (name: string, patch: { description?: string; body?: string }) => {
+      if (name === "bundled-a") throw new Error("bundled skills are read-only");
+      const skill = skills.find((entry) => entry.name === name);
+      if (skill === undefined) throw new Error(`unknown user skill ${JSON.stringify(name)}`);
+      if (patch.description !== undefined) skill.description = patch.description;
+      return { name };
+    },
+    remove: (name: string) => {
+      if (name === "bundled-a") throw new Error("bundled skills are read-only");
+      const index = skills.findIndex((entry) => entry.name === name);
+      if (index < 0) throw new Error(`unknown user skill ${JSON.stringify(name)}`);
+      skills.splice(index, 1);
+    },
+    setEnabled: (name: string, enabled: boolean) => {
+      const skill = skills.find((entry) => entry.name === name);
+      if (skill === undefined) throw new Error(`unknown user skill ${JSON.stringify(name)}`);
+      skill.enabled = enabled;
+    },
+  } as any;
+}
+
+/** Stateful MCP double: full-list replace with parser-shaped validation. */
+export function mockMcp() {
+  let servers: Array<Record<string, unknown>> = [{ command: "npx", args: ["-y", "demo"], enabled: true }];
+  return {
+    list: () => servers.map((server) => ({ ...server })),
+    replace: (input: unknown) => {
+      if (!Array.isArray(input)) throw new Error("MCP_SERVERS must be a JSON array of server configs");
+      for (const entry of input) {
+        const record = entry as Record<string, unknown>;
+        if (typeof record.command !== "string" || record.command.trim() === "") {
+          throw new Error("MCP_SERVERS[0].command must be a non-empty string");
+        }
+      }
+      servers = input.map((entry) => ({ ...(entry as Record<string, unknown>) }));
+      return servers.map((server) => ({ ...server }));
     },
   } as any;
 }
@@ -122,6 +181,8 @@ export function mockDeps(overrides: Partial<HttpApplicationDeps> = {}): HttpAppl
     threads: mockThreadService(),
     runtimeKnobs: mockRuntimeKnobs(),
     memoryStatus: mockMemoryStatus(),
+    skills: mockSkills(),
+    mcp: mockMcp(),
     clock: { now: () => 1700000000000 },
     ...overrides,
   };

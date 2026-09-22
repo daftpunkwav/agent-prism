@@ -115,8 +115,13 @@ export function createUserSkill(input: { name: string; description: string; body
   const name = input.name.trim();
   if (!SKILL_NAME_RE.test(name)) throw new Error("name must be kebab-case (lowercase letters, digits, dashes)");
   const description = input.description.trim();
-  const body = input.body.trim();
   if (description === "") throw new Error("description must not be empty");
+  if (/\r?\n/.test(description)) {
+    // The description is rendered into single-line SKILL.md frontmatter; a newline
+    // would silently bleed its tail into the skill body on the next parse.
+    throw new Error("description must be a single line");
+  }
+  const body = input.body.trim();
   if (body === "") throw new Error("body must not be empty");
   if (config.fs.exists(userSkillPath(name))) throw new Error(`skill ${JSON.stringify(name)} already exists`);
   config.fs.writeFile(userSkillPath(name), renderSkillFile(description, body));
@@ -134,8 +139,9 @@ export function updateUserSkill(
   const current = loadUserSkill(name);
   if (current === null) throw new Error(`unknown user skill ${JSON.stringify(name)}`);
   const description = (patch.description ?? current.description).trim();
-  const body = (patch.body ?? current.body).trim();
   if (description === "") throw new Error("description must not be empty");
+  if (/\r?\n/.test(description)) throw new Error("description must be a single line");
+  const body = (patch.body ?? current.body).trim();
   if (body === "") throw new Error("body must not be empty");
   config.fs.writeFile(userSkillPath(name), renderSkillFile(description, body));
   return { name, description, body, source: "user" };

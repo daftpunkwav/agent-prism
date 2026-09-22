@@ -72,6 +72,10 @@ describe("user skills", () => {
     createUserSkill({ name: "dup", description: "x", body: "y" });
     expect(() => createUserSkill({ name: "dup", description: "x", body: "y" })).toThrow(/already exists/);
     expect(() => createUserSkill({ name: "ok", description: " ", body: "y" })).toThrow(/description/);
+    // A newline in the description would bleed into the SKILL.md body on the next parse.
+    expect(() => createUserSkill({ name: "ok", description: "line1\nline2", body: "y" })).toThrow(/single line/);
+    createUserSkill({ name: "ok", description: "x", body: "y" });
+    expect(() => updateUserSkill("ok", { description: "line1\nline2" })).toThrow(/single line/);
     expect(() => updateUserSkill("commit", { body: "nope" })).toThrow(/read-only/);
     expect(() => deleteUserSkill("review")).toThrow(/read-only/);
     expect(() => deleteUserSkill("missing")).toThrow(/unknown user skill/);
