@@ -3,7 +3,7 @@
  * @description The observability panel: timeline, LLM wire pairs, raw log.
  *
  * Responsibilities:
- * - Render the session's whole execution trail: settled turns as phase groups,
+ * - Render the session's whole execution trail: settled turns as flat step rows,
  *   hot-swap banners interleaved chronologically, and the live turn tail
  * - Render LLM request/response rounds as color-coded collapsed blocks
  *   (request = lane blue, response = lane teal) with full payloads on expand
@@ -101,7 +101,7 @@ function SwapBanner({ entry }: { entry: BuilderTraceEntry }) {
   );
 }
 
-/** One settled turn of the trail: user message header plus its phase-folded work. */
+/** One settled turn of the trail: user message header plus its flat step rows. */
 function TurnBlock({ group }: { group: TurnGroup }) {
   const t = useT();
   const segments = useMemo(() => segmentsOf(group.events), [group.events]);

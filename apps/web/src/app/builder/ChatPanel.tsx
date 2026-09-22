@@ -82,7 +82,7 @@ function flatSteps(segments: DisplaySegment[]): DisplaySegment[] {
   return segments.filter((segment) => segment.meta !== true && !(segment.kind === "step" && segment.completed !== false));
 }
 
-/** Per-step duration from segment timestamps, phase-row formatting. */
+/** Per-step duration from segment timestamps, formatted for a summary row. */
 function stepDuration(segment: DisplaySegment): string | null {
   if (segment.tsStart === undefined || segment.tsEnd === undefined) return null;
   const ms = Math.max(0, segment.tsEnd - segment.tsStart);
@@ -90,10 +90,10 @@ function stepDuration(segment: DisplaySegment): string | null {
 }
 
 /**
- * Collapsed-trace body, flat: one row per step in execution order — 思考 / tool /
- * 思考 / tool / 最终回复 — each opening directly to its detail (no phase nesting).
- * With `autoExpandTail` (live turn), the newest row stays open so streaming text
- * remains visible.
+ * Collapsed-trace body, flat: one row per step in execution order (reasoning /
+ * tool / reasoning / tool / final reply), each opening directly to its detail
+ * (no phase nesting). With `autoExpandTail` (live turn), the newest row stays
+ * open so streaming text remains visible.
  */
 export function PhaseGroups({
   segments,
@@ -543,8 +543,8 @@ export function ChatPanel({ history, hasSession, running, liveSegments, onSend, 
                     <Square size={11} /> {t("builder.stop")}
                   </button>
                 </div>
-                {/* Live view follows the Arena trace: phase rows all the way through,
-                    with the newest phase auto-expanded so streaming text stays visible. */}
+                {/* Live view: flat step rows with the newest row auto-open so
+                    streaming text stays visible. */}
                 <PhaseGroups segments={liveSegments} autoExpandTail />
               </div>
             ) : null}

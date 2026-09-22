@@ -7,9 +7,10 @@
  * - Fold consecutive same-category segments into one phase with per-tool counts
  * - Compute phase duration from segment timestamps when present
  *
- * Shared by the Builder chat's collapsed trace and any caller that wants the
- * Arena trace rendered as phase summaries; tool categories intentionally match
- * the Arena TraceView classification.
+ * Currently has no app consumer (the Builder chat renders flat per-step rows
+ * now); kept as the phase-summary utility over display segments, with its
+ * folding behavior locked by tests. Tool categories intentionally match the
+ * Arena TraceView classification.
  */
 
 import type { DisplaySegment } from "./trace-events.js";
