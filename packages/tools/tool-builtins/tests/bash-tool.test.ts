@@ -1,9 +1,9 @@
 /**
- * @file run tool tests
+ * @file bash tool tests
  * @description Locks shell execution: output capture, empty-command refusal, abort propagation.
  *
  * Responsibilities:
- * - Pin output capture, refusal, and abort semantics of the run tool
+ * - Pin output capture, refusal, and abort semantics of the bash tool
  * - Pin the workspace sandbox hint reaching the spawn layer
  */
 

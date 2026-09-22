@@ -66,7 +66,7 @@ export default defineConfig({
     env: {
       NODE_ENV: "test",
     },
-    // Tests that spawn real shell children (run/run_job/spill/sandbox) pay the
+    // Tests that spawn real shell children (bash/run_job/spill/sandbox) pay the
     // PowerShell 5.1 cold start; under parallel load that can exceed the 5s default
     // and fail as a false timeout. A genuine hang still fails, just later.
     testTimeout: 30_000,

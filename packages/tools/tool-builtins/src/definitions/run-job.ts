@@ -3,16 +3,16 @@
  * @description Builtin run_job tool: background shell commands with poll/kill.
  *
  * Responsibilities:
- * - Start background commands inside the workspace cwd (same interpreter as run)
+ * - Start background commands inside the workspace cwd (same interpreter as bash)
  * - Poll incremental output per job (delta since last poll, context-efficient)
  * - Spill oversized unspilled output to .spills/ files (rotated) instead of losing the middle
  * - Kill jobs and list live records
  *
- * Background job handles: the foreground `run` caps at 120s,
+ * Background job handles: the foreground `bash` caps at 120s,
  * so servers, watchers, and sleepers had no honest home (models faked them with
  * `sleep &&` chains). Jobs are process-scoped: a server restart orphans the OS
  * process (documented, not silently solved). Starts pass through the same
- * sandbox deny-list as run (see sandbox toBeforeExecute).
+ * sandbox deny-list as bash (see sandbox toBeforeExecute).
  */
 
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";
@@ -24,17 +24,17 @@ export const RUN_JOB_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
   properties: {
     action: { type: "string", description: "start a command, poll output, kill the job, or list jobs" },
-    command: { type: "string", description: "Shell command for start (same syntax as run)" },
+    command: { type: "string", description: "Shell command for start (same syntax as bash)" },
     job_id: { type: "string", description: "Job id for poll/kill" },
   },
   required: ["action"],
   additionalProperties: false,
 };
 
-/** Windows command interpreter (mirrors the run tool: PowerShell 5.1 is always present). */
+/** Windows command interpreter (mirrors the bash tool: PowerShell 5.1 is always present). */
 const WIN32_SHELL = "powershell.exe";
 const WIN32_SHELL_ARGS = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
-/** Same UTF-8 forcing as the run tool: without it Chinese Windows output arrives as GBK mojibake. */
+/** Same UTF-8 forcing as the bash tool: without it Chinese Windows output arrives as GBK mojibake. */
 const WIN32_UTF8_PREAMBLE = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); ";
 
 /** Per-workspace live-job ceiling: the registry stays small and reaps exited jobs on start. */
@@ -118,7 +118,7 @@ function renderPoll(
   record.sent = full.length;
   const head = `job ${record.id}: ${statusLine(record)}, ${full.length} chars total`;
   // Sandbox setup failure: the exit-3 sentinel is mapped to a readable note
-  // instead of drowning in raw output, mirroring the run tool.
+  // instead of drowning in raw output, mirroring the bash tool.
   const setupFailure = record.job.sandboxSetupFailure();
   const setupNote =
     setupFailure === null || record.job.alive()
@@ -223,7 +223,7 @@ async function executeRunJob(workspace: ToolWorkspace, args: ToolArgs): Promise<
 export const runJobTool: ToolDefinition = {
   name: "run_job",
   description:
-    "Background shell commands in the workspace cwd (same syntax as run): start returns a job id, poll shows output since the last poll (oversized output spills to .spills/ files), kill stops it, list shows live jobs. Jobs die with the server (process-scoped); sandbox deny-list applies to starts.",
+    "Background shell commands in the workspace cwd (same syntax as bash): start returns a job id, poll shows output since the last poll (oversized output spills to .spills/ files), kill stops it, list shows live jobs. Jobs die with the server (process-scoped); sandbox deny-list applies to starts.",
   jsonSchema: RUN_JOB_JSON_SCHEMA,
   mutatesWorkspace: true,
   execute: executeRunJob,

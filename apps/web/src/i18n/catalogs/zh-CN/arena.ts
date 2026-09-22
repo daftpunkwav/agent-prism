@@ -412,7 +412,7 @@ export const arena = {
     },
     snake_game: {
       name: "贪吃蛇游戏",
-      question: "在工作区里实现一个可运行的贪吃蛇游戏。至少包含：主游戏文件（如 snake.py 或 index.html）和简短的运行说明 README。写完后用 run 工具验证它能启动或运行。",
+      question: "在工作区里实现一个可运行的贪吃蛇游戏。至少包含：主游戏文件（如 snake.py 或 index.html）和简短的运行说明 README。写完后用 bash 工具验证它能启动或运行。",
     },
     string_reverse: {
       name: "字符串反转",
@@ -478,7 +478,7 @@ export const arena = {
     },
     context_long_tail: {
       name: "长日志尾部",
-      question: "用 run 工具执行 `seq 1 2000 | tail -n 1`，只回答数字。",
+      question: "用 bash 工具执行 `seq 1 2000 | tail -n 1`，只回答数字。",
     },
   },
 };

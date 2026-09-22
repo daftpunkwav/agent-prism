@@ -7,12 +7,12 @@
  * - Send commands framed by exit-code sentinels; report output plus status
  * - Close the shell on demand
  *
- * Persistent shell: every `run` call starts fresh, so `cd`
+ * Persistent shell: every `bash` call starts fresh, so `cd`
  * and `export` never stick — this shell keeps them. Framing is sentinel lines
  * (`__AP_DONE_<seq>__:<exit>`); a send that times out leaves the shell alive
  * and may bleed into the next read (documented, close+reopen resets clean).
  * POSIX only: interactive PowerShell framing is a separate backend, so Windows
- * fails closed toward run/run_job. Process-scoped like run_job (restart orphans).
+ * fails closed toward bash/run_job. Process-scoped like run_job (restart orphans).
  */
 
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";
@@ -61,11 +61,11 @@ async function executeBashSession(workspace: ToolWorkspace, args: ToolArgs): Pro
     if (action === "start") {
       // The persistent shell has no sandbox enforcement path (same-user pipes,
       // no per-command spawn): with the OS sandbox requested, starting an
-      // unrestricted shell would quietly bypass the containment that run/run_job
+      // unrestricted shell would quietly bypass the containment that bash/run_job
       // honor. Fail closed regardless of platform.
       if (workspace.sandbox !== undefined) {
         return {
-          result: "Error: sandbox_mode=os is enabled but bash_session cannot enforce the OS write sandbox; use run/run_job (sandboxed) or disable sandbox_mode for shell sessions",
+          result: "Error: sandbox_mode=os is enabled but bash_session cannot enforce the OS write sandbox; use bash/run_job (sandboxed) or disable sandbox_mode for shell sessions",
           fileDiff: null,
           ok: false,
           code: "workspace_error",
@@ -165,7 +165,7 @@ ${output.slice(record.cursor)}`,
 export const bashSessionTool: ToolDefinition = {
   name: "bash_session",
   description:
-    "One persistent POSIX shell per workspace (cd/export survive across sends). start, then send commands (framed output plus exit code), close to reset. Process-scoped; Windows fails closed toward run/run_job.",
+    "One persistent POSIX shell per workspace (cd/export survive across sends). start, then send commands (framed output plus exit code), close to reset. Process-scoped; Windows fails closed toward bash/run_job.",
   jsonSchema: BASH_SESSION_JSON_SCHEMA,
   mutatesWorkspace: true,
   execute: executeBashSession,

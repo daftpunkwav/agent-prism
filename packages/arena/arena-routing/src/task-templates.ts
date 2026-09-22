@@ -123,7 +123,7 @@ export const TEMPLATES: TaskTemplate[] = [
     question:
       "Build a runnable Snake game in the workspace. " +
       "Include at least: a main game file (e.g. snake.py or index.html) and a short README on how to run it. " +
-      "After writing, use the run tool to verify it starts or runs.",
+      "After writing, use the bash tool to verify it starts or runs.",
     suggested_dimension: "reasoning",
     suggested_selections: ["react", "cot_tool", "tot", "reflexion"],
     judge: judge({ type: "code", must_contain: ["snake"], max_len: 12000 }),
@@ -337,7 +337,7 @@ export const TEMPLATES: TaskTemplate[] = [
       "Ablation task for the context dimension (sliding vs tool_tail vs token_budget): a long " +
       "command log whose verdict sits on the last line, favoring strategies that preserve tails; " +
       "ablation observation_chars show what each strategy actually kept.",
-    question: "Run `seq 1 2000 | tail -n 1` with the run tool and reply with the number only.",
+    question: "Run `seq 1 2000 | tail -n 1` with the bash tool and reply with the number only.",
     suggested_dimension: "context",
     suggested_selections: ["sliding", "tool_tail", "token_budget"],
     judge: judge({ type: "numeric", operator: "==", value: 2000, tolerance: 0.001 }),

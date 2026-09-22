@@ -416,7 +416,7 @@ export const arena = {
     },
     snake_game: {
       name: "Snake game",
-      question: "Build a runnable Snake game in the workspace. Include at least: a main game file (e.g. snake.py or index.html) and a short README on how to run it. After writing, use the run tool to verify it starts or runs.",
+      question: "Build a runnable Snake game in the workspace. Include at least: a main game file (e.g. snake.py or index.html) and a short README on how to run it. After writing, use the bash tool to verify it starts or runs.",
     },
     string_reverse: {
       name: "String reverse",
@@ -482,7 +482,7 @@ export const arena = {
     },
     context_long_tail: {
       name: "Long-log tail",
-      question: "Run `seq 1 2000 | tail -n 1` with the run tool and reply with the number only.",
+      question: "Run `seq 1 2000 | tail -n 1` with the bash tool and reply with the number only.",
     },
   },
 };

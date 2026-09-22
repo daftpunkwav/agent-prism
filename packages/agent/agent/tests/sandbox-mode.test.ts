@@ -3,7 +3,7 @@
  * @description Locks sandbox_mode wiring from run config to the actual spawn.
  *
  * Responsibilities:
- * - Pin that `sandbox_mode: os` reaches the run tool and executes under the OS
+ * - Pin that `sandbox_mode: os` reaches the bash tool and executes under the OS
  *   write sandbox (Windows; skipped elsewhere)
  * - Pin fail-closed refusal on platforms that cannot enforce it
  */

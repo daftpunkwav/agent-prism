@@ -91,7 +91,7 @@ const POST_EXIT_FLUSH_MS = 100;
 /**
  * Child-process env allowlist: only base variables needed for execution are inherited;
  * host secrets such as API keys and proxy credentials are not passed through (the model
- * can read subprocess output via the run tool).
+ * can read subprocess output via the bash tool).
  */
 const ALLOWED_ENV_KEYS: readonly string[] = [
   "PATH",
@@ -300,7 +300,7 @@ export interface PersistentShell {
  */
 export function spawnPersistentShell(options: PersistentShellOptions): PersistentShell {
   if (process.platform === "win32") {
-    throw new WorkspaceError("Error: persistent shell needs POSIX bash (use run/run_job on Windows)");
+    throw new WorkspaceError("Error: persistent shell needs POSIX bash (use bash/run_job on Windows)");
   }
   const { cwd } = options;
   let child: ChildProcess;

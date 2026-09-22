@@ -36,7 +36,7 @@
 | `ask_user` | 把问题记录到 `.agent-questions.json`，每次调用至多 5 条、共存 50 条；绝不阻塞，指示模型继续 | full, edit_run |
 | `web_search` | 经 `SEARCH_PROVIDER` 与 `SEARCH_API_KEY` 使用 Exa 或 Tavily；未配置则失败关闭并给出设置提示；15 秒超时；1 至 10 条结果，默认 5 | full |
 | `run_job` | 后台 job，含 `start`、`poll`、`kill`、`list`；每 workspace 8 个活跃 job；poll 只返回 delta；输出超过 32 K spill 到 `.spills/*.log`；进程作用域，重启后出现孤儿 | full, edit_run |
-| `bash_session` | 每 workspace 一个持久 POSIX shell，`cd` 与 `export` 存活；哨兵分隔帧；Windows 失败关闭并转向 `run` 与 `run_job` | full, edit_run |
+| `bash_session` | 每 workspace 一个持久 POSIX shell，`cd` 与 `export` 存活；哨兵分隔帧；Windows 失败关闭并转向 `bash` 与 `run_job` | full, edit_run |
 | `subagent` | 嵌套委派，`spawn` 为空白历史或 `fork` 为父 transcript；子级 step 默认 8，范围 1 至 10；深度上限 1；token 折叠进父级 | all |
 | `skill` | `list` 与 `read` runbook，来自内置集合、全局用户目录（`data/skills/`）与 workspace `.skills/<name>/SKILL.md` 覆盖（优先级 workspace > 用户 > 内置）；在 settings 中停用的名称被过滤；kebab-case 命名 | all |
 | `goal` | `.agent-goal.json` 中一个持久目标；状态 `active`、`paused`、`blocked`、`completed`；blocked 需要原因 | full, edit_run |

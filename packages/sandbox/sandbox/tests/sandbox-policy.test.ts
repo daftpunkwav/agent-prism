@@ -37,7 +37,7 @@ describe("DenyListSandboxPolicy allows legitimate work", () => {
     expect(denials).toEqual([]);
   });
 
-  it("toBeforeExecute only judges the run tool", () => {
+  it("toBeforeExecute only judges the bash tool", () => {
     const guard = toBeforeExecute();
     expect(guard("read", { path: "x" })).toBeNull();
     expect(guard("bash", { command: "echo hi" })).toBeNull();

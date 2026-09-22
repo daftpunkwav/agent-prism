@@ -1,6 +1,6 @@
 /**
  * @file sandbox-policy
- * @description Shell-command sandbox policies for the run tool.
+ * @description Shell-command sandbox policies for the bash tool.
  *
  * Responsibilities:
  * - Define the SandboxPolicy seam (verdict per shell command)

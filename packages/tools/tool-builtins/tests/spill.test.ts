@@ -104,7 +104,7 @@ describe("boundText", () => {
   });
 });
 
-describe("run tool spill wiring", () => {
+describe("bash tool spill wiring", () => {
   it("spills huge command output instead of losing the middle", async () => {
     const ws = tempWorkspace();
     try {

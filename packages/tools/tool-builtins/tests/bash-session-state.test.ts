@@ -218,7 +218,7 @@ describe("bash_session tool", () => {
     const ws = tempWorkspace();
     try {
       mockSpawn.mockImplementation(() => {
-        throw new WorkspaceError("Error: persistent shell needs POSIX bash (use run/run_job on Windows)");
+        throw new WorkspaceError("Error: persistent shell needs POSIX bash (use bash/run_job on Windows)");
       });
       const out = await bashSessionTool.execute(ws, { action: "start" });
       expect(out.ok).toBe(false);

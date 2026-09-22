@@ -43,7 +43,7 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 | `harness` | 中性执行语义：context pipeline、prompt 装配、reasoning 模式、verification 循环 | `AgentExecutionContext`、`applyContextPipeline`、`MapPromptSectionRegistry`、`MapContextPolicyRegistry`、`tool-guard` |
 | `memory/{memory-store, memory-episodic, memory-semantic, memory-service}` | 跨 session 记忆：原子 store 与搜索索引、episodic 与 semantic 两层、以及 service port adapter | `MemoryServicePort` adapter 消费 `contracts` 与 `persistence`；由组合根挂载 |
 | `tools/tool-registry` | Tool seam，无实现 | `MapToolRegistry` 实现 `contracts.ToolRegistry`；`normalizeToolset`、`selectToolNames`、`selectToolRegistry` |
-| `tools/tool-builtins` | 内置 tool 实现 | `createBuiltinToolRegistry`，含 read、write、edit、ls、run、apply-patch、glob、grep、webfetch、todo_write、ask_user、web_search、run_job、bash_session、subagent、skill、goal、ralph_loop、plan、session_query、symbols、scatter |
+| `tools/tool-builtins` | 内置 tool 实现 | `createBuiltinToolRegistry`，含 read、write、edit、ls、bash、apply-patch、glob、grep、webfetch、todo_write、ask_user、web_search、run_job、bash_session、subagent、skill、goal、ralph_loop、plan、session_query、symbols、scatter |
 | `drivers/driver-registry` | Driver seam 与共享运行时支持 | `FrameworkDriverRegistry` 实现 `contracts.DriverLookup`；`registerDriversBestEffort` 接受注入的 loader，后端失败时告警 |
 | `drivers/driver-native` | 进程内 native backend | 以 `native` 注册到 `DriverLookup` |
 | `drivers/driver-langchain` | LangChain backend 与 LC/message 桥接 | 以 `langchain` 注册到 `DriverLookup` |

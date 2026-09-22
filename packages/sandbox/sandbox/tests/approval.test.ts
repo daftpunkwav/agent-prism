@@ -5,7 +5,7 @@
  *
  * Responsibilities:
  * - Pin mode normalization (unknown values fail closed)
- * - Pin per-tool review semantics (run/run_job/bash_session only, by action)
+ * - Pin per-tool review semantics (bash/run_job/bash_session only, by action)
  * - Pin the deny reason prefix shared with the sandbox policy family
  */
 
