@@ -92,13 +92,23 @@ describe("RuntimeKnobsStore", () => {
     const onUpdate = vi.fn();
     const store = new RuntimeKnobsStore(file, defaultRuntimeKnobs(settingsStub()), onUpdate);
 
-    const next = store.update({ contextWindowMessages: 24 });
+    const next = await store.update({ contextWindowMessages: 24 });
     expect(next.contextWindowMessages).toBe(24);
     expect(onUpdate).toHaveBeenCalledWith(next);
-    // Atomic write is async: poll briefly for the persisted payload.
-    await vi.waitFor(() => {
-      expect(JSON.parse(readFileSync(join(root, "runtime_knobs.json"), "utf8")).contextWindowMessages).toBe(24);
-    });
+    expect(JSON.parse(readFileSync(join(root, "runtime_knobs.json"), "utf8")).contextWindowMessages).toBe(24);
+  });
+
+  it("keeps the live knobs untouched when persistence fails", async () => {
+    const onUpdate = vi.fn();
+    const store = new RuntimeKnobsStore(
+      { read: () => null, write: () => Promise.reject(new Error("disk full")) },
+      defaultRuntimeKnobs(settingsStub()),
+      onUpdate,
+    );
+
+    await expect(store.update({ contextWindowMessages: 24 })).rejects.toThrow("disk full");
+    expect(store.current().contextWindowMessages).not.toBe(24);
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it("loads saved overrides over the defaults on construction", async () => {

@@ -28,7 +28,7 @@ export interface RuntimeKnobsController {
   current(): RuntimeKnobs;
   /** Field metadata (group/kind/range/options/defaults) for settings UI rendering. */
   fields(): readonly RuntimeKnobFieldMeta[];
-  update(raw: unknown): RuntimeKnobs;
+  update(raw: unknown): Promise<RuntimeKnobs>;
 }
 
 /** Skill management controller backing the settings/skills routes (composition root provides). */

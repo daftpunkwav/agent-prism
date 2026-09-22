@@ -12,7 +12,7 @@
  * fallbacks (driver-registry reasoning-constants) and harness loop caps.
  */
 
-import { AtomicJsonFile } from "@agentprism/persistence";
+import type { JsonFile } from "@agentprism/persistence";
 import type { RuntimeKnobFieldMeta, RuntimeKnobs } from "@agentprism/contracts";
 import { RUNTIME_KNOB_FIELDS, staticDefaultRuntimeKnobs } from "@agentprism/contracts";
 import type { Settings } from "./settings.js";
@@ -118,7 +118,7 @@ export class RuntimeKnobsStore {
   private currentKnobs: RuntimeKnobs;
 
   constructor(
-    private readonly file: AtomicJsonFile,
+    private readonly file: JsonFile,
     base: RuntimeKnobs,
     private readonly onUpdate?: (knobs: RuntimeKnobs) => void,
   ) {
@@ -136,11 +136,17 @@ export class RuntimeKnobsStore {
     return this.currentKnobs;
   }
 
-  /** Normalizes, persists, hot-applies, and returns the new knobs. */
-  update(raw: unknown): RuntimeKnobs {
-    this.currentKnobs = normalizeRuntimeKnobs(raw, this.currentKnobs);
-    void this.file.write(this.currentKnobs);
-    this.onUpdate?.(this.currentKnobs);
-    return this.currentKnobs;
+  /**
+   * Normalizes, persists, hot-applies, and returns the new knobs.
+   * Persistence lands before the hot-apply: a failed write throws (the route
+   * answers 5xx) and leaves the live knobs untouched, so the operator never
+   * sees "saved" while a restart would silently revert the values.
+   */
+  async update(raw: unknown): Promise<RuntimeKnobs> {
+    const next = normalizeRuntimeKnobs(raw, this.currentKnobs);
+    await this.file.write(next);
+    this.currentKnobs = next;
+    this.onUpdate?.(next);
+    return next;
   }
 }
