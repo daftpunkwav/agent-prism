@@ -136,6 +136,15 @@ describe("CrewAIDriver sequential process", () => {
     expect(complete?.metrics?.success).toBe(true);
     expect(complete?.metrics?.tool_calls).toBe(2);
   });
+
+  it("emits temp/model/max_steps in the Step-0 config banner", async () => {
+    const llm = stubLlm([], [{ text: "final: done" }]);
+    const events = await collect(new CrewAIDriver(), contextWith(llm));
+    const banner = events.find((event) => event.type === "thought");
+    expect(banner?.content).toContain("temp=0");
+    expect(banner?.content).toContain("model=");
+    expect(banner?.content).toContain("max_steps=24");
+  });
 });
 
 describe("CrewAIDriver hierarchical process", () => {

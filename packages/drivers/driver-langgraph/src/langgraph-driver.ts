@@ -86,7 +86,7 @@ export class LangGraphDriver implements AgentDriver {
       workspace: state.workspaceName,
       step: 0,
       content:
-        `${PIPELINE_BANNER_PREFIX.langgraph} ${modeLabel} · ${config.prompt_profile} · ` +
+        `${PIPELINE_BANNER_PREFIX.langgraph} ${modeLabel} · reasoning=${config.reasoning} · prompt=${config.prompt_profile} · ` +
         `context=${config.context}(real trim) · harness=${config.harness} · ` +
         `temp=${config.temperature} · model=${config.model_id} · ` +
         `max_steps=${config.max_steps} · toolset=${config.toolset} · ` +

@@ -99,4 +99,12 @@ describe("NativeDriver self_consistency", () => {
     expect(events.filter((event) => event.type === "reflect")).toHaveLength(0);
     expect(extractAnswerFromEvents(events)).toBe("only answer");
   });
+
+  it("emits temp/model/max_steps in the Step-0 config banner", async () => {
+    const events = await collect(new NativeDriver(), contextWith(stubLlm(["only answer"]), "react"));
+    const banner = events.find((event) => event.type === "thought");
+    expect(banner?.content).toContain("temp=0");
+    expect(banner?.content).toContain("model=");
+    expect(banner?.content).toContain("max_steps=8");
+  });
 });

@@ -128,4 +128,16 @@ describe("AutogenDriver", () => {
     expect(reviewerBudgetFor("react")).toBe(2);
     expect(reviewerBudgetFor("reflexion")).toBe(3);
   });
+
+  it("emits temp/model/max_steps in the Step-0 config banner", async () => {
+    const llm = stubLlm(
+      ["reviewer"],
+      [{ text: `${AUTOGEN_TERMINATE_KEYWORD}: nothing to do` }],
+    );
+    const events = await collect(new AutogenDriver(), contextWith(llm));
+    const banner = events.find((event) => event.type === "thought");
+    expect(banner?.content).toContain("temp=0");
+    expect(banner?.content).toContain("model=");
+    expect(banner?.content).toContain("max_steps=16");
+  });
 });

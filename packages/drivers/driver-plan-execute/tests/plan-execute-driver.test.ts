@@ -109,6 +109,15 @@ describe("PlanExecuteDriver", () => {
     expect(events.some((e) => e.type === "reflect")).toBe(false);
     expect(events.some((e) => e.type === "complete")).toBe(true);
   });
+
+  it("emits temp/model/max_steps in the Step-0 config banner", async () => {
+    const llm = stubLlm(["1. Step one"], [{ text: "final" }]);
+    const events = await collect(new PlanExecuteDriver(), contextWith(llm));
+    const banner = events.find((event) => event.type === "thought");
+    expect(banner?.content).toContain("temp=0");
+    expect(banner?.content).toContain("model=");
+    expect(banner?.content).toContain("max_steps=5");
+  });
 });
 
 describe("PlanExecuteDriver reasoning modes", () => {

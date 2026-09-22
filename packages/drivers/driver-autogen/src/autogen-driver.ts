@@ -184,7 +184,9 @@ export class AutogenDriver implements AgentDriver {
       step: 0,
       content:
         `${PIPELINE_BANNER_PREFIX.autogen} coder+reviewer · reasoning=${config.reasoning} · prompt=${config.prompt_profile} · ` +
-        `context=${config.context} · harness=${config.harness} · toolset=${config.toolset} · ` +
+        `context=${config.context} · harness=${config.harness} · ` +
+        `temp=${config.temperature} · model=${config.model_id} · ` +
+        `max_steps=${config.max_steps} · toolset=${config.toolset} · ` +
         `mcp=${String((config as Record<string, unknown>)["mcp_policy"] ?? "off")} · ` +
         `skill=${String((config as Record<string, unknown>)["skill_policy"] ?? "on_demand")} · ` +
         `orchestration=${String((config as Record<string, unknown>)["orchestration"] ?? "direct")} · ` +

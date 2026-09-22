@@ -120,7 +120,11 @@ describe("LangGraphDriver.run", () => {
     try {
       const events = await collect(driver.run(context));
       expect(events[0]?.type).toBe("token_update");
-      expect(events.some((event) => event.type === "thought" && event.content.includes("LangGraph"))).toBe(true);
+      const banner = events.find((event) => event.type === "thought" && event.content.includes("LangGraph"));
+      expect(banner).toBeDefined();
+      // The compare table unions key=value fields: reasoning/prompt must be keyed, never bare modes.
+      expect(banner?.content).toContain("prompt=");
+      expect(banner?.content).toContain("reasoning=");
       // streamEvents v2 does not surface nested model chunks for this scripted
       // model; the observable contract is the run arc completing cleanly.
       expect(events.some((event) => event.type === "step_start")).toBe(true);

@@ -137,7 +137,7 @@ export class LangChainDriver implements AgentDriver {
       workspace: state.workspaceName,
       step: 0,
       content:
-        `${PIPELINE_BANNER_PREFIX.langchain} Tool Calling · ${config.prompt_profile} · ` +
+        `${PIPELINE_BANNER_PREFIX.langchain} Tool Calling · prompt=${config.prompt_profile} · ` +
         `context=${config.context}(real trim) · harness=${config.harness} · ` +
         `temp=${config.temperature} · model=${config.model_id} · ` +
         `max_steps=${config.max_steps} · toolset=${config.toolset} · ` +

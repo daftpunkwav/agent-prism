@@ -109,7 +109,11 @@ describe("LangChainDriver.run", () => {
     try {
       const events = await collect(driver.run(context));
       expect(events[0]?.type).toBe("token_update");
-      expect(events.some((event) => event.type === "thought" && event.content.includes("LangChain"))).toBe(true);
+      const banner = events.find((event) => event.type === "thought" && event.content.includes("LangChain"));
+      expect(banner).toBeDefined();
+      // The compare table unions key=value fields: reasoning/prompt must be keyed, never bare modes.
+      expect(banner?.content).toContain("prompt=");
+      expect(banner?.content).toContain("reasoning=");
       // The real createAgent loop runs the scripted model to completion: the run
       // must finish with a complete terminal and no error convergence.
       expect(events.some((event) => event.type === "error")).toBe(false);

@@ -134,6 +134,15 @@ describe("SelfCritiqueDriver", () => {
     expect(verdicts.some((c) => c.includes("Critic redirect 1/2"))).toBe(true);
     expect(events.filter((e) => e.type === "step_start")).toHaveLength(2);
   });
+
+  it("emits temp/model/max_steps in the Step-0 config banner", async () => {
+    const llm = stubLlm(["SCORE: 9\nNEXT: DONE"], [{ text: "final answer" }]);
+    const events = await collect(contextWith(llm));
+    const banner = events.find((e) => e.type === "thought");
+    expect(banner?.content).toContain("temp=0");
+    expect(banner?.content).toContain("model=");
+    expect(banner?.content).toContain("max_steps=6");
+  });
 });
 
 describe("criticBudgetFor", () => {
