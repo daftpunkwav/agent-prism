@@ -15,7 +15,10 @@ import { OBSERVATION_MAX_CHARS, sanitizeErrorMessage } from "@agentprism/contrac
 import { blockedToolMessageContent, type AgentExecutionContext } from "@agentprism/harness";
 import { eventOf, emitToolOutcomeEvents, normalizeActionArgs, canonicalToolName } from "./event-translation.js";
 
-/** Collects tool names already used in the message history (excluding the current response). */
+/**
+ * Collects tool names already used in the message history. Call BEFORE pushing
+ * the current response onto the list so its own tool names stay out of the result.
+ */
 export function collectPriorToolNames(messages: LlmMessage[]): string[] {
   const names: string[] = [];
   for (const message of messages) {
@@ -25,7 +28,14 @@ export function collectPriorToolNames(messages: LlmMessage[]): string[] {
   return names;
 }
 
-/** Executes a batch of toolCalls: emits Arena events and yields LlmToolMessages. */
+/**
+ * Executes a batch of toolCalls: emits Arena events and yields LlmToolMessages.
+ *
+ * Timing contract: `priorToolNames` must be collected from the message list
+ * BEFORE the caller pushes `response` onto it — the drift guard must not see
+ * the current call's own tool names as prior history (see collectPriorToolNames;
+ * every neutral-transcript loop follows this order).
+ */
 export async function* executeToolCalls(
   context: AgentExecutionContext,
   response: LlmAssistantMessage,
