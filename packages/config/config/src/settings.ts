@@ -146,8 +146,8 @@ function readApiFormat(source: Record<string, string>, key: string, fallback: Ap
   const raw = source[key];
   if (raw === undefined || raw.trim() === "") return fallback;
   const value = raw.trim();
-  if (value !== "anthropic_messages" && value !== "openai_chat") {
-    throw new SettingsLoadError(`${key} must be anthropic_messages or openai_chat`);
+  if (value !== "anthropic_messages" && value !== "openai_chat" && value !== "openai_responses") {
+    throw new SettingsLoadError(`${key} must be anthropic_messages, openai_chat, or openai_responses`);
   }
   return value;
 }

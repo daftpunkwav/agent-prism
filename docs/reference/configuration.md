@@ -31,7 +31,7 @@ out-of-box behavior equals the default column.
 | `LLM_API_KEY` | `""` | seed API key |
 | `LLM_BASE_URL` | `https://api.stepfun.com/step_plan` | seed base URL |
 | `LLM_MODEL` | `step-3.7-flash` | seed model |
-| `LLM_API_FORMAT` | `anthropic_messages` | `anthropic_messages` or `openai_chat` |
+| `LLM_API_FORMAT` | `anthropic_messages` | `anthropic_messages`, `openai_chat`, or `openai_responses` |
 | `LLM_TEMPERATURE` | `0.0` | 0 to 2 |
 | `LLM_TIMEOUT_MS` | `120000` | per-call chat-model timeout, applied to column models, judge, narrative, and builder |
 | `LLM_MAX_RETRIES` | `2`, range 0 to 5 | SDK-level transient-failure retry count for chat models |

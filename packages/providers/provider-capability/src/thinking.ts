@@ -22,7 +22,7 @@ export interface ThinkingClientOptions {
   thinking?: { type: "enabled"; budget_tokens: number };
   /** max_tokens automatically raised when the budget is too large. */
   maxTokens?: number;
-  /** openai_chat: reasoning-effort level. */
+  /** openai_chat / openai_responses: reasoning-effort level. */
   reasoningEffort?: string;
 }
 
@@ -49,7 +49,7 @@ export function buildThinkingClientOptions(
     }
     return options;
   }
-  // openai_chat: map the reasoning-effort level only
+  // openai_chat / openai_responses: map the reasoning-effort level only
   const effort = level === "low" || level === "medium" || level === "high" ? level : "medium";
   return { reasoningEffort: effort };
 }

@@ -27,6 +27,7 @@ describe("buildThinkingClientOptions", () => {
   it("maps openai levels to reasoning effort", () => {
     expect(buildThinkingClientOptions("openai_chat", "low", true, 4096)?.reasoningEffort).toBe("low");
     expect(buildThinkingClientOptions("openai_chat", "high", true, 4096)?.reasoningEffort).toBe("high");
+    expect(buildThinkingClientOptions("openai_responses", "medium", true, 4096)?.reasoningEffort).toBe("medium");
   });
 
   it("returns null for levels without a budget", () => {

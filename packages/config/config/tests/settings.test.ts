@@ -246,6 +246,7 @@ describe("loadSettings env-file compatibility", () => {
 
   it("trims whitespace-padded api format like the numeric readers", () => {
     expect(loadSettings({ LLM_API_FORMAT: "  openai_chat  " }, MISSING_ENV).llmApiFormat).toBe("openai_chat");
+    expect(loadSettings({ LLM_API_FORMAT: "openai_responses" }, MISSING_ENV).llmApiFormat).toBe("openai_responses");
     expect(() => loadSettings({ LLM_API_FORMAT: "openai" }, MISSING_ENV)).toThrow(/LLM_API_FORMAT/);
   });
 });

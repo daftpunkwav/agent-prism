@@ -105,7 +105,7 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
   const timeoutMs = options.timeoutMs ?? LLM_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? LLM_MAX_RETRIES;
 
-  if (apiFormat === "openai_chat") {
+  if (apiFormat === "openai_chat" || apiFormat === "openai_responses") {
     return new ChatOpenAI({
       model,
       apiKey,
@@ -113,6 +113,7 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
       maxTokens,
       timeout: timeoutMs,
       maxRetries,
+      useResponsesApi: apiFormat === "openai_responses",
       ...(options.callbacks !== undefined ? { callbacks: options.callbacks } : {}),
       configuration: {
         baseURL: baseUrl,

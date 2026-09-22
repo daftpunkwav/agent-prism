@@ -30,7 +30,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 | `LLM_API_KEY` | `""` | 播种 API key |
 | `LLM_BASE_URL` | `https://api.stepfun.com/step_plan` | 播种 base URL |
 | `LLM_MODEL` | `step-3.7-flash` | 播种模型 |
-| `LLM_API_FORMAT` | `anthropic_messages` | `anthropic_messages` 或 `openai_chat` |
+| `LLM_API_FORMAT` | `anthropic_messages` | `anthropic_messages`、`openai_chat` 或 `openai_responses` |
 | `LLM_TEMPERATURE` | `0.0` | 0 至 2 |
 | `LLM_TIMEOUT_MS` | `120000` | 每次 chat-model 调用超时，适用于列模型、judge、narrative 与 builder |
 | `LLM_MAX_RETRIES` | `2`，范围 0 至 5 | chat model 的 SDK 级瞬时失败重试次数 |

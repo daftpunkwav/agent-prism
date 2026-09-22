@@ -222,7 +222,7 @@ export function ConnectionsSection({
     onUpdateConn(c.key, {
       provider_name: str(parsed.provider_name, c.provider_name),
       base_url: str(parsed.base_url, c.base_url),
-      api_format: parsed.api_format === "openai_chat" || parsed.api_format === "anthropic_messages"
+      api_format: parsed.api_format === "openai_chat" || parsed.api_format === "anthropic_messages" || parsed.api_format === "openai_responses"
         ? parsed.api_format
         : c.api_format,
       auth_field: str(parsed.auth_field, c.auth_field),
@@ -342,6 +342,7 @@ export function ConnectionsSection({
                         options={[
                           { value: "anthropic_messages", label: "Anthropic Messages" },
                           { value: "openai_chat", label: "OpenAI Chat" },
+                          { value: "openai_responses", label: "OpenAI Responses" },
                         ]}
                       />
                     </Field>

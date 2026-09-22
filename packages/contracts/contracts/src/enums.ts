@@ -84,5 +84,5 @@ export const TOOL_NAMES_BY_TOOLSET: Record<ToolsetId, readonly string[]> = {
 };
 
 /** LLM API wire formats. */
-export const ApiFormatSchema = z.enum(["anthropic_messages", "openai_chat"]);
+export const ApiFormatSchema = z.enum(["anthropic_messages", "openai_chat", "openai_responses"]);
 export type ApiFormat = z.infer<typeof ApiFormatSchema>;

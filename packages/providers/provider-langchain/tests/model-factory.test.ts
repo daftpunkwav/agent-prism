@@ -146,6 +146,18 @@ describe("toLlmAdapter", () => {
   });
 });
 
+describe("createChatModel api format routing", () => {
+  it("builds ChatOpenAI on the Responses API for openai_responses", () => {
+    const model = createChatModel({ provider: fixture("openai_responses") });
+    expect((model as unknown as { useResponsesApi?: boolean }).useResponsesApi).toBe(true);
+  });
+
+  it("keeps Chat Completions for openai_chat", () => {
+    const model = createChatModel({ provider: fixture("openai_chat") });
+    expect((model as unknown as { useResponsesApi?: boolean }).useResponsesApi).toBe(false);
+  });
+});
+
 describe("createChatModel base_url failure", () => {
   it("invalid base_url throws ConfigurationError with a fixed message (never echoes the URL)", () => {
     const provider = { ...fixture("openai_chat"), base_url: "https://user:secret@example.com:99999/v1" };
