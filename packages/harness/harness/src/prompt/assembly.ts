@@ -124,6 +124,14 @@ export function buildSystemUser(context: AgentExecutionContext): { system: strin
   if (override !== "") {
     system = override;
   }
+  // The authoritative tool roster: rendered from the actually-registered set
+  // (builder allowlist, toolset selection, plus MCP joins), so the prompt never
+  // promises a tool the runtime would refuse. Appended after the override so a
+  // custom system prompt still learns the real roster.
+  const toolNames = [...context.tools.names];
+  if (toolNames.length > 0) {
+    system += `\n\nAvailable tools: ${toolNames.join(", ")}.`;
+  }
   const feedback = (context.verificationFeedback ?? "").trim();
   if (feedback !== "") {
     system += `\n\n[Previous reflection]\n${feedback}`;

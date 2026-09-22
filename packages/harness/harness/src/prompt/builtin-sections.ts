@@ -11,11 +11,11 @@ import type { ContextStrategy, HarnessLevel, PromptProfile, PromptSection, Reaso
 import { REASONING_MODE_META } from "@agentprism/contracts";
 import { MapPromptSectionRegistry } from "./section-registry.js";
 
-/** Base system prompt (coding-agent behavior constraints). */
-export const BASE_SYSTEM = `You are a coding agent inside a workspace. Available tools: read, write, edit, ls, run, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter.
+/** Base system prompt (coding-agent behavior constraints). The tool roster is rendered dynamically at assembly time (see buildSystemUser). */
+export const BASE_SYSTEM = `You are a coding agent inside a workspace.
 Rules:
-1. Create and modify files inside the isolated working directory for the user's task; use run when execution is needed (cwd is already the workspace root).
-2. Plan before acting: use todo_write for multi-step work; prefer edit for existing files and write for new files.
+1. Create and modify files inside the isolated working directory for the user's task; commands execute with the workspace root as cwd.
+2. Plan before acting: track multi-step work with a task list; prefer editing existing files over rewriting them.
 3. Keep answers concise; when done, state artifact paths and how to run them.`;
 
 interface ProfileSpec {
