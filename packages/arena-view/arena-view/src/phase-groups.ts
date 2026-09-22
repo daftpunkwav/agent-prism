@@ -9,8 +9,9 @@
  *
  * Currently has no app consumer (the Builder chat renders flat per-step rows
  * now); kept as the phase-summary utility over display segments, with its
- * folding behavior locked by tests. Tool categories intentionally match the
- * Arena TraceView classification.
+ * folding behavior locked by tests. The tool classification here is the single
+ * source shared with the web TraceView (re-exported there as toolCategory), so
+ * the two renderers cannot drift.
  */
 
 import type { DisplaySegment } from "./trace-events.js";
@@ -28,6 +29,9 @@ export type PhaseCategory =
   | "other"
   | "answer";
 
+/** Display categories for tool work, shared by the web TraceView and the phase rows. */
+export type ToolDisplayCategory = "read" | "write" | "code" | "ask" | "plan" | "net" | "agent" | "other";
+
 const READ_TOOLS = new Set(["read", "ls", "glob", "grep", "symbols"]);
 const WRITE_TOOLS = new Set(["write", "edit", "apply_patch"]);
 // "run" stays recognized for pre-rename journals (display only).
@@ -36,8 +40,12 @@ const PLAN_TOOLS = new Set(["todo_write", "plan", "goal", "ralph_loop"]);
 const NET_TOOLS = new Set(["webfetch", "web_search"]);
 const AGENT_TOOLS = new Set(["subagent", "skill", "session_query", "scatter"]);
 
-/** Maps a tool name to its phase category (mirrors the Arena TraceView classification). */
-export function phaseCategoryOfTool(tool: string): Exclude<PhaseCategory, "thinking" | "answer"> {
+/**
+ * Classifies one tool name into its display category (case-insensitive; the
+ * web TraceView re-exports this as toolCategory). Single source so a tool-name
+ * change (e.g. run -> bash) lands in exactly one table.
+ */
+export function classifyTool(tool: string): ToolDisplayCategory {
   const name = tool.toLowerCase();
   if (READ_TOOLS.has(name)) return "read";
   if (WRITE_TOOLS.has(name)) return "write";
@@ -47,6 +55,11 @@ export function phaseCategoryOfTool(tool: string): Exclude<PhaseCategory, "think
   if (NET_TOOLS.has(name)) return "net";
   if (AGENT_TOOLS.has(name)) return "agent";
   return "other";
+}
+
+/** Maps a tool name to its phase category. */
+export function phaseCategoryOfTool(tool: string): Exclude<PhaseCategory, "thinking" | "answer"> {
+  return classifyTool(tool);
 }
 
 /** One tool invocation count inside a phase (insertion-ordered). */

@@ -120,6 +120,9 @@ export function buildSystemUser(context: AgentExecutionContext): { system: strin
   if (instructions !== "") {
     system += `\n\n${instructions}`;
   }
+  // Replaces everything composed so far (policy notes, memory block, skill
+  // preload, workspace instructions); the roster, reflection feedback, and
+  // notices below still append so a custom prompt keeps the runtime facts.
   const override = (context.systemPromptOverride ?? "").trim();
   if (override !== "") {
     system = override;

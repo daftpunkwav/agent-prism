@@ -329,20 +329,16 @@ export async function* runAgentExecution(
         // Seed failures stay silent: the orchestration prompt note still disciplines the run.
       }
     }
-    // Delegation: the child shares the workspace (files stay visible to the parent)
-    // with blank history (spawn, not fork), the parent toolset minus subagent
-    // (no privilege change, no regress: depth 1 cannot re-delegate), and a capped
-    // step budget. Nested token cost folds into the parent tracker so run totals
-    // stay honest; nested events are consumed here, never re-yielded upstream.
+    // Delegation: the child shares the workspace (files stay visible to the parent).
     // (subagentDepth is hoisted above the try so the catch path shares it.)
-    // One nested turn: blank history, shared workspace, caller toolset minus every
-    // delegation tool, capped steps. Token cost folds into the parent tracker;
-    // events are consumed here, never re-yielded. Abort still throws (parity).
     /**
-     * Runs one nested turn sharing this workspace: spawn uses blank history, fork
-     * inherits the parent transcript plus the subtask as a new user turn.
-     * Caller toolset minus delegation tools, capped steps. Folds token cost into the
-     * parent tracker; consumes nested events without re-yielding. Throws on abort.
+     * Runs one nested delegation turn sharing this workspace: spawn uses blank
+     * history, fork inherits the parent transcript plus the subtask as a new
+     * user turn. The caller toolset minus the withheld delegation tools (no
+     * privilege change: depth 1 cannot re-delegate), capped steps. Token cost
+     * folds into the parent tracker so run totals stay honest; nested events
+     * are consumed here, never re-yielded. Abort rethrows (parity with direct
+     * tools); turn failures return a failure message instead of throwing.
      *
      * @param task Self-contained subtask text (becomes the nested question).
      * @param maxSteps Caller-side step cap, clamped against the parent config.
