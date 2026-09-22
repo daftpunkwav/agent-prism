@@ -106,6 +106,22 @@ describe("journal record helpers", () => {
     expect(turn).toMatchObject({ turn: 1, user: "what?" });
     expect(turn.events).toHaveLength(1);
   });
+
+  it("merges a retried turn into one group so timeline keys stay unique", () => {
+    const retry: BuilderTraceRecord[] = [
+      { kind: "turn", turn: 1, ts: 100, user: "first try" } as BuilderTraceRecord,
+      { kind: "event", turn: 1, event: tokenEvent(101) } as BuilderTraceRecord,
+      { kind: "turn", turn: 1, ts: 200, user: "retry" } as BuilderTraceRecord,
+      { kind: "event", turn: 1, event: tokenEvent(201) } as BuilderTraceRecord,
+    ];
+    const turns = settledTurns(retry);
+    expect(turns).toHaveLength(1);
+    expect(turns[0]).toMatchObject({ turn: 1, user: "retry", ts: 100 });
+    expect(turns[0]?.events).toHaveLength(2);
+    // Timeline keys derive from turn numbers: they must be unique.
+    const keys = turns.map((group) => `turn-${group.turn}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
 });
 
 describe("attachTurnSegments", () => {

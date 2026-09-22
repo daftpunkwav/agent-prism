@@ -80,15 +80,25 @@ export function mergedTraceEntries(persisted: BuilderTraceRecord[], live: Builde
   return [...persistedTraceEntries(persisted), ...live.filter((entry) => !seen.has(entry.id))];
 }
 
-/** Groups journal records into settled turns (user message + raw events, turn order). */
+/**
+ * Groups journal records into settled turns (user message + raw events, turn order).
+ * Turn numbers stay unique: a retried turn reuses its number (the backend
+ * counter advances only on success), so a repeat marker folds its attempt
+ * into the existing group instead of opening a second one.
+ */
 export function settledTurns(records: BuilderTraceRecord[]): TurnGroup[] {
   const turns: TurnGroup[] = [];
   const byTurn = new Map<number, TurnGroup>();
   for (const record of records) {
     if (record.kind === "turn") {
-      const group: TurnGroup = { turn: record.turn, ts: record.ts, user: record.user, events: [] };
-      turns.push(group);
-      byTurn.set(record.turn, group);
+      const existing = byTurn.get(record.turn);
+      if (existing === undefined) {
+        const group: TurnGroup = { turn: record.turn, ts: record.ts, user: record.user, events: [] };
+        turns.push(group);
+        byTurn.set(record.turn, group);
+      } else {
+        existing.user = record.user;
+      }
     } else if (record.kind === "event") {
       byTurn.get(record.turn)?.events.push(record.event);
     }
