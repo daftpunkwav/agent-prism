@@ -112,6 +112,7 @@ export function askQuestionsOfArgs(args: Record<string, unknown>): AskUserQuesti
         header: typeof item.header === "string" ? (item.header as string) : "",
         question: typeof item.question === "string" ? (item.question as string) : "",
         options: item.options === undefined ? [] : flatOptions(item.options),
+        multiSelect: item.multiselect === true,
       };
     });
   return questions.filter((question) => question.question !== "");
@@ -136,11 +137,14 @@ export function AskUserModal({ pending, submitting, onAnswer, onClose, variant =
   // once every question has an answer (an empty string counts as an explicit skip).
   const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  /** Ticked option labels per multiSelect question (single-select chips submit immediately). */
+  const [ticked, setTicked] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     // A new batch resets the per-question state.
     setAnswered(new Set());
     setDrafts({});
+    setTicked({});
   }, [pending]);
 
   // Manual dismissal (Escape / backdrop / X) skips every unanswered question:
@@ -224,17 +228,41 @@ export function AskUserModal({ pending, submitting, onAnswer, onClose, variant =
                 <>
                   {question.options.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {question.options.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          className="chip-toggle"
-                          disabled={submitting}
-                          onClick={() => void submit(question.id, option)}
-                        >
-                          {option}
-                        </button>
-                      ))}
+                      {question.options.map((option) =>
+                        question.multiSelect === true ? (
+                          <button
+                            key={option}
+                            type="button"
+                            className="chip-toggle"
+                            data-active={(ticked[question.id] ?? []).includes(option)}
+                            disabled={submitting}
+                            aria-pressed={(ticked[question.id] ?? []).includes(option)}
+                            onClick={() =>
+                              setTicked((prev) => {
+                                const current = prev[question.id] ?? [];
+                                return {
+                                  ...prev,
+                                  [question.id]: current.includes(option)
+                                    ? current.filter((label) => label !== option)
+                                    : [...current, option],
+                                };
+                              })
+                            }
+                          >
+                            {option}
+                          </button>
+                        ) : (
+                          <button
+                            key={option}
+                            type="button"
+                            className="chip-toggle"
+                            disabled={submitting}
+                            onClick={() => void submit(question.id, option)}
+                          >
+                            {option}
+                          </button>
+                        ),
+                      )}
                     </div>
                   )}
                   <div className="mt-2 flex items-center gap-1.5">
@@ -255,7 +283,17 @@ export function AskUserModal({ pending, submitting, onAnswer, onClose, variant =
                       type="button"
                       className="btn-primary !h-8 !px-2.5 text-xs"
                       disabled={submitting}
-                      onClick={() => void submit(question.id, drafts[question.id] ?? "")}
+                      onClick={() => {
+                        const picked = ticked[question.id] ?? [];
+                        const draft = drafts[question.id]?.trim() ?? "";
+                        const answer =
+                          question.multiSelect === true && picked.length > 0
+                            ? draft !== ""
+                              ? `${picked.join(", ")}; ${draft}`
+                              : picked.join(", ")
+                            : drafts[question.id] ?? "";
+                        void submit(question.id, answer);
+                      }}
                     >
                       <Send className="h-3 w-3" aria-hidden />
                       {t("common.askSend")}

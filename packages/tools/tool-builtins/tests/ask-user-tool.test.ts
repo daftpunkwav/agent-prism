@@ -148,6 +148,25 @@ describe("liveAskUserTool", () => {
   });
 });
 
+describe("parseAskedQuestions multiSelect", () => {
+  it("passes the multiSelect flag through and defaults it to undefined", () => {
+    const flagged = parseAskedQuestions({
+      questions: [{ id: "q1", question: "Pick", options: ["a", "b"], multiSelect: true }],
+    });
+    if ("error" in flagged) throw new Error(flagged.error);
+    expect(flagged.questions[0]?.multiSelect).toBe(true);
+    // A model-cased MULTIPLESELECT-style key still binds (case-tolerant parse).
+    const cased = parseAskedQuestions({
+      questions: [{ id: "q2", question: "Pick", options: ["a"], MULTISELECT: true }],
+    });
+    if ("error" in cased) throw new Error(cased.error);
+    expect(cased.questions[0]?.multiSelect).toBe(true);
+    const plain = parseAskedQuestions({ questions: [{ id: "q3", question: "Pick", options: ["a"] }] });
+    if ("error" in plain) throw new Error(plain.error);
+    expect(plain.questions[0]?.multiSelect).toBeUndefined();
+  });
+});
+
 describe("parseAskedQuestions id uniqueness", () => {
   it("rejects duplicate ids fail-closed (interactive settle keys answers by id)", () => {
     const parsed = parseAskedQuestions({

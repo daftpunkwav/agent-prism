@@ -59,6 +59,24 @@ describe("AskUserModal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("multiSelect questions toggle chips and submit the joined labels on send", async () => {
+    const onAnswer = vi.fn(async () => true);
+    renderModal({
+      pending: {
+        sourceLabel: "Native",
+        questions: [{ id: "q1", header: "Pick", question: "Which ones?", options: ["a", "b", "c"], multiSelect: true }],
+      },
+      onAnswer,
+    });
+    // Ticking chips must not submit; each chip toggles its own selection.
+    fireEvent.click(screen.getByRole("button", { name: "a" }));
+    fireEvent.click(screen.getByRole("button", { name: "b" }));
+    expect(onAnswer).not.toHaveBeenCalled();
+    // Send submits the ticked labels joined (single value on the wire).
+    fireEvent.click(screen.getAllByRole("button", { name: getCatalog("en").common.askSend })[0]!);
+    await waitFor(() => expect(onAnswer).toHaveBeenCalledWith("q1", "a, b"));
+  });
+
   it("closes after the last question is submitted", async () => {
     const { onClose } = renderModal();
     const skips = screen.getAllByRole("button", { name: getCatalog("en").common.askSkip });

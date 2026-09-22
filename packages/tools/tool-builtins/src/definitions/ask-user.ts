@@ -37,6 +37,11 @@ export const ASK_USER_JSON_SCHEMA: Record<string, unknown> = {
             description: 'Flat string array, e.g. ["yes", "no"]; never nest arrays',
             items: { type: "string" },
           },
+          multiSelect: {
+            type: "boolean",
+            description:
+              "Set true to let the human tick several options; the answer then arrives as the selected labels joined by \", \"",
+          },
         },
         required: ["question"],
         additionalProperties: false,
@@ -63,6 +68,7 @@ export interface AskedQuestion {
   header: string;
   question: string;
   options: string[];
+  multiSelect?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -72,7 +78,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** Shared wire example so models stop guessing the options shape (flat string array). */
 const ASK_USER_FORMAT_EXAMPLE =
   'Format: {"questions": [{"id": "q1", "header": "Confirm", "question": "Proceed?", "options": ["yes", "no"]}]}. ' +
-  "options is a flat array of strings (max 6); omit it for free-text questions.";
+  "options is a flat array of strings (max 6); omit it for free-text questions. " +
+  'With "multiSelect": true the human ticks several options and the answer arrives as those labels joined by ", ".';
 
 /**
  * Validates and normalizes one ask_user batch.
@@ -135,7 +142,7 @@ export function parseAskedQuestions(args: ToolArgs): { questions: AskedQuestion[
           return label;
         });
       }
-      return { id, header, question, options };
+      return { id, header, question, options, ...(item.multiselect === true ? { multiSelect: true } : {}) };
     });
     return { questions };
   } catch (error) {

@@ -50,6 +50,8 @@ export interface AskUserQuestion {
   header: string;
   question: string;
   options: string[];
+  /** True = the human may pick several options; the answer arrives as the labels joined by ", ". */
+  multiSelect?: boolean;
 }
 
 /** The attached human's reply to one ask_user batch; answered=false falls back to headless defer. */
