@@ -9,7 +9,6 @@
  */
 
 import { z } from "zod";
-import { ThinkingLevelSchema } from "./enums.js";
 import { DECODE_FIELD_RANGES } from "./decode-options.js";
 import { validateLlmBaseUrl, validateWebsiteUrl } from "./url-validation.js";
 
@@ -48,6 +47,7 @@ export const LlmEndpointPublicSchema = z.object({
   website_url: z.string().default(""),
   thinking_capable: z.boolean().default(false),
   thinking_level: z.string().default("off"),
+  thinking_levels: z.array(z.string()).default([]),
   image_input: z.boolean().default(false),
   video_input: z.boolean().default(false),
   enabled: z.boolean().default(true),
@@ -93,7 +93,8 @@ export const LlmEndpointUpdateSchema = z.object({
       }
     }, "website_url is invalid"),
   thinking_capable: z.boolean().default(false),
-  thinking_level: ThinkingLevelSchema.default("off"),
+  thinking_level: z.string().trim().max(32).default("off"),
+  thinking_levels: z.array(z.string().trim().min(1).max(32)).max(16).default([]),
   image_input: z.boolean().default(false),
   video_input: z.boolean().default(false),
   enabled: z.boolean().default(true),

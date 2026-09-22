@@ -30,8 +30,9 @@ export function endpointUpdateFromPublic(endpoint: LlmEndpointPublic): LlmEndpoi
     max_output_tokens: endpoint.max_output_tokens,
     website_url: endpoint.website_url,
     thinking_capable: endpoint.thinking_capable,
-    // The public view is a string; storage clamps it to the enum — a single-point assertion narrows it here
+    // The public view is a string; storage clamps unlisted selections to off — a single-point assertion narrows it here
     thinking_level: endpoint.thinking_level as LlmEndpointUpdate["thinking_level"],
+    thinking_levels: Array.isArray(endpoint.thinking_levels) ? [...endpoint.thinking_levels] : [],
     image_input: endpoint.image_input,
     video_input: endpoint.video_input,
     enabled: endpoint.enabled,

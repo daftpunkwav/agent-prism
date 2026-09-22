@@ -178,6 +178,7 @@ function toPublicEndpoint(endpoint: LlmEndpoint) {
     website_url: endpoint.website_url,
     thinking_capable: endpoint.thinking_capable,
     thinking_level: endpoint.thinking_level,
+    thinking_levels: Array.isArray(endpoint.thinking_levels) ? [...endpoint.thinking_levels] : [],
     image_input: endpoint.image_input,
     video_input: endpoint.video_input,
   };

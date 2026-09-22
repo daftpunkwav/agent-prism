@@ -30,7 +30,13 @@ describe("buildThinkingClientOptions", () => {
     expect(buildThinkingClientOptions("openai_responses", "medium", true, 4096)?.reasoningEffort).toBe("medium");
   });
 
+  it("passes vendor-defined档位 through verbatim on openai formats", () => {
+    expect(buildThinkingClientOptions("openai_chat", "xhigh", true, 4096)?.reasoningEffort).toBe("xhigh");
+    expect(buildThinkingClientOptions("openai_responses", "max", true, 4096)?.reasoningEffort).toBe("max");
+  });
+
   it("returns null for levels without a budget", () => {
-    expect(buildThinkingClientOptions("openai_chat", "bogus", true, 4096)).toBeNull();
+    expect(buildThinkingClientOptions("anthropic_messages", "bogus", true, 4096)).toBeNull();
+    expect(buildThinkingClientOptions("mystery_format", "bogus", true, 4096)?.reasoningEffort).toBe("medium");
   });
 });

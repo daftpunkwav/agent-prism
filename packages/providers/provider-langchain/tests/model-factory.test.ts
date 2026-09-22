@@ -171,3 +171,12 @@ describe("createChatModel base_url failure", () => {
     }
   });
 });
+
+describe("createChatModel decode passthrough", () => {
+  it("passes temperature to every api format branch", () => {
+    for (const format of ["openai_chat", "openai_responses", "anthropic_messages"] as const) {
+      const model = createChatModel({ provider: { ...fixture(format), temperature: 0.7 } });
+      expect((model as unknown as { temperature?: number }).temperature).toBe(0.7);
+    }
+  });
+});

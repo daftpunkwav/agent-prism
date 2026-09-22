@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { IdGenerator } from "@agentprism/contracts";
-import { normalizeModelIds, parseLlmEndpoint } from "@agentprism/provider-capability";
+import { normalizeModelIds, normalizeThinkingLevels, parseLlmEndpoint } from "@agentprism/provider-capability";
 
 const ids: IdGenerator = { next: () => "gen-1" };
 
@@ -70,6 +70,26 @@ describe("parseLlmEndpoint", () => {
     expect(endpoint.label).toBe(""); // non-string reads as fallback
   });
 
+  it("keeps vendor-defined档位 and coerces unlisted selections to off", () => {
+    const openai = parseLlmEndpoint(
+      { api_format: "openai_chat", thinking_level: "xhigh", thinking_levels: ["low", " xhigh ", "", "low", 7, "max"] },
+      ids,
+    );
+    expect(openai.thinking_levels).toEqual(["low", "xhigh", "max"]);
+    expect(openai.thinking_level).toBe("xhigh");
+    // The same list is inert on anthropic: the standard set applies instead.
+    const anthropic = parseLlmEndpoint(
+      { api_format: "anthropic_messages", thinking_level: "xhigh", thinking_levels: ["low", "xhigh"] },
+      ids,
+    );
+    expect(anthropic.thinking_levels).toEqual(["low", "xhigh"]);
+    expect(anthropic.thinking_level).toBe("off");
+    expect(
+      parseLlmEndpoint({ api_format: "anthropic_messages", thinking_level: "high", thinking_levels: ["low", "xhigh"] }, ids)
+        .thinking_level,
+    ).toBe("high");
+  });
+
   it("preserves the openai_responses format instead of coercing it", () => {
     expect(parseLlmEndpoint({ api_format: "openai_responses" }, ids).api_format).toBe("openai_responses");
     expect(parseLlmEndpoint({ api_format: "openai_chat" }, ids).api_format).toBe("openai_chat");
@@ -94,6 +114,15 @@ describe("parseLlmEndpoint", () => {
     expect(
       parseLlmEndpoint({ base_url: "https://api.acme.com/v1/chat/completions", use_full_url: false }, ids).base_url,
     ).toBe("https://api.acme.com/v1/chat/completions");
+  });
+});
+
+describe("normalizeThinkingLevels", () => {
+  it("trims, drops empties/non-strings, dedupes, and caps the count", () => {
+    expect(normalizeThinkingLevels(["  xhigh ", "", "xhigh", 7, null, "max"])).toEqual(["xhigh", "max"]);
+    expect(normalizeThinkingLevels("nope")).toEqual([]);
+    expect(normalizeThinkingLevels(undefined)).toEqual([]);
+    expect(normalizeThinkingLevels(Array.from({ length: 20 }, (_, i) => `l${i}`))).toHaveLength(16);
   });
 });
 

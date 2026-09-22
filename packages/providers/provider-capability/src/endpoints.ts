@@ -9,7 +9,7 @@
  */
 
 import type { IdGenerator, LlmEndpoint } from "@agentprism/contracts";
-import { DEFAULT_LLM_BASE_URL, DEFAULT_MODEL_ID, ThinkingLevelSchema } from "@agentprism/contracts";
+import { DEFAULT_LLM_BASE_URL, DEFAULT_MODEL_ID } from "@agentprism/contracts";
 
 /**
  * Credential reference syntax: the whole value must be `${env:NAME}` (env names
@@ -74,6 +74,22 @@ function stripTerminalApiPath(baseUrl: string): string {
   return baseUrl;
 }
 
+/** Vendor thinking档位 hygiene: trim, drop empties, dedupe (order-preserving), cap count. */
+export function normalizeThinkingLevels(levels: unknown): string[] {
+  if (!Array.isArray(levels)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of levels) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim().slice(0, 32);
+    if (trimmed === "" || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+    if (result.length >= 16) break;
+  }
+  return result;
+}
+
 /** Trim, drop empties, dedupe (order-preserving). */
 export function normalizeModelIds(models: unknown): string[] {
   if (!Array.isArray(models)) return [];
@@ -115,6 +131,15 @@ export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
   const id = (typeof source.id === "string" ? source.id.trim().slice(0, ENDPOINT_ID_MAX) : "") || ids.next();
   const useFullUrl = source.use_full_url !== false;
   const baseUrl = readString(source, "base_url", DEFAULT_LLM_BASE_URL, STRING_MAX.base_url);
+  const apiFormat = source.api_format === "openai_chat" || source.api_format === "openai_responses" ? source.api_format : "anthropic_messages";
+  // Effectiveness still gates on the consumer-side effectiveThinkingLevel: parse
+  // only coerces unlisted selections to off so hand-edited configs stay runnable.
+  const thinkingLevels = normalizeThinkingLevels(source.thinking_levels);
+  const allowedLevels =
+    thinkingLevels.length > 0 && (apiFormat === "openai_chat" || apiFormat === "openai_responses")
+      ? thinkingLevels
+      : ["low", "medium", "high"];
+  const thinkingLevel = readString(source, "thinking_level", "off", 32);
   return {
     id,
     label: readString(source, "label", "", STRING_MAX.label),
@@ -122,7 +147,7 @@ export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
     api_key: readString(source, "api_key", "", STRING_MAX.api_key),
     base_url: useFullUrl ? stripTerminalApiPath(baseUrl) : baseUrl,
     use_full_url: useFullUrl,
-    api_format: source.api_format === "openai_chat" || source.api_format === "openai_responses" ? source.api_format : "anthropic_messages",
+    api_format: apiFormat,
     auth_field: readString(source, "auth_field", "ANTHROPIC_AUTH_TOKEN", STRING_MAX.auth_field),
     model: (typeof source.model === "string" && source.model.trim() !== "" ? source.model.trim() : DEFAULT_MODEL_ID).slice(0, STRING_MAX.model),
     context_window: clampInt(source.context_window, TOKEN_LIMITS.context_window),
@@ -136,9 +161,9 @@ export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
     // before the flag existed must not silently lose their models.
     enabled: source.enabled !== false,
     // Same level whitelist normalization on read and write sides: illegal levels fall to off, so a hand-edited config file
-    // never ends up "UI echoes the raw value while thinking params are silently absent". Effectiveness still gates on
-    // the consumer-side effectiveThinkingLevel.
-    thinking_level: ThinkingLevelSchema.catch("off").parse(source.thinking_level),
+    // never ends up "UI echoes the raw value while thinking params are silently absent".
+    thinking_level: thinkingLevel === "off" || allowedLevels.includes(thinkingLevel) ? thinkingLevel : "off",
+    thinking_levels: thinkingLevels,
   };
 }
 

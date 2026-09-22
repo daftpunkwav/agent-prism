@@ -28,6 +28,16 @@ describe("endpointUpdateFromPublic", () => {
     expect(update.model).toBe("m1");
     expect(update.api_key).toBe("");
   });
+
+  it("keeps vendor-defined thinking档位 on the round trip", () => {
+    const update = endpointUpdateFromPublic({
+      ...publicEndpoint(),
+      thinking_level: "xhigh",
+      thinking_levels: ["low", "xhigh"],
+    });
+    expect(update.thinking_level).toBe("xhigh");
+    expect(update.thinking_levels).toEqual(["low", "xhigh"]);
+  });
 });
 
 describe("providerUpdateFromPublic", () => {
