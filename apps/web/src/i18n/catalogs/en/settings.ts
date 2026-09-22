@@ -12,6 +12,7 @@ export const settings = {
   page: {
     title: "Provider Settings",
     loading: "Loading configuration…",
+    retry: "Retry",
     endpointSection: "LLM Endpoints",
     addEndpoint: "New endpoint",
     save: "Save configuration",

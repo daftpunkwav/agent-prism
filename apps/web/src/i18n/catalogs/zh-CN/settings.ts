@@ -12,6 +12,7 @@ export const settings = {
   page: {
     title: "Provider 配置",
     loading: "加载配置…",
+    retry: "重试",
     endpointSection: "LLM 接入点",
     addEndpoint: "新建接入点",
     save: "保存配置",

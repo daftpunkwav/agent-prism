@@ -5,7 +5,7 @@
  * Responsibilities:
  * - Own the edited draft locally so Cancel discards everything
  * - Edit identity, token budgets, capability flags, and thinking config
- * - Offer vendor-defined thinking档位 on OpenAI-compatible formats
+ * - Offer vendor-defined thinking levels on OpenAI-compatible formats
  *
  * Visual language matches the arena dialogs (backdrop, panel, head, body)
  * and the settings form controls (form-input, UiSelect, Field).
@@ -31,7 +31,7 @@ export interface ModelModalProps {
   onSave(draft: ModelSlot): void;
 }
 
-/** Effective level options: vendor-defined档位 replace the standard set when present. */
+/** Effective level options: vendor-defined levels replace the standard set when present. */
 function levelOptions(
   thinkingLevels: string[],
   isOpenAI: boolean,
@@ -95,7 +95,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
 
   const patch = (p: Partial<ModelSlot>) => setDraft((d) => ({ ...d, ...p }));
 
-  const setlevels = (levels: string[]) => {
+  const setLevels = (levels: string[]) => {
     const cleaned = levels.map((l) => l.slice(0, 32));
     const selectedKept = draft.thinking_level === "off" || cleaned.some((l) => l.trim() !== "" && l === draft.thinking_level);
     patch({ thinking_levels: cleaned, thinking_level: selectedKept ? draft.thinking_level : "off" });
@@ -224,15 +224,19 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
               />
               {t("settings.model.enabledLabel")}
             </label>
-            <label className="flex items-center gap-2 text-xs text-foreground">
-              <input
-                type="checkbox"
-                className="accent-[var(--primary)]"
-                checked={draft.id === defaultEndpointId}
-                onChange={() => onSetDefault(draft.id)}
-              />
-              {t("settings.model.setDefaultTitle")}
-            </label>
+            {/* Hidden for new drafts: a local id never survives submit (it is
+                stripped to "" for create), so a default picked here would dangle. */}
+            {!isNew && (
+              <label className="flex items-center gap-2 text-xs text-foreground">
+                <input
+                  type="checkbox"
+                  className="accent-[var(--primary)]"
+                  checked={draft.id === defaultEndpointId}
+                  onChange={() => onSetDefault(draft.id)}
+                />
+                {t("settings.model.setDefaultTitle")}
+              </label>
+            )}
             <label className="flex items-center gap-2 text-xs text-foreground sm:col-span-2">
               <input
                 type="checkbox"
@@ -277,14 +281,14 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                     onChange={(e) => {
                       const next = [...draft.thinking_levels];
                       next[index] = e.target.value;
-                      setlevels(next);
+                      setLevels(next);
                     }}
                   />
                   <button
                     type="button"
                     className="btn-ghost !h-8 !w-8 !p-0 shrink-0"
                     aria-label={t("settings.model.customLevelRemoveAria", { index: index + 1 })}
-                    onClick={() => setlevels(draft.thinking_levels.filter((_, i) => i !== index))}
+                    onClick={() => setLevels(draft.thinking_levels.filter((_, i) => i !== index))}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -294,7 +298,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 type="button"
                 className="btn-ghost !h-8 text-xs"
                 disabled={draft.thinking_levels.length >= 16}
-                onClick={() => setlevels([...draft.thinking_levels, ""])}
+                onClick={() => setLevels([...draft.thinking_levels, ""])}
               >
                 <Plus className="h-3.5 w-3.5" />
                 {t("settings.model.customLevelAdd")}

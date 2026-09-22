@@ -24,7 +24,6 @@ import {
   flattenConnections,
   groupEndpoints,
   isLocalModelId,
-  newLocalId,
 } from "./settingsConnectionModel";
 import { ConnectionsSection } from "./ConnectionsSection";
 import { McpSection } from "./McpSection";
@@ -57,6 +56,7 @@ export default function SettingsPage() {
   });
   const abortRef = useRef<AbortController | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   useEffect(() => {
     return () => {
@@ -64,11 +64,10 @@ export default function SettingsPage() {
     };
   }, []);
 
-  useEffect(() => {
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-    fetchProvider({ signal: ac.signal })
+  // Initial `loading` renders the spinner; retries keep the page mounted with the
+  // error banner visible until the fetch resolves (matches MemorySection's refresh).
+  const load = useCallback((signal: AbortSignal): void => {
+    fetchProvider({ signal })
       .then((cfg: ProviderConfig) => {
         const connections = groupEndpoints(cfg);
         setForm({
@@ -82,15 +81,23 @@ export default function SettingsPage() {
           max_output_tokens: cfg.max_output_tokens ?? 2048,
         });
         setSelectedConnKey(connections[0]?.key ?? null);
+        setLoadError(null);
       })
       .catch((err: Error) => {
         if (err.name !== "AbortError") setLoadError(err.message);
       })
       .finally(() => {
-        if (!ac.signal.aborted) setLoading(false);
+        if (!signal.aborted) setLoading(false);
       });
-    return () => ac.abort();
   }, []);
+
+  useEffect(() => {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    load(ac.signal);
+    return () => ac.abort();
+  }, [load, reloadNonce]);
 
   const flash = useCallback((msg: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -105,11 +112,11 @@ export default function SettingsPage() {
     }));
   };
 
-  const updateModel = (connKeyStr: string, modelId: string, patch: Partial<ModelSlot>) => {
+  const updateModel = (connKey: string, modelId: string, patch: Partial<ModelSlot>) => {
     setForm((f) => ({
       ...f,
       connections: f.connections.map((c) => {
-        if (c.key !== connKeyStr) return c;
+        if (c.key !== connKey) return c;
         return {
           ...c,
           models: c.models.map((m) => (m.id === modelId ? { ...m, ...patch } : m)),
@@ -178,7 +185,6 @@ export default function SettingsPage() {
       <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
         <div className="loading-prism" aria-hidden />
         <p className="text-sm">{t("settings.page.loading")}</p>
-        {loadError && <p className="text-xs text-destructive">{loadError}</p>}
       </div>
     );
   }
@@ -189,6 +195,15 @@ export default function SettingsPage() {
         <p className="eyebrow mb-2">BYOK</p>
         <h1 className="page-title text-3xl">{t("settings.page.title")}</h1>
       </div>
+
+      {loadError !== null && (
+        <div className="panel-surface settings-panel flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <p className="text-xs text-destructive">{loadError}</p>
+          <button type="button" className="btn-ghost !h-8 text-xs" onClick={() => setReloadNonce((n) => n + 1)}>
+            {t("settings.page.retry")}
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-[176px_minmax(0,1fr)] items-start gap-6">
         <nav
@@ -259,9 +274,19 @@ export default function SettingsPage() {
                   setSelectedConnKey(null);
                 }}
                 onAddModel={(connKey, draft) => {
-                  const c = form.connections.find((x) => x.key === connKey);
-                  if (c === undefined || modelCount >= 12) return;
-                  updateConn(connKey, { models: [...c.models, { ...draft, id: newLocalId("m") }] });
+                  // Keep the draft's local id: regenerating here would dangle any
+                  // state keyed on it (the add dialog cannot set a persisted default
+                  // either way — local ids are stripped to "" on submit).
+                  setForm((f) => {
+                    const target = f.connections.find((x) => x.key === connKey);
+                    if (target === undefined || modelCount >= 12) return f;
+                    return {
+                      ...f,
+                      connections: f.connections.map((x) =>
+                        x.key === connKey ? { ...x, models: [...x.models, draft] } : x,
+                      ),
+                    };
+                  });
                 }}
                 onAddProvider={() => {
                   const c = blankConnection();
