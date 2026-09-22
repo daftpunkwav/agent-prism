@@ -28,7 +28,7 @@ export interface LlmEndpoint {
   /** Disabled endpoints are excluded from the model dimension options and refused at model construction. */
   enabled: boolean;
   thinking_level: string;
-  /** Vendor-defined thinking档位 offered by this model (OpenAI-compatible only); empty means the standard low/medium/high set. */
+  /** Vendor-defined thinking levels offered by this model (OpenAI-compatible only); empty means the standard low/medium/high set. */
   thinking_levels: string[];
 }
 
@@ -59,9 +59,9 @@ export interface ProviderConfig {
 
 /**
  * Thinking level actually in effect for an endpoint: unsupported capability or
- * illegal levels resolve to off. Custom档位 (endpoint.thinking_levels) apply
+ * illegal levels resolve to off. Custom levels (endpoint.thinking_levels) apply
  * to OpenAI-compatible formats only; Anthropic keeps the standard set. The
- * result is a plain string because custom档位 are vendor-defined.
+ * result is a plain string because custom levels are vendor-defined.
  */
 export function effectiveThinkingLevel(
   endpoint: Pick<LlmEndpoint, "thinking_capable" | "thinking_level" | "thinking_levels" | "api_format">,

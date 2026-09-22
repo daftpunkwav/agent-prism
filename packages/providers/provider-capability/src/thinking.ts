@@ -30,7 +30,7 @@ export interface ThinkingClientOptions {
  * Builds thinking parameters per API format.
  * Returns null for thinking-incapable models, off, or unmapped levels (no
  * thinking params attached). OpenAI-compatible formats pass the level string
- * through verbatim so vendor-defined档位 (xhigh/max/…) reach the API as-is.
+ * through verbatim so vendor-defined levels (xhigh/max/…) reach the API as-is.
  */
 export function buildThinkingClientOptions(
   apiFormat: ApiFormat | string,

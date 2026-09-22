@@ -29,7 +29,7 @@ describe("endpointUpdateFromPublic", () => {
     expect(update.api_key).toBe("");
   });
 
-  it("keeps vendor-defined thinking档位 on the round trip", () => {
+  it("keeps vendor-defined thinking levels on the round trip", () => {
     const update = endpointUpdateFromPublic({
       ...publicEndpoint(),
       thinking_level: "xhigh",

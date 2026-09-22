@@ -92,7 +92,7 @@ describe("settings connection model", () => {
     expect(endpoints[0]?.thinking_level).toBe("off");
   });
 
-  it("round-trips vendor-defined thinking档位 through flatten and grouping", () => {
+  it("round-trips vendor-defined thinking levels through flatten and grouping", () => {
     const group = blankConnection();
     group.models[0] = {
       ...blankModel(),

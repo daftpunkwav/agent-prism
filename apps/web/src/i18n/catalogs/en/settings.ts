@@ -54,7 +54,7 @@ export const settings = {
     addModel: "Add model",
     deleteGroup: "Delete provider",
     modelsHint:
-      "Models are added and edited in a dialog: name, model id, token budgets, capabilities, and thinking档位. The Arena \"thinking level\" dimension compares levels; models without \"supports thinking\" checked are forced to think off.",
+      "Models are added and edited in a dialog: name, model id, token budgets, capabilities, and thinking levels. The Arena \"thinking level\" dimension compares levels; models without \"supports thinking\" checked are forced to think off.",
   },
   model: {
     editTitle: "Edit model",
@@ -64,7 +64,7 @@ export const settings = {
     enabledLabel: "Enabled",
     customLevels: "Custom thinking levels",
     customLevelsHint:
-      "Vendor-defined档位, one per row (e.g. low, mid, high, max). They replace the standard set and are sent as reasoning effort.",
+      "Vendor-defined levels, one per row (e.g. low, mid, high, max). They replace the standard set and are sent as reasoning effort.",
     customLevelsUnavailable:
       "Custom levels apply to OpenAI-compatible formats; Anthropic uses Low / Medium / High.",
     customLevelPlaceholder: "Level name (e.g. xhigh)",

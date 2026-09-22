@@ -70,7 +70,7 @@ describe("parseLlmEndpoint", () => {
     expect(endpoint.label).toBe(""); // non-string reads as fallback
   });
 
-  it("keeps vendor-defined档位 and coerces unlisted selections to off", () => {
+  it("keeps vendor-defined levels and coerces unlisted selections to off", () => {
     const openai = parseLlmEndpoint(
       { api_format: "openai_chat", thinking_level: "xhigh", thinking_levels: ["low", " xhigh ", "", "low", 7, "max"] },
       ids,

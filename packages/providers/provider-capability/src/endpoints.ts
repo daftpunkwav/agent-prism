@@ -74,7 +74,7 @@ function stripTerminalApiPath(baseUrl: string): string {
   return baseUrl;
 }
 
-/** Vendor thinking档位 hygiene: trim, drop empties, dedupe (order-preserving), cap count. */
+/** Vendor thinking-level hygiene: trim, drop empties, dedupe (order-preserving), cap count. */
 export function normalizeThinkingLevels(levels: unknown): string[] {
   if (!Array.isArray(levels)) return [];
   const seen = new Set<string>();

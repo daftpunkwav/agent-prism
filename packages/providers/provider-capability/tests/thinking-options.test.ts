@@ -30,7 +30,7 @@ describe("buildThinkingClientOptions", () => {
     expect(buildThinkingClientOptions("openai_responses", "medium", true, 4096)?.reasoningEffort).toBe("medium");
   });
 
-  it("passes vendor-defined档位 through verbatim on openai formats", () => {
+  it("passes vendor-defined levels through verbatim on openai formats", () => {
     expect(buildThinkingClientOptions("openai_chat", "xhigh", true, 4096)?.reasoningEffort).toBe("xhigh");
     expect(buildThinkingClientOptions("openai_responses", "max", true, 4096)?.reasoningEffort).toBe("max");
   });

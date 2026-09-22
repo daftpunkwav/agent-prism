@@ -31,7 +31,7 @@ describe("effectiveThinkingLevel", () => {
     expect(effectiveThinkingLevel(endpoint, null)).toBe("off");
   });
 
-  it("honors vendor-defined档位 on openai formats only", () => {
+  it("honors vendor-defined levels on openai formats only", () => {
     const openai = { thinking_capable: true, thinking_level: "xhigh", thinking_levels: ["low", "xhigh", "max"], api_format: "openai_chat" };
     expect(effectiveThinkingLevel(openai)).toBe("xhigh");
     expect(effectiveThinkingLevel(openai, "max")).toBe("max");

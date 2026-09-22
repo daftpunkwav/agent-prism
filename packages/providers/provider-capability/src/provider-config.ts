@@ -13,8 +13,6 @@ import type { IdGenerator, LlmEndpoint, LlmEndpointUpdateInput, ProviderConfig, 
 import { DEFAULT_WEBSITE_URL, DECODE_FIELD_RANGES, MAX_ENDPOINTS } from "@agentprism/contracts";
 import { CREDENTIAL_REFERENCE_PATTERN, connectionFingerprint, normalizeModelIds, parseLlmEndpoint } from "./endpoints.js";
 
-// Bound shared with the contracts update schema (same quota, one source).
-
 function clampDecodeValue(value: unknown, min: number, max: number, fallback: number): number {
   const num = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(num)) return fallback;

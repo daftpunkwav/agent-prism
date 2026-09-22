@@ -22,7 +22,7 @@ export type ModelSlot = {
   max_output_tokens: number;
   thinking_capable: boolean;
   thinking_level: string;
-  /** Vendor-defined thinking档位 (OpenAI-compatible only); empty means the standard low/medium/high set. */
+  /** Vendor-defined thinking levels (OpenAI-compatible only); empty means the standard low/medium/high set. */
   thinking_levels: string[];
   image_input: boolean;
   video_input: boolean;
