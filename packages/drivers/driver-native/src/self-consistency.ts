@@ -63,13 +63,16 @@ export async function* runSelfConsistencyLoop(args: {
         }
       }
       if (response === null) break;
+      // Prior names must exclude the current response: collect before pushing it
+      // (same convention as the single-run loop in native-driver.ts).
+      const priorToolNames = collectPriorToolNames(messages);
       messages.push(response);
       const hadTools = (response.toolCalls ?? []).length > 0;
       if (!hadTools) {
         afterLlm(attemptState, response, false);
         continue;
       }
-      for await (const item of executeToolCalls(context, response, context.question, collectPriorToolNames(messages), stats)) {
+      for await (const item of executeToolCalls(context, response, context.question, priorToolNames, stats)) {
         if (isToolMessage(item)) messages.push(item);
         else {
           attemptEvents.push(item);
