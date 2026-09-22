@@ -122,6 +122,64 @@ describe("McpClient", () => {
       client.close();
     }
   });
+
+  /**
+   * A server that died after the handshake must fail later requests fast with
+   * "server stream ended" instead of burning the full per-request timeout on a
+   * dead pipe. The pump resets when the stream ends so a later request re-pumps
+   * and observes the ended transport immediately.
+   */
+  it("fails a post-mortem request fast instead of burning the timeout", async () => {
+    let child: McpChildProcess | null = null;
+    const queue: string[] = [];
+    const waiters: Array<() => void> = [];
+    let ended = false;
+    const wake = (): void => {
+      while (queue.length > 0 && waiters.length > 0) (waiters.shift() as () => void)();
+    };
+    const transport: McpTransport = {
+      spawn: () => {
+        child = {
+          write(message: string): void {
+            if (ended) return;
+            const request = JSON.parse(message) as { id?: number };
+            if (request.id === undefined) return;
+            queue.push(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: request.id,
+                result: { protocolVersion: "2024-11-05", capabilities: {}, serverInfo: { name: "fake", version: "0" } },
+              }),
+            );
+            wake();
+          },
+          async *messages(): AsyncGenerator<string> {
+            for (;;) {
+              const next = queue.shift();
+              if (next !== undefined) {
+                yield next;
+                continue;
+              }
+              if (ended) return;
+              await new Promise<void>((resolve) => waiters.push(resolve));
+            }
+          },
+          kill(): void {
+            ended = true;
+            while (waiters.length > 0) (waiters.shift() as () => void)();
+          },
+          exited: async () => ({ code: 0, signal: null }),
+        };
+        return child;
+      },
+    };
+    const client = await McpClient.connect(transport, { command: "fake", timeoutMs: 1500 });
+    // The server dies right after the handshake; let the pump observe the ended
+    // stream and settle before the next request (the regression case).
+    (child as unknown as McpChildProcess).kill();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await expect(client.listTools()).rejects.toThrow(/server stream ended/);
+  });
 });
 
 describe("mcpContentToText", () => {

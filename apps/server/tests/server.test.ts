@@ -226,4 +226,74 @@ describe("startServer", () => {
       HttpServer.prototype.close = originalClose;
     }
   });
+
+  /**
+   * Bind-race path: when the listener errors before it ever listened (port
+   * taken between the precheck and listen), the process must exit non-zero —
+   * startServer() has already resolved, so the host would otherwise sit as a
+   * listener-less zombie that only looks alive. The error is simulated by
+   * patching listen to emit EADDRINUSE asynchronously (deterministic; no real
+   * race needed).
+   */
+  it("exits non-zero when the listener errors before it ever listened", async () => {
+    const { Server: HttpServer } = await import("node:http");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const originalListen = HttpServer.prototype.listen;
+    HttpServer.prototype.listen = function listenFails(
+      this: import("node:http").Server,
+      ...args: unknown[]
+    ) {
+      // Never bind: surface the async listen error the race window produces.
+      setImmediate(() => {
+        this.emit("error", Object.assign(new Error("listen EADDRINUSE: address already in use"), { code: "EADDRINUSE" }));
+      });
+      return this as never;
+    } as typeof originalListen;
+
+    try {
+      const host = "127.0.0.1";
+      const port = await freePort(host);
+      await startServer(stubComponents(host, port, vi.fn()));
+      // Wait past the simulated async error emission.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Port in use"));
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    } finally {
+      HttpServer.prototype.listen = originalListen;
+    }
+  });
+
+  /**
+   * Runtime-error path: an error AFTER the server is listening must NOT exit
+   * (in-flight work keeps running); it is logged and the server stays up.
+   */
+  it("does not exit for a listener error after the server is listening", async () => {
+    const { Server: HttpServer } = await import("node:http");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const originalListen = HttpServer.prototype.listen;
+    let captured: import("node:http").Server | null = null;
+    HttpServer.prototype.listen = function listenCaptures(
+      this: import("node:http").Server,
+      ...args: unknown[]
+    ) {
+      captured = this;
+      return (originalListen as (...listenArgs: unknown[]) => unknown).apply(this, args) as never;
+    } as typeof originalListen;
+
+    try {
+      const host = "127.0.0.1";
+      const port = await freePort(host);
+      const stop = await startServer(stubComponents(host, port, vi.fn()));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(captured).not.toBeNull();
+      const srv = captured as import("node:http").Server | null;
+      srv?.emit("error", new Error("simulated runtime listener error"));
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("simulated runtime listener error"));
+      expect(exitSpy).not.toHaveBeenCalled();
+      await stop();
+    } finally {
+      HttpServer.prototype.listen = originalListen;
+    }
+  });
 });

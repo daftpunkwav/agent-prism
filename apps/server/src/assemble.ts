@@ -66,7 +66,6 @@ import { EpisodicMemory } from "@agentprism/memory-episodic";
 import { SemanticMemory } from "@agentprism/memory-semantic";
 import { MemoryServiceAdapter } from "@agentprism/memory-service";
 import { AtomicJsonFile, NodeAppendFile, atomicWriteJson, readJsonFile } from "@agentprism/persistence";
-import { withRetry, withTimeout } from "@agentprism/runtime";
 import { SessionService } from "@agentprism/application";
 import { FileBlobStore, FileSessionStore } from "@agentprism/session-persistence";
 import { RandomIdGenerator, SystemClock, WorkspaceRegistry } from "@agentprism/runtime";
@@ -229,9 +228,12 @@ export async function assemble(): Promise<RuntimeComponents> {
       testProviderConnection({ provider, catalog: endpointCatalog, idGenerator }, target),
   };
 
-  // Judge-model resilience policy (composition root owns the tuning): one hung
-  // verdict cannot stall the judge endpoint, transient provider faults retry
-  // boundedly, and every residual failure still lands fail-closed downstream.
+  // Judge-model resilience policy (composition root owns the tuning): the model
+  // carries the single timeout + retry layer (createChatModel wires the same
+  // knobs into both vendor SDKs), so one hung verdict cannot stall the judge
+  // endpoint and transient provider faults retry boundedly. No outer retry/
+  // timeout wrappers here: they would multiply the same policy into up to 9
+  // wire calls per verdict (3 SDK attempts x 3 outer rounds).
   const judgeInvoke = async (prompt: string): Promise<string> => {
     const model = createChatModel({
       provider: providerStore.load(),
@@ -239,10 +241,7 @@ export async function assemble(): Promise<RuntimeComponents> {
       timeoutMs: llmCallOptions().timeoutMs,
       maxRetries: llmCallOptions().maxRetries,
     });
-    const response = await withRetry(
-      () => withTimeout(() => model.invoke(prompt), settings.llmTimeoutMs),
-      { maxRetries: settings.llmMaxRetries, retryDelayMs: settings.llmRetryDelayMs },
-    );
+    const response = await model.invoke(prompt);
     const content = response.content;
     if (typeof content === "string") return content;
     try {

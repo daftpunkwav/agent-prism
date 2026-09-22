@@ -22,6 +22,11 @@ export async function startServer(components: RuntimeComponents): Promise<() => 
   // the race where the port is taken between this probe and listen().
   await ensurePortAvailable(settings.backendHost, settings.backendPort);
 
+  // Flips in the listening callback: only errors BEFORE this point are startup
+  // failures worth exiting over; runtime listener errors after it are logged
+  // without killing in-flight work.
+  let listening = false;
+
   const server = serve(
     {
       fetch: components.app.fetch,
@@ -29,6 +34,7 @@ export async function startServer(components: RuntimeComponents): Promise<() => 
       port: settings.backendPort,
     },
     (info) => {
+      listening = true;
       console.log(`[server] Listening: http://${settings.backendHost}:${info.port}`);
       console.log(`[server] API served under /api/*; health check /health`);
     },
@@ -38,12 +44,17 @@ export async function startServer(components: RuntimeComponents): Promise<() => 
   // event, not a serve() throw: log the same friendly guidance instead of
   // crashing with a bare syscall error. Any other listener error is logged
   // verbatim: swallowing it would hide faults (EACCES, EMFILE, …).
+  // An error before the server ever listened leaves a listener-less zombie
+  // process (startServer has resolved, main() waits on signals forever, the
+  // health check is dead): exit non-zero so the operator/supervisor restart
+  // fails fast instead of a broken process that only looks alive.
   server.on("error", (error: unknown) => {
     if (typeof error === "object" && error !== null && (error as { code?: string }).code === "EADDRINUSE") {
       console.error(new PortInUseError(settings.backendHost, settings.backendPort).message);
     } else {
       console.error(`[server] HTTP listener error: ${error instanceof Error ? error.message : String(error)}`);
     }
+    if (!listening) process.exit(1);
   });
 
   return () =>

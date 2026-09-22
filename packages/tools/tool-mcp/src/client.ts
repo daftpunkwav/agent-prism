@@ -221,7 +221,15 @@ export class McpClient {
         },
         timer,
       });
-      this.process.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+      try {
+        this.process.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+      } catch (error) {
+        // A synchronous write failure must not strand the pending entry (it
+        // would linger until the timeout) nor leak the raw transport error type.
+        this.pending.delete(id);
+        clearTimeout(timer);
+        reject(new McpError(`request ${method} failed to write: ${(error as Error)?.message ?? String(error)}`));
+      }
     });
   }
 
@@ -247,37 +255,44 @@ export class McpClient {
   private pumpMessages(): void {
     if (this.pump !== null) return;
     this.pump = (async () => {
-      for await (const body of this.process.messages()) {
-        let message: Record<string, unknown>;
-        try {
-          message = JSON.parse(body) as Record<string, unknown>;
-        } catch {
-          continue;
+      try {
+        for await (const body of this.process.messages()) {
+          let message: Record<string, unknown>;
+          try {
+            message = JSON.parse(body) as Record<string, unknown>;
+          } catch {
+            continue;
+          }
+          if (typeof message.id !== "number") continue;
+          const pending = this.pending.get(message.id);
+          if (pending === undefined) {
+            // Server-initiated request (no matching client call): serve
+            // roots/list from the advertised roots, reject the rest loudly.
+            if (typeof message.method === "string") this.answerServerRequest(message);
+            continue;
+          }
+          this.pending.delete(message.id);
+          if ("error" in message && isRecord(message.error)) {
+            const code = (message.error as Record<string, unknown>).code;
+            const text = (message.error as Record<string, unknown>).message;
+            pending.reject(new McpError(`server error ${String(code)}: ${String(text).slice(0, 300)}`));
+          } else if ("result" in message) {
+            pending.resolve(message.result ?? {});
+          } else {
+            pending.reject(new McpError("server replied without result or error"));
+          }
         }
-        if (typeof message.id !== "number") continue;
-        const pending = this.pending.get(message.id);
-        if (pending === undefined) {
-          // Server-initiated request (no matching client call): serve
-          // roots/list from the advertised roots, reject the rest loudly.
-          if (typeof message.method === "string") this.answerServerRequest(message);
-          continue;
+      } finally {
+        // Stream ended (server died): reject everything still pending, then reset
+        // the pump so a LATER request re-pumps, sees the ended stream, and fails
+        // fast instead of burning the full per-request timeout on a dead pipe.
+        for (const [, pending] of this.pending) {
+          clearTimeout(pending.timer);
+          pending.reject(new McpError("server stream ended"));
         }
-        this.pending.delete(message.id);
-        if ("error" in message && isRecord(message.error)) {
-          const code = (message.error as Record<string, unknown>).code;
-          const text = (message.error as Record<string, unknown>).message;
-          pending.reject(new McpError(`server error ${String(code)}: ${String(text).slice(0, 300)}`));
-        } else if ("result" in message) {
-          pending.resolve(message.result ?? {});
-        } else {
-          pending.reject(new McpError("server replied without result or error"));
-        }
+        this.pending.clear();
+        this.pump = null;
       }
-      for (const [, pending] of this.pending) {
-        clearTimeout(pending.timer);
-        pending.reject(new McpError("server stream ended"));
-      }
-      this.pending.clear();
     })();
   }
 }
