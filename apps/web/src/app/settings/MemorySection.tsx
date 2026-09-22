@@ -56,7 +56,7 @@ export function MemorySection({ onFlash }: { onFlash(message: string): void }) {
     );
   }
   if (loadError !== null || status === null) {
-    return <p className="text-sm text-destructive">{loadError ?? "Memory status unavailable"}</p>;
+    return <p className="text-sm text-destructive">{loadError}</p>;
   }
 
   return (
@@ -83,7 +83,7 @@ export function MemorySection({ onFlash }: { onFlash(message: string): void }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-primary" onClick={reload} disabled={loading}>
+        <button type="button" className="btn-primary" onClick={reload}>
           <Database className="h-4 w-4" />
           {t("settings.memory.refresh")}
         </button>

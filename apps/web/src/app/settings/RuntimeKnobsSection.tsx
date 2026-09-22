@@ -33,7 +33,8 @@ const GROUPS: ReadonlyArray<{ id: RuntimeKnobFieldMeta["group"]; labelKey: Messa
   { id: "llm", labelKey: "settings.runtime.groupLlm", descKey: "settings.runtime.groupLlmDesc" },
 ];
 
-function fieldLabel(key: string): MessageKey {
+/** The catalog key for a knob's label; null when the knob has no catalog entry (renders the raw key). */
+function fieldLabel(key: string): MessageKey | null {
   switch (key) {
     case "contextWindowMessages":
       return "settings.runtime.fields.contextWindowMessages";
@@ -78,7 +79,7 @@ function fieldLabel(key: string): MessageKey {
     case "harnessRetries.selfEvolve":
       return "settings.runtime.fields.harnessRetries.selfEvolve";
     default:
-      return "settings.runtime.desc";
+      return null;
   }
 }
 
@@ -148,43 +149,47 @@ export function RuntimeKnobsSection({ onFlash }: { onFlash(message: string): voi
             <p className="eyebrow">{t(group.labelKey)}</p>
             <p className="text-[11px] text-muted-foreground leading-relaxed">{t(group.descKey)}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-              {groupFields.map((meta) => (
-                <Field key={meta.key} label={t(fieldLabel(meta.key))}>
-                  {meta.kind === "select" ? (
-                    <UiSelect
-                      className="w-full"
-                      value={String(draft[meta.key] ?? meta.default)}
-                      onChange={(value) => setDraft((d) => ({ ...d, [meta.key]: value }))}
-                      ariaLabel={t(fieldLabel(meta.key))}
-                      options={(meta.options ?? []).map((option) => ({ value: option, label: option }))}
-                    />
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        className="form-input font-mono text-sm"
-                        type="number"
-                        min={meta.min}
-                        max={meta.max}
-                        step={meta.step}
+              {groupFields.map((meta) => {
+                const labelKey = fieldLabel(meta.key);
+                const label = labelKey === null ? meta.key : t(labelKey);
+                return (
+                  <Field key={meta.key} label={label}>
+                    {meta.kind === "select" ? (
+                      <UiSelect
+                        className="w-full"
                         value={String(draft[meta.key] ?? meta.default)}
-                        onChange={(e) => {
-                          const parsed = parseInt(e.target.value, 10);
-                          setDraft((d) => ({ ...d, [meta.key]: Number.isFinite(parsed) ? parsed : meta.default as number }));
-                        }}
+                        onChange={(value) => setDraft((d) => ({ ...d, [meta.key]: value }))}
+                        ariaLabel={label}
+                        options={(meta.options ?? []).map((option) => ({ value: option, label: option }))}
                       />
-                      <button
-                        type="button"
-                        className="btn-ghost !h-9 !w-9 !p-0 shrink-0"
-                        title={t("settings.runtime.resetTitle")}
-                        aria-label={t("settings.runtime.resetTitle")}
-                        onClick={() => setDraft((d) => ({ ...d, [meta.key]: meta.default as number }))}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </Field>
-              ))}
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          className="form-input font-mono text-sm"
+                          type="number"
+                          min={meta.min}
+                          max={meta.max}
+                          step={meta.step}
+                          value={String(draft[meta.key] ?? meta.default)}
+                          onChange={(e) => {
+                            const parsed = parseInt(e.target.value, 10);
+                            setDraft((d) => ({ ...d, [meta.key]: Number.isFinite(parsed) ? parsed : meta.default as number }));
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn-ghost !h-9 !w-9 !p-0 shrink-0"
+                          title={t("settings.runtime.resetTitle")}
+                          aria-label={t("settings.runtime.resetTitle")}
+                          onClick={() => setDraft((d) => ({ ...d, [meta.key]: meta.default as number }))}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </Field>
+                );
+              })}
             </div>
           </div>
         );
