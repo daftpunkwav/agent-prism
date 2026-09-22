@@ -133,14 +133,15 @@ function ThoughtRow({
   live: boolean;
   t: ReturnType<typeof useT>;
 }) {
-  const final = segment.final === true;
   const duration = stepDuration(segment);
   return (
     <details className="builder-seg builder-seg-thought" {...(live ? { open: true } : {})}>
       <summary className="builder-seg-summary">
         <ChevronRight size={12} aria-hidden />
-        {final ? <ScrollText size={12} aria-hidden /> : <Lightbulb size={12} aria-hidden />}
-        <span>{final ? t("builder.phaseSummary.answer") : t("builder.thinkingTitle")}</span>
+        <ScrollText size={12} aria-hidden />
+        {/* Uniform "reply" label: finality is unknowable mid-run (the flag
+            relocates as the turn progresses), so every thought row reads the same. */}
+        <span>{t("builder.replyTitle")}</span>
         {segment.actor && <span className="builder-phase-actor">{segment.actor}</span>}
         {live && <span className="builder-seg-live-hint">{t("builder.thinkingStreaming")}</span>}
         {duration !== null && <span className="builder-seg-duration">{duration}</span>}

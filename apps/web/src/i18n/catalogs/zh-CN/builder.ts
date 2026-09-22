@@ -15,9 +15,6 @@ export const builder = {
   sessions: "会话",
   delete: "删除",
   renameAria: "重命名 Agent",
-  phaseSummary: {
-    answer: "最终回复",
-  },
   renameConfirm: "保存名称",
   renameCancel: "取消重命名",
   running: "运行中",
@@ -84,6 +81,7 @@ export const builder = {
   // live segment labels
   stepCalling: "第 {step} 步 · 调用模型中",
   thinkingTitle: "思考",
+  replyTitle: "回复",
   thinkingStreaming: "思考中",
   thinkingChars: "{count} 字",
   bannerTitle: "管线配置",

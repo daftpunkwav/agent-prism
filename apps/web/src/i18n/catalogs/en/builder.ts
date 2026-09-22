@@ -15,9 +15,6 @@ export const builder = {
   sessions: "Sessions",
   delete: "Delete",
   renameAria: "Rename agent",
-  phaseSummary: {
-    answer: "Final answer",
-  },
   renameConfirm: "Save name",
   renameCancel: "Cancel rename",
   running: "Running",
@@ -84,6 +81,7 @@ export const builder = {
   // live segment labels
   stepCalling: "Step {step} · calling model",
   thinkingTitle: "Thinking",
+  replyTitle: "Reply",
   thinkingStreaming: "thinking",
   thinkingChars: "{count} chars",
   bannerTitle: "Pipeline config",

@@ -65,7 +65,7 @@ describe("ChatPanel history and live turn", () => {
     expect(screen.getByText(en().turnTrace)).toBeDefined();
     expect(screen.getByText(en().turnTrace).closest("summary")!.textContent).toContain("1");
     fireEvent.click(screen.getByText(en().turnTrace));
-    expect(screen.getByText(en().thinkingTitle)).toBeDefined();
+    expect(screen.getByText(en().replyTitle)).toBeDefined();
   });
 
   it("renders consecutive steps as separate flat rows with the final reply labeled", () => {
@@ -84,10 +84,11 @@ describe("ChatPanel history and live turn", () => {
       ],
     });
     fireEvent.click(screen.getByText(en().turnTrace));
-    // Four flat rows in execution order: thinking rows with the final one
-    // labeled as the final answer, plus the tool row in between.
-    expect(screen.getAllByText(en().thinkingTitle).length).toBe(2);
-    expect(screen.getByText(en().phaseSummary.answer)).toBeDefined();
+    // Four flat rows in execution order: one thinking row, the tool row, and
+    // both thought rows labeled uniformly as "reply" (finality is unknowable
+    // mid-run, so no row claims to be the final answer).
+    expect(screen.getAllByText(en().thinkingTitle).length).toBe(1);
+    expect(screen.getAllByText(en().replyTitle).length).toBe(2);
     expect(screen.getByText("run")).toBeDefined();
   });
 

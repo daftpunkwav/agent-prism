@@ -95,8 +95,8 @@ describe("TracePanel", () => {
     expect(screen.getByText("build me a widget")).toBeDefined();
     // Flat step rows: each step renders one collapsible row; expanding it
     // reveals the raw segment text directly (no phase group in between). A
-    // single settled thought is the turn's final reply row.
-    fireEvent.click(screen.getByText(en().phaseSummary.answer));
+    // settled thought renders as a uniformly labeled reply row.
+    fireEvent.click(screen.getByText(en().replyTitle));
     expect(await screen.findByText(/thinking it through/)).toBeDefined();
   });
 
