@@ -64,6 +64,33 @@ const started = createServer((req, res) => {
   });
   req.on("end", () => {
     res.setHeader("Content-Type", "application/json");
+    if (req.url !== undefined && req.url.includes("/responses")) {
+      res.end(
+        JSON.stringify({
+          id: "resp_1",
+          object: "response",
+          output: [
+            {
+              type: "message",
+              id: "m1",
+              role: "assistant",
+              content: [{ type: "output_text", text: "pong from responses", annotations: [] }],
+            },
+          ],
+          usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+        }),
+      );
+      return;
+    }
+    if (req.url !== undefined && req.url.includes("/echo-auth")) {
+      res.statusCode = 401;
+      res.end(
+        JSON.stringify({
+          error: { message: `bad key, got header '${String(req.headers.authorization ?? "")}'`, type: "invalid_request_error" },
+        }),
+      );
+      return;
+    }
     res.end(
       JSON.stringify({
         choices: [{ message: { role: "assistant", content: "pong from loopback" } }],
@@ -162,6 +189,29 @@ describe("testProviderConnection endpoint selection", () => {
       { testEndpointId: "", legacy: { id: "", api_key: "direct-key", base_url: url, api_format: "openai_chat" } as never },
     );
     expect(legacy.ok).toBe(true);
+  });
+
+  it("probes openai_responses endpoints through the Responses API", async () => {
+    const url = await loopbackUrl();
+    const target: ConnectionTestTarget = {
+      endpoints: [{ id: "", api_key: "direct-key", base_url: url, api_format: "openai_responses" } as never],
+    };
+    const result = await testProviderConnection({ provider: provider([]), idGenerator: ids }, target);
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain("pong from responses");
+  });
+
+  it("reports the redacted failure detail instead of a bare error name", async () => {
+    const url = `${await loopbackUrl()}/echo-auth`;
+    const key = "sk-test-secret-key";
+    const target: ConnectionTestTarget = {
+      endpoints: [{ id: "", api_key: key, base_url: url, api_format: "openai_chat" } as never],
+    };
+    const result = await testProviderConnection({ provider: provider([]), idGenerator: ids }, target);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("Connection failed:");
+    expect(result.message).not.toBe("Connection failed: Error");
+    expect(result.message).not.toContain(key);
   });
 
   it("selects a stored endpoint by id when the target pins testEndpointId", async () => {

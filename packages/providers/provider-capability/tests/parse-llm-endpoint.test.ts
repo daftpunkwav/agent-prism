@@ -69,6 +69,32 @@ describe("parseLlmEndpoint", () => {
     expect(endpoint.model.length).toBe(200);
     expect(endpoint.label).toBe(""); // non-string reads as fallback
   });
+
+  it("preserves the openai_responses format instead of coercing it", () => {
+    expect(parseLlmEndpoint({ api_format: "openai_responses" }, ids).api_format).toBe("openai_responses");
+    expect(parseLlmEndpoint({ api_format: "openai_chat" }, ids).api_format).toBe("openai_chat");
+    expect(parseLlmEndpoint({ api_format: "bogus" }, ids).api_format).toBe("anthropic_messages");
+  });
+
+  it("strips terminal API paths from full URLs so SDKs do not double-append", () => {
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/chat/completions" }, ids).base_url).toBe(
+      "https://api.acme.com/v1",
+    );
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/responses" }, ids).base_url).toBe(
+      "https://api.acme.com/v1",
+    );
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/messages" }, ids).base_url).toBe(
+      "https://api.acme.com/v1",
+    );
+    // Untouched otherwise: plain bases, non-terminal segments, and explicit opt-out.
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1" }, ids).base_url).toBe("https://api.acme.com/v1");
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/responses-proxy/v1" }, ids).base_url).toBe(
+      "https://api.acme.com/responses-proxy/v1",
+    );
+    expect(
+      parseLlmEndpoint({ base_url: "https://api.acme.com/v1/chat/completions", use_full_url: false }, ids).base_url,
+    ).toBe("https://api.acme.com/v1/chat/completions");
+  });
 });
 
 describe("normalizeModelIds", () => {

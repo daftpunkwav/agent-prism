@@ -5,10 +5,11 @@
  * Responsibilities:
  * - Resolve the target endpoint from explicit payloads or stored config
  * - Perform a minimal model call and report the result
+ * - Report redacted failure details (type + message, secrets masked)
  */
 
 import type { ConnectionTestResult, ConnectionTestTarget, IdGenerator, LlmEndpoint, ProviderConfig } from "@agentprism/contracts";
-import { sanitizeErrorMessage } from "@agentprism/contracts";
+import { ConfigurationError } from "@agentprism/contracts";
 import { HumanMessage } from "@langchain/core/messages";
 import { createChatModel } from "./model-factory.js";
 import type { EndpointCatalog } from "@agentprism/provider-capability";
@@ -37,6 +38,37 @@ function extractSnippet(content: unknown): string {
     }
   }
   return "";
+}
+
+/** Failure detail ceiling: SDK messages can embed response bodies. */
+const PROBE_ERROR_MAX_CHARS = 300;
+
+/**
+ * Redacts secrets from a probe failure message. The endpoint key never
+ * appears verbatim (SDKs may echo auth headers or request URLs), and URL
+ * userinfo (`user:password@`) is masked as a whole — the host stays visible
+ * so the failure remains diagnosable.
+ */
+function redactProbeSecrets(text: string, secrets: Array<string | undefined>): string {
+  let out = text;
+  for (const secret of secrets) {
+    if (secret !== undefined && secret !== "") out = out.split(secret).join("<redacted>");
+  }
+  return out.replace(/:\/\/[^/\s@]+@/g, "://<credentials>@");
+}
+
+/**
+ * Probe failure detail: error type + redacted message. The global sanitizer
+ * deliberately exposes only the type name (a bare "Error" cannot be
+ * diagnosed), but a connection test targets the operator's own endpoint, so
+ * the redacted message is safe to surface here.
+ */
+function describeProbeError(error: unknown, secrets: Array<string | undefined>): string {
+  if (error instanceof ConfigurationError) return error.message;
+  const name = error instanceof Error ? error.name : "Error";
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const message = redactProbeSecrets(raw, secrets).slice(0, PROBE_ERROR_MAX_CHARS).trim();
+  return message === "" ? name : `${name}: ${message}`;
 }
 
 /**
@@ -105,6 +137,6 @@ export async function testProviderConnection(
     const snippet = extractSnippet(response.content);
     return { ok: true, message: `Connection succeeded: ${snippet || "ok"}`, model: endpoint.model };
   } catch (error) {
-    return { ok: false, message: `Connection failed: ${sanitizeErrorMessage(error)}`, model: endpoint.model };
+    return { ok: false, message: `Connection failed: ${describeProbeError(error, [endpoint.api_key])}`, model: endpoint.model };
   }
 }
