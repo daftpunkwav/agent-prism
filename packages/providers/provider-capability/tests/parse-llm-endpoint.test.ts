@@ -96,24 +96,32 @@ describe("parseLlmEndpoint", () => {
     expect(parseLlmEndpoint({ api_format: "bogus" }, ids).api_format).toBe("anthropic_messages");
   });
 
-  it("strips terminal API paths from full URLs so SDKs do not double-append", () => {
-    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/chat/completions" }, ids).base_url).toBe(
-      "https://api.acme.com/v1",
+  it("keeps the input verbatim when use_full_url is set; unchecked strips terminal paths as a fallback", () => {
+    // Checked (default for API payloads): the operator's input is authoritative.
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/chat/completions", use_full_url: true }, ids).base_url).toBe(
+      "https://api.acme.com/v1/chat/completions",
     );
-    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/responses" }, ids).base_url).toBe(
-      "https://api.acme.com/v1",
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/responses", use_full_url: true }, ids).base_url).toBe(
+      "https://api.acme.com/v1/responses",
     );
-    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/messages" }, ids).base_url).toBe(
-      "https://api.acme.com/v1",
-    );
-    // Untouched otherwise: plain bases, non-terminal segments, and explicit opt-out.
-    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1" }, ids).base_url).toBe("https://api.acme.com/v1");
-    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/responses-proxy/v1" }, ids).base_url).toBe(
-      "https://api.acme.com/responses-proxy/v1",
-    );
+    // Unchecked: fallback normalization strips the terminal suffix so the SDK
+    // appends the right path exactly once.
     expect(
       parseLlmEndpoint({ base_url: "https://api.acme.com/v1/chat/completions", use_full_url: false }, ids).base_url,
-    ).toBe("https://api.acme.com/v1/chat/completions");
+    ).toBe("https://api.acme.com/v1");
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/responses", use_full_url: false }, ids).base_url).toBe(
+      "https://api.acme.com/v1",
+    );
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/messages", use_full_url: false }, ids).base_url).toBe(
+      "https://api.acme.com/v1",
+    );
+    // Plain bases and non-terminal segments stay untouched in both modes.
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1" }, ids).base_url).toBe("https://api.acme.com/v1");
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/responses-proxy/v1", use_full_url: false }, ids).base_url).toBe(
+      "https://api.acme.com/responses-proxy/v1",
+    );
+    // An absent flag (hand-written config files) falls to the stripping fallback.
+    expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/messages" }, ids).base_url).toBe("https://api.acme.com/v1");
   });
 });
 

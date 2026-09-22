@@ -42,7 +42,9 @@ export const settings = {
     provider: "供应商",
     apiFormat: "API 格式",
     baseUrl: "请求地址",
-    fullUrl: "完整 URL",
+    fullUrl: "原样使用请求地址",
+    fullUrlHint:
+      "不勾选时也接受直接粘贴的完整请求地址：末端的 /chat/completions、/responses、/messages 会被自动剥离，API 路径只拼接一次。勾选则对输入不做任何处理。",
     keyPlaceholder: "填写 API Key",
     keyPlaceholderSaved: "已保存（留空保持）",
     showKeyAria: "显示 API Key",

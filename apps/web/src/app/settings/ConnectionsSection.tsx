@@ -394,6 +394,9 @@ export function ConnectionsSection({
                       />
                       {t("settings.connection.fullUrl")}
                     </label>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      {t("settings.connection.fullUrlHint")}
+                    </p>
                   </Field>
                   <Field label="API Key">
                     <div className="relative">

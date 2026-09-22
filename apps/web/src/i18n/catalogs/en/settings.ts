@@ -42,7 +42,9 @@ export const settings = {
     provider: "Provider",
     apiFormat: "API format",
     baseUrl: "Request URL",
-    fullUrl: "Full URL",
+    fullUrl: "Use request URL as-is",
+    fullUrlHint:
+      "Unchecked also accepts a pasted full request URL: a terminal /chat/completions, /responses, or /messages segment is stripped so the API path is appended exactly once. Checked stores your input untouched.",
     keyPlaceholder: "Enter API key",
     keyPlaceholderSaved: "Saved (leave blank to keep)",
     showKeyAria: "Show API key",

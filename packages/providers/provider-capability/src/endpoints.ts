@@ -55,11 +55,13 @@ export function normalizeBaseUrl(rawUrl: string): string {
 }
 
 /**
- * Terminal request paths the SDKs append themselves. When the operator pastes
- * a full request URL with "full URL" checked, the suffix is stripped so the
- * stored value stays a base URL (double-appending otherwise 404s). Only exact
- * terminal segments strip: a gateway path that merely contains these words is
- * left untouched.
+ * Terminal request paths the SDKs append themselves. When "use request URL
+ * as-is" is UNCHECKED (the fallback mode), a pasted full request URL is
+ * normalized: the terminal suffix is stripped so the stored value stays a base
+ * URL and the SDK appends the right path exactly once (double-appending
+ * otherwise 404s). Checked stores the input verbatim for gateways whose real
+ * path ends in one of these segments. Only exact terminal segments strip: a
+ * gateway path that merely contains these words is left untouched.
  */
 const TERMINAL_API_PATHS = ["/chat/completions", "/responses", "/messages"];
 
@@ -129,7 +131,9 @@ function clampInt(value: unknown, limits: { min: number; max: number; fallback: 
 export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
   const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const id = (typeof source.id === "string" ? source.id.trim().slice(0, ENDPOINT_ID_MAX) : "") || ids.next();
-  const useFullUrl = source.use_full_url !== false;
+  // Checked = verbatim: the operator's input is authoritative, no rewriting.
+  // Unchecked = fallback: terminal API paths strip so the SDK appends once.
+  const useAsIs = source.use_full_url === true;
   const baseUrl = readString(source, "base_url", DEFAULT_LLM_BASE_URL, STRING_MAX.base_url);
   const apiFormat = source.api_format === "openai_chat" || source.api_format === "openai_responses" ? source.api_format : "anthropic_messages";
   // Effectiveness still gates on the consumer-side effectiveThinkingLevel: parse
@@ -145,8 +149,8 @@ export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
     label: readString(source, "label", "", STRING_MAX.label),
     provider_name: readString(source, "provider_name", "", STRING_MAX.provider_name),
     api_key: readString(source, "api_key", "", STRING_MAX.api_key),
-    base_url: useFullUrl ? stripTerminalApiPath(baseUrl) : baseUrl,
-    use_full_url: useFullUrl,
+    base_url: useAsIs ? baseUrl : stripTerminalApiPath(baseUrl),
+    use_full_url: useAsIs,
     api_format: apiFormat,
     auth_field: readString(source, "auth_field", "ANTHROPIC_AUTH_TOKEN", STRING_MAX.auth_field),
     model: (typeof source.model === "string" && source.model.trim() !== "" ? source.model.trim() : DEFAULT_MODEL_ID).slice(0, STRING_MAX.model),
