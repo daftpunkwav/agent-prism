@@ -13,6 +13,7 @@
  * port ownership belongs to apps/server (owns listen/serve).
  */
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import type { Context, MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
@@ -76,6 +77,19 @@ export interface HttpApplicationDeps {
   mcp?: McpController;
 }
 
+/**
+ * Constant-time token comparison: SHA-256 digests compared via timingSafeEqual
+ * so the request-boundary check does not leak token content or length through
+ * an early-exit string compare (the server may be exposed on the LAN).
+ * Digest equality is equivalent to string equality (collision-resistant hash),
+ * and fixed-length digests sidestep timingSafeEqual's equal-length requirement.
+ */
+function tokensMatch(presented: string, expected: string): boolean {
+  const presentedDigest = createHash("sha256").update(presented, "utf-8").digest();
+  const expectedDigest = createHash("sha256").update(expected, "utf-8").digest();
+  return timingSafeEqual(presentedDigest, expectedDigest);
+}
+
 /** API token auth: /api/health and /health are exempt. */
 function apiTokenMiddleware(token: string): MiddlewareHandler {
   return async (c, next) => {
@@ -86,7 +100,7 @@ function apiTokenMiddleware(token: string): MiddlewareHandler {
     const headerToken = c.req.header("X-API-Token") ?? "";
     const bearerMatch = /^bearer\s+(.+)$/i.exec(authorization);
     const presented = bearerMatch?.[1]?.trim() ?? "";
-    if (presented === token || headerToken === token) return next();
+    if (tokensMatch(presented, token) || tokensMatch(headerToken, token)) return next();
     return c.json({ detail: "Unauthorized: a valid API Token is required" }, 401);
   };
 }
