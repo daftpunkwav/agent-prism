@@ -93,8 +93,10 @@ describe("TracePanel", () => {
     expect(screen.getByText(en().swapBanner)).toBeDefined();
     expect(screen.getByText(en().turnLabel.replace("{turn}", "1"))).toBeDefined();
     expect(screen.getByText("build me a widget")).toBeDefined();
-    // Phase rows fold their work; expanding one reveals the raw segment text.
-    fireEvent.click(document.querySelector("button.builder-phase-row")!);
+    // Flat step rows: each step renders one collapsible row; expanding it
+    // reveals the raw segment text directly (no phase group in between). A
+    // single settled thought is the turn's final reply row.
+    fireEvent.click(screen.getByText(en().phaseSummary.answer));
     expect(await screen.findByText(/thinking it through/)).toBeDefined();
   });
 

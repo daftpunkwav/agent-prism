@@ -60,10 +60,35 @@ describe("ChatPanel history and live turn", () => {
     });
     expect(screen.getByText("build it")).toBeDefined();
     expect(screen.getByText("done, here you go")).toBeDefined();
-    // The work trail collapses to a phase count until expanded.
+    // The work trail collapses to a step count until expanded; a thought step
+    // renders as one flat row (one click to the detail, no phase nesting).
     expect(screen.getByText(en().turnTrace)).toBeDefined();
+    expect(screen.getByText(en().turnTrace).closest("summary")!.textContent).toContain("1");
     fireEvent.click(screen.getByText(en().turnTrace));
-    expect(screen.getByText(en().phaseSummary.thinking.replace("{count}", "1"))).toBeDefined();
+    expect(screen.getByText(en().thinkingTitle)).toBeDefined();
+  });
+
+  it("renders consecutive steps as separate flat rows with the final reply labeled", () => {
+    renderChat({
+      history: [
+        {
+          role: "assistant",
+          content: "final text",
+          segments: [
+            { id: "s1", kind: "thinking", step: 1, turn: 1, text: "first thought", completed: true },
+            { id: "s2", kind: "action", step: 2, turn: 1, text: "", tool: "run", args: { command: "ls" }, completed: true },
+            { id: "s3", kind: "thought", step: 3, turn: 1, text: "mid narration", completed: true },
+            { id: "s4", kind: "thought", step: 4, turn: 1, text: "the reply", completed: true, final: true },
+          ] as unknown as DisplaySegment[],
+        },
+      ],
+    });
+    fireEvent.click(screen.getByText(en().turnTrace));
+    // Four flat rows in execution order: thinking rows with the final one
+    // labeled as the final answer, plus the tool row in between.
+    expect(screen.getAllByText(en().thinkingTitle).length).toBe(2);
+    expect(screen.getByText(en().phaseSummary.answer)).toBeDefined();
+    expect(screen.getByText("run")).toBeDefined();
   });
 
   it("renders the live turn with a stop control and disables the composer", () => {

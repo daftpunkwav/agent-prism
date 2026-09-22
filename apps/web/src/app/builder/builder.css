@@ -1080,40 +1080,7 @@ details[open] > .builder-log-summary::before {
   padding: 0;
 }
 
-.builder-phase-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 4px 6px;
-  border: 0;
-  border-radius: var(--radius-sm, 6px);
-  background: transparent;
-  color: var(--muted-foreground);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.builder-phase-row:hover {
-  background: color-mix(in srgb, var(--muted) 40%, transparent);
-  color: var(--foreground);
-}
-
-.builder-phase-chevron {
-  transition: transform 120ms ease;
-}
-
-.builder-phase-chevron.is-open {
-  transform: rotate(90deg);
-}
-
-.builder-phase-label {
-  font-weight: 500;
-  color: var(--foreground);
-}
-
-/* Multi-agent identity chip (framework drivers): names who owns the phase. */
+/* Multi-agent identity chip (framework drivers): names who owns the step. */
 .builder-phase-actor {
   flex-shrink: 0;
   padding: 0 0.3rem;
@@ -1126,15 +1093,10 @@ details[open] > .builder-log-summary::before {
   white-space: nowrap;
 }
 
-.builder-phase-summary {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.builder-phase-duration {
+/* Right-aligned per-step duration on a segment summary row. */
+.builder-seg-duration {
+  margin-left: auto;
+  flex-shrink: 0;
   font-family: var(--font-mono, monospace);
   font-size: 11px;
   color: var(--muted-foreground);

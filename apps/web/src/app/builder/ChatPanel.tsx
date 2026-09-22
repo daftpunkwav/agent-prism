@@ -12,22 +12,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  AlertCircle,
   ArrowDown,
-  Bot,
   BrainCircuit,
   CheckCircle2,
   ChevronRight,
   Circle,
-  FilePenLine,
-  Globe,
   Lightbulb,
   Loader2,
-  ListTodo,
-  MessageCircleQuestion,
   Paperclip,
   ScrollText,
-  Search,
   Square,
   Terminal,
   X,
@@ -35,7 +28,7 @@ import {
 } from "lucide-react";
 import type { RunAttachment } from "@agentprism/client";
 import { useFollowScroll } from "@/hooks/useFollowScroll";
-import { groupPhases, type DisplaySegment, type PhaseCategory, type PhaseGroup } from "@agentprism/arena-view";
+import type { DisplaySegment } from "@agentprism/arena-view";
 import { MarkdownBlock } from "@/components/MarkdownBlock";
 import { useT } from "@/i18n/useT";
 
@@ -84,25 +77,24 @@ function actionDetail(seg: DisplaySegment): string {
   return "";
 }
 
-const PHASE_ICONS: Record<PhaseCategory, typeof BrainCircuit> = {
-  thinking: BrainCircuit,
-  answer: ScrollText,
-  read: Search,
-  write: FilePenLine,
-  code: Terminal,
-  plan: ListTodo,
-  net: Globe,
-  agent: Bot,
-  ask: MessageCircleQuestion,
-  error: AlertCircle,
-  // ChevronRight here would read as a second expander arrow next to the row's
-  // own chevron; a neutral dot marks uncategorized work without that ambiguity.
-  other: Circle,
-};
+/** Steps that render as work rows: drops config banners and settled step ticks. */
+function flatSteps(segments: DisplaySegment[]): DisplaySegment[] {
+  return segments.filter((segment) => segment.meta !== true && !(segment.kind === "step" && segment.completed !== false));
+}
 
-/** Collapsed-trace body: phases fold consecutive same-kind steps into one row (Arena trace style).
- * With `autoExpandTail` (live turn), the newest phase stays expanded so streaming text remains
- * visible until the user pins an expansion choice of their own. */
+/** Per-step duration from segment timestamps, phase-row formatting. */
+function stepDuration(segment: DisplaySegment): string | null {
+  if (segment.tsStart === undefined || segment.tsEnd === undefined) return null;
+  const ms = Math.max(0, segment.tsEnd - segment.tsStart);
+  return ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`;
+}
+
+/**
+ * Collapsed-trace body, flat: one row per step in execution order — 思考 / tool /
+ * 思考 / tool / 最终回复 — each opening directly to its detail (no phase nesting).
+ * With `autoExpandTail` (live turn), the newest row stays open so streaming text
+ * remains visible.
+ */
 export function PhaseGroups({
   segments,
   autoExpandTail = false,
@@ -111,60 +103,59 @@ export function PhaseGroups({
   autoExpandTail?: boolean;
 }) {
   const t = useT();
-  // null = no pinned choice; "" = user pinned "all collapsed". An unpinned live
-  // view falls back to the tail phase so it keeps following the stream.
-  const [pinnedId, setPinnedId] = useState<string | null>(null);
-  const phases = groupPhases(segments);
-  const tailId = autoExpandTail && phases.length > 0 ? phases[phases.length - 1]!.id : null;
-  const activeOpen = pinnedId !== null ? pinnedId : tailId;
+  const steps = flatSteps(segments);
+  const liveId = autoExpandTail && segments.length > 0 ? segments[segments.length - 1]!.id : null;
   return (
     <ul className="builder-phase-list">
-      {phases.map((phase: PhaseGroup, phaseIndex: number) => {
-        const Icon = PHASE_ICONS[phase.category] ?? ChevronRight;
-        const open = activeOpen === phase.id;
-        const subset = segments.filter((segment) => phase.segmentIds.includes(segment.id));
-        const duration =
-          phase.durationMs !== null
-            ? phase.durationMs < 10_000
-              ? `${(phase.durationMs / 1000).toFixed(1)}s`
-              : `${Math.round(phase.durationMs / 1000)}s`
-            : null;
+      {steps.map((segment) => {
+        const live = segment.id === liveId;
         return (
-          <li key={phase.id} className="builder-phase">
-            <button
-              type="button"
-              className="builder-phase-row"
-              aria-expanded={open}
-              onClick={() => setPinnedId(open ? "" : phase.id)}
-            >
-              <ChevronRight
-                size={11}
-                className={"builder-phase-chevron" + (open ? " is-open" : "")}
-                aria-hidden
-              />
-              <Icon size={12} aria-hidden />
-              <span className="builder-phase-label">{t(`builder.phase.${phase.category}` as const)}</span>
-              {phase.actor && <span className="builder-phase-actor">{phase.actor}</span>}
-              <span className="builder-phase-summary">
-                {phase.category === "thinking"
-                  ? t("builder.phaseSummary.thinking", { count: phase.thinkingCount })
-                  : phase.category === "answer"
-                    ? // Only the tail answer phase is the turn's final reply; mid-turn
-                      // answer segments are process narration, not the final reply.
-                      phaseIndex === phases.length - 1
-                      ? t("builder.phaseSummary.answer")
-                      : t("builder.phaseSummary.answerMid")
-                    : phase.category === "error"
-                      ? t("builder.phaseSummary.error")
-                      : phase.tools.map((tc) => `${tc.count}× ${tc.tool}`).join(" · ")}
-              </span>
-              {duration !== null && <span className="builder-phase-duration">{duration}</span>}
-            </button>
-            {open && <SegmentList segments={subset} running={autoExpandTail} />}
+          <li key={segment.id} className="builder-phase">
+            {segment.kind === "thought" ? (
+              <ThoughtRow segment={segment} live={live} t={t} />
+            ) : (
+              <SegmentRow segment={segment} live={live} t={t} />
+            )}
           </li>
         );
       })}
     </ul>
+  );
+}
+
+/** One interim or final reasoning-prose step as a single collapsible row. */
+function ThoughtRow({
+  segment,
+  live,
+  t,
+}: {
+  segment: DisplaySegment;
+  live: boolean;
+  t: ReturnType<typeof useT>;
+}) {
+  const final = segment.final === true;
+  const duration = stepDuration(segment);
+  return (
+    <details className="builder-seg builder-seg-thought" {...(live ? { open: true } : {})}>
+      <summary className="builder-seg-summary">
+        <ChevronRight size={12} aria-hidden />
+        {final ? <ScrollText size={12} aria-hidden /> : <Lightbulb size={12} aria-hidden />}
+        <span>{final ? t("builder.phaseSummary.answer") : t("builder.thinkingTitle")}</span>
+        {segment.actor && <span className="builder-phase-actor">{segment.actor}</span>}
+        {live && <span className="builder-seg-live-hint">{t("builder.thinkingStreaming")}</span>}
+        {duration !== null && <span className="builder-seg-duration">{duration}</span>}
+      </summary>
+      <div className="builder-seg-body builder-seg-prose">
+        {live ? (
+          <span className="whitespace-pre-wrap break-words">
+            {segment.text}
+            <span className="builder-seg-cursor" />
+          </span>
+        ) : (
+          <MarkdownBlock text={segment.text} />
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -256,6 +247,7 @@ function SegmentRow({
   }
 
   if (segment.kind === "thinking") {
+    const duration = stepDuration(segment);
     return (
       <details className="builder-seg builder-seg-thinking">
         <summary className="builder-seg-summary">
@@ -267,6 +259,7 @@ function SegmentRow({
           ) : (
             <span className="builder-seg-meta">{t("builder.thinkingChars", { count: segment.text.length })}</span>
           )}
+          {duration !== null && <span className="builder-seg-duration">{duration}</span>}
         </summary>
         <pre className="builder-seg-pre builder-seg-pre-thinking">{segment.text}</pre>
       </details>
@@ -318,6 +311,7 @@ function SegmentRow({
     const result = segment.result ?? "";
     const diff = segment.diff ?? "";
     const executing = live && segment.resultDone === false;
+    const duration = stepDuration(segment);
     return (
       <details className="builder-seg builder-seg-action">
         <summary className="builder-seg-summary">
@@ -333,6 +327,7 @@ function SegmentRow({
           ) : (
             result !== "" && <span className="builder-seg-done">{t("builder.actionDone")}</span>
           )}
+          {duration !== null && <span className="builder-seg-duration">{duration}</span>}
         </summary>
         <div className="builder-seg-body">
           {todos !== null ? (
@@ -524,7 +519,7 @@ export function ChatPanel({ history, hasSession, running, liveSegments, onSend, 
                         <ChevronRight size={12} aria-hidden />
                         {t("builder.turnTrace")}
                         <span className="builder-turn-trace-count">
-                          {groupPhases(message.segments).length}
+                          {flatSteps(message.segments).length}
                         </span>
                       </summary>
                       <PhaseGroups segments={message.segments} />
