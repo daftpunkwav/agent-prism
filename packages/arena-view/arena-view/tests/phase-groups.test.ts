@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ArenaEvent } from "@agentprism/contracts";
-import { groupPhases, mergeEvents } from "../src/index.js";
+import { classifyTool, groupPhases, mergeEvents } from "../src/index.js";
 
 function ev(partial: Partial<ArenaEvent> & { type: ArenaEvent["type"] }): ArenaEvent {
   return {
@@ -133,5 +133,17 @@ describe("groupPhases", () => {
     // The lone thought is the turn's last → marked final (answer), per the
     // tool-free folding convention.
     expect(phases.map((phase) => phase.category)).toEqual(["answer", "other"]);
+  });
+});
+
+describe("classifyTool", () => {
+  it("maps tool names to display categories with the legacy run alias", () => {
+    expect(classifyTool("bash")).toBe("code");
+    // Pre-rename journals still carry "run": the display alias keeps their category.
+    expect(classifyTool("run")).toBe("code");
+    expect(classifyTool("run_job")).toBe("code");
+    expect(classifyTool("read")).toBe("read");
+    expect(classifyTool("ask_user")).toBe("ask");
+    expect(classifyTool("totally_new_tool")).toBe("other");
   });
 });
