@@ -14,7 +14,7 @@ import type { ArenaEvent, PipelineMetrics } from "./events.js";
 
 /** Input for publishing a comparison report: assembled by the orchestration layer after all columns finish. */
 export interface ReportPublishInput {
-  request: { dimension: string; question: string };
+  request: { dimension: string; question: string; language?: string };
   configs: PipelineConfig[];
   eventsByPipeline: Record<string, ArenaEvent[]>;
   metricsByPipeline: Record<string, PipelineMetrics | null>;

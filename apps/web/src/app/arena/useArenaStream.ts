@@ -51,6 +51,8 @@ export type RunOptions = {
   preserveColumns: Array<{ label: string; frameworkId: string }>;
   /** Text files seeded into newly created column workspaces. */
   attachments?: RunAttachment[];
+  /** UI locale tag steering server-generated prose (comparison narrative). */
+  language?: string;
 };
 
 function metricsToTokenStats(m: PipelineMetrics): TokenStats {
@@ -272,7 +274,7 @@ export function useArenaStream() {
    */
   const run = useCallback(
     async (opts: RunOptions, onSystemError?: () => void): Promise<RunResult> => {
-      const { question, dimension, selections, baseline, columnSessions, preserveColumns, attachments } = opts;
+      const { question, dimension, selections, baseline, columnSessions, preserveColumns, attachments, language } = opts;
       setError(null);
       setRunning(true);
       setComparisonReport(null);
@@ -347,6 +349,7 @@ export function useArenaStream() {
             console.warn(`[arena] SSE event parse failed: ${err.message} raw=${raw.slice(0, 120)}`),
           columnSessions,
           attachments,
+          language,
         });
         return { aborted: false, failed: false };
       } catch (err) {

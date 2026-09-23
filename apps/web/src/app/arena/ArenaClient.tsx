@@ -36,7 +36,7 @@ import { MainTabButton } from "./MainTabButton";
 import { ArenaSetupModule } from "./ArenaSetupModule";
 import { ComposerBar } from "./ComposerBar";
 import { SaveProjectCard } from "./SaveProjectCard";
-import { useT } from "@/i18n/useT";
+import { useLocale, useT } from "@/i18n/useT";
 import type { MainTab } from "./arenaConstants";
 import type { TaskTemplate } from "@agentprism/client";
 import { pipelineDisplayLabel, dimSubtitle } from "./dimensionLabels";
@@ -50,6 +50,7 @@ const MAX_ATTACHMENT_CHARS = 64 * 1024;
 /** Arena container: layout (tabs/drawers), run orchestration guards, and hook wiring only; follow-up commits and project saving are hooks of their own. */
 export function ArenaClient() {
   const t = useT();
+  const locale = useLocale();
   const [showPromptBanner, setShowPromptBanner] = useState(true);
   const [showLeftPanel, setShowLeftPanel] = useState(false);
   /** Workspace starts collapsed, expand when needed */
@@ -252,6 +253,7 @@ export function ArenaClient() {
         columnSessions,
         preserveColumns,
         attachments,
+        language: locale,
       },
       () => {
         // Route/baseline-level error: this turn is not committed to the shared history

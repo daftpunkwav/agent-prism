@@ -266,6 +266,12 @@ export const ArenaRunRequestSchema = z
      * keep the default false and never block.
      */
     interactive: z.boolean().default(false),
+    /**
+     * UI locale tag ("en" / "zh-CN") steering generated prose (comparison
+     * narrative). Server-side generated text defaults to English when absent;
+     * unknown tags fall back to English, so free-form input is safe.
+     */
+    language: z.string().max(16).optional(),
   })
   .superRefine((value, ctx) => {
     addChatHistoryIssues(value.messages, value.question, ctx, ["messages"]);

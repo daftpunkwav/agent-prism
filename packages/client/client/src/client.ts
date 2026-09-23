@@ -113,6 +113,8 @@ export interface StreamArenaRunOptions {
   columnSessions?: Record<string, ColumnSession>;
   /** Text files seeded into newly created column workspaces for this run. */
   attachments?: RunAttachment[];
+  /** UI locale tag steering server-generated prose (comparison narrative). */
+  language?: string;
 }
 
 /**
@@ -125,7 +127,7 @@ export interface StreamArenaRunOptions {
  * - the whole read loop honors the passed AbortSignal: disconnects immediately on unmount
  */
 export async function streamArenaRun(options: StreamArenaRunOptions): Promise<void> {
-  const { question, dimension, onEvent, signal, selections, baseline, onParseError, messages, columnSessions } = options;
+  const { question, dimension, onEvent, signal, selections, baseline, onParseError, messages, columnSessions, language } = options;
   let res: Response;
   try {
     const body: Record<string, unknown> = {
@@ -146,6 +148,9 @@ export async function streamArenaRun(options: StreamArenaRunOptions): Promise<vo
     }
     if (options.attachments && options.attachments.length > 0) {
       body.attachments = options.attachments;
+    }
+    if (language) {
+      body.language = language;
     }
     res = await apiFetch(`${API_BASE}/api/arena/run`, {
       method: "POST",
