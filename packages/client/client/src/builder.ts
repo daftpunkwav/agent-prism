@@ -11,6 +11,7 @@
 
 import { API_BASE, ApiError, apiFetch, isAbortError, responseDetail } from "./http.js";
 import { pumpSSEBlocks } from "./sse.js";
+import { defaultBuilderComposition } from "@agentprism/contracts";
 import type {
   BuilderCatalog,
   BuilderCreateRequest,
@@ -21,6 +22,9 @@ import type {
   BuilderSwapResult,
   RunAttachment,
 } from "@agentprism/contracts";
+
+/** Factory-default composition (contracts single source), re-exported for UI restore-default. */
+export { defaultBuilderComposition };
 
 /** Fetches the block palette (frameworks / endpoints / tools / capabilities). */
 export async function fetchBuilderCatalog(options?: { signal?: AbortSignal }): Promise<BuilderCatalog> {

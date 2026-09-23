@@ -116,6 +116,11 @@ export type BuilderComposition = z.infer<typeof BuilderCompositionSchema>;
 export type BuilderCompositionInput = z.input<typeof BuilderCompositionSchema>;
 export type BuilderCompositionPatch = z.input<ReturnType<typeof BuilderCompositionSchema.partial>>;
 
+/** Factory-default composition: the schema's own defaults, parsed once at module load (single source shared by UI restore-default and server normalization). */
+export function defaultBuilderComposition(): BuilderComposition {
+  return BuilderCompositionSchema.parse({});
+}
+
 /** One tool call inside an LLM wire payload (id/name/arguments triple). */
 export const LlmWireToolCallSchema = z.object({
   id: z.string().default(""),
