@@ -25,6 +25,7 @@ export const dimensions = {
     skill: "Skill",
     orchestration: "Orchestration",
     memory: "Memory",
+    history_mode: "History",
   },
   subtitle: {
     framework: "Orchestration differs; other dims stay pinned by the baseline",
@@ -41,6 +42,7 @@ export const dimensions = {
     skill: "Off disables the skill tool; on-demand loads via the skill tool; preloaded injects runbooks into the prompt",
     orchestration: "Direct runs free-form; plan-first seeds a plan doc; goal-first seeds a tracked objective",
     memory: "Mounts cross-session memory into the prompt; none vs episodic vs semantic vs full changes what the model recalls",
+    history_mode: "Cross-turn replay: minimal bare Q/A pairs, tool_summary one line per tool call, full args + results appended to past answers",
   },
   baselineField: {
     framework: "Framework",
@@ -64,6 +66,7 @@ export const dimensions = {
     sandbox_mode: "Sandbox mode",
     orchestration: "Orchestration",
     memory: "Memory",
+    history_mode: "History",
   },
   opt: {
     framework: {
@@ -143,6 +146,11 @@ export const dimensions = {
       episodic: "Episodic (past task experience)",
       semantic: "Semantic (project facts)",
       full: "Full (episodic + semantic)",
+    },
+    history_mode: {
+      minimal: "Minimal (bare Q/A pairs)",
+      tool_summary: "Tool summary (one line per call)",
+      full: "Full (args + results)",
     },
   },
   baselineOpt: {

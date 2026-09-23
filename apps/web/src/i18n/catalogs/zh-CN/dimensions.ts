@@ -25,6 +25,7 @@ export const dimensions = {
     skill: "Skill",
     orchestration: "编排",
     memory: "记忆",
+    history_mode: "历史",
   },
   subtitle: {
     framework: "编排实现不同，其余维由基线固定",
@@ -41,6 +42,7 @@ export const dimensions = {
     skill: "off 禁用 skill 工具；on-demand 经 skill 工具按需加载；preloaded 注入 runbook 到 prompt",
     orchestration: "direct 自由执行；plan-first 预置 plan 文档；goal-first 预置可追踪目标",
     memory: "跨会话记忆挂载进 prompt；none 无记忆，episodic 挂历史经验，semantic 挂项目事实，full 两者都挂",
+    history_mode: "跨轮回放：minimal 仅裸问答对，tool_summary 每次工具调用一行摘要，full 附完整参数与结果",
   },
   baselineField: {
     framework: "框架",
@@ -64,6 +66,7 @@ export const dimensions = {
     sandbox_mode: "沙箱模式",
     orchestration: "编排",
     memory: "记忆",
+    history_mode: "历史",
   },
   opt: {
     framework: {
@@ -143,6 +146,11 @@ export const dimensions = {
       episodic: "情景记忆（历史任务经验）",
       semantic: "语义记忆（项目事实）",
       full: "完整记忆（经验 + 事实）",
+    },
+    history_mode: {
+      minimal: "极简（裸问答对）",
+      tool_summary: "工具摘要（每次调用一行）",
+      full: "全量（参数 + 结果）",
     },
   },
   baselineOpt: {

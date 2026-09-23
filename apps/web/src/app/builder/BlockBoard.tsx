@@ -55,13 +55,16 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, dirty,
   const t = useT();
   // Capability values are contract enums mirrored in both catalogs, so the dynamic
   // key is safe; the cast keeps the single dynamic-key point explicit.
-  const opt = (value: string) => t(`builder.opts.${value}` as Parameters<typeof t>[0]);
+  // history_mode values (minimal/tool_summary/full) collide with other blocks'
+  // flat keys, so its labels live under a `history_` prefix.
+  const opt = (value: string, prefix = "") => t(`builder.opts.${prefix}${value}` as Parameters<typeof t>[0]);
 
   const capabilityOptions = new Map<string, Array<{ value: string; label: string; description: string }>>();
   for (const group of catalog.capabilities) {
+    const prefix = group.block === "history_mode" ? "history_" : "";
     capabilityOptions.set(
       group.block,
-      group.options.map((option) => ({ ...option, label: opt(option.value) })),
+      group.options.map((option) => ({ ...option, label: opt(option.value, prefix) })),
     );
   }
 
@@ -224,6 +227,9 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, dirty,
       </Slot>
       <Slot title={t("builder.slotOrchestration")}>
         <div className="builder-chip-row">{renderChips("orchestration", composition.orchestration, (value) => set({ orchestration: value as BuilderComposition["orchestration"] }))}</div>
+      </Slot>
+      <Slot title={t("builder.slotHistoryMode")}>
+        <div className="builder-chip-row">{renderChips("history_mode", composition.history_mode, (value) => set({ history_mode: value as BuilderComposition["history_mode"] }))}</div>
       </Slot>
 
       <Slot title={t("builder.slotDecode")}>

@@ -101,7 +101,13 @@ const fieldMatrix: Array<{
     dimension: "memory",
     type: "MemoryPolicy",
     defaultValue: "none",
-    lockedWhen: "when comparing memory",
+    lockedWhen: "Comparing \"Memory\"",
+  },
+  {
+    dimension: "history_mode",
+    type: "HistoryMode",
+    defaultValue: "minimal",
+    lockedWhen: "Comparing \"History\"",
   },
 ];
 
@@ -890,6 +896,51 @@ const dimensions: DimDoc[] = [
       "Stores persist at data/memory_episodic.json and data/memory_semantic.json; a failed or missing store degrades the run to stateless (best-effort), never failing the run.",
       "Builder pins memory=none; memory exists only as an Arena comparison dimension.",
       "Write-back distills one post-mortem per run (task, tools, outcome, lessons), never the full intermediate trajectory.",
+    ],
+  },
+  {
+    id: "history_mode",
+    label: "History",
+    reality: "full",
+    summary:
+      "Cross-turn history replay modes: each run's tool calls (action→observation pairs) are captured and rendered back into assistant history text on the next turn, per the column's mode; tests whether the model seeing last turn's process changes follow-ups and correction.",
+    controls:
+      "Capture always stores the full superset (tool_rounds); rendering trims per config.history_mode at the execution boundary: minimal is byte-identical to the old behavior, tool_summary appends one line per call, full appends args + results (results keep the event stream's 8,000-char truncation).",
+    options: [
+      {
+        value: "minimal",
+        label: "Minimal",
+        effect: "Replays bare Q/A pairs only; tool process does not survive turns (legacy behavior, default).",
+      },
+      {
+        value: "tool_summary",
+        label: "Tool summary",
+        effect: "Last turn's each tool call appends one line: tool(args) → result digest, after the answer.",
+      },
+      {
+        value: "full",
+        label: "Full",
+        effect: "Last turn's each tool call appends full args and result text blocks (32k chars per turn cap).",
+      },
+    ],
+    path: [
+      "Capture rebuilds from the event stream (extractToolRounds pairs action/observation per pipeline column) with no AgentDriver contract change; result fidelity is capped at the same 8,000-char truncation the UI shows.",
+      "Rounds render as assistant-text appendices, never structured tool messages: past turns' tools cannot be re-called anyway, and text keeps the wire's strict user/assistant alternation validation untouched.",
+      "Threads, arena column sessions, and builder sessions share the same storage and rendering semantics; fork subagents inherit the parent's rendered history.",
+    ],
+    langChain: "History renders at the execution boundary before entering any framework; all five drivers behave identically.",
+    langGraph: "History renders at the execution boundary before entering any framework; all five drivers behave identically.",
+    modules: [
+      "packages/contracts/contracts/src/history-mode.ts · extractToolRounds / renderToolActivity",
+      "packages/agent/agent/src/history-render.ts · renderHistoryForMode (execution boundary)",
+      "packages/application/application/src/thread-store.ts · appendTurn (thread capture)",
+      "apps/web/src/app/arena/useColumnSessions.ts · pushColumnTurn (client capture)",
+    ],
+    baselineTip: "Two turns on one question: let the model run tools in turn one, then ask \"what did you do first?\" in turn two — minimal cannot answer, tool_summary/full can cite the trace.",
+    caveats: [
+      "tool_rounds commit only after a successful run; failed turns leave the transcript untouched, matching the atomic commit semantics.",
+      "full mode's tool results are an event-stream replay, not the exact full text the model saw live (over-long results were truncated).",
+      "Switching modes loses no data: storage is always the full superset; each turn re-renders per the column's current mode.",
     ],
   },
 ];

@@ -102,6 +102,12 @@ const fieldMatrix: Array<{
     defaultValue: "none",
     lockedWhen: "对比「记忆」时",
   },
+  {
+    dimension: "history_mode",
+    type: "HistoryMode",
+    defaultValue: "minimal",
+    lockedWhen: "对比「历史」时",
+  },
 ];
 
 /** Multi-turn conversation mechanics doc (columns share history; not a PipelineConfig field). Consumed only via overviewSections, not exported. */
@@ -889,6 +895,51 @@ const dimensions: DimDoc[] = [
       "存储持久化在 data/memory_episodic.json 与 data/memory_semantic.json；存储缺失或失败时该次运行按无状态降级（best-effort），不会导致运行失败。",
       "Builder 固定 memory=none；记忆只作为 Arena 对比维存在。",
       "回写按运行粒度蒸馏（任务、工具、成败、教训），不含中间轨迹全文。",
+    ],
+  },
+  {
+    id: "history_mode",
+    label: "历史",
+    reality: "full",
+    summary:
+      "跨轮历史回放模式：捕获每次运行的工具调用（action→observation 配对），下一轮按列的档位渲染回 assistant 历史文本；检验「模型看见上一轮过程」对追问与纠错的影响。",
+    controls:
+      "捕获端始终存全量（tool_rounds），渲染端在执行边界按 config.history_mode 裁剪：minimal 与旧行为逐字节一致；tool_summary 每次调用一行；full 附参数与结果（结果沿用事件流 8000 字截断）。",
+    options: [
+      {
+        value: "minimal",
+        label: "极简",
+        effect: "只回放裸问答对；工具过程不跨轮（历史行为，默认）。",
+      },
+      {
+        value: "tool_summary",
+        label: "工具摘要",
+        effect: "上一轮每次工具调用在答案后附一行「工具(参数) → 结果摘要」。",
+      },
+      {
+        value: "full",
+        label: "全量",
+        effect: "上一轮每次工具调用附完整参数与结果文本块（单轮总量 32k 字符封顶）。",
+      },
+    ],
+    path: [
+      "捕获走事件流重建（extractToolRounds 按 pipeline 列配对 action/observation），不改 AgentDriver 契约；观察结果保真上限 = UI 显示的 8000 字截断。",
+      "渲染为 assistant 文本附录而非结构化 tool 消息：旧轮次工具本就不可续调，文本保持 wire 层 user/assistant 严格交替校验不变。",
+      "线程、Arena 列会话、builder 会话三条链路共享同一存储与渲染语义；fork 子代理继承父列渲染后的历史。",
+    ],
+    langChain: "历史在执行边界统一渲染后才进各框架，五个 driver 无差别。",
+    langGraph: "历史在执行边界统一渲染后才进各框架，五个 driver 无差别。",
+    modules: [
+      "packages/contracts/contracts/src/history-mode.ts · extractToolRounds / renderToolActivity",
+      "packages/agent/agent/src/history-render.ts · renderHistoryForMode（执行边界）",
+      "packages/application/application/src/thread-store.ts · appendTurn（线程捕获）",
+      "apps/web/src/app/arena/useColumnSessions.ts · pushColumnTurn（客户端捕获）",
+    ],
+    baselineTip: "同题两轮：第一轮让模型跑工具，第二轮追问「刚才第一步做了什么」，对比 minimal（答不上）与 tool_summary/full（能引用）的差异。",
+    caveats: [
+      "tool_rounds 捕获在运行成功后提交；失败轮不落盘，与转写本的原子提交语义一致。",
+      "full 模式的工具结果是事件流回放，不等于模型当时真实看到的全文（超长结果已被截断）。",
+      "切换档位不丢数据：存储始终是全量超集，下一轮按当前列档位重新渲染。",
     ],
   },
 ];

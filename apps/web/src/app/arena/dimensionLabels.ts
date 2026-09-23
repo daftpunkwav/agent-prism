@@ -28,6 +28,7 @@ const FIELD_TO_DIMENSION: Record<string, string> = {
   skill_policy: "skill",
   orchestration: "orchestration",
   memory: "memory",
+  history_mode: "history_mode",
 };
 
 /** Baseline-only fields (no dimension id) with translatable option labels. */

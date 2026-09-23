@@ -47,6 +47,7 @@ export const builder = {
   slotMcp: "MCP",
   slotSkill: "Skills",
   slotOrchestration: "Orchestration",
+  slotHistoryMode: "History",
   applySwap: "Apply hot-swap",
   dirty: "Unapplied changes",
   swapBlocked: "Cannot swap while a turn is running",
@@ -156,5 +157,8 @@ export const builder = {
     goal_first: "Goal first",
     auto: "Auto",
     unless_trusted: "Unless trusted",
+    minimal: "Minimal history",
+    tool_summary: "Tool summary",
+    full_history: "Full history",
   },
 };

@@ -50,6 +50,9 @@ export type {
 export type { ComparisonReport as ComparisonReportPayload } from "@agentprism/contracts";
 // Run-log read view + envelope: contract single source (contracts/run-logs), consumed by the frontend through this outlet.
 export type { ColumnLogs, LlmWireRecord, WireLogEntry } from "@agentprism/contracts";
+// History-mode capture helpers: contract single source (contracts/history-mode), used by arena session accumulation.
+export { extractToolRounds, renderToolActivity } from "@agentprism/contracts";
+export type { ToolRound, HistoryMode } from "@agentprism/contracts";
 
 /** Builder contracts: block composition, sessions, trace entries, stream chunks. */
 export type {

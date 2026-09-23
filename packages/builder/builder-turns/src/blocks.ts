@@ -16,6 +16,7 @@ import type { ToolDefinition } from "@agentprism/contracts";
 import {
   ContextStrategySchema,
   HarnessLevelSchema,
+  HistoryModeSchema,
   McpPolicySchema,
   MemoryPolicySchema,
   OrchestrationModeSchema,
@@ -71,6 +72,9 @@ const DESCRIPTIONS: Record<string, string> = {
   goal_first: "Seed a tracked objective before coding",
   auto: "Auto-approve non-catastrophic tool calls",
   unless_trusted: "Also require known-safe shell commands",
+  history_minimal: "Replay bare Q/A pairs only (no tool trace)",
+  history_tool_summary: "Append one summary line per past tool call",
+  history_full: "Append full past tool args and results",
 };
 
 function describe(value: string): string {
@@ -122,6 +126,14 @@ export const CAPABILITY_GROUPS: ReadonlyArray<{
   {
     block: "orchestration",
     options: fromEnum(OrchestrationModeSchema),
+  },
+  {
+    block: "history_mode",
+    options: HistoryModeSchema.options.map((value) => ({
+      value,
+      label: value,
+      description: describe(`history_${value}`),
+    })),
   },
 ];
 

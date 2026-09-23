@@ -107,6 +107,7 @@ export function compositionToPipelineConfig(
     sandbox_mode: composition.sandbox_mode,
     orchestration: composition.orchestration,
     memory: composition.memory,
+    history_mode: composition.history_mode,
     prompt_version: "v1.0.0",
     label,
   };
@@ -150,6 +151,7 @@ const COMPARABLE_FIELDS = [
   "skill_policy",
   "orchestration",
   "memory",
+  "history_mode",
   "approval_mode",
   "sandbox_mode",
 ] as const;

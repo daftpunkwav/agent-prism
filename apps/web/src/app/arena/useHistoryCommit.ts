@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ColumnState } from "@agentprism/arena-view";
 import { extractFinalAnswer } from "@agentprism/arena-view";
+import { extractToolRounds, type ToolRound } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 
 /** Commits settled column turns into per-column chat history plus workspace memory. */
@@ -20,7 +21,7 @@ export function useHistoryCommit(options: {
   allSettled: boolean;
   columns: Record<string, ColumnState>;
   columnList: ColumnState[];
-  pushColumnTurn: (label: string, question: string, answer: string) => void;
+  pushColumnTurn: (label: string, question: string, answer: string, toolRounds?: ToolRound[]) => void;
   rememberWorkspace: (label: string, workspace: string) => void;
   /** Post-commit coordination (upstream clears the input box). */
   onCommitted: () => void;
@@ -46,7 +47,7 @@ export function useHistoryCommit(options: {
       if (!col.metrics && !col.error) continue;
       const extracted = extractFinalAnswer(col.events);
       const answer = extracted || col.error || t("arena.history.noReply");
-      pushColumnTurn(col.label, pending.question, answer);
+      pushColumnTurn(col.label, pending.question, answer, extractToolRounds(col.events));
       if (col.workspace) rememberWorkspace(col.label, col.workspace);
     }
     onCommitted();

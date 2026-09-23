@@ -61,6 +61,7 @@ describe("useHistoryCommit", () => {
       "col-failed",
       "Explain recursion",
       "Connection dropped",
+      [],
     );
     expect(onCommitted).toHaveBeenCalled();
   });

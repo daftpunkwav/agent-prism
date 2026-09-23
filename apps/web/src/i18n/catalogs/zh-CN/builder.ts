@@ -47,6 +47,7 @@ export const builder = {
   slotMcp: "MCP",
   slotSkill: "技能",
   slotOrchestration: "编排",
+  slotHistoryMode: "历史",
   applySwap: "应用热切换",
   dirty: "有未应用的修改",
   swapBlocked: "回合运行中，暂不可切换",
@@ -156,5 +157,8 @@ export const builder = {
     goal_first: "先立目标",
     auto: "自动",
     unless_trusted: "受信命令",
+    minimal: "极简历史",
+    tool_summary: "工具摘要",
+    full_history: "全量历史",
   },
 };

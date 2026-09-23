@@ -11,7 +11,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { MAX_COLUMN_SESSION_MESSAGES, MAX_HISTORY_CHARS, type ChatMessage, type ColumnSession } from "@agentprism/client";
+import { MAX_COLUMN_SESSION_MESSAGES, MAX_HISTORY_CHARS, type ChatMessage, type ColumnSession, type ToolRound } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 
 export type ColumnSessionState = {
@@ -54,23 +54,30 @@ export function useColumnSessions() {
   const t = useT();
   const [sessions, setSessions] = useState<Record<string, ColumnSessionState>>({});
 
-  const pushColumnTurn = useCallback((label: string, question: string, answer: string) => {
-    setSessions((prev) => {
-      const current = prev[label] ?? { messages: [] };
-      const nextMessages: ChatMessage[] = [
-        ...current.messages,
-        { role: "user", content: question },
-        { role: "assistant", content: clipAnswer(answer || t("arena.history.noReply")) },
-      ];
-      return {
-        ...prev,
-        [label]: {
-          ...current,
-          messages: trimToBudget(nextMessages, question),
-        },
-      };
-    });
-  }, [t]);
+  const pushColumnTurn = useCallback(
+    (label: string, question: string, answer: string, toolRounds?: ToolRound[]) => {
+      setSessions((prev) => {
+        const current = prev[label] ?? { messages: [] };
+        const nextMessages: ChatMessage[] = [
+          ...current.messages,
+          { role: "user", content: question },
+          {
+            role: "assistant",
+            content: clipAnswer(answer || t("arena.history.noReply")),
+            ...(toolRounds !== undefined && toolRounds.length > 0 ? { tool_rounds: toolRounds } : {}),
+          },
+        ];
+        return {
+          ...prev,
+          [label]: {
+            ...current,
+            messages: trimToBudget(nextMessages, question),
+          },
+        };
+      });
+    },
+    [t],
+  );
 
   const rememberWorkspace = useCallback((label: string, workspace: string) => {
     if (workspace.trim() === "") return;
