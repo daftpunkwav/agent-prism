@@ -278,6 +278,10 @@ export async function* runAgentExecution(
     idGenerator: deps.idGenerator,
     existingName: spec.existingWorkspaceName,
   });
+  // The traces for this run land under its own runId while a reused workspace's
+  // root stays under the FIRST run's directory; the marker is the disk-level
+  // link the logs read side merges across turns on.
+  deps.workspaceRegistry.associateTrace(spec.runId, workspaceName);
   const tracker = new TokenTracker({
     contextWindow: spec.columnRuntime.contextWindow,
     maxInputTokens: spec.columnRuntime.maxInputTokens,

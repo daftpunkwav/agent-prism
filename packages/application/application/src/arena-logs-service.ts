@@ -130,27 +130,38 @@ export class ArenaLogsService {
   }
 
   /**
-   * Reads one column's logs for the run that owns the given (resident) workspace.
-   * Unknown workspaces yield an empty result rather than 404: the logs page polls
-   * while columns are still starting and their workspace is not registered yet.
+   * Reads one column's logs across EVERY run that hosted the given workspace.
+   * A follow-up turn reuses the resident workspace (its root stays under the
+   * first run's directory) while each run appends observability streams beside
+   * its own runId, so a single-runId read would pin the page to turn 1 forever.
+   * Rows from all run directories merge in chronological order (event timestamp /
+   * wire ts), then the caps apply to the merged tail. Unknown workspaces yield an
+   * empty result rather than 404: the logs page polls while columns are still
+   * starting and their workspace is not registered yet.
    */
   columnLogs(workspaceName: string, label: string): ColumnLogs {
-    const runId = this.deps.workspaceRegistry.runIdOf(workspaceName);
-    if (runId === null) return emptyLogs(workspaceName, label);
-    let traceDir: string;
-    try {
-      traceDir = this.deps.workspaceRegistry.traceDir(runId);
-    } catch {
-      return emptyLogs(workspaceName, label);
+    const traceDirs = this.deps.workspaceRegistry.traceDirsForWorkspace(workspaceName);
+    if (traceDirs.length === 0) return emptyLogs(workspaceName, label);
+    const eventRows: ArenaEvent[] = [];
+    const wireRows: WireLogEntry[] = [];
+    let truncated = false;
+    for (const traceDir of traceDirs) {
+      const events = readJsonlTail<ArenaEvent>(join(traceDir, eventLogFileName(label)), MAX_EVENTS);
+      const wire = readJsonlTail<WireLogEntry>(join(traceDir, wireLogFileName(label)), MAX_WIRE);
+      eventRows.push(...events.rows);
+      wireRows.push(...wire.rows);
+      truncated = truncated || events.truncated || wire.truncated;
     }
-    const events = readJsonlTail<ArenaEvent>(join(traceDir, eventLogFileName(label)), MAX_EVENTS);
-    const wire = readJsonlTail<WireLogEntry>(join(traceDir, wireLogFileName(label)), MAX_WIRE);
+    eventRows.sort((a, b) => a.timestamp - b.timestamp);
+    wireRows.sort((a, b) => a.ts - b.ts);
+    const mergedEvents = eventRows.length > MAX_EVENTS ? eventRows.slice(-MAX_EVENTS) : eventRows;
+    const mergedWire = wireRows.length > MAX_WIRE ? wireRows.slice(-MAX_WIRE) : wireRows;
     return {
       workspace: workspaceName,
       label,
-      events: events.rows,
-      wire: wire.rows,
-      truncated: events.truncated || wire.truncated,
+      events: mergedEvents,
+      wire: mergedWire,
+      truncated: truncated || eventRows.length > MAX_EVENTS || wireRows.length > MAX_WIRE,
     };
   }
 }

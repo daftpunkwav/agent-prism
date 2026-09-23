@@ -8,7 +8,7 @@
  * - Protect in-run workspaces from eviction
  */
 
-import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { cp } from "node:fs/promises";
 import path from "node:path";
 import type { Clock } from "@agentprism/contracts";
@@ -197,6 +197,62 @@ export class WorkspaceRegistry {
     }
     mkdirSync(dir, { recursive: true });
     return dir;
+  }
+
+  /**
+   * Every run's `_traces` directory hosting the named workspace, oldest first.
+   * A follow-up turn reuses the resident workspace (whose root stays under the
+   * FIRST run's directory) while each run appends observability streams beside
+   * its own runId, so the log read side must merge across run directories. A run
+   * with no workspace copy on disk is linked by its `associateTrace` marker.
+   * Stateless disk scan: correct after restarts, no registry bookkeeping to drift.
+   */
+  traceDirsForWorkspace(name: string): string[] {
+    if (!isSafeWorkspaceSegment(name)) return [];
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = readdirSync(this.runsRoot, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+    const resolvedRunsRoot = path.resolve(this.runsRoot);
+    const found: Array<{ dir: string; mtime: number }> = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !isSafeWorkspaceSegment(entry.name)) continue;
+      const runDir = path.resolve(this.runsRoot, entry.name);
+      const workspaceRoot = path.join(runDir, name);
+      const marker = path.join(runDir, "_traces", `${name}.ws`);
+      if (!existsSync(workspaceRoot) && !existsSync(marker)) continue;
+      const traceDir = path.join(runDir, "_traces");
+      if (!existsSync(traceDir)) continue;
+      let mtime = 0;
+      try {
+        mtime = statSync(runDir).mtimeMs;
+      } catch {
+        // An unreadable run dir still contributes its traces; ordering degrades gracefully.
+      }
+      found.push({ dir: traceDir, mtime });
+    }
+    return found.sort((a, b) => a.mtime - b.mtime).map((f) => f.dir);
+  }
+
+  /**
+   * Links a run's observability stream to a workspace it ran in: drops an empty
+   * `<workspaceName>.ws` marker beside the run's trace files. Runs that reuse a
+   * resident workspace have no workspace copy under their own runId, so this
+   * marker is the only disk-level association the log read side can find later.
+   */
+  associateTrace(runId: string, workspaceName: string): void {
+    if (!isSafeWorkspaceSegment(workspaceName)) return;
+    const marker = path.join(this.traceDir(runId), `${workspaceName}.ws`);
+    if (!existsSync(marker)) {
+      try {
+        writeFileSync(marker, "", "utf-8");
+      } catch {
+        // Best-effort association: a failed marker write degrades the logs page
+        // for this run, never the run itself.
+      }
+    }
   }
 
   /**

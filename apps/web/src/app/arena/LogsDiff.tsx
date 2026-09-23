@@ -16,7 +16,7 @@
 
 import { memo, useState } from "react";
 import { ArrowLeftRight, Braces, FileJson, ScrollText } from "lucide-react";
-import type { ArenaEvent, LlmWireMessage, WireLogEntry } from "@agentprism/client";
+import type { ArenaEvent, WireLogEntry } from "@agentprism/client";
 import type { ColumnState } from "@agentprism/arena-view";
 import { useT } from "@/i18n/useT";
 import { useColumnLogs } from "./useColumnLogs";
@@ -50,15 +50,11 @@ function eventLine(event: ArenaEvent): string {
   return parts.join(" · ");
 }
 
-/** Role badge color for one wire message. */
-function roleColor(role: LlmWireMessage["role"]): string {
-  if (role === "system") return "var(--muted-foreground)";
-  if (role === "user") return "var(--chart-1)";
-  if (role === "assistant") return "var(--spectrum-2)";
-  return "var(--success)";
-}
-
-/** One request/response wire record block. */
+/**
+ * One request/response wire record block. The expansion renders the captured
+ * payload as-is (pretty-printed JSON) — the wire view is an inspection surface,
+ * so fidelity beats prettification.
+ */
 const WireEntry = memo(function WireEntry({ entry }: { entry: WireLogEntry }) {
   const t = useT();
   const { record } = entry;
@@ -76,15 +72,10 @@ const WireEntry = memo(function WireEntry({ entry }: { entry: WireLogEntry }) {
   }
   const isRequest = record.kind === "llm_request";
   const model = String(record.data.model ?? "");
-  const messages = Array.isArray(record.data.messages)
-    ? (record.data.messages as LlmWireMessage[])
-    : [];
-  const tools = Array.isArray(record.data.tools) ? (record.data.tools as string[]) : [];
+  const messages = Array.isArray(record.data.messages) ? record.data.messages : [];
   const usage = (record.data.usage ?? null) as { total_tokens?: number } | null;
-  const toolCalls = Array.isArray(record.data.tool_calls) ? (record.data.tool_calls as unknown[]) : [];
+  const toolCalls = Array.isArray(record.data.tool_calls) ? record.data.tool_calls : [];
   const durationMs = record.durationMs;
-  const text = isRequest ? "" : String(record.data.text ?? "");
-  const reasoning = String(record.data.reasoning ?? "");
   return (
     <details className="trace-seg trace-action" data-kind="wire" data-record={record.kind}>
       <summary className="trace-tag cursor-pointer select-none flex items-center gap-1.5 flex-wrap font-mono">
@@ -98,6 +89,9 @@ const WireEntry = memo(function WireEntry({ entry }: { entry: WireLogEntry }) {
         >
           {isRequest ? t("arena.logs.kindRequest") : t("arena.logs.kindResponse")}
         </span>
+        <span className="rounded-[var(--radius-sm)] border border-border px-1.5 py-0.5 text-muted-foreground">
+          t{entry.turn}
+        </span>
         <span className="text-foreground">{model}</span>
         <span className="text-muted-foreground">
           {isRequest
@@ -105,42 +99,9 @@ const WireEntry = memo(function WireEntry({ entry }: { entry: WireLogEntry }) {
             : `${toolCalls.length > 0 ? `${t("arena.logs.toolCallsCount", { count: toolCalls.length })} · ` : ""}${usage?.total_tokens ? `${t("arena.logs.tokensCount", { count: usage.total_tokens })} · ` : ""}${durationMs !== null ? `${durationMs}ms` : ""}`}
         </span>
       </summary>
-      <div className="mt-2 space-y-2">
-        {!isRequest && text !== "" && (
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-none border border-border bg-muted/40 p-2 text-[11px] leading-relaxed">
-            {clipField(text)}
-          </pre>
-        )}
-        {!isRequest && reasoning !== "" && (
-          <div>
-            <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-              {t("arena.logs.reasoning")}
-            </p>
-            <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-none border border-border bg-muted/40 p-2 text-[11px] text-muted-foreground">
-              {clipField(reasoning)}
-            </pre>
-          </div>
-        )}
-        {isRequest &&
-          messages.map((message, index) => (
-            <div key={index} className="flex gap-2">
-              <span
-                className="mt-0.5 h-fit shrink-0 rounded-[var(--radius-sm)] border px-1 py-0.5 text-[10px] font-mono uppercase"
-                style={{ borderColor: roleColor(message.role), color: roleColor(message.role) }}
-              >
-                {message.role}
-              </span>
-              <pre className="min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-none border border-border bg-muted/30 p-1.5 text-[11px] leading-relaxed text-muted-foreground max-h-40">
-                {clipField(message.content || (message.tool_calls.length > 0 ? JSON.stringify(message.tool_calls, null, 2) : ""))}
-              </pre>
-            </div>
-          ))}
-        {isRequest && tools.length > 0 && (
-          <p className="text-[11px] font-mono text-muted-foreground">
-            {t("arena.logs.toolsBound")}: {tools.join(", ")}
-          </p>
-        )}
-      </div>
+      <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-none border border-border bg-muted/30 p-2 text-[11px] leading-relaxed text-muted-foreground">
+        {clipField(JSON.stringify(record.data, null, 2))}
+      </pre>
     </details>
   );
 });
@@ -191,8 +152,9 @@ function ColumnLogsCard({
           <p className="text-[11px] italic text-muted-foreground">{t("arena.logs.emptyWire")}</p>
         ) : (
           <div className="space-y-1.5">
-            {logs.wire.map((entry) => (
-              <WireEntry key={entry.seq} entry={entry} />
+            {logs.wire.map((entry, index) => (
+              // seq restarts per run file; ts+seq+index stays unique across merged turns.
+              <WireEntry key={`${entry.ts}_${entry.seq}_${index}`} entry={entry} />
             ))}
           </div>
         )

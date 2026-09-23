@@ -10,12 +10,12 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { WorkspaceRegistry } from "@agentprism/runtime";
-import type { ArenaEvent } from "@agentprism/contracts";
+import { eventLogFileName, wireLogFileName, type ArenaEvent } from "@agentprism/contracts";
 import { RunTraceLogs } from "@agentprism/arena-runner";
 import { ArenaLogsService } from "@agentprism/application";
 
@@ -341,6 +341,69 @@ describe("ArenaLogsService column logs", () => {
       expect(order(logs.eventLogPath("LaneB"))).toEqual(Array.from({ length: total }, (_, i) => `b${i}`));
     } finally {
       await teardown();
+    }
+  });
+
+  it("merges logs across every run hosting the workspace, ordered by time", async () => {
+    // A follow-up turn reuses the resident workspace (root under run-1) while
+    // each run appends traces beside its own runId: the read must cover both.
+    const runsRoot = join(tmpdir(), `aprism-arena-logs-${randomUUID()}`);
+    const registry = new WorkspaceRegistry({ runsRoot, clock: { now: () => 0 } });
+    try {
+      const writeTrace = (runId: string, turn: number, ts: number, content: string) => {
+        const wsRoot = join(runsRoot, runId, "ws1");
+        const traceDir = join(runsRoot, runId, "_traces");
+        mkdirSync(wsRoot, { recursive: true });
+        mkdirSync(traceDir, { recursive: true });
+        const event = thoughtEvent(1, content);
+        writeFileSync(
+          join(traceDir, eventLogFileName("Lane")),
+          `${JSON.stringify({ ...event, timestamp: ts })}
+`,
+          "utf-8",
+        );
+        writeFileSync(
+          join(traceDir, wireLogFileName("Lane")),
+          `${JSON.stringify({
+            seq: 0,
+            ts,
+            turn,
+            record: { kind: "llm_request", title: `t${turn}`, data: { model: "m1", messages: [], tools: [] }, durationMs: null },
+          })}
+`,
+          "utf-8",
+        );
+      };
+      writeTrace("runaaa111111", 1, 100, "turn one");
+      writeTrace("runbbb222222", 2, 200, "turn two");
+      // A follow-up run that reused the resident workspace has no workspace copy
+      // under its own runId — only the associateTrace marker links it.
+      const reuseTrace = join(runsRoot, "runccc333333", "_traces");
+      mkdirSync(reuseTrace, { recursive: true });
+      writeFileSync(join(runsRoot, "runccc333333", "_traces", "ws1.ws"), "", "utf-8");
+      writeFileSync(
+        join(reuseTrace, wireLogFileName("Lane")),
+        `${JSON.stringify({
+          seq: 0,
+          ts: 300,
+          turn: 3,
+          record: { kind: "llm_request", title: "t3", data: { model: "m1", messages: [], tools: [] }, durationMs: null },
+        })}
+`,
+        "utf-8",
+      );
+
+      const service = new ArenaLogsService({ workspaceRegistry: registry });
+      const result = service.columnLogs("ws1", "Lane");
+      expect(result.wire.map((entry) => [entry.turn, entry.ts])).toEqual([
+        [1, 100],
+        [2, 200],
+        [3, 300],
+      ]);
+      expect(result.events.map((event) => event.content)).toEqual(["turn one", "turn two"]);
+      expect(result.truncated).toBe(false);
+    } finally {
+      rmSync(runsRoot, { recursive: true, force: true });
     }
   });
 });

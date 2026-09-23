@@ -30,7 +30,7 @@ const PENDING = [
   "staticDefaultRuntimeKnobs", "systemErrorEvent", "systemReportEvent",
   "tokenUpdateEvent",
   // packages/harness/harness
-  "MapPromptSectionRegistry", "applyCheckpointCompaction", "buildInitialMessages",
+  "MapPromptSectionRegistry", "applyCheckpointCompaction",
   "createBuiltinPromptSectionRegistry", "estimateMessageTokens", "extractOriginalQuestion",
   "getBuiltinPromptSectionRegistry", "injectToolResultReminder",
   "reinforceSystemWithQuestion", "withToolGrounding",
