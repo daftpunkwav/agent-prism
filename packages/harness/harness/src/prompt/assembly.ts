@@ -7,7 +7,7 @@
  * - Compose system/user prompts including cwd and workspace retrieval
  */
 
-import type { ChatMessage, LlmMessage, MemoryRecallResult } from "@agentprism/contracts";
+import type { ChatTurnMessage, LlmMessage, MemoryRecallResult } from "@agentprism/contracts";
 import { parseMentions, resolveMentionBlock, type MentionFileSystem } from "@agentprism/context-mentions";
 import { formatRetrievedSnippets } from "../context/messages.js";
 import { queryWorkspaceSnippets } from "../memory/rag.js";
@@ -49,17 +49,24 @@ export function renderMemoryBlock(memory: MemoryRecallResult | undefined | null)
 }
 
 /**
- * Builds the initial LlmMessage list: system + shared history + this turn's user.
- * Empty-text history entries are skipped.
+ * Builds the initial LlmMessage list: system + rendered history + this turn's user.
+ * History arrives already rendered per the column's history mode (full mode expands
+ * tool rounds into structured assistant/tool turns), so tool entries pass through
+ * verbatim; empty-text turns are skipped unless they carry tool calls (the shell).
  */
-export function buildInitialMessages(system: string, user: string, history?: ChatMessage[]): LlmMessage[] {
+export function buildInitialMessages(system: string, user: string, history?: ChatTurnMessage[]): LlmMessage[] {
   const messages: LlmMessage[] = [{ role: "system", content: system }];
   for (const message of history ?? []) {
+    if (message.role === "tool") {
+      messages.push({ role: "tool", content: message.content, toolCallId: message.toolCallId, name: message.name });
+      continue;
+    }
     const text = (message.content ?? "").trim();
-    if (text === "") continue;
+    const calls = message.role === "assistant" ? (message.toolCalls ?? []) : [];
+    if (text === "" && calls.length === 0) continue;
     messages.push(
       message.role === "assistant"
-        ? { role: "assistant", content: text }
+        ? { role: "assistant", content: text, ...(calls.length > 0 ? { toolCalls: calls } : {}) }
         : { role: "user", content: text },
     );
   }

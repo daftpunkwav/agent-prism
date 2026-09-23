@@ -905,7 +905,7 @@ const dimensions: DimDoc[] = [
     summary:
       "Cross-turn history replay modes: each run's tool calls (action→observation pairs) are captured and rendered back into assistant history text on the next turn, per the column's mode; tests whether the model seeing last turn's process changes follow-ups and correction.",
     controls:
-      "Capture always stores the full transcript superset (tool_rounds; oversized args keep a 2,000-char preview, like the 8,000-char result cap); rendering trims per config.history_mode at the execution boundary: minimal is byte-identical to the old behavior, tool_summary appends one line per call, full appends args + results.",
+      "Capture always stores the full transcript superset (tool_rounds; oversized args keep a 2,000-char preview, like the 8,000-char result cap); rendering shapes the replay per config.history_mode at the execution boundary: minimal keeps bare Q/A pairs, tool_summary appends a one-line digest per call, full expands the previous turn into structured messages (assistant(tool_calls args detail) → tool results → final answer).",
     options: [
       {
         value: "minimal",
@@ -920,12 +920,12 @@ const dimensions: DimDoc[] = [
       {
         value: "full",
         label: "Full",
-        effect: "Last turn's each tool call appends full args and result text blocks (32k chars per turn cap).",
+        effect: "Last turn expands into structured messages: assistant carrying tool_calls (args detail) → tool results → final answer (32k chars per turn cap).",
       },
     ],
     path: [
       "Capture rebuilds from the event stream (extractToolRounds pairs action/observation per pipeline column) with no AgentDriver contract change; result fidelity is capped at the same 8,000-char truncation the UI shows.",
-      "Rounds render as assistant-text appendices, never structured tool messages: past turns' tools cannot be re-called anyway, and text keeps the wire's strict user/assistant alternation validation untouched.",
+      "full's structured expansion happens only at the execution boundary: storage and the wire stay in the user/assistant + tool_rounds form, keeping the strict alternation validation untouched; tool_summary stays as answer-appendix text, visible in wire logs as part of the answer content.",
       "Threads, arena column sessions, and builder sessions share the same storage and rendering semantics; fork subagents inherit the parent's rendered history.",
     ],
     langChain: "History renders at the execution boundary before entering any framework; all five drivers behave identically.",

@@ -11,7 +11,7 @@
 
 import type {
   AgentIdentity,
-  ChatMessage,
+  ChatTurnMessage,
   Clock,
   LlmAdapter,
   MemoryRecallResult,
@@ -42,7 +42,7 @@ export interface AgentExecutionContext {
   identity: AgentIdentity;
   config: PipelineConfig;
   question: string;
-  history: ChatMessage[];
+  history: ChatTurnMessage[];
   /** 1-based multi-turn turn number. */
   turn: number;
   workspace: Workspace;

@@ -904,7 +904,7 @@ const dimensions: DimDoc[] = [
     summary:
       "跨轮历史回放模式：捕获每次运行的工具调用（action→observation 配对），下一轮按列的档位渲染回 assistant 历史文本；检验「模型看见上一轮过程」对追问与纠错的影响。",
     controls:
-      "捕获端始终存全量转写超集（tool_rounds；超长参数保留 2000 字 preview，与结果 8000 字截断同理），渲染端在执行边界按 config.history_mode 裁剪：minimal 与旧行为逐字节一致；tool_summary 每次调用一行；full 附参数与结果。",
+      "捕获端始终存全量转写超集（tool_rounds；超长参数保留 2000 字 preview，与结果 8000 字截断同理），渲染端在执行边界按 config.history_mode 裁剪：minimal 仅裸问答对；tool_summary 在答案后附每次调用一行摘要；full 把上一轮展开为结构化消息（assistant(tool_calls 参数详情) → tool 结果 → 最终回复）。",
     options: [
       {
         value: "minimal",
@@ -919,12 +919,12 @@ const dimensions: DimDoc[] = [
       {
         value: "full",
         label: "全量",
-        effect: "上一轮每次工具调用附完整参数与结果文本块（单轮总量 32k 字符封顶）。",
+        effect: "上一轮展开为结构化消息：assistant 带工具调用参数（tool_calls）→ tool 结果 → 最终回复（单轮总量 32k 字符封顶）。",
       },
     ],
     path: [
       "捕获走事件流重建（extractToolRounds 按 pipeline 列配对 action/observation），不改 AgentDriver 契约；观察结果保真上限 = UI 显示的 8000 字截断。",
-      "渲染为 assistant 文本附录而非结构化 tool 消息：旧轮次工具本就不可续调，文本保持 wire 层 user/assistant 严格交替校验不变。",
+      "full 的结构化展开只发生在执行边界：存储与 wire 仍是 user/assistant + tool_rounds 形态，严格交替校验不变；tool_summary 保持答案附录文本，报文/日志里以答案内容形式可见。",
       "线程、Arena 列会话、builder 会话三条链路共享同一存储与渲染语义；fork 子代理继承父列渲染后的历史。",
     ],
     langChain: "历史在执行边界统一渲染后才进各框架，五个 driver 无差别。",

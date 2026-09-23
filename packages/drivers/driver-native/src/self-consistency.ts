@@ -12,7 +12,7 @@
  * never sees earlier attempts' transcripts.
  */
 
-import type { ArenaEvent, ChatMessage, LlmAssistantMessage, LlmMessage, ToolDefinition } from "@agentprism/contracts";
+import type { ArenaEvent, ChatTurnMessage, LlmAssistantMessage, LlmMessage, ToolDefinition } from "@agentprism/contracts";
 import { extractAnswerFromEvents } from "@agentprism/contracts";
 import { buildInitialMessages, type AgentExecutionContext } from "@agentprism/harness";
 import { selfConsistencyAttempts, selfConsistencyOutcomeEvents } from "@agentprism/driver-registry";
@@ -39,7 +39,7 @@ export async function* runSelfConsistencyLoop(args: {
   context: AgentExecutionContext;
   system: string;
   user: string;
-  history?: ChatMessage[];
+  history?: ChatTurnMessage[];
   maxSteps: number;
   stats: { step: number; turns: number; toolCalls: number };
   retrieveSnippets: (query: string) => string;

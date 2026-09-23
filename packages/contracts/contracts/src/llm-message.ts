@@ -48,6 +48,9 @@ export interface LlmToolMessage {
 /** One message in an LlmAdapter / harness conversation. */
 export type LlmMessage = LlmSystemMessage | LlmUserMessage | LlmAssistantMessage | LlmToolMessage;
 
+/** Rendered conversation history (everything but the leading system turn, which buildInitialMessages owns). */
+export type ChatTurnMessage = LlmUserMessage | LlmAssistantMessage | LlmToolMessage;
+
 interface ContentBlockLike {
   type?: unknown;
   text?: unknown;
