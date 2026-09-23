@@ -333,6 +333,7 @@ export const arena = {
   },
   stream: {
     runError: "运行错误",
+    disconnected: "连接在所有列结束前中断，请重新发起提问",
   },
   ws: {
     empty: "运行实验后，Agent 工作空间会显示在这里",

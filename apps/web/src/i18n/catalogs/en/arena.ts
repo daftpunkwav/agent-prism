@@ -334,6 +334,7 @@ export const arena = {
   },
   stream: {
     runError: "Run error",
+    disconnected: "Connection lost before every column finished; run the question again",
   },
   ws: {
     empty: "Agent workspace files appear here after a run",

@@ -171,6 +171,27 @@ describe("ArenaClient run orchestration", () => {
     });
   });
 
+  it("surfaces an error when the stream ends before every column settles", async () => {
+    scriptStream();
+    const input = await renderAndType("connection drops");
+    fireEvent.click(screen.getByRole("button", { name: en().action.run }));
+    await waitFor(() => expect(streamMock).toHaveBeenCalledOnce());
+    // Only the first column settles; the SSE body then ends normally (the
+    // connection dropped mid-run without a transport error).
+    act(() => {
+      emit?.({ type: "complete", pipeline: "Native", metrics: METRICS } as unknown as ArenaEvent);
+    });
+    await act(async () => {
+      settle?.();
+    });
+
+    // The disconnect is surfaced instead of the run ending silently, the composer
+    // unlocks, and the question stays in the box (the turn is not committed).
+    await waitFor(() => expect(screen.getByText(en().stream.disconnected)).toBeDefined());
+    expect((screen.getByLabelText(en().composer.questionAria) as HTMLInputElement).disabled).toBe(false);
+    expect((input as HTMLInputElement).value).toBe("connection drops");
+  });
+
   it("pops an inline ask window inside its column and answers it", async () => {
     scriptStream();
     await renderAndType("need input");

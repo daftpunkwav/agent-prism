@@ -325,6 +325,7 @@ export function useArenaStream() {
           setRunning(false);
         }
       };
+      const runResult: RunResult = { aborted: false, failed: false };
       try {
         await streamArenaRun({
           question,
@@ -351,7 +352,7 @@ export function useArenaStream() {
           attachments,
           language,
         });
-        return { aborted: false, failed: false };
+        return runResult;
       } catch (err) {
         if (isAbortError(err) || signal.aborted) {
           // User-initiated cancellation: not a failure; upstream clears pending and stops accordingly
@@ -365,6 +366,21 @@ export function useArenaStream() {
         if (runSeqRef.current === seq) {
           setPendingAsks({});
           setRunning(false);
+        }
+        // The SSE body ended (no thrown error) but not every expected column
+        // settled: the connection dropped mid-run (server crash, proxy timeout,
+        // network break). Surface it instead of leaving the columns hanging
+        // without a verdict, and fail the run so the pending turn is not
+        // committed from a partial stream. Only the clean-end return object is
+        // touched; aborts and thrown errors already carry their own outcome.
+        if (
+          !signal.aborted &&
+          expectedLabels.size > 0 &&
+          settledLabels.size < expectedLabels.size &&
+          runSeqRef.current === seq
+        ) {
+          setError(t("arena.stream.disconnected"));
+          runResult.failed = true;
         }
       }
     },
