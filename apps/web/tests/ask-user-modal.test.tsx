@@ -104,6 +104,25 @@ describe("AskUserModal", () => {
     expect(inline.onClose).not.toHaveBeenCalled();
   });
 
+  /**
+   * Regression (stale Escape closure): after q1 is answered, Escape must skip
+   * only the still-unanswered questions. With `answered` missing from the
+   * keydown effect deps, the handler captured the initial empty set and
+   * re-submitted "" over q1's already-delivered answer.
+   */
+  it("escape after a partial submit does not overwrite the submitted answer", async () => {
+    const { onAnswer, onClose } = renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "yes" }));
+    await waitFor(() => expect(onAnswer).toHaveBeenCalledWith("q1", "yes"));
+    await screen.findByText(getCatalog("en").common.askAnswered);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    // q2 is skipped explicitly; q1's delivered answer is never resent as "".
+    expect(onAnswer).toHaveBeenCalledWith("q2", "");
+    expect(onAnswer).not.toHaveBeenCalledWith("q1", "");
+    expect(onAnswer).toHaveBeenCalledTimes(2);
+  });
+
   it("disables every control while an answer is in flight", () => {
     renderModal({ submitting: true });
     expect((screen.getAllByRole("button", { name: "yes" })[0] as HTMLButtonElement).disabled).toBe(true);

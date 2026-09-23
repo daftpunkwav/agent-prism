@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmMessage, LlmStreamPart } from "@agentprism/contracts";
 import { extractAnswerFromEvents, PipelineConfigSchema } from "@agentprism/contracts";
 import { RagStoreCache } from "@agentprism/harness";
-import type { AgentExecutionContext } from "@agentprism/harness";
+import { assessToolRelevance, type AgentExecutionContext } from "@agentprism/harness";
 import { MapToolRegistry } from "@agentprism/tool-registry";
 import { TokenTracker } from "@agentprism/telemetry";
 import { SystemClock } from "@agentprism/runtime";
@@ -46,6 +46,24 @@ function contextWith(llm: LlmAdapter, reasoning: string): AgentExecutionContext 
   } as AgentExecutionContext;
 }
 
+/** Scripted LLM: first call streams a tool call, the second settles the attempt with text. */
+function toolThenTextLlm(toolName: string, args: Record<string, unknown>): LlmAdapter {
+  let streamAt = 0;
+  return {
+    async invoke(): Promise<LlmInvokeResult> {
+      return { text: "", toolCalls: [] };
+    },
+    async *stream(): AsyncGenerator<LlmStreamPart> {
+      streamAt += 1;
+      if (streamAt === 1) {
+        yield { toolCalls: [{ id: "c1", name: toolName, args }] };
+      } else {
+        yield { text: "final answer" };
+      }
+    },
+  };
+}
+
 async function collect(driver: NativeDriver, ctx: AgentExecutionContext): Promise<ArenaEvent[]> {
   const events: ArenaEvent[] = [];
   for await (const event of driver.run(ctx)) events.push(event);
@@ -68,6 +86,45 @@ describe("NativeDriver self_consistency", () => {
       expect(lastThought?.content).toBe("A");
       const complete = events.find((event) => event.type === "complete");
       expect(complete?.metrics?.success).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  /**
+   * Regression (prior-tool-names timing): prior names must be collected BEFORE
+   * the current response is pushed onto the message list. If the response is
+   * pushed first, the attempt's own call names read as prior history and the
+   * drift guard blocks the very first tool call of the attempt.
+   */
+  it("executes the attempt's first tool call: prior names exclude the current response", async () => {
+    // Sanity pin on the guard itself: these inputs must be rejected only when
+    // the current call's own name leaks into prior history. If the heuristic
+    // changes, this assertion flags it instead of letting the wiring regression
+    // below pass silently.
+    const question = "alpha beta gamma delta epsilon zeta iota kappa";
+    const args = { z: "x".repeat(40) };
+    expect(assessToolRelevance(question, "bash", args, ["bash"]).allowed).toBe(false);
+    expect(assessToolRelevance(question, "bash", args, []).allowed).toBe(true);
+
+    vi.stubEnv("ARENA_SELF_CONSISTENCY_N", "1");
+    try {
+      const execute = vi.fn(async () => ({ result: "tool ran", fileDiff: null, ok: true }));
+      // Guarded harness (anything but "bare"): the drift guard is active, so a
+      // wrongly-collected prior list would block this exact call.
+      const ctx = contextWith(toolThenTextLlm("bash", args), "self_consistency");
+      ctx.config = PipelineConfigSchema.parse({ label: "col", harness: "verify", max_steps: 8, reasoning: "self_consistency" });
+      ctx.question = question;
+      (ctx.tools.names as Set<string>).add("bash");
+      ctx.tools.execute = execute;
+      const events = await collect(new NativeDriver(), ctx);
+      // The call ran: the executor saw an empty prior-name list.
+      expect(execute).toHaveBeenCalledTimes(1);
+      const types = events.map((event) => event.type);
+      expect(types).toContain("action");
+      expect(types).toContain("observation");
+      const action = events.find((event) => event.type === "action");
+      expect(action?.tool).toBe("bash");
     } finally {
       vi.unstubAllEnvs();
     }
