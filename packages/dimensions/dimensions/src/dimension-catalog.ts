@@ -21,6 +21,7 @@ import { MCP_OPTIONS } from "./dimensions/mcp.js";
 import { SKILL_POLICY_OPTIONS } from "./dimensions/skill.js";
 import { ORCHESTRATION_OPTIONS } from "./dimensions/orchestration.js";
 import { MEMORY_OPTIONS } from "./dimensions/memory.js";
+import { HISTORY_MODE_OPTIONS } from "./dimensions/history-mode.js";
 
 /** Static fallback options per dimension.
  *  Capability dims (prompt/reasoning/context/harness/toolset) start empty and are
@@ -43,6 +44,7 @@ const STATIC_DIMENSION_OPTIONS: Record<DimensionId, DimensionOptionTriple[]> = {
   skill: SKILL_POLICY_OPTIONS,
   orchestration: ORCHESTRATION_OPTIONS,
   memory: MEMORY_OPTIONS,
+  history_mode: HISTORY_MODE_OPTIONS,
 };
 
 /** Pipeline defaults (the controlled-variable baseline; endpoint/decode fields are injected from Provider at runtime). */
@@ -61,6 +63,7 @@ const STATIC_DEFAULT_BASE: Record<string, string | number> = {
   sandbox_mode: "off",
   orchestration: "direct",
   memory: "none",
+  history_mode: "minimal",
 };
 
 /** Registry of experiment dimensions and their selectable options. */

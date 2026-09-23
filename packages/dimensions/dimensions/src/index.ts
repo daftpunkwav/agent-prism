@@ -17,3 +17,4 @@ export { MCP_OPTIONS } from "./dimensions/mcp.js";
 export { SKILL_POLICY_OPTIONS } from "./dimensions/skill.js";
 export { ORCHESTRATION_OPTIONS } from "./dimensions/orchestration.js";
 export { MEMORY_OPTIONS } from "./dimensions/memory.js";
+export { HISTORY_MODE_OPTIONS } from "./dimensions/history-mode.js";

@@ -82,6 +82,7 @@ export const FIELD_LABELS: Record<string, string> = {
   skill_policy: "Skill",
   orchestration: "Orchestration",
   memory: "Memory",
+  history_mode: "History",
 };
 
 /** Dimension id → purpose description (subtitle of the dimension card in the Arena UI). */
@@ -100,6 +101,7 @@ export const FIELD_SUBTITLES: Record<string, string> = {
   skill: "Off disables the skill tool, on-demand loads via skill tool, preloaded injects runbooks into the prompt",
   orchestration: "Direct runs free-form; plan-first seeds a plan doc, goal-first seeds a tracked objective",
   memory: "Mounts cross-session memory into the prompt; none vs episodic vs semantic vs full changes what the model recalls",
+  history_mode: "Cross-turn replay: minimal bare Q/A vs one-line tool summary vs full args + results appended to past answers",
 };
 
 /** Config field name → display name (used by presentation layers such as reports and narratives). */
@@ -118,6 +120,7 @@ export const FIELD_NAME_LABELS: Record<string, string> = {
   skill_policy: "Skill",
   orchestration: "Orchestration",
   memory: "Memory",
+  history_mode: "History",
 };
 
 /** Baseline UI grouping (pipeline / decode / access). */
@@ -135,6 +138,7 @@ export const FIELD_GROUP: Record<string, string> = {
   sandbox_mode: "pipeline",
   orchestration: "pipeline",
   memory: "pipeline",
+  history_mode: "pipeline",
   temperature: "decode",
   top_p: "decode",
   frequency_penalty: "decode",

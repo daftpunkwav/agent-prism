@@ -129,6 +129,7 @@ export function buildPipelineBase(
     sandbox_mode: base.sandbox_mode ?? "off",
     orchestration: base.orchestration ?? "direct",
     memory: base.memory ?? "none",
+    history_mode: base.history_mode ?? "minimal",
     endpoint_id: endpoint.id,
     model_id: endpoint.model,
     thinking_capable: endpoint.thinking_capable,
@@ -204,6 +205,7 @@ function toPipelineConfig(data: Record<string, unknown>): PipelineConfig {
     sandbox_mode: data.sandbox_mode as PipelineConfig["sandbox_mode"],
     orchestration: data.orchestration as PipelineConfig["orchestration"],
     memory: data.memory as PipelineConfig["memory"],
+    history_mode: data.history_mode as PipelineConfig["history_mode"],
     prompt_version: data.prompt_version as PipelineConfig["prompt_version"],
     label: data.label as PipelineConfig["label"],
   };
