@@ -134,4 +134,31 @@ describe("createLlmWireTraceHandler", () => {
     expect(records[0]?.kind).toBe("llm_error");
     expect((records[0]?.data as { error: string }).error).toBe("boom");
   });
+
+  it("records the per-call streaming mode over the constructor-params snapshot", () => {
+    const records: LlmWireRecord[] = [];
+    const handler = createLlmWireTraceHandler({
+      sink: collect(records),
+      now: () => 1_000,
+      boundToolNames: () => [],
+    });
+    const serialized = { lc: 1, type: "constructor", id: ["ChatOpenAI"], kwargs: { model: "test-model" } } as never;
+    const messages = [[new HumanMessage("hello")]];
+
+    handler.handleChatModelStart?.(serialized, messages, "run-s", undefined, {
+      invocation_params: { model: "test-model", stream: false },
+    });
+    handler.handleChatModelStart?.(serialized, messages, "run-t", undefined, {
+      invocation_params: { model: "test-model", stream: false },
+    }, undefined, { wire_stream: true });
+    handler.handleChatModelStart?.(serialized, messages, "run-f", undefined, {
+      invocation_params: { model: "test-model", stream: false },
+    }, undefined, { wire_stream: false });
+
+    const requests = records.filter((r) => r.kind === "llm_request");
+    expect(requests).toHaveLength(3);
+    // No marker: the SDK snapshot stands. Marker: the true per-call mode wins.
+    const streams = requests.map((r) => (r.data as { params: { stream: unknown } }).params.stream);
+    expect(streams).toEqual([false, true, false]);
+  });
 });

@@ -259,7 +259,7 @@ export function createLlmWireTraceHandler(options: LlmWireTraceHandlerOptions): 
       _parentRunId?: string,
       extraParams?: Record<string, unknown>,
       _tags?: string[],
-      _metadata?: Record<string, unknown>,
+      metadata?: Record<string, unknown>,
     ): void {
       try {
         const model = modelFromSerialized(serialized);
@@ -287,6 +287,13 @@ export function createLlmWireTraceHandler(options: LlmWireTraceHandlerOptions): 
         backfill("temperature", ["temperature"]);
         backfill("top_p", ["topP", "top_p"]);
         backfill("max_tokens", ["maxTokens", "max_tokens", "maxCompletionTokens"]);
+        // The snapshot's stream flag is a constructor-params artifact: LangChain
+        // picks the streaming transport per call (Runnable.stream adds stream:true
+        // at the vendor client layer). The adapter stamps the true mode per call;
+        // framework calls without the marker keep the snapshot (accurate: those
+        // paths invoke non-streaming).
+        const wireStream = asRecord(metadata).wire_stream;
+        if (typeof wireStream === "boolean") params.stream = wireStream;
         options.sink({
           kind: "llm_request",
           title: `LLM request → ${model} (${flat.length} messages, tools: ${boundTools.join(", ") || "none"})`,
