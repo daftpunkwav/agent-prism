@@ -2,8 +2,7 @@
 
 `apps/server/src/assemble.ts` is the only composition root in the repository. It is the
 only place that may construct the driver registry, call `registerDriversBestEffort`, and
-mount the `register*Routes` leaves. `bootstrap.ts` is a deprecated alias that re-exports
-`assemble`.
+mount the `register*Routes` leaves.
 
 ## Entry chain and process behavior
 

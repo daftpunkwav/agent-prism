@@ -4,7 +4,6 @@
 
 `apps/server/src/assemble.ts` 是仓库中唯一的组合根。它是唯一允许构造 driver
 registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf 的地方。
-`bootstrap.ts` 是已弃用的别名，重新导出 `assemble`。
 
 ## 入口链与进程行为
 

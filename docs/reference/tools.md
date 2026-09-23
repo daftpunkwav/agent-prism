@@ -64,7 +64,7 @@ overrides by name at execution, or bind an injected port such as `SessionQueryPo
 
 | Helper | Thresholds | Behavior |
 |---|---|---|
-| `truncate` in `helpers.ts` | `MAX_OUTPUT` 32 K characters and `MAX_FILE` 256 K | middle-prune, keeping head and tail where `tail <= min(4096, max/5)`, with the marker `…[middle pruned: ~N tokens total]…` using the char-proxy estimate from contracts `CHARS_PER_TOKEN` |
+| `truncate` in `caps.ts` | `MAX_OUTPUT` 32 K characters and `MAX_FILE` 256 K | middle-prune, keeping head and tail where `tail <= min(4096, max/5)`, with the marker `…[middle pruned: ~N tokens total]…` using the char-proxy estimate from contracts `CHARS_PER_TOKEN` |
 | `boundText` and spill in `spill.ts` | spill at 32 KiB UTF-8; per-file cap 512 K characters; 20 files kept with the oldest `spill-*.txt` evicted | full text to `.spills/spill-NNNNNN-<tool>.txt`; the model sees a locator and preview; a dump failure degrades to a loud truncation rather than an error |
 
 ## MCP tools in `packages/tools/tool-mcp`

@@ -3,7 +3,7 @@
  * @description Registers the twenty-two builtin workspace tools into a fresh registry.
  *
  * Responsibilities:
- * - Build a registry preloaded with the nineteen builtin workspace tools
+ * - Build a registry preloaded with the twenty-two builtin workspace tools
  * - Derive workspace-mutation info from the registered set
  */
 

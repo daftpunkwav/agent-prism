@@ -17,11 +17,11 @@
 - 单 leaf family 与 family 名同名，例如 `agent/agent` 与 `contracts/contracts`，
   遵循 [architecture.zh.md](../architecture.zh.md) 中的统一布局约定。
 
-当前 families 共 61 个 leaf：`agent`、`application`、`arena-view`、`arena`、
+当前 families 共 62 个 leaf：`agent`、`application`、`arena-view`、`arena`、
 `builder`、`client`、`config`、`context` 含 8 个 `context-*` leaf、`contracts`、
 `dimensions`、`drivers` 含 8 个、`environment`、`evaluation`、`harness`、`memory` 含
 4 个、`persistence`、`providers` 含 2 个、`runtime`、`sandbox`、`session` 含 8 个、
-`telemetry`、`tools` 含 4 个、`transport` 含 8 个，以及 `ui`。
+`telemetry`、`tools` 含 4 个、`transport` 含 9 个，以及 `ui`。
 
 ## 依赖铁律
 

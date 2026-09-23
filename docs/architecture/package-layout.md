@@ -16,11 +16,11 @@ two-level path `packages/<family>/<leaf>/`. There are no flat packages.
   `contracts/contracts`, following the uniform-layout convention described in
   [architecture.md](../architecture.md).
 
-Current families cover 61 leaves: `agent`, `application`, `arena-view`, `arena`,
+Current families cover 62 leaves: `agent`, `application`, `arena-view`, `arena`,
 `builder`, `client`, `config`, `context` with 8 `context-*` leaves, `contracts`,
 `dimensions`, `drivers` with 8, `environment`, `evaluation`, `harness`, `memory` with 4,
 `persistence`, `providers` with 2, `runtime`, `sandbox`, `session` with 8, `telemetry`,
-`tools` with 4, `transport` with 8, and `ui`.
+`tools` with 4, `transport` with 9, and `ui`.
 
 ## Dependency iron rules
 

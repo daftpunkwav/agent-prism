@@ -64,7 +64,7 @@
 
 | Helper | 阈值 | 行为 |
 |---|---|---|
-| `helpers.ts` 中的 `truncate` | `MAX_OUTPUT` 32 K 字符与 `MAX_FILE` 256 K | 中部修剪，保留 head 与 tail，其中 `tail <= min(4096, max/5)`，标记为 `…[middle pruned: ~N tokens total]…`，使用 contracts `CHARS_PER_TOKEN` 的字符代理估算 |
+| `caps.ts` 中的 `truncate` | `MAX_OUTPUT` 32 K 字符与 `MAX_FILE` 256 K | 中部修剪，保留 head 与 tail，其中 `tail <= min(4096, max/5)`，标记为 `…[middle pruned: ~N tokens total]…`，使用 contracts `CHARS_PER_TOKEN` 的字符代理估算 |
 | `spill.ts` 中的 `boundText` 与 spill | 32 KiB UTF-8 时 spill；每文件上限 512 K 字符；保留 20 个文件，最旧的 `spill-*.txt` 被驱逐 | 全文写入 `.spills/spill-NNNNNN-<tool>.txt`；模型看到 locator 与预览；dump 失败降级为响亮的截断而非错误 |
 
 ## `packages/tools/tool-mcp` 中的 MCP tool
