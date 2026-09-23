@@ -162,6 +162,37 @@ export function clampToolRoundsForWire(rounds: ToolRound[]): ToolRound[] {
   return kept;
 }
 
+/** Caps for trimming a stored chat history: max messages and max summed chars (content + rounds). */
+export interface HistoryTrimCaps {
+  maxMessages: number;
+  maxChars: number;
+}
+
+/**
+ * Trims the oldest user/assistant pairs until both caps hold (history stays
+ * user/assistant alternating). Message weight counts captured tool rounds the
+ * same way the wire contract measures them, so full-mode rounds cannot silently
+ * inflate the transcript past the char cap. Single source shared by the thread
+ * and builder session stores.
+ */
+export function trimHistoryToCaps<T extends { content: string; tool_rounds?: ToolRound[] }>(
+  history: readonly T[],
+  caps: HistoryTrimCaps,
+): T[] {
+  const weights = history.map(
+    (message) =>
+      message.content.length +
+      (message.tool_rounds ?? []).reduce((sum, round) => sum + toolRoundChars(round), 0),
+  );
+  let start = 0;
+  let total = weights.reduce((sum, weight) => sum + weight, 0);
+  while (history.length - start > 0 && (history.length - start > caps.maxMessages || total > caps.maxChars)) {
+    total -= (weights[start] ?? 0) + (weights[start + 1] ?? 0);
+    start += 2;
+  }
+  return history.slice(start);
+}
+
 /**
  * Per-column session: that column's own transcript and disk workspace.
  * Keys are pipeline labels (the same aggregation key as ArenaEvent.pipeline).

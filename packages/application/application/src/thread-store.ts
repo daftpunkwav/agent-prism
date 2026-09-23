@@ -12,7 +12,7 @@
  * resume point, so a failed turn is never committed (the caller decides).
  */
 
-import { PipelineConfigSchema, THREAD_MESSAGE_MAX_CHARS, ThreadMessageSchema, toolRoundChars, type Clock, type IdGenerator, type PipelineConfig, type ThreadMessage, type ThreadView } from "@agentprism/contracts";
+import { PipelineConfigSchema, THREAD_MESSAGE_MAX_CHARS, ThreadMessageSchema, trimHistoryToCaps, type Clock, type IdGenerator, type PipelineConfig, type ThreadMessage, type ThreadView } from "@agentprism/contracts";
 import type { ToolRound } from "@agentprism/contracts";
 import type { JsonFile } from "@agentprism/persistence";
 import { z } from "zod";
@@ -277,7 +277,7 @@ export class FileThreadStore {
    */
   appendTurn(id: string, question: string, answer: string, workspace: string, toolRounds?: ToolRound[]): void {
     const record = this.get(id);
-    record.history = trimToCaps(
+    record.history = trimHistoryToCaps(
       [
         ...record.history,
         { role: "user", content: sanitizedTurnContent(question, "(no question recorded)") },
@@ -287,7 +287,7 @@ export class FileThreadStore {
           ...(toolRounds !== undefined && toolRounds.length > 0 ? { tool_rounds: toolRounds } : {}),
         },
       ],
-      this.caps,
+      { maxMessages: this.caps.maxHistoryMessages, maxChars: this.caps.maxHistoryChars },
     );
     if (workspace !== "") record.workspace = workspace;
     record.turnCount += 1;
@@ -352,26 +352,6 @@ export class FileThreadStore {
   }
 }
 
-/**
- * Trims the oldest pairs until both caps hold (history stays user/assistant
- * alternating). Message weight counts captured tool rounds the same way the
- * wire contract measures them, so full-mode rounds cannot silently inflate the
- * transcript past the char cap.
- */
-function trimToCaps(history: ThreadMessage[], caps: ThreadStoreCaps): ThreadMessage[] {
-  const weights = history.map(
-    (message) =>
-      message.content.length +
-      (message.tool_rounds ?? []).reduce((sum, round) => sum + toolRoundChars(round), 0),
-  );
-  let start = 0;
-  let total = weights.reduce((sum, weight) => sum + weight, 0);
-  while (history.length - start > 0 && (history.length - start > caps.maxHistoryMessages || total > caps.maxHistoryChars)) {
-    total -= (weights[start] ?? 0) + (weights[start + 1] ?? 0);
-    start += 2;
-  }
-  return history.slice(start);
-}
 
 /**
  * Guarantees a turn half survives the persisted schema round-trip: empty

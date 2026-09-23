@@ -18,7 +18,7 @@ import {
   BuilderChatMessageSchema,
   BuilderCompositionSchema,
   migrateLegacyToolNames,
-  toolRoundChars,
+  trimHistoryToCaps,
   type BuilderChatMessage,
   type BuilderComposition,
   type BuilderSessionView,
@@ -363,22 +363,9 @@ export class BuilderSessionStore {
 }
 
 /**
- * Trims the oldest pairs until both caps hold (history stays user/assistant
- * alternating). Message weight counts captured tool rounds the same way the
- * wire contract measures them, so full-mode rounds cannot silently inflate the
- * transcript past the char cap.
+ * Trims the oldest pairs until both caps hold (wire-contract accounting shared
+ * via contracts/trimHistoryToCaps).
  */
 function trimToCaps(history: BuilderChatMessage[]): BuilderChatMessage[] {
-  const weights = history.map(
-    (message) =>
-      message.content.length +
-      (message.tool_rounds ?? []).reduce((sum, round) => sum + toolRoundChars(round), 0),
-  );
-  let start = 0;
-  let total = weights.reduce((sum, weight) => sum + weight, 0);
-  while (history.length - start > 0 && (history.length - start > MAX_HISTORY_MESSAGES || total > MAX_HISTORY_CHARS)) {
-    total -= (weights[start] ?? 0) + (weights[start + 1] ?? 0);
-    start += 2;
-  }
-  return history.slice(start);
+  return trimHistoryToCaps(history, { maxMessages: MAX_HISTORY_MESSAGES, maxChars: MAX_HISTORY_CHARS });
 }
