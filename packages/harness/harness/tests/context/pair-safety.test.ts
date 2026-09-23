@@ -70,6 +70,29 @@ describe("stripUnpairedToolTurns", () => {
     expect(out).toContainEqual(toolMsg("c1", "kept result"));
     expect(JSON.stringify(out)).not.toContain('"c2"');
   });
+
+  it("drops a fully shed call shell that carries no text (empty assistant body is a wire error)", () => {
+    const messages: LlmMessage[] = [
+      { role: "user", content: "q" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "bash", args: {} }] },
+      toolMsg("c2", "result of a shed requester"),
+      { role: "user", content: "tail" },
+    ];
+    const out = stripUnpairedToolTurns(messages);
+    expect(out).toEqual([
+      { role: "user", content: "q" },
+      { role: "user", content: "tail" },
+    ]);
+  });
+
+  it("keeps a fully shed call shell that still carries text, without its calls", () => {
+    const messages: LlmMessage[] = [
+      { role: "assistant", content: "reasoning only", toolCalls: [{ id: "c1", name: "bash", args: {} }] },
+      { role: "user", content: "tail" },
+    ];
+    const out = stripUnpairedToolTurns(messages);
+    expect(out).toEqual([{ role: "assistant", content: "reasoning only" }, { role: "user", content: "tail" }]);
+  });
 });
 
 describe("shedding stays pair-safe", () => {

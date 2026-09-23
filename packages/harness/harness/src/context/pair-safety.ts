@@ -20,6 +20,9 @@ import type { LlmMessage } from "@agentprism/contracts";
  * requester and every surviving tool call has its kept result. Assistant turns
  * whose calls were only partially answered keep just the answerable subset
  * (each surviving call is answered, which is what the wire format requires).
+ * An assistant left with no calls and no text (a fully shed tool-call shell)
+ * is dropped outright: Anthropic rejects empty assistant content mid-list, so
+ * keeping the shell would still turn the trimmed transcript into a hard 400.
  */
 export function stripUnpairedToolTurns(messages: LlmMessage[]): LlmMessage[] {
   const requested = new Set<string>();
@@ -37,7 +40,13 @@ export function stripUnpairedToolTurns(messages: LlmMessage[]): LlmMessage[] {
       if (calls === undefined) return message;
       const answerable = calls.filter((call) => answered.has(call.id));
       if (answerable.length === calls.length) return message;
-      return { ...message, toolCalls: answerable.length > 0 ? answerable : undefined };
+      if (answerable.length === 0) {
+        // Fully shed shell: keep it only when it still says something; an empty
+        // assistant body is a wire error on Anthropic even without tool calls.
+        if (message.content.trim() === "") return null;
+        return { ...message, toolCalls: undefined };
+      }
+      return { ...message, toolCalls: answerable };
     }
     if (message.role === "tool" && !requested.has(message.toolCallId)) return null;
     return message;
