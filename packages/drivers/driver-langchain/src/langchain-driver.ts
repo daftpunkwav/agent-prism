@@ -143,7 +143,8 @@ export class LangChainDriver implements AgentDriver {
         `max_steps=${config.max_steps} · toolset=${config.toolset} · ` +
         `mcp=${String((config as Record<string, unknown>)["mcp_policy"] ?? "off")} · ` +
         `skill=${String((config as Record<string, unknown>)["skill_policy"] ?? "on_demand")} · ` +
-        `orchestration=${String((config as Record<string, unknown>)["orchestration"] ?? "direct")} · ${reasoningNote}` +
+        `orchestration=${String((config as Record<string, unknown>)["orchestration"] ?? "direct")} · ` +
+        `history_mode=${String((config as Record<string, unknown>)["history_mode"] ?? "minimal")} · ${reasoningNote}` +
         (historyCount > 0 ? ` · history=${historyCount}` : "") +
         ` · ${formatCapabilityPluginIds(config)}`,
       turn: context.turn,

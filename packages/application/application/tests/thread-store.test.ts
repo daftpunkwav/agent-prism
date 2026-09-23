@@ -175,6 +175,27 @@ describe("FileThreadStore lifecycle", () => {
     const history = store.get(thread.id).history;
     expect(history[1]?.content.length).toBe(32_000);
   });
+
+  it("persists tool rounds on the assistant half and survives a reload", async () => {
+    const filePath = tempFilePath();
+    const store = createStore(filePath);
+    const thread = store.create("t", CONFIG);
+    const rounds = [{ tool: "write", args: { path: "a.txt" }, result: "created" }];
+    store.appendTurn(thread.id, "q", "a", "ws", rounds);
+    await store.flushNow();
+
+    const reloaded = new FileThreadStore({ file: new AtomicJsonFile(filePath), idGenerator: ids, clock });
+    const history = reloaded.get(thread.id).history;
+    expect(history[1]?.tool_rounds).toEqual(rounds);
+    expect(history[0]?.tool_rounds).toBeUndefined();
+  });
+
+  it("omits the tool_rounds field entirely when rounds are absent (legacy shape)", () => {
+    const store = createStore();
+    const thread = store.create("t", CONFIG);
+    store.appendTurn(thread.id, "q", "a", "", []);
+    expect(Object.hasOwn(store.get(thread.id).history[1] as object, "tool_rounds")).toBe(false);
+  });
 });
 
 describe("FileThreadStore persistence", () => {

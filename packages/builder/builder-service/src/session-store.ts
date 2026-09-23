@@ -23,6 +23,7 @@ import {
   type BuilderSessionView,
   type Clock,
   type IdGenerator,
+  type ToolRound,
 } from "@agentprism/contracts";
 import type { JsonFile } from "@agentprism/persistence";
 import { z } from "zod";
@@ -236,13 +237,27 @@ export class BuilderSessionStore {
    * Commits one finished turn atomically: history pair + workspace + counter.
    * Both messages carry the turn number so the client can re-attach each
    * bubble's work trail from the persisted journal after a reload.
+   * The turn's captured tool rounds ride on the assistant half; rendering them
+   * is the execution boundary's decision (history_mode), not the store's.
    */
-  appendTurn(id: string, userMessage: string, assistantAnswer: string, workspaceName: string, turn?: number): void {
+  appendTurn(
+    id: string,
+    userMessage: string,
+    assistantAnswer: string,
+    workspaceName: string,
+    turn?: number,
+    toolRounds?: ToolRound[],
+  ): void {
     const record = this.get(id);
     record.history = trimToCaps([
       ...record.history,
       { role: "user", content: userMessage, ...(turn === undefined ? {} : { turn }) },
-      { role: "assistant", content: assistantAnswer, ...(turn === undefined ? {} : { turn }) },
+      {
+        role: "assistant",
+        content: assistantAnswer,
+        ...(turn === undefined ? {} : { turn }),
+        ...(toolRounds !== undefined && toolRounds.length > 0 ? { tool_rounds: toolRounds } : {}),
+      },
     ]);
     if (workspaceName !== "") record.workspaceName = workspaceName;
     record.turnCount += 1;

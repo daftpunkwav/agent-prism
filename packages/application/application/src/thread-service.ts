@@ -14,8 +14,8 @@
  */
 
 import type { ArenaEvent, Clock, ThreadCreateRequest, ThreadForkRequest, ThreadRunRequest, ThreadView } from "@agentprism/contracts";
-import type { ArenaRunRequest, PipelineConfig } from "@agentprism/contracts";
-import { extractAnswerFromEvents } from "@agentprism/contracts";
+import type { ArenaRunRequest, PipelineConfig, ToolRound } from "@agentprism/contracts";
+import { extractAnswerFromEvents, extractToolRounds } from "@agentprism/contracts";
 import type { WorkspaceRegistry } from "@agentprism/runtime";
 import { isSafeWorkspaceSegment, sanitizeErrorMessage } from "@agentprism/contracts";
 import type { ArenaService } from "./arena-service.js";
@@ -204,10 +204,18 @@ export class ThreadService {
     const label = `${THREAD_WORKSPACE_PREFIX}${thread.id}`;
     const arenaRequest = this.buildArenaRequest(thread, request.question, label);
     const collected: ArenaEvent[] = [];
+    // Tool rounds accumulate incrementally as pairs close, so a very long run
+    // never loses early rounds to the bounded answer-extraction tail.
+    const seenEvents: ArenaEvent[] = [];
+    let toolRounds: ReturnType<typeof extractToolRounds> = [];
 
     for await (const event of this.deps.arena.run(arenaRequest, { signal: options.signal })) {
       collected.push(event);
       if (collected.length > this.answerTail) collected.shift();
+      seenEvents.push(event);
+      if (event.type === "action" || event.type === "observation") {
+        toolRounds = extractToolRounds(seenEvents);
+      }
       if (event.type === "complete" && event.pipeline === label) {
         const success = event.metrics?.success === true;
         if (success) {
@@ -216,7 +224,7 @@ export class ThreadService {
             // The store commits a placeholder; make the degenerate extraction observable.
             console.warn(`[thread] turn on ${thread.id} completed without an extractable answer`);
           }
-          this.deps.threads.appendTurn(thread.id, request.question, answer, event.workspace);
+          this.deps.threads.appendTurn(thread.id, request.question, answer, event.workspace, toolRounds);
           if (event.workspace !== "") this.deps.workspaceRegistry.pin(event.workspace);
           // The committed turn IS the resume anchor: flush past the debounce so a
           // shutdown right after completion cannot lose it.
@@ -235,8 +243,17 @@ export class ThreadService {
    * clients.
    */
   private buildArenaRequest(thread: ThreadRecord, question: string, label: string): ArenaRunRequest {
-    const session: { workspace?: string; messages: Array<{ role: "user" | "assistant"; content: string }> } = {
-      messages: thread.history.map((message) => ({ role: message.role, content: message.content })),
+    const session: {
+      workspace?: string;
+      messages: Array<{ role: "user" | "assistant"; content: string; tool_rounds?: ToolRound[] }>;
+    } = {
+      messages: thread.history.map((message) => ({
+        role: message.role,
+        content: message.content,
+        ...(message.tool_rounds !== undefined && message.tool_rounds.length > 0
+          ? { tool_rounds: message.tool_rounds }
+          : {}),
+      })),
     };
     if (thread.workspace !== "" && isSafeWorkspaceSegment(thread.workspace)) {
       session.workspace = thread.workspace;
@@ -284,6 +301,7 @@ export const THREAD_BASELINE_FIELDS = [
   "sandbox_mode",
   "orchestration",
   "memory",
+  "history_mode",
 ] as const;
 
 /** Comparison dimension a thread run pins to (single column of the thread's framework). */

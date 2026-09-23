@@ -13,6 +13,7 @@
  */
 
 import { PipelineConfigSchema, THREAD_MESSAGE_MAX_CHARS, ThreadMessageSchema, type Clock, type IdGenerator, type PipelineConfig, type ThreadMessage, type ThreadView } from "@agentprism/contracts";
+import type { ToolRound } from "@agentprism/contracts";
 import type { JsonFile } from "@agentprism/persistence";
 import { z } from "zod";
 import { AppError } from "./errors.js";
@@ -271,14 +272,20 @@ export class FileThreadStore {
    * or over-long value becomes a placeholder, because a history entry that
    * fails the persisted schema on reload would drop the WHOLE thread
    * (per-item corruption containment). Write-time validity = read-time validity.
+   * The turn's captured tool rounds ride on the assistant half; rendering them
+   * is the execution boundary's decision (history_mode), not the store's.
    */
-  appendTurn(id: string, question: string, answer: string, workspace: string): void {
+  appendTurn(id: string, question: string, answer: string, workspace: string, toolRounds?: ToolRound[]): void {
     const record = this.get(id);
     record.history = trimToCaps(
       [
         ...record.history,
         { role: "user", content: sanitizedTurnContent(question, "(no question recorded)") },
-        { role: "assistant", content: sanitizedTurnContent(answer, "(no answer extracted)") },
+        {
+          role: "assistant",
+          content: sanitizedTurnContent(answer, "(no answer extracted)"),
+          ...(toolRounds !== undefined && toolRounds.length > 0 ? { tool_rounds: toolRounds } : {}),
+        },
       ],
       this.caps,
     );

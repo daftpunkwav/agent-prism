@@ -68,6 +68,7 @@ export class NativeDriver implements AgentDriver {
         `mcp=${String((config as Record<string, unknown>)["mcp_policy"] ?? "off")} · ` +
         `skill=${String((config as Record<string, unknown>)["skill_policy"] ?? "on_demand")} · ` +
         `orchestration=${String((config as Record<string, unknown>)["orchestration"] ?? "direct")} · ` +
+        `history_mode=${String((config as Record<string, unknown>)["history_mode"] ?? "minimal")} · ` +
         formatCapabilityPluginIds(config),
       workspace: workspaceName,
     });

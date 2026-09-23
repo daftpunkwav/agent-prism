@@ -35,8 +35,9 @@ import type {
   SessionListFilter,
   SessionRecord,
   ToolDefinition,
+  ArenaEvent,
 } from "@agentprism/contracts";
-import { BUILDER_MESSAGE_MAX_CHARS, DEFAULT_ASK_USER_WAIT_MS, sanitizeErrorMessage } from "@agentprism/contracts";
+import { BUILDER_MESSAGE_MAX_CHARS, DEFAULT_ASK_USER_WAIT_MS, extractToolRounds, sanitizeErrorMessage } from "@agentprism/contracts";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import type {
   BuilderContextTuning,
@@ -511,6 +512,7 @@ export class BuilderService {
     yield { stream: "trace", entry: startEntry };
 
     let output: BuilderTurnOutput | null = null;
+    const turnEvents: ArenaEvent[] = [];
     try {
       const iterator = runBuilderTurn(
         {
@@ -554,6 +556,7 @@ export class BuilderService {
         // Raw arena events land in the journal as they stream (full-fidelity trail).
         if (next.value.stream === "event") {
           this.deps.traceStore.append(id, { kind: "event", turn, event: next.value.event });
+          turnEvents.push(next.value.event);
         }
         yield next.value;
       }
@@ -571,7 +574,7 @@ export class BuilderService {
         }
       } else {
         const answer = result.answer.slice(0, BUILDER_MESSAGE_MAX_CHARS) || "(no reply)";
-        this.deps.store.appendTurn(id, message, answer, result.workspaceName, turn);
+        this.deps.store.appendTurn(id, message, answer, result.workspaceName, turn, extractToolRounds(turnEvents));
         trace.append("session", `Turn ${turn} completed · ${result.metrics?.total_tokens ?? 0} tokens`, {
           turn,
           runId: result.runId,
