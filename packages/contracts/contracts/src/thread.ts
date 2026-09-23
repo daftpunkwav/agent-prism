@@ -12,6 +12,7 @@
 
 import { z } from "zod";
 import { PipelineConfigSchema } from "./arena.js";
+import { ToolRoundSchema } from "./history-mode.js";
 
 /** Display title ceiling (matches the ledger's title cap). */
 export const THREAD_TITLE_MAX_CHARS = 120;
@@ -19,10 +20,11 @@ export const THREAD_TITLE_MAX_CHARS = 120;
 /** Per-message content ceiling on the wire; the store trims total history separately. */
 export const THREAD_MESSAGE_MAX_CHARS = 32_000;
 
-/** One transcript turn half. History stays user/assistant alternating. */
+/** One transcript turn half. History stays user/assistant alternating; assistant halves may carry the turn's tool rounds. */
 export const ThreadMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(THREAD_MESSAGE_MAX_CHARS),
+  tool_rounds: z.array(ToolRoundSchema).optional(),
 });
 export type ThreadMessage = z.infer<typeof ThreadMessageSchema>;
 

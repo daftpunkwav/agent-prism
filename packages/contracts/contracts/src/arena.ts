@@ -16,6 +16,7 @@ import {
   ContextStrategySchema,
   DimensionIdSchema,
   HarnessLevelSchema,
+  HistoryModeSchema,
   McpPolicySchema,
   MemoryPolicySchema,
   OrchestrationModeSchema,
@@ -27,6 +28,7 @@ import {
   ToolsetIdSchema,
 } from "./enums.js";
 import { PipelineMetricsSchema, TokenStatsSchema } from "./events.js";
+import { ToolRoundSchema } from "./history-mode.js";
 
 /** Total character budget over chat history plus the current question (one shared source for backend validation and frontend trimming). */
 export const MAX_HISTORY_CHARS = 24_000;
@@ -75,6 +77,8 @@ export const PipelineConfigSchema = z.object({
   sandbox_mode: SandboxModeSchema.default("off"),
   orchestration: OrchestrationModeSchema.default("direct"),
   memory: MemoryPolicySchema.default("none"),
+  /** Cross-turn history replay mode; minimal keeps the legacy bare Q/A transcript. */
+  history_mode: HistoryModeSchema.default("minimal"),
   prompt_version: z.string().default("v1.0.0"),
   /** Column display label; display plus per-turn aggregation key, not a stable cross-system identity (use agentId/runId). */
   label: z.string().default(""),
@@ -108,16 +112,21 @@ export const BaselineOverridesSchema = z.object({
   sandbox_mode: SandboxModeSchema.nullish(),
   orchestration: OrchestrationModeSchema.nullish(),
   memory: MemoryPolicySchema.nullish(),
+  history_mode: HistoryModeSchema.nullish(),
   /** Column label override: pins the pipeline aggregation key for single-column callers (e.g. threads). */
   label: z.string().max(96).nullish(),
 });
 export type BaselineOverridesInput = z.input<typeof BaselineOverridesSchema>;
 export type BaselineOverrides = z.infer<typeof BaselineOverridesSchema>;
 
-/** Chat history message. */
+/** Total char budget for one assistant entry's captured tool rounds (independent of the Q/A history budgets). */
+export const MAX_TOOL_ROUNDS_CHARS = 32_000;
+
+/** Chat history message. Assistant entries may carry the turn's captured tool rounds for history-mode replay. */
 export const ChatMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(4000),
+  tool_rounds: z.array(ToolRoundSchema).max(64).optional(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
@@ -162,6 +171,22 @@ function addChatHistoryIssues(
     ctx.addIssue({
       code: "custom",
       message: `Chat history plus question exceeds the limit (${MAX_HISTORY_CHARS} characters)`,
+      path: pathPrefix,
+    });
+  }
+  const roundsChars = messages.reduce(
+    (sum, m) =>
+      sum +
+      (m.tool_rounds ?? []).reduce(
+        (acc, round) => acc + round.tool.length + JSON.stringify(round.args ?? {}).length + round.result.length,
+        0,
+      ),
+    0,
+  );
+  if (roundsChars > MAX_TOOL_ROUNDS_CHARS) {
+    ctx.addIssue({
+      code: "custom",
+      message: `Tool rounds exceed the limit (${MAX_TOOL_ROUNDS_CHARS} characters)`,
       path: pathPrefix,
     });
   }

@@ -9,4 +9,5 @@
  */
 
 export * from "./agent-execution.js";
+export * from "./history-render.js";
 export * from "./run-workspace.js";

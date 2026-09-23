@@ -25,6 +25,7 @@ export const DimensionIdSchema = z.enum([
   "skill",
   "orchestration",
   "memory",
+  "history_mode",
 ]);
 export type DimensionId = z.infer<typeof DimensionIdSchema>;
 
@@ -67,6 +68,10 @@ export type OrchestrationMode = z.infer<typeof OrchestrationModeSchema>;
 /** Memory recall policy: which cross-session memory layers mount into the prompt. */
 export const MemoryPolicySchema = z.enum(["none", "episodic", "semantic", "full"]);
 export type MemoryPolicy = z.infer<typeof MemoryPolicySchema>;
+
+/** Cross-turn history mode: how much of past tool activity replays into the model context. */
+export const HistoryModeSchema = z.enum(["minimal", "tool_summary", "full"]);
+export type HistoryMode = z.infer<typeof HistoryModeSchema>;
 
 /** How unattended runs approve tool calls: auto denies only catastrophic shell shapes; unless_trusted additionally requires known-safe shell commands. */
 export const ApprovalModeSchema = z.enum(["auto", "unless_trusted"]);

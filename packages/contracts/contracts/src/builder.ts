@@ -15,6 +15,7 @@ import { z } from "zod";
 import {
   ContextStrategySchema,
   HarnessLevelSchema,
+  HistoryModeSchema,
   PromptProfileSchema,
   ReasoningModeSchema,
   ApprovalModeSchema,
@@ -27,6 +28,7 @@ import {
 } from "./enums.js";
 import { ArenaEventSchema, PipelineMetricsSchema } from "./events.js";
 import { RunAttachmentSchema } from "./arena.js";
+import { ToolRoundSchema } from "./history-mode.js";
 
 /** Per-message content cap of the builder chat history (server-side store enforces the same value). */
 export const BUILDER_MESSAGE_MAX_CHARS = 12_000;
@@ -37,6 +39,8 @@ export const BuilderChatMessageSchema = z.object({
   content: z.string().min(1).max(BUILDER_MESSAGE_MAX_CHARS),
   /** 1-based turn this message belongs to (absent on pre-dating and compacted messages). */
   turn: z.number().int().min(1).optional(),
+  /** Captured tool rounds of this turn (assistant halves only) for history-mode replay. */
+  tool_rounds: z.array(ToolRoundSchema).optional(),
 });
 export type BuilderChatMessage = z.infer<typeof BuilderChatMessageSchema>;
 
@@ -103,6 +107,8 @@ export const BuilderCompositionSchema = z.object({
   skill_policy: SkillPolicySchema.default("on_demand"),
   orchestration: OrchestrationModeSchema.default("direct"),
   memory: MemoryPolicySchema.default("none"),
+  /** Cross-turn history replay mode (same semantics as the Arena dimension). */
+  history_mode: HistoryModeSchema.default("minimal"),
   approval_mode: ApprovalModeSchema.default("auto"),
   sandbox_mode: SandboxModeSchema.default("off"),
 });
@@ -290,6 +296,7 @@ export const BuilderCapabilityBlockIdSchema = z.enum([
   "skill_policy",
   "orchestration",
   "memory",
+  "history_mode",
 ]);
 export type BuilderCapabilityBlockId = z.infer<typeof BuilderCapabilityBlockIdSchema>;
 

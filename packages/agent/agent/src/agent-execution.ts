@@ -43,6 +43,7 @@ import {
 } from "@agentprism/harness";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import { buildMetrics, TokenTracker } from "@agentprism/telemetry";
+import { renderHistoryForMode } from "./history-render.js";
 import {
   GOAL_STORE_FILE,
   PLAN_STORE_FILE,
@@ -519,7 +520,9 @@ export async function* runAgentExecution(
       identity: { agentId: spec.agentId, runId: spec.runId },
       config: spec.config,
       question: spec.question,
-      history: spec.history,
+      // One render at the execution boundary: drivers and the fork/subagent
+      // history below all see the mode's shape; minimal is byte-identical.
+      history: renderHistoryForMode(spec.history, spec.config.history_mode ?? "minimal"),
       turn: spec.turn,
       workspace,
       tracker,

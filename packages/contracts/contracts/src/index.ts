@@ -40,6 +40,7 @@ export * from "./builder.js";
 export * from "./session.js";
 export * from "./thread.js";
 export * from "./answer-from-events.js";
+export * from "./history-mode.js";
 export * from "./prompt-guard.js";
 export * from "./structured-output.js";
 export * from "./majority-vote.js";

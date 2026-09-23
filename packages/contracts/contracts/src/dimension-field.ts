@@ -27,6 +27,7 @@ export const DIMENSION_FIELD: Record<DimensionId, string> = {
   skill: "skill_policy",
   orchestration: "orchestration",
   memory: "memory",
+  history_mode: "history_mode",
 };
 
 /** All dimension ids (derived from the zod schema, guaranteed same-source with the enum). */
