@@ -5,7 +5,7 @@ Sources of truth: `DimensionIdSchema` in `packages/contracts/contracts/src/enums
 modules in `packages/dimensions/dimensions/src/dimensions/`, and the templates in
 `packages/arena/arena-routing/src/task-templates.ts`.
 
-## The 14 dimensions
+## The 15 dimensions
 
 | Dimension | PipelineConfig field | Options, default in bold | Option source |
 |---|---|---|---|
@@ -23,6 +23,7 @@ modules in `packages/dimensions/dimensions/src/dimensions/`, and the templates i
 | `skill` | `skill_policy` | off, **on_demand**, preloaded | static |
 | `orchestration` | `orchestration` | **direct**, plan_first, goal_first | static |
 | `memory` | `memory` | **none**, episodic, semantic, full | static |
+| `history_mode` | `history_mode` | **minimal**, tool_summary, full | static |
 
 Notes:
 

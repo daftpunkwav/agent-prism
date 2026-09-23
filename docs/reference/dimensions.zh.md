@@ -7,7 +7,7 @@
 `packages/dimensions/dimensions/src/dimensions/` 中的选项模块，以及
 `packages/arena/arena-routing/src/task-templates.ts` 中的 templates。
 
-## 14 个 dimensions
+## 15 个 dimensions
 
 | Dimension | PipelineConfig 字段 | 选项，默认值加粗 | 选项来源 |
 |---|---|---|---|
@@ -25,6 +25,7 @@
 | `skill` | `skill_policy` | off、**on_demand**、preloaded | static |
 | `orchestration` | `orchestration` | **direct**、plan_first、goal_first | static |
 | `memory` | `memory` | **none**、episodic、semantic、full | static |
+| `history_mode` | `history_mode` | **minimal**、tool_summary、full | static |
 
 备注：
 
