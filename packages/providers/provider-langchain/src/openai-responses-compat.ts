@@ -57,13 +57,23 @@ function patchContentParts(content: unknown[]): void {
   }
 }
 
-/** Patches one SSE data line; comments, blanks, and unparseable payloads pass through. */
+/**
+ * Patches one SSE data line; comments, blanks, and unparseable payloads pass
+ * through. SSE terminators are LF, CRLF, or CR and the `data:` prefix may omit
+ * the space, so both variants are parsed: a CRLF frame split on "\n" carries a
+ * trailing "\r" into the JSON payload, and an unparsed payload would silently
+ * skip the patch (the exact crash this layer exists to prevent).
+ */
 function patchSseLine(line: string): string {
-  if (!line.startsWith("data: ")) return line;
-  const payload = line.slice("data: ".length);
+  const match = /^data: ?/.exec(line);
+  if (match === null) return line;
+  const prefix = match[0];
+  const body = line.slice(prefix.length);
+  const terminator = body.endsWith("\r") ? "\r" : "";
+  const payload = terminator !== "" ? body.slice(0, -1) : body;
   if (payload === "[DONE]") return line;
   try {
-    return `data: ${JSON.stringify(patchResponsesEvent(JSON.parse(payload)))}`;
+    return `${prefix}${JSON.stringify(patchResponsesEvent(JSON.parse(payload)))}${terminator}`;
   } catch {
     return line;
   }

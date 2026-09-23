@@ -73,6 +73,31 @@ describe("createResponsesCompatFetch", () => {
     expect(inner).toHaveBeenCalledOnce();
   });
 
+  it("patches CRLF-framed and space-less data lines (legal SSE variants)", async () => {
+    const event = '{"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"hi","annotations":null}]}]}}';
+    // CRLF terminators: splitting on "\n" leaves the "\r" on each line, which
+    // must not break JSON parsing (a skipped patch restores the SDK crash).
+    const inner = vi.fn().mockResolvedValue(
+      new Response(`: ping\r\ndata: ${event}\r\ndata: [DONE]\r\n`, { headers: { "content-type": "text/event-stream" } }),
+    );
+    const wrapped = createResponsesCompatFetch(inner as unknown as typeof fetch);
+    const res = await wrapped("https://gw.example.com/v1/responses", { method: "POST" });
+    const text = await res.text();
+    expect(text).toContain('"annotations":[]');
+    expect(text).not.toContain('"annotations":null');
+    expect(text).toContain("[DONE]");
+
+    // The "data:" prefix without a space is equally valid SSE framing.
+    const innerNoSpace = vi.fn().mockResolvedValue(
+      new Response(`data:${event}\n`, { headers: { "content-type": "text/event-stream" } }),
+    );
+    const wrappedNoSpace = createResponsesCompatFetch(innerNoSpace as unknown as typeof fetch);
+    const resNoSpace = await wrappedNoSpace("https://gw.example.com/v1/responses", { method: "POST" });
+    const textNoSpace = await resNoSpace.text();
+    expect(textNoSpace).toContain('"annotations":[]');
+    expect(textNoSpace).not.toContain('"annotations":null');
+  });
+
   it("passes non-responses URLs and non-stream JSON of other routes through untouched", async () => {
     const inner = vi.fn().mockResolvedValue(new Response('{"annotations":null}', { headers: { "content-type": "application/json" } }));
     const wrapped = createResponsesCompatFetch(inner as unknown as typeof fetch);
