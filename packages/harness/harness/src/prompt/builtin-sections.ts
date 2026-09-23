@@ -86,7 +86,12 @@ const HARNESS_SUFFIXES: Record<HarnessLevel, string> = {
 const REASONING_SUFFIXES: Record<ReasoningMode, { systemSuffix: string; userSuffix: string }> = {
   react: {
     systemSuffix:
-      "\n\nUse ReAct mode: think first (Thought), then decide an action (Action), then observe the result (Observation), looping until the task is done.",
+      "\n\nUse ReAct mode with mandatory step labels, kept consistent across every step of the task: " +
+      "write `Action: ...` immediately before EVERY tool call (what you are about to do and why), " +
+      "and `Observation: ...` immediately after EVERY tool result (what the result shows). " +
+      "When one message carries both a result summary and the next step, put them on separate lines in that order: " +
+      "`Observation: ...` first, then `Action: ...`. " +
+      "Never omit or rename these labels; drop them only in the final answer once the task is done.",
     userSuffix: "",
   },
   cot_tool: {

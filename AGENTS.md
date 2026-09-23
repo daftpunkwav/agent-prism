@@ -1,11 +1,10 @@
 ## Git conventions
 
-###### Commit messages (Conventional Commits)
+### Commit messages (Conventional Commits)
 
 Format: `<type>(<scope>): <subject>` — `<scope>` is optional; omit the parentheses when there is none.
 
-- `type`: standard types only — `feat` / `fix` / `docs` / `refactor` / `chore` / `test` / `perf`.
-- 
+- `type`: feat` / `fix` / `docs` / `refactor` / `chore` / `test` / `perf
 
 Examples: `feat: initialize project repository`, `fix: long-session context overflow`, `feat(parser): support nested generics`, `fix(api): reject expired tokens`
 
