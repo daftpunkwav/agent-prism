@@ -33,7 +33,7 @@
 | `grep` | regex 内容搜索，返回 `path:line: text`；最多 200 匹配行；每行窗口 20 000 字符 | all |
 | `webfetch` | http 或 https 转可读文本；15 秒超时；HTML 剥离前 body 上限 512 KB | full |
 | `todo_write` | 整表替换的计划列表；50 项、每项 500 字符；持久化 `.agent-todos.json` | full, edit_run |
-| `ask_user` | 把问题记录到 `.agent-questions.json`，每次调用至多 5 条、共存 50 条；绝不阻塞，指示模型继续 | full, edit_run |
+| `ask_user` | 把问题记录到 `.agent-questions.json`，每次调用至多 5 条、共存 50 条；headless 运行绝不阻塞并指示模型继续，interactive 运行把问题内联交给人工回答（有界等待，超时后同样降级）；问题可带选项与 `multiSelect` 多选 | full, edit_run |
 | `web_search` | 经 `SEARCH_PROVIDER` 与 `SEARCH_API_KEY` 使用 Exa 或 Tavily；未配置则失败关闭并给出设置提示；15 秒超时；1 至 10 条结果，默认 5 | full |
 | `run_job` | 后台 job，含 `start`、`poll`、`kill`、`list`；每 workspace 8 个活跃 job；poll 只返回 delta；输出超过 32 K spill 到 `.spills/*.log`；进程作用域，重启后出现孤儿 | full, edit_run |
 | `bash_session` | 每 workspace 一个持久 POSIX shell，`cd` 与 `export` 存活；哨兵分隔帧；Windows 失败关闭并转向 `bash` 与 `run_job` | full, edit_run |

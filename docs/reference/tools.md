@@ -31,7 +31,7 @@ to `edit_run` and `calc_time` or `workspace_read` to `read_only`.
 | `grep` | regex content search returning `path:line: text`; at most 200 match lines; per-line window of 20 000 characters | all |
 | `webfetch` | http or https to readable text; 15-second timeout; body capped at 512 KB before HTML stripping | full |
 | `todo_write` | whole-list replace plan list; 50 items of 500 characters; persists `.agent-todos.json` | full, edit_run |
-| `ask_user` | records questions to `.agent-questions.json`, at most 5 per call and 50 stored; never blocks and instructs the model to continue | full, edit_run |
+| `ask_user` | records questions to `.agent-questions.json`, at most 5 per call and 50 stored; headless runs never block and tell the model to continue, interactive runs hand the batch to the human inline (bounded wait, then the same defer); questions may carry options and `multiSelect` for ticking several | full, edit_run |
 | `web_search` | Exa or Tavily through `SEARCH_PROVIDER` and `SEARCH_API_KEY`; unconfigured fails closed with a setup hint; 15-second timeout; 1 to 10 results with a default of 5 | full |
 | `run_job` | background jobs with `start`, `poll`, `kill`, and `list`; 8 live jobs per workspace; poll returns the delta only; output over 32 K spills to `.spills/*.log`; process-scoped, so orphans appear after restart | full, edit_run |
 | `bash_session` | one persistent POSIX shell per workspace, so `cd` and `export` survive; sentinel-delimited frames; Windows fails closed toward `bash` and `run_job` | full, edit_run |
