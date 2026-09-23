@@ -439,6 +439,7 @@ export class ArenaRunner {
             config,
             question: request.question,
             history,
+            language: request.language,
             turn,
             agentId,
             runId,

@@ -85,6 +85,7 @@ export function registerBuilderRoutes(app: HttpApp, deps: HttpApplicationDeps): 
         for await (const chunk of deps.builder.chatTurn(c.req.param("id"), request.message, {
           signal: abortController.signal,
           attachments: request.attachments,
+          language: request.language,
         })) {
           if (abortController.signal.aborted) break;
           await stream.writeSSE({ event: "builder", data: JSON.stringify(chunk) });

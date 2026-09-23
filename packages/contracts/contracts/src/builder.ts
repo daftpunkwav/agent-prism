@@ -374,6 +374,8 @@ export const BuilderChatRequestSchema = z.object({
   message: z.string().min(1).max(BUILDER_MESSAGE_MAX_CHARS),
   /** Files seeded into newly created session workspaces before the turn starts (arena parity). */
   attachments: z.array(RunAttachmentSchema).max(5).optional(),
+  /** UI locale tag steering the agent's reply language (arena parity). */
+  language: z.string().max(16).optional(),
 });
 export type BuilderChatRequest = z.infer<typeof BuilderChatRequestSchema>;
 

@@ -32,7 +32,7 @@ import {
   type BuilderTraceRecord,
   type RunAttachment,
 } from "@agentprism/client";
-import { useT } from "@/i18n/useT";
+import { useLocale, useT } from "@/i18n/useT";
 import { AskUserModal, askQuestionsOfArgs, type PendingAskBatch } from "@/components/AskUserModal";
 import { attachTurnSegments, mergedTraceEntries, segmentsOf, settledTurns } from "./builderTrace";
 import { BlockBoard } from "./BlockBoard";
@@ -117,6 +117,7 @@ function loadLayout(): BuilderLayout {
 /** Builder workspace root: sessions, composition, chat turns, and trace panels. */
 export function BuilderClient() {
   const t = useT();
+  const locale = useLocale();
   const [catalog, setCatalog] = useState<BuilderCatalog | null>(null);
   const [sessions, setSessions] = useState<BuilderSessionView[]>([]);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -310,6 +311,7 @@ export function BuilderClient() {
       void refreshSessions();
 
       void streamBuilderChat({
+        language: locale,
         sessionId,
         message,
         attachments: attachments.length > 0 ? attachments : undefined,

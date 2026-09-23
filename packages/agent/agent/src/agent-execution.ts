@@ -91,6 +91,8 @@ export interface AgentRunSpec {
   columnRuntime: ColumnRuntime;
   /** Prior turn's workspace name; reused when still resident in the registry. */
   existingWorkspaceName?: string;
+  /** UI locale tag steering the agent's reply language (zh-CN gets a system-prompt directive). */
+  language?: string;
   /** Files seeded into the workspace when this run creates one (follow-up reuse skips seeding). */
   attachments?: readonly RunAttachment[];
   /**
@@ -524,9 +526,8 @@ export async function* runAgentExecution(
       identity: { agentId: spec.agentId, runId: spec.runId },
       config: spec.config,
       question: spec.question,
-      // One render at the execution boundary: drivers and the fork/subagent
-      // history below all see the mode's shape; minimal is byte-identical.
       history: renderHistoryForMode(spec.history, spec.config.history_mode ?? "minimal"),
+      language: spec.language,
       turn: spec.turn,
       workspace,
       tracker,

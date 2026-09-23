@@ -8,6 +8,7 @@
  */
 
 import type { ChatTurnMessage, LlmMessage, MemoryRecallResult } from "@agentprism/contracts";
+import { agentReplyDirective } from "@agentprism/contracts";
 import { parseMentions, resolveMentionBlock, type MentionFileSystem } from "@agentprism/context-mentions";
 import { formatRetrievedSnippets } from "../context/messages.js";
 import { queryWorkspaceSnippets } from "../memory/rag.js";
@@ -133,6 +134,13 @@ export function buildSystemUser(context: AgentExecutionContext): { system: strin
   const override = (context.systemPromptOverride ?? "").trim();
   if (override !== "") {
     system = override;
+  }
+  // Reply-language pin survives the override: an all-English system prompt pulls
+  // even Chinese questions toward English replies, and a custom prompt must not
+  // lose the UI-language contract either.
+  const replyDirective = agentReplyDirective(context.language);
+  if (replyDirective !== "") {
+    system += replyDirective;
   }
   // The authoritative tool roster: rendered from the actually-registered set
   // (builder allowlist, toolset selection, plus MCP joins), so the prompt never

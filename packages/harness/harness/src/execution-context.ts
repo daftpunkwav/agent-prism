@@ -43,6 +43,8 @@ export interface AgentExecutionContext {
   config: PipelineConfig;
   question: string;
   history: ChatTurnMessage[];
+  /** UI locale tag steering the agent's reply language ("" / absent = mirror the user). */
+  language?: string;
   /** 1-based multi-turn turn number. */
   turn: number;
   workspace: Workspace;

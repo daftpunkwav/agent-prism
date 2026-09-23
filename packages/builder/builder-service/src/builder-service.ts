@@ -463,7 +463,7 @@ export class BuilderService {
   async *chatTurn(
     id: string,
     message: string,
-    options: { signal?: AbortSignal; attachments?: readonly RunAttachment[] } = {},
+    options: { signal?: AbortSignal; attachments?: readonly RunAttachment[]; language?: string } = {},
   ): AsyncGenerator<BuilderStreamChunk> {
     const record = this.deps.store.get(id);
     this.assertIdle(record);
@@ -538,6 +538,7 @@ export class BuilderService {
           message,
           composition,
           history: [...record.history],
+          language: options.language,
           workspaceName: record.workspaceName,
           thinkingCapable: this.deps.resolveThinkingCapable(composition.endpoint_id),
           notices,

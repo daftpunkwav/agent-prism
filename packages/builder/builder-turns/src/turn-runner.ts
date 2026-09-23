@@ -112,6 +112,8 @@ export interface BuilderTurnInput {
   history: ChatMessage[];
   /** Prior turn's workspace name; reused when still resident. */
   workspaceName?: string;
+  /** UI locale tag steering the agent's reply language (arena parity). */
+  language?: string;
   thinkingCapable: boolean;
   /** Session notices rendered into this turn's system prompt (hot-swap, no-tools). */
   notices: readonly string[];
@@ -200,6 +202,7 @@ export async function* runBuilderTurn(
         config,
         question: input.message,
         history: input.history,
+        language: input.language,
         turn: input.turn,
         agentId: input.sessionId,
         runId,

@@ -111,6 +111,8 @@ export interface StreamBuilderChatOptions {
   sessionId: string;
   message: string;
   attachments?: RunAttachment[];
+  /** UI locale tag steering the agent's reply language (arena parity). */
+  language?: string;
   onChunk: (chunk: BuilderStreamChunk) => void;
   signal?: AbortSignal;
   onParseError?: (raw: string, err: Error) => void;
@@ -123,13 +125,17 @@ export interface StreamBuilderChatOptions {
  * onChunk, ``data: [DONE]`` ends silently, and parse failures go to onParseError.
  */
 export async function streamBuilderChat(options: StreamBuilderChatOptions): Promise<void> {
-  const { sessionId, message, attachments, onChunk, signal, onParseError } = options;
+  const { sessionId, message, attachments, language, onChunk, signal, onParseError } = options;
   let res: Response;
   try {
     res = await apiFetch(`${API_BASE}/api/builder/sessions/${encodeURIComponent(sessionId)}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-      body: JSON.stringify({ message, ...(attachments === undefined ? {} : { attachments }) }),
+      body: JSON.stringify({
+        message,
+        ...(attachments === undefined ? {} : { attachments }),
+        ...(language === undefined ? {} : { language }),
+      }),
       signal,
       timeout: false, // SSE long connection: no timeout
     });
