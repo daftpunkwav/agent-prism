@@ -1083,7 +1083,7 @@ details[open] > .builder-log-summary::before {
   outline: none;
 }
 
-.builder-phase-list {
+.builder-step-list {
   display: flex;
   flex-direction: column;
   gap: 2px;

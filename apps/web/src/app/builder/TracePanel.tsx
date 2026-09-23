@@ -31,7 +31,7 @@ import {
   type LogRow,
   type TurnGroup,
 } from "./builderTrace";
-import { PhaseGroups, SegmentList } from "./ChatPanel";
+import { StepRows, SegmentList } from "./ChatPanel";
 import { WorkspacePanel } from "../arena/WorkspacePanel";
 import { useT } from "@/i18n/useT";
 
@@ -112,7 +112,7 @@ function TurnBlock({ group }: { group: TurnGroup }) {
         <span className="builder-timeline-turn-label">{t("builder.turnLabel", { turn: group.turn })}</span>
         <span className="builder-timeline-turn-user">{group.user}</span>
       </div>
-      <PhaseGroups segments={segments} />
+      <StepRows segments={segments} />
     </div>
   );
 }

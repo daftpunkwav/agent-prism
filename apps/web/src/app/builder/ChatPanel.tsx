@@ -95,7 +95,7 @@ function stepDuration(segment: DisplaySegment): string | null {
  * (no phase nesting). With `autoExpandTail` (live turn), the newest row stays
  * open so streaming text remains visible.
  */
-export function PhaseGroups({
+export function StepRows({
   segments,
   autoExpandTail = false,
 }: {
@@ -106,11 +106,11 @@ export function PhaseGroups({
   const steps = flatSteps(segments);
   const liveId = autoExpandTail && segments.length > 0 ? segments[segments.length - 1]!.id : null;
   return (
-    <ul className="builder-phase-list">
+    <ul className="builder-step-list">
       {steps.map((segment) => {
         const live = segment.id === liveId;
         return (
-          <li key={segment.id} className="builder-phase">
+          <li key={segment.id} className="builder-step-row">
             {segment.kind === "thought" ? (
               <ThoughtRow segment={segment} live={live} t={t} />
             ) : (
@@ -525,7 +525,7 @@ export function ChatPanel({ history, hasSession, running, liveSegments, onSend, 
                           {flatSteps(message.segments).length}
                         </span>
                       </summary>
-                      <PhaseGroups segments={message.segments} />
+                      <StepRows segments={message.segments} />
                     </details>
                   )}
                   <div className="builder-answer">
@@ -548,7 +548,7 @@ export function ChatPanel({ history, hasSession, running, liveSegments, onSend, 
                 </div>
                 {/* Live view: flat step rows with the newest row auto-open so
                     streaming text stays visible. */}
-                <PhaseGroups segments={liveSegments} autoExpandTail />
+                <StepRows segments={liveSegments} autoExpandTail />
               </div>
             ) : null}
           </div>
