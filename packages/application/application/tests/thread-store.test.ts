@@ -196,6 +196,27 @@ describe("FileThreadStore lifecycle", () => {
     store.appendTurn(thread.id, "q", "a", "", []);
     expect(Object.hasOwn(store.get(thread.id).history[1] as object, "tool_rounds")).toBe(false);
   });
+
+  it("counts tool-round chars toward the history char cap when trimming", () => {
+    const store = createStore(undefined, { maxHistoryMessages: 8, maxHistoryChars: 5_000 });
+    const thread = store.create("t", CONFIG);
+    // Each turn carries 4k chars of rounds: content-only accounting would keep
+    // every pair, blowing the cap threefold once rounds are counted.
+    const rounds = [{ tool: "read", args: {}, result: "x".repeat(4_000) }];
+    for (let i = 0; i < 3; i += 1) {
+      store.appendTurn(thread.id, `q${i}`, "a", "ws", rounds);
+    }
+    const history = store.get(thread.id).history;
+    const total = history.reduce(
+      (sum, m) =>
+        sum +
+        m.content.length +
+        (m.tool_rounds ?? []).reduce((acc, round) => acc + round.tool.length + JSON.stringify(round.args).length + round.result.length, 0),
+      0,
+    );
+    expect(total).toBeLessThanOrEqual(5_000);
+    expect(history.length).toBeLessThan(6);
+  });
 });
 
 describe("FileThreadStore persistence", () => {

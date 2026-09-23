@@ -904,7 +904,7 @@ const dimensions: DimDoc[] = [
     summary:
       "跨轮历史回放模式：捕获每次运行的工具调用（action→observation 配对），下一轮按列的档位渲染回 assistant 历史文本；检验「模型看见上一轮过程」对追问与纠错的影响。",
     controls:
-      "捕获端始终存全量（tool_rounds），渲染端在执行边界按 config.history_mode 裁剪：minimal 与旧行为逐字节一致；tool_summary 每次调用一行；full 附参数与结果（结果沿用事件流 8000 字截断）。",
+      "捕获端始终存全量转写超集（tool_rounds；超长参数保留 2000 字 preview，与结果 8000 字截断同理），渲染端在执行边界按 config.history_mode 裁剪：minimal 与旧行为逐字节一致；tool_summary 每次调用一行；full 附参数与结果。",
     options: [
       {
         value: "minimal",

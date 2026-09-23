@@ -37,7 +37,7 @@ import type {
   ToolDefinition,
   ArenaEvent,
 } from "@agentprism/contracts";
-import { BUILDER_MESSAGE_MAX_CHARS, DEFAULT_ASK_USER_WAIT_MS, extractToolRounds, sanitizeErrorMessage } from "@agentprism/contracts";
+import { BUILDER_MESSAGE_MAX_CHARS, DEFAULT_ASK_USER_WAIT_MS, clampToolRoundsForWire, extractToolRounds, sanitizeErrorMessage } from "@agentprism/contracts";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import type {
   BuilderContextTuning,
@@ -574,7 +574,9 @@ export class BuilderService {
         }
       } else {
         const answer = result.answer.slice(0, BUILDER_MESSAGE_MAX_CHARS) || "(no reply)";
-        this.deps.store.appendTurn(id, message, answer, result.workspaceName, turn, extractToolRounds(turnEvents));
+        // Same clamp as the client capture path: a stored turn can never outgrow
+        // the wire budget, whichever mode renders it later.
+        this.deps.store.appendTurn(id, message, answer, result.workspaceName, turn, clampToolRoundsForWire(extractToolRounds(turnEvents)));
         trace.append("session", `Turn ${turn} completed · ${result.metrics?.total_tokens ?? 0} tokens`, {
           turn,
           runId: result.runId,

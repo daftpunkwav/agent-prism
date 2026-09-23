@@ -238,8 +238,10 @@ export function ArenaClient() {
         })) ?? [];
     const labels = preserveColumns.map((c) => c.label);
     const columnSessions = snapshotFor(labels);
-    const turn = Math.max(1, ...labels.map((label) => deriveTurn(columnSessions[label]?.messages ?? [])));
-    beginTurn(turn, q);
+    // Per-column turn numbers (same formula the backend annotates events with);
+    // sessions can diverge when a column skips a run, so one global number lies.
+    const turns = Object.fromEntries(labels.map((label) => [label, deriveTurn(columnSessions[label]?.messages ?? [])]));
+    beginTurn(turns, q);
 
     const result = await streamRun(
       {

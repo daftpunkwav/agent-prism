@@ -11,13 +11,27 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { MAX_COLUMN_SESSION_MESSAGES, MAX_HISTORY_CHARS, type ChatMessage, type ColumnSession, type ToolRound } from "@agentprism/client";
+import {
+  clampToolRoundsForWire,
+  MAX_COLUMN_SESSION_MESSAGES,
+  MAX_HISTORY_CHARS,
+  MAX_TOOL_ROUNDS_CHARS,
+  toolRoundChars,
+  type ChatMessage,
+  type ColumnSession,
+  type ToolRound,
+} from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 
 export type ColumnSessionState = {
   messages: ChatMessage[];
   workspace?: string;
 };
+
+/** Summed tool-round chars over the transcript, mirrored on the wire by the backend's history check. */
+function roundsChars(messages: ChatMessage[]): number {
+  return messages.reduce((sum, m) => sum + (m.tool_rounds ?? []).reduce((acc, round) => acc + toolRoundChars(round), 0), 0);
+}
 
 function trimToBudget(messages: ChatMessage[], question: string): ChatMessage[] {
   const budget = MAX_HISTORY_CHARS - question.length;
@@ -33,7 +47,17 @@ function trimToBudget(messages: ChatMessage[], question: string): ChatMessage[] 
   // The backend zod caps a session transcript at MAX_COLUMN_SESSION_MESSAGES rows;
   // histories are always appended in user/assistant pairs (even length), so the
   // tail slice keeps the pairing and the user-first alternation intact.
-  return kept.length > MAX_COLUMN_SESSION_MESSAGES ? kept.slice(-MAX_COLUMN_SESSION_MESSAGES) : kept;
+  const bounded = kept.length > MAX_COLUMN_SESSION_MESSAGES ? kept.slice(-MAX_COLUMN_SESSION_MESSAGES) : kept;
+  // Tool rounds carry their own wire budget: drop the oldest pairs until the
+  // summed rounds chars hold, so a tool-heavy turn cannot 422 the next request.
+  let rounds = roundsChars(bounded);
+  let start = 0;
+  while (bounded.length - start > 0 && rounds > MAX_TOOL_ROUNDS_CHARS) {
+    const dropped = bounded.slice(start, start + 2);
+    rounds -= roundsChars(dropped);
+    start += 2;
+  }
+  return start === 0 ? bounded : bounded.slice(start);
 }
 
 function clipAnswer(text: string): string {
@@ -58,13 +82,16 @@ export function useColumnSessions() {
     (label: string, question: string, answer: string, toolRounds?: ToolRound[]) => {
       setSessions((prev) => {
         const current = prev[label] ?? { messages: [] };
+        // Clamp to the wire caps here: the stored transcript is the request payload,
+        // and an over-budget entry would 422 every follow-up in the session.
+        const clampedRounds = toolRounds === undefined ? undefined : clampToolRoundsForWire(toolRounds);
         const nextMessages: ChatMessage[] = [
           ...current.messages,
           { role: "user", content: question },
           {
             role: "assistant",
             content: clipAnswer(answer || t("arena.history.noReply")),
-            ...(toolRounds !== undefined && toolRounds.length > 0 ? { tool_rounds: toolRounds } : {}),
+            ...(clampedRounds !== undefined && clampedRounds.length > 0 ? { tool_rounds: clampedRounds } : {}),
           },
         ];
         return {

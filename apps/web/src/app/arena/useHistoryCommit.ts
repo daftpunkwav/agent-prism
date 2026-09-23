@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ColumnState } from "@agentprism/arena-view";
-import { extractFinalAnswer } from "@agentprism/arena-view";
+import { eventTurn, extractFinalAnswer } from "@agentprism/arena-view";
 import { extractToolRounds, type ToolRound } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 
@@ -29,10 +29,11 @@ export function useHistoryCommit(options: {
   const { running, allSettled, columns, columnList, pushColumnTurn, rememberWorkspace, onCommitted } = options;
   const t = useT();
   const [historySeedLabel, setHistorySeedLabel] = useState<string | null>(null);
-  const pendingRef = useRef<{ turn: number; question: string } | null>(null);
+  /** Per-column turn numbers of the pending run (same formula the backend annotates events with). */
+  const pendingRef = useRef<{ turns: Record<string, number>; question: string } | null>(null);
 
-  const beginTurn = useCallback((turn: number, question: string) => {
-    pendingRef.current = { turn, question };
+  const beginTurn = useCallback((turns: Record<string, number>, question: string) => {
+    pendingRef.current = { turns, question };
   }, []);
 
   const cancelTurn = useCallback(() => {
@@ -47,7 +48,10 @@ export function useHistoryCommit(options: {
       if (!col.metrics && !col.error) continue;
       const extracted = extractFinalAnswer(col.events);
       const answer = extracted || col.error || t("arena.history.noReply");
-      pushColumnTurn(col.label, pending.question, answer, extractToolRounds(col.events));
+      // col.events also holds earlier completed turns (kept for the trace view),
+      // so rounds must come from this turn's events only or they duplicate every turn.
+      const turn = pending.turns[col.label] ?? 0;
+      pushColumnTurn(col.label, pending.question, answer, extractToolRounds(col.events.filter((event) => eventTurn(event) === turn)));
       if (col.workspace) rememberWorkspace(col.label, col.workspace);
     }
     onCommitted();

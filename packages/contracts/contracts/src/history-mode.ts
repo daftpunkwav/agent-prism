@@ -19,7 +19,11 @@ import { z } from "zod";
 import type { ArenaEvent } from "./events.js";
 import type { HistoryMode } from "./enums.js";
 
-/** One captured tool invocation: the action's tool+args and the paired observation result. */
+/** One captured tool invocation: the action's tool+args and the paired observation result.
+ * Over-sized args (serialized above TOOL_ROUND_ARGS_MAX_CHARS) collapse to a
+ * `{ preview }` record at capture, mirroring the result cap: replay renders at
+ * most the preview anyway, and unbounded args would bust the wire budget.
+ */
 export const ToolRoundSchema = z.object({
   tool: z.string().min(1),
   args: z.record(z.string(), z.unknown()),
@@ -48,6 +52,18 @@ function truncate(text: string, maxChars: number): string {
   return `${text.slice(0, Math.max(0, maxChars - 1))}…`;
 }
 
+/** Keeps args as captured when they serialize within the cap; otherwise collapses to a bounded preview record. */
+function boundedArgs(args: Record<string, unknown>): Record<string, unknown> {
+  let text: string;
+  try {
+    text = JSON.stringify(args) ?? "";
+  } catch {
+    return { preview: "" };
+  }
+  if (text.length <= TOOL_ROUND_ARGS_MAX_CHARS) return args;
+  return { preview: text.slice(0, TOOL_ROUND_ARGS_MAX_CHARS) };
+}
+
 /**
  * Extracts tool rounds from an ArenaEvent stream by pairing each `action`
  * with the next `observation` on the same pipeline column. Column-aware so
@@ -66,7 +82,7 @@ export function extractToolRounds(events: ArenaEvent[]): ToolRound[] {
     if (event.type === "observation" && pending !== null && pending.pipeline === event.pipeline) {
       rounds.push({
         tool: pending.tool,
-        args: pending.args,
+        args: boundedArgs(pending.args),
         result: truncate(event.result ?? "", 8_000),
       });
       pending = null;

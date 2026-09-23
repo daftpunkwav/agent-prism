@@ -15,7 +15,7 @@
 
 import type { ArenaEvent, Clock, ThreadCreateRequest, ThreadForkRequest, ThreadRunRequest, ThreadView } from "@agentprism/contracts";
 import type { ArenaRunRequest, PipelineConfig, ToolRound } from "@agentprism/contracts";
-import { extractAnswerFromEvents, extractToolRounds } from "@agentprism/contracts";
+import { clampToolRoundsForWire, extractAnswerFromEvents, extractToolRounds } from "@agentprism/contracts";
 import type { WorkspaceRegistry } from "@agentprism/runtime";
 import { isSafeWorkspaceSegment, sanitizeErrorMessage } from "@agentprism/contracts";
 import type { ArenaService } from "./arena-service.js";
@@ -204,17 +204,16 @@ export class ThreadService {
     const label = `${THREAD_WORKSPACE_PREFIX}${thread.id}`;
     const arenaRequest = this.buildArenaRequest(thread, request.question, label);
     const collected: ArenaEvent[] = [];
-    // Tool rounds accumulate incrementally as pairs close, so a very long run
-    // never loses early rounds to the bounded answer-extraction tail.
-    const seenEvents: ArenaEvent[] = [];
-    let toolRounds: ReturnType<typeof extractToolRounds> = [];
+    // Only pairing-relevant events are retained and the extract runs once at
+    // commit: buffering the whole stream (including thought/token deltas) and
+    // re-extracting per tool event would cost quadratic work on long runs.
+    const toolEvents: ArenaEvent[] = [];
 
     for await (const event of this.deps.arena.run(arenaRequest, { signal: options.signal })) {
       collected.push(event);
       if (collected.length > this.answerTail) collected.shift();
-      seenEvents.push(event);
       if (event.type === "action" || event.type === "observation") {
-        toolRounds = extractToolRounds(seenEvents);
+        toolEvents.push(event);
       }
       if (event.type === "complete" && event.pipeline === label) {
         const success = event.metrics?.success === true;
@@ -224,7 +223,15 @@ export class ThreadService {
             // The store commits a placeholder; make the degenerate extraction observable.
             console.warn(`[thread] turn on ${thread.id} completed without an extractable answer`);
           }
-          this.deps.threads.appendTurn(thread.id, request.question, answer, event.workspace, toolRounds);
+          this.deps.threads.appendTurn(
+            thread.id,
+            request.question,
+            answer,
+            event.workspace,
+            // Same clamp as the client capture path: a stored turn can never
+            // outgrow the wire budget, whichever mode renders it later.
+            clampToolRoundsForWire(extractToolRounds(toolEvents)),
+          );
           if (event.workspace !== "") this.deps.workspaceRegistry.pin(event.workspace);
           // The committed turn IS the resume anchor: flush past the debounce so a
           // shutdown right after completion cannot lose it.

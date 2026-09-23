@@ -905,7 +905,7 @@ const dimensions: DimDoc[] = [
     summary:
       "Cross-turn history replay modes: each run's tool calls (action→observation pairs) are captured and rendered back into assistant history text on the next turn, per the column's mode; tests whether the model seeing last turn's process changes follow-ups and correction.",
     controls:
-      "Capture always stores the full superset (tool_rounds); rendering trims per config.history_mode at the execution boundary: minimal is byte-identical to the old behavior, tool_summary appends one line per call, full appends args + results (results keep the event stream's 8,000-char truncation).",
+      "Capture always stores the full transcript superset (tool_rounds; oversized args keep a 2,000-char preview, like the 8,000-char result cap); rendering trims per config.history_mode at the execution boundary: minimal is byte-identical to the old behavior, tool_summary appends one line per call, full appends args + results.",
     options: [
       {
         value: "minimal",

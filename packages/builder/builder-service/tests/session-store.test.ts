@@ -73,6 +73,27 @@ describe("BuilderSessionStore", () => {
     }
   });
 
+  it("counts tool-round chars toward the history char cap when trimming", () => {
+    const store = makeStore();
+    const record = store.create("", composition);
+    // Each turn carries 30k chars of rounds: content-only accounting would keep
+    // every pair and blow the 96k cap once rounds are counted.
+    const rounds = [{ tool: "read", args: {}, result: "x".repeat(30_000) }];
+    for (let i = 0; i < 5; i += 1) {
+      store.appendTurn(record.id, `q${i}`, `a${i}`, "", i + 1, rounds);
+    }
+    const history: BuilderChatMessage[] = store.get(record.id).history;
+    const total = history.reduce(
+      (sum, m) =>
+        sum +
+        m.content.length +
+        (m.tool_rounds ?? []).reduce((acc, round) => acc + round.tool.length + JSON.stringify(round.args).length + round.result.length, 0),
+      0,
+    );
+    expect(total).toBeLessThanOrEqual(96_000);
+    expect(history.length).toBeLessThan(10);
+  });
+
   it("queues and drains notices exactly once", () => {
     const store = makeStore();
     const record = store.create("", composition);

@@ -53,6 +53,8 @@ export type { ColumnLogs, LlmWireRecord, WireLogEntry } from "@agentprism/contra
 // History-mode capture helpers: contract single source (contracts/history-mode), used by arena session accumulation.
 export { extractToolRounds, renderToolActivity } from "@agentprism/contracts";
 export type { ToolRound, HistoryMode } from "@agentprism/contracts";
+// Wire caps + clamp for rounds riding on the arena request (contracts/arena), the client transcript's trim budget.
+export { clampToolRoundsForWire, MAX_TOOL_ROUNDS_CHARS, toolRoundChars } from "@agentprism/contracts";
 
 /** Builder contracts: block composition, sessions, trace entries, stream chunks. */
 export type {

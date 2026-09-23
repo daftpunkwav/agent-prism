@@ -41,7 +41,7 @@ describe("useHistoryCommit", () => {
     );
 
     act(() => {
-      result.current.beginTurn(1, "Explain recursion");
+      result.current.beginTurn({ "col-failed": 1 }, "Explain recursion");
     });
 
     expect(pushColumnTurn).not.toHaveBeenCalled();
@@ -64,5 +64,62 @@ describe("useHistoryCommit", () => {
       [],
     );
     expect(onCommitted).toHaveBeenCalled();
+  });
+
+  it("commits only the pending turn's tool rounds, not earlier turns' events", () => {
+    const pushColumnTurn = vi.fn();
+    const rememberWorkspace = vi.fn();
+    const onCommitted = vi.fn();
+
+    // col.events keeps earlier completed turns for the trace view; the earlier
+    // turn's rounds must not ride onto this turn's assistant entry again.
+    const base = { pipeline: "col-a", agentId: "agent-1", runId: "run-1", step: 1, passed: null, metrics: null, token_stats: null };
+    const action = (turn: number, tool: string, result: string) => ({ ...base, turn, type: "action", tool, args: {}, result });
+    const observation = (turn: number, tool: string, result: string) => ({ ...base, turn, type: "observation", tool, args: {}, result });
+    const column: ColumnState = {
+      label: "col-a",
+      // A settled column needs metrics (success) or an error to be committed.
+      metrics: { success: true, duration_ms: 1, input_tokens: 0, output_tokens: 0, total_tokens: 0, tool_calls: 0, steps: 1 } as ColumnState["metrics"],
+      events: [
+        action(1, "read", "old turn body"),
+        observation(1, "read", "old turn body"),
+        action(2, "run", "new turn output"),
+        observation(2, "run", "new turn output"),
+      ] as unknown as ColumnState["events"],
+    };
+
+    const { result, rerender } = renderHook(
+      (props) => useHistoryCommit(props),
+      {
+        wrapper: ({ children }) => React.createElement(I18nProvider, { initialLocale: "en", children }),
+        initialProps: {
+          running: true,
+          allSettled: false,
+          columns: { "col-a": column },
+          columnList: [column],
+          pushColumnTurn,
+          rememberWorkspace,
+          onCommitted,
+        },
+      },
+    );
+
+    act(() => {
+      result.current.beginTurn({ "col-a": 2 }, "follow up");
+    });
+
+    rerender({
+      running: false,
+      allSettled: true,
+      columns: { "col-a": column },
+      columnList: [column],
+      pushColumnTurn,
+      rememberWorkspace,
+      onCommitted,
+    });
+
+    const rounds = pushColumnTurn.mock.calls[0]?.[3] as Array<{ tool: string; result: string }>;
+    expect(rounds).toHaveLength(1);
+    expect(rounds[0]).toEqual({ tool: "run", args: {}, result: "new turn output" });
   });
 });

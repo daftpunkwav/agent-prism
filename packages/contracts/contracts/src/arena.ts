@@ -28,7 +28,7 @@ import {
   ToolsetIdSchema,
 } from "./enums.js";
 import { PipelineMetricsSchema, TokenStatsSchema } from "./events.js";
-import { ToolRoundSchema } from "./history-mode.js";
+import { ToolRoundSchema, type ToolRound } from "./history-mode.js";
 
 /** Total character budget over chat history plus the current question (one shared source for backend validation and frontend trimming). */
 export const MAX_HISTORY_CHARS = 24_000;
@@ -119,16 +119,48 @@ export const BaselineOverridesSchema = z.object({
 export type BaselineOverridesInput = z.input<typeof BaselineOverridesSchema>;
 export type BaselineOverrides = z.infer<typeof BaselineOverridesSchema>;
 
-/** Total char budget for one assistant entry's captured tool rounds (independent of the Q/A history budgets). */
+/**
+ * Total char budget for the captured tool rounds riding on one request's chat
+ * history (summed over all messages with the same accounting as the check
+ * below; independent of the Q/A history budgets).
+ */
 export const MAX_TOOL_ROUNDS_CHARS = 32_000;
+
+/** Per-message cap on captured tool rounds (one shared source for the zod cap and the client-side clamp). */
+export const MAX_TOOL_ROUNDS_PER_MESSAGE = 64;
 
 /** Chat history message. Assistant entries may carry the turn's captured tool rounds for history-mode replay. */
 export const ChatMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1).max(4000),
-  tool_rounds: z.array(ToolRoundSchema).max(64).optional(),
+  tool_rounds: z.array(ToolRoundSchema).max(MAX_TOOL_ROUNDS_PER_MESSAGE).optional(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+
+/** Wire accounting for one round, shared by the history check below and the client-side clamp. */
+export function toolRoundChars(round: ToolRound): number {
+  return round.tool.length + JSON.stringify(round.args ?? {}).length + round.result.length;
+}
+
+/**
+ * Clamps captured rounds to the wire caps (MAX_TOOL_ROUNDS_PER_MESSAGE entries,
+ * MAX_TOOL_ROUNDS_CHARS chars summed with toolRoundChars accounting), keeping
+ * the newest rounds. The client transcript is both the capture store and the
+ * wire payload, so it must clamp here; server stores are trimmed by their own
+ * caps instead.
+ */
+export function clampToolRoundsForWire(rounds: ToolRound[]): ToolRound[] {
+  const kept: ToolRound[] = [];
+  let total = 0;
+  for (let i = rounds.length - 1; i >= 0 && kept.length < MAX_TOOL_ROUNDS_PER_MESSAGE; i -= 1) {
+    const round = rounds[i] as ToolRound;
+    const size = toolRoundChars(round);
+    if (size > MAX_TOOL_ROUNDS_CHARS || total + size > MAX_TOOL_ROUNDS_CHARS) break;
+    kept.unshift(round);
+    total += size;
+  }
+  return kept;
+}
 
 /**
  * Per-column session: that column's own transcript and disk workspace.
@@ -175,12 +207,7 @@ function addChatHistoryIssues(
     });
   }
   const roundsChars = messages.reduce(
-    (sum, m) =>
-      sum +
-      (m.tool_rounds ?? []).reduce(
-        (acc, round) => acc + round.tool.length + JSON.stringify(round.args ?? {}).length + round.result.length,
-        0,
-      ),
+    (sum, m) => sum + (m.tool_rounds ?? []).reduce((acc, round) => acc + toolRoundChars(round), 0),
     0,
   );
   if (roundsChars > MAX_TOOL_ROUNDS_CHARS) {

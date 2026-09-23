@@ -11,11 +11,17 @@
 import { describe, expect, it } from "vitest";
 import {
   ArenaEventSchema,
+  ArenaRunRequestSchema,
   ChatMessageSchema,
+  clampToolRoundsForWire,
   extractToolRounds,
   HistoryModeSchema,
+  MAX_TOOL_ROUNDS_CHARS,
+  MAX_TOOL_ROUNDS_PER_MESSAGE,
   renderToolActivity,
   TOOL_ACTIVITY_MAX_CHARS,
+  TOOL_ROUND_ARGS_MAX_CHARS,
+  toolRoundChars,
   type ArenaEvent,
   type ToolRound,
 } from "../src/index.js";
@@ -84,6 +90,52 @@ describe("extractToolRounds", () => {
     });
     expect(extractToolRounds([thought])).toEqual([]);
   });
+
+  it("collapses over-sized args to a bounded preview record at capture", () => {
+    const events = [
+      actionEvent("write", { content: "x".repeat(TOOL_ROUND_ARGS_MAX_CHARS + 500) }, 1),
+      observationEvent("written", 1),
+    ];
+    const rounds = extractToolRounds(events);
+    expect(rounds).toHaveLength(1);
+    const preview = (rounds[0]?.args as { preview?: string }).preview;
+    expect(typeof preview).toBe("string");
+    expect((preview as string).length).toBe(TOOL_ROUND_ARGS_MAX_CHARS);
+    // Small args pass through untouched.
+    const small = extractToolRounds([actionEvent("read", { path: "a.txt" }, 1), observationEvent("ok", 1)]);
+    expect(small[0]?.args).toEqual({ path: "a.txt" });
+  });
+});
+
+describe("clampToolRoundsForWire", () => {
+  const round = (size: number): ToolRound => ({ tool: "read", args: {}, result: "x".repeat(size) });
+
+  it("measures rounds with the same accounting as the wire check", () => {
+    expect(toolRoundChars({ tool: "read", args: { path: "a.txt" }, result: "ok" })).toBe(
+      "read".length + JSON.stringify({ path: "a.txt" }).length + "ok".length,
+    );
+  });
+
+  it("keeps the newest rounds within the per-message count cap", () => {
+    const rounds = Array.from({ length: MAX_TOOL_ROUNDS_PER_MESSAGE + 6 }, (_, i) => ({ ...round(10), result: `r${i}` }));
+    const clamped = clampToolRoundsForWire(rounds);
+    expect(clamped).toHaveLength(MAX_TOOL_ROUNDS_PER_MESSAGE);
+    expect(clamped[0]?.result).toBe(`r${6}`);
+    expect(clamped[clamped.length - 1]?.result).toBe(`r${rounds.length - 1}`);
+  });
+
+  it("drops the oldest rounds until the summed char budget holds", () => {
+    const big = round(10_000);
+    const clamped = clampToolRoundsForWire([big, big, big, big]);
+    const total = clamped.reduce((sum, r) => sum + r.tool.length + JSON.stringify(r.args).length + r.result.length, 0);
+    expect(total).toBeLessThanOrEqual(MAX_TOOL_ROUNDS_CHARS);
+    expect(clamped).toHaveLength(3);
+  });
+
+  it("returns rounds unchanged when they already fit", () => {
+    const rounds = [round(10), round(20)];
+    expect(clampToolRoundsForWire(rounds)).toEqual(rounds);
+  });
 });
 
 describe("renderToolActivity", () => {
@@ -148,6 +200,27 @@ describe("history wire shapes", () => {
       content: "done",
       tool_rounds: [{ args: {}, result: "ok" }],
     });
+    expect(result.success).toBe(false);
+  });
+
+  it("the wire rejects history whose summed rounds chars bust the budget", () => {
+    const oversize = "x".repeat(MAX_TOOL_ROUNDS_CHARS);
+    const result = ArenaRunRequestSchema.safeParse({
+      question: "q",
+      messages: [
+        { role: "user", content: "q1" },
+        { role: "assistant", content: "a1", tool_rounds: [{ tool: "read", args: {}, result: oversize }] },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes("Tool rounds exceed the limit"))).toBe(true);
+    }
+  });
+
+  it("the wire rejects a single message with more rounds than the per-message cap", () => {
+    const rounds = Array.from({ length: MAX_TOOL_ROUNDS_PER_MESSAGE + 1 }, () => ({ tool: "read", args: {}, result: "r" }));
+    const result = ChatMessageSchema.safeParse({ role: "assistant", content: "done", tool_rounds: rounds });
     expect(result.success).toBe(false);
   });
 });
