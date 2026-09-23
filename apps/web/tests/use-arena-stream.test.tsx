@@ -134,8 +134,20 @@ describe("useArenaStream", () => {
     await waitFor(() => expect(run).resolves.toEqual({ aborted: true, failed: false }));
   });
 
-  it("parses the comparison report and leaves a trace on malformed JSON", async () => {
-    scriptStream();
+  it("keeps the request error message when the stream never opens", async () => {
+    // A rejected request (e.g. 422) throws before any column settles: the
+    // disconnect verdict must not overwrite the real error message.
+    streamMock.mockRejectedValue(new Error("HTTP 422: baseline field invalid"));
+    const { result } = renderStream();
+    let run!: Promise<{ aborted: boolean; failed: boolean }>;
+    await act(async () => {
+      run = result.current.run(runOptions());
+    });
+    await expect(run).resolves.toEqual({ aborted: false, failed: true });
+    expect(result.current.error).toBe("HTTP 422: baseline field invalid");
+  });
+
+  it("parses the comparison report and leaves a trace on malformed JSON", async () => {    scriptStream();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { result } = renderStream();
     let run!: Promise<unknown>;
