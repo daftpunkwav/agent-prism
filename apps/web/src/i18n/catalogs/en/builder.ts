@@ -49,6 +49,8 @@ export const builder = {
   slotOrchestration: "Orchestration",
   slotHistoryMode: "History",
   applySwap: "Apply hot-swap",
+  restoreDefaults: "Restore defaults",
+  restoreDefaultsTitle: "Clear the remembered composition; new sessions start from factory defaults",
   dirty: "Unapplied changes",
   swapBlocked: "Cannot swap while a turn is running",
   swapped: "Hot-swap applied",

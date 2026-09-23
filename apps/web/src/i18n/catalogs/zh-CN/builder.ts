@@ -49,6 +49,8 @@ export const builder = {
   slotOrchestration: "编排",
   slotHistoryMode: "历史",
   applySwap: "应用热切换",
+  restoreDefaults: "恢复默认",
+  restoreDefaultsTitle: "清除记住的构造配置，新会话恢复出厂默认",
   dirty: "有未应用的修改",
   swapBlocked: "回合运行中，暂不可切换",
   swapped: "热切换已应用",

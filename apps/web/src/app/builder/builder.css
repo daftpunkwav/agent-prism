@@ -272,8 +272,20 @@
   font-size: 0.625rem;
 }
 
-.builder-apply {
+.builder-board-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   align-self: flex-start;
+}
+
+.builder-restore {
+  height: 30px;
+  padding: 0 0.6rem;
+  font-size: 0.8125rem;
+}
+
+.builder-apply {
   height: 30px;
   padding: 0 0.8rem;
   font-size: 0.8125rem;

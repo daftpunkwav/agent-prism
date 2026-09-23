@@ -54,6 +54,7 @@ afterEach(cleanup);
 function renderBoard(overrides?: { dirty?: boolean; swapBlocked?: boolean }) {
   const onChange = vi.fn();
   const onApplySwap = vi.fn();
+  const onRestoreDefaults = vi.fn();
   render(
     <I18nProvider initialLocale="en">
       <BlockBoard
@@ -61,12 +62,13 @@ function renderBoard(overrides?: { dirty?: boolean; swapBlocked?: boolean }) {
         composition={COMPOSITION}
         onChange={onChange}
         onApplySwap={onApplySwap}
+        onRestoreDefaults={onRestoreDefaults}
         dirty={overrides?.dirty ?? true}
         swapBlocked={overrides?.swapBlocked ?? false}
       />
     </I18nProvider>,
   );
-  return { onChange, onApplySwap };
+  return { onChange, onApplySwap, onRestoreDefaults };
 }
 
 const en = () => getCatalog("en").builder;
@@ -123,6 +125,13 @@ describe("BlockBoard", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ temperature: 1.5 }));
     fireEvent.change(temperature, { target: { value: "" } });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ temperature: 0.7 }));
+  });
+
+  it("reports restore-default clicks", () => {
+    const { onRestoreDefaults } = renderBoard();
+    const restore = screen.getByRole("button", { name: en().restoreDefaults });
+    fireEvent.click(restore);
+    expect(onRestoreDefaults).toHaveBeenCalledOnce();
   });
 });
 

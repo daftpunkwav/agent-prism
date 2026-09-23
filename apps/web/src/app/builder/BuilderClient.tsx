@@ -18,6 +18,7 @@ import {
   abortBuilderTurn,
   answerBuilderQuestion,
   createBuilderSession,
+  defaultBuilderComposition,
   deleteBuilderSession,
   fetchBuilderCatalog,
   fetchBuilderSessionDetail,
@@ -48,7 +49,21 @@ interface BuilderLayout {
 }
 
 const LAYOUT_KEY = "agentprism.builder.layout";
+const COMPOSITION_KEY = "agentprism.builder.composition";
 const DEFAULT_LAYOUT: BuilderLayout = { leftW: 320, rightW: 420, leftOpen: true, rightOpen: true };
+
+/** Reads the remembered last-used composition; null when absent or corrupted. */
+function loadStoredComposition(): Partial<BuilderComposition> | null {
+  try {
+    const raw = typeof window === "undefined" ? null : window.localStorage.getItem(COMPOSITION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+    return parsed as Partial<BuilderComposition>;
+  } catch {
+    return null;
+  }
+}
 
 /** Side-width bounds as fractions of the shell's column area: two visible
  * columns allow [1/3, 2/3] per side, three visible columns [1/4, 1/2]. */
@@ -232,10 +247,23 @@ export function BuilderClient() {
       });
   }, [activeId, switchSession]);
 
+  // Remember the last-used composition: every settled view (a loaded session or
+  // an edited draft) writes through, so newly created sessions start from it.
+  useEffect(() => {
+    if (composition === null) return;
+    try {
+      window.localStorage.setItem(COMPOSITION_KEY, JSON.stringify(composition));
+    } catch {
+      // Private mode / quota: preference simply resets next visit.
+    }
+  }, [composition]);
+
   const handleCreateSession = useCallback(async () => {
     if (catalog === null) return;
     try {
-      const view = await createBuilderSession({ name: "", composition: {} });
+      // New sessions start from the remembered last-used composition (factory
+      // defaults when no preference is stored), not from a blank composition.
+      const view = await createBuilderSession({ name: "", composition: loadStoredComposition() ?? {} });
       await refreshSessions();
       switchSession(view.id);
       setError(null);
@@ -243,6 +271,17 @@ export function BuilderClient() {
       setError(err instanceof Error ? err.message : String(err));
     }
   }, [catalog, refreshSessions, switchSession]);
+
+  /** Clears the stored composition preference and resets the draft to factory defaults. */
+  const handleRestoreComposition = useCallback(() => {
+    try {
+      window.localStorage.removeItem(COMPOSITION_KEY);
+    } catch {
+      // Storage unavailable: the in-memory reset below still applies.
+    }
+    setComposition(defaultBuilderComposition());
+    setDirty(true);
+  }, []);
 
   const handleDeleteSession = useCallback(
     async (id: string) => {
@@ -704,6 +743,7 @@ export function BuilderClient() {
                 setDirty(true);
               }}
               onApplySwap={() => void handleApplySwap()}
+              onRestoreDefaults={handleRestoreComposition}
               dirty={dirty}
               swapBlocked={chatBusy || activeId === null}
             />

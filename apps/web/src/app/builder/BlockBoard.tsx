@@ -12,6 +12,7 @@
 
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { UiSelect, type UiSelectEntry } from "@agentprism/ui";
 import type { BuilderCatalog, BuilderComposition } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
@@ -21,6 +22,8 @@ export interface BlockBoardProps {
   composition: BuilderComposition;
   onChange: (next: BuilderComposition) => void;
   onApplySwap: () => void;
+  /** Clears the stored composition preference and resets the draft to factory defaults. */
+  onRestoreDefaults: () => void;
   dirty: boolean;
   /** True while a turn is running (swap blocked) or no session is selected. */
   swapBlocked: boolean;
@@ -51,7 +54,7 @@ function Slot({ title, children }: SlotProps) {
  * @param dirty Whether the draft differs from the running composition.
  * @param swapBlocked True while a turn runs or no session is selected.
  */
-export function BlockBoard({ catalog, composition, onChange, onApplySwap, dirty, swapBlocked }: BlockBoardProps) {
+export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRestoreDefaults, dirty, swapBlocked }: BlockBoardProps) {
   const t = useT();
   // Capability values are contract enums mirrored in both catalogs, so the dynamic
   // key is safe; the cast keeps the single dynamic-key point explicit.
@@ -123,16 +126,27 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, dirty,
             </span>
           ))}
         </div>
-        <button
-          type="button"
-          className="btn-primary builder-apply"
-          disabled={!dirty || swapBlocked}
-          title={swapBlocked ? t("builder.swapBlocked") : t("builder.applySwap")}
-          onClick={onApplySwap}
-        >
-          {t("builder.applySwap")}
-          {dirty ? <span className="builder-dirty-dot" aria-label={t("builder.dirty")} /> : null}
-        </button>
+        <div className="builder-board-actions">
+          <button
+            type="button"
+            className="btn-ghost builder-restore"
+            title={t("builder.restoreDefaultsTitle")}
+            onClick={onRestoreDefaults}
+          >
+            <RotateCcw className="h-3 w-3" aria-hidden />
+            {t("builder.restoreDefaults")}
+          </button>
+          <button
+            type="button"
+            className="btn-primary builder-apply"
+            disabled={!dirty || swapBlocked}
+            title={swapBlocked ? t("builder.swapBlocked") : t("builder.applySwap")}
+            onClick={onApplySwap}
+          >
+            {t("builder.applySwap")}
+            {dirty ? <span className="builder-dirty-dot" aria-label={t("builder.dirty")} /> : null}
+          </button>
+        </div>
       </header>
 
       <Slot title={t("builder.slotFramework")}>
