@@ -253,8 +253,9 @@ export function ArenaClient() {
         cancelTurn();
       },
     );
-    // Cancellation or whole-run failure: this turn is not committed to the shared history
-    // (when a column fails, allCompleted is false, so the turn also stays out of history; pending is overwritten by the next run)
+    // Cancellation or transport-level stream failure: this turn is not committed
+    // (the commit effect's gate is run-level, not per-column — a failed column still
+    // commits its error text as that column's answer, on purpose)
     if (result.aborted || result.failed) {
       cancelTurn();
       return;
