@@ -52,10 +52,11 @@ function renderPanel(props?: { workspaceName?: string | null; refreshToken?: num
   );
 }
 
-/** Clicks a tree file button by its visible label and waits for the read to land. */
+/** Clicks a tree file button by its visible label and waits for the read to land.
+ *  Matches on body text: highlighted source views split content across spans. */
 async function openFile(path: string, label: string) {
   fireEvent.click(await screen.findByRole("button", { name: label }));
-  await waitFor(() => expect(screen.getByText(`content of ${path}`)).toBeDefined());
+  await waitFor(() => expect(document.body.textContent).toContain(`content of ${path}`));
 }
 
 describe("WorkspacePanel", () => {
@@ -103,7 +104,7 @@ describe("WorkspacePanel", () => {
     await waitFor(() => expect(saveMock).toHaveBeenCalledWith("ws-native", "new.py", "", true, expect.anything()));
     expect(await screen.findByText(en().created.replace("{path}", "new.py"))).toBeDefined();
     // The created file becomes the selected file.
-    await waitFor(() => expect(screen.getByText("content of new.py")).toBeDefined());
+    await waitFor(() => expect(document.body.textContent).toContain("content of new.py"));
   });
 
   it("deletes the selected file after confirmation and clears the viewer", async () => {
@@ -118,7 +119,8 @@ describe("WorkspacePanel", () => {
   });
 
   it("keeps a read failure out of the editable content", async () => {
-    readMock.mockRejectedValue(new Error("permission denied"));
+    // One-shot rejection: a sticky implementation would leak into later tests.
+    readMock.mockRejectedValueOnce(new Error("permission denied"));
     renderPanel();
     fireEvent.click(await screen.findByRole("button", { name: "README.md" }));
     expect(await screen.findByText(en().loadFailed.replace("{message}", "permission denied"))).toBeDefined();
@@ -133,5 +135,38 @@ describe("WorkspacePanel", () => {
       </I18nProvider>,
     );
     await waitFor(() => expect(listMock.mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("opens markdown files in preview and toggles to the highlighted source view", async () => {
+    renderPanel();
+    await openFile("README.md", "README.md");
+    // Markdown defaults to the rendered preview; the toggle starts on Preview.
+    const previewBtn = screen.getByRole("button", { name: en().previewView });
+    expect(previewBtn.getAttribute("data-active")).toBe("true");
+    expect(document.querySelector(".ws-md-preview")).not.toBeNull();
+    const sourceBtn = screen.getByRole("button", { name: en().sourceView });
+    fireEvent.click(sourceBtn);
+    await waitFor(() => expect(document.querySelector("pre.code-view")).not.toBeNull());
+    expect(sourceBtn.getAttribute("data-active")).toBe("true");
+  });
+
+  it("renders source files through the highlighted code view", async () => {
+    renderPanel();
+    // Directories start collapsed; expand src before its file is reachable.
+    fireEvent.click(await screen.findByRole("button", { name: "src" }));
+    await openFile("src/a.ts", "a.ts");
+    expect(document.querySelector("pre.code-view")).not.toBeNull();
+    // Highlight spans exist (token kinds break the text across elements).
+    expect(document.querySelectorAll("pre.code-view span[class^='hl-']").length).toBeGreaterThan(0);
+  });
+
+  it("exposes the pane splitter with clamped range metadata", async () => {
+    renderPanel();
+    const splitter = await screen.findByRole("separator", { name: en().splitterAria });
+    expect(splitter.getAttribute("aria-valuemin")).toBe("15");
+    expect(splitter.getAttribute("aria-valuemax")).toBe("80");
+    const now = Number(splitter.getAttribute("aria-valuenow"));
+    expect(now).toBeGreaterThanOrEqual(15);
+    expect(now).toBeLessThanOrEqual(80);
   });
 });

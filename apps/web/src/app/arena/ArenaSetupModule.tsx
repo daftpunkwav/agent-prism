@@ -5,7 +5,7 @@
  * Responsibilities:
  * - Render participating-column selection as an always-visible one-row strip
  * - Show the active comparison dimension as a read-only hint (no dimension control)
- * - Open the baseline modal, params drawer, and workspace drawer via pressed-state chips
+ * - Open the baseline modal and the full-stage workspace explorer via pressed-state chips
  *
  * The baseline form itself lives in BaselineModal, so toggling settings never
  * changes this strip's geometry.
@@ -14,7 +14,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, GitCompare, PanelLeft, PanelRight, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, GitCompare, PanelRightOpen, SlidersHorizontal } from "lucide-react";
 import type { ArenaMeta, DimensionId } from "@agentprism/client";
 import { UiSelect } from "@agentprism/ui";
 import { LaneTile } from "./LaneTile";
@@ -133,12 +133,9 @@ export interface ArenaSetupModuleProps {
   activeDim: ArenaMeta["dimensions"][number] | null;
   activeSelections: string[];
   onToggleSelection: (value: string) => void;
-  showLeftPanel: boolean;
-  /** Toggles the left drawer and closes the right one (the original exclusive behavior). */
-  onToggleLeftPanel: () => void;
-  showRightPanel: boolean;
-  /** Toggles the right drawer and closes the left one (the original exclusive behavior). */
-  onToggleRightPanel: () => void;
+  explorerOpen: boolean;
+  /** Toggles the full-stage workspace explorer. */
+  onToggleExplorer: () => void;
 }
 
 /** Compact experiment setup: participant tiles stay visible in one strip; every stage control is a persistent chip. */
@@ -152,10 +149,8 @@ export function ArenaSetupModule({
   activeDim,
   activeSelections,
   onToggleSelection,
-  showLeftPanel,
-  onToggleLeftPanel,
-  showRightPanel,
-  onToggleRightPanel,
+  explorerOpen,
+  onToggleExplorer,
 }: ArenaSetupModuleProps) {
   const t = useT();
   const customLanes = CUSTOM_LANE_DIMENSIONS.has(dimension);
@@ -235,23 +230,12 @@ export function ArenaSetupModule({
             <button
               type="button"
               className="chip-toggle"
-              onClick={onToggleLeftPanel}
-              aria-pressed={showLeftPanel}
-              aria-label={showLeftPanel ? t("arena.drawer.closeParamsAria") : t("arena.drawer.openParamsAria")}
-              title={showLeftPanel ? t("arena.drawer.closeParamsAria") : t("arena.label.params")}
+              onClick={onToggleExplorer}
+              aria-pressed={explorerOpen}
+              aria-label={explorerOpen ? t("arena.drawer.closeWorkspaceAria") : t("arena.drawer.openWorkspaceAria")}
+              title={explorerOpen ? t("arena.drawer.closeWorkspaceAria") : t("arena.label.workspace")}
             >
-              <PanelLeft className="h-3 w-3" aria-hidden />
-              {t("arena.label.params")}
-            </button>
-            <button
-              type="button"
-              className="chip-toggle"
-              onClick={onToggleRightPanel}
-              aria-pressed={showRightPanel}
-              aria-label={showRightPanel ? t("arena.drawer.closeWorkspaceAria") : t("arena.drawer.openWorkspaceAria")}
-              title={showRightPanel ? t("arena.drawer.closeWorkspaceAria") : t("arena.label.workspace")}
-            >
-              <PanelRight className="h-3 w-3" aria-hidden />
+              <PanelRightOpen className="h-3 w-3" aria-hidden />
               {t("arena.label.workspace")}
             </button>
           </div>

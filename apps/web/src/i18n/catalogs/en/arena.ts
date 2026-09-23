@@ -15,12 +15,9 @@ export const arena = {
     needSelections: "Select at least 1 comparison item before running",
   },
   label: {
-    params: "Experiment parameters",
     workspace: "Workspace",
   },
   drawer: {
-    openParamsAria: "Open experiment parameters",
-    closeParamsAria: "Close experiment parameters",
     openWorkspaceAria: "Open workspace",
     closeWorkspaceAria: "Close workspace",
     closeSideAria: "Close side panel",
@@ -53,6 +50,8 @@ export const arena = {
       "to create a cross-provider endpoint, or \"Add model\" under the same endpoint. Comparing only switches endpoints; temperature / Top P etc. are pinned by the baseline below.",
     baselineTitle: "Baseline",
     baselineShort: "Baseline",
+    baselineReset: "Restore defaults",
+    baselineResetTitle: "Clear the stored baseline preference and restore the served defaults",
     baselineCloseAria: "Close baseline settings",
     baselineToggleTitle: "Expand or collapse the controlled-variable baseline",
     baselineHint: "Editable off-dimension · locked on current dimension · grouped",
@@ -319,30 +318,6 @@ export const arena = {
     toolsBound: "Bound tools",
     reasoning: "Reasoning",
   },
-  decode: {
-    loading: "Loading configuration…",
-    loadFailed: "Failed to load decode defaults",
-    loadFailedDetail: "Failed to load decode defaults: {detail}",
-    loadFailedHint: "Make sure the backend is running, then retry",
-    desc: "Writes the shared decode defaults (the Arena baseline seed). Actual runs follow the Arena \"controlled-variable baseline\"; when comparing models, temperature / Top P / thinking level stay consistent across columns.",
-    defaultEndpoint: "Default endpoint",
-    saveFailed: "Save failed",
-    endpointCount:
-      "{count} endpoints configured (cross-provider or multiple models on one connection)",
-    hintTemperature:
-      "Sampling temperature (0 = precise, 2 = most random; snaps to levels when the baseline is built)",
-    hintTopP: "Nucleus sampling threshold",
-    hintFrequencyPenalty: "Reduces the probability of repeated tokens",
-    hintPresencePenalty: "Encourages new topics",
-    sliderCap: "Cap {cap}k",
-    estimateTitle: "Estimated usage",
-    estimateMethod: "Method: rough character/token ratio (mixed CJK & Latin)",
-    estimateFormula:
-      "System + sample prompt ≈ {per} tokens × {count} columns = ~{total} tokens",
-    estimateNote: "* Actual usage depends on the model tokenizer and the number of Agent tool calls",
-    inputShare: "Estimated input share",
-    currentDimension: "Current dimension",
-  },
   project: {
     title: "Save as project",
     desc: "Writes this experiment's workspace files and comparison results into the project list; view them on the \"Projects\" page.",
@@ -386,6 +361,10 @@ export const arena = {
     deleted: "Deleted",
     deleteFailed: "Delete failed: {message}",
     confirmDelete: "Delete file {path}?",
+    previewView: "Preview",
+    sourceView: "Source",
+    viewToggleAria: "Toggle preview/source view",
+    splitterAria: "Adjust pane split",
   },
   templates: {
     json_profile: {

@@ -12,17 +12,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, FileJson, GitCompare, Terminal, X } from "lucide-react";
-import { UiSelect } from "@agentprism/ui";
+import { BarChart3, FileJson, GitCompare, Terminal } from "lucide-react";
 import type { RunAttachment } from "@agentprism/client";
 import type { DimensionId } from "@agentprism/client";
 import { ComparisonReport } from "./ComparisonReport";
 import { MatrixPanel } from "./MatrixPanel";
-import { DecodeDefaultsPanel } from "./DecodeDefaultsPanel";
 import { TraceDiff } from "./TraceDiff";
 import { LogsDiff } from "./LogsDiff";
-import { WorkspacePanel } from "./WorkspacePanel";
 import { BaselineModal } from "./BaselineModal";
+import { WorkspaceExplorer } from "./WorkspaceExplorer";
 import type { PendingAskBatch } from "@/components/AskUserModal";
 import { useArenaStream } from "./useArenaStream";
 import { deriveTurn } from "./useColumnSessions";
@@ -39,7 +37,7 @@ import { SaveProjectCard } from "./SaveProjectCard";
 import { useLocale, useT } from "@/i18n/useT";
 import type { MainTab } from "./arenaConstants";
 import type { TaskTemplate } from "@agentprism/client";
-import { pipelineDisplayLabel, dimSubtitle } from "./dimensionLabels";
+import { pipelineDisplayLabel } from "./dimensionLabels";
 import { templateQuestion } from "./templateLabels";
 
 /** Attachment limits: mirrored by the server-side RunAttachmentSchema (defense in depth). */
@@ -52,9 +50,8 @@ export function ArenaClient() {
   const t = useT();
   const locale = useLocale();
   const [showPromptBanner, setShowPromptBanner] = useState(true);
-  const [showLeftPanel, setShowLeftPanel] = useState(false);
-  /** Workspace starts collapsed, expand when needed */
-  const [showRightPanel, setShowRightPanel] = useState(false);
+  /** Full-stage workspace explorer (the old side drawers are gone). */
+  const [explorerOpen, setExplorerOpen] = useState(false);
   const [workspaceFocusLabel, setWorkspaceFocusLabel] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>("results");
   /** Baseline settings live in a modal so the setup strip never changes size */
@@ -110,6 +107,7 @@ export function ArenaClient() {
     setDimension,
     baseline,
     setBaseline,
+    resetBaseline,
     metaLoading,
     templates,
     activeTemplateId,
@@ -138,11 +136,6 @@ export function ArenaClient() {
     if (workspaceFocusLabel && workspaceChoices.some((c) => c.label === workspaceFocusLabel)) return;
     setWorkspaceFocusLabel(workspaceChoices[0]?.label ?? null);
   }, [workspaceChoices, workspaceFocusLabel]);
-
-  const focusedWorkspace =
-    workspaceChoices.find((c) => c.label === workspaceFocusLabel)?.workspace ??
-    workspaceChoices[0]?.workspace ??
-    null;
 
   const resolvePipelineLabel = useCallback(
     (label: string) =>
@@ -411,16 +404,8 @@ export function ArenaClient() {
           activeDim={activeDim}
           activeSelections={activeSelections}
           onToggleSelection={toggleSelection}
-          showLeftPanel={showLeftPanel}
-          onToggleLeftPanel={() => {
-            setShowLeftPanel((v) => !v);
-            setShowRightPanel(false);
-          }}
-          showRightPanel={showRightPanel}
-          onToggleRightPanel={() => {
-            setShowRightPanel((v) => !v);
-            setShowLeftPanel(false);
-          }}
+          explorerOpen={explorerOpen}
+          onToggleExplorer={() => setExplorerOpen((v) => !v)}
         />
 
         <BaselineModal
@@ -431,6 +416,7 @@ export function ArenaClient() {
           dimension={dimension}
           baseline={baseline}
           onBaselineFieldChange={(field, value) => setBaseline((prev) => ({ ...prev, [field]: value }))}
+          onResetBaseline={resetBaseline}
           showPromptBanner={showPromptBanner}
           onDismissPromptBanner={() => setShowPromptBanner(false)}
         />
@@ -460,49 +446,6 @@ export function ArenaClient() {
       </div>
 
       <div className="arena-body">
-        <button
-          type="button"
-          className="arena-backdrop"
-          data-open={showLeftPanel || showRightPanel ? "true" : undefined}
-          aria-label={t("arena.drawer.closeSideAria")}
-          aria-hidden={!(showLeftPanel || showRightPanel)}
-          tabIndex={showLeftPanel || showRightPanel ? 0 : -1}
-          onClick={() => {
-            setShowLeftPanel(false);
-            setShowRightPanel(false);
-          }}
-        />
-
-        <aside
-          className="arena-drawer"
-          data-side="left"
-          data-open={showLeftPanel ? "true" : undefined}
-          aria-label={t("arena.label.params")}
-          aria-hidden={!showLeftPanel}
-          inert={!showLeftPanel ? true : undefined}
-        >
-          <div className="arena-drawer-head">
-            <p className="eyebrow">{t("arena.label.params")}</p>
-            <button
-              type="button"
-              className="btn-ghost !h-7 !w-7 !p-0"
-              onClick={() => setShowLeftPanel(false)}
-              aria-label={t("arena.drawer.closeParamsAria")}
-              tabIndex={showLeftPanel ? 0 : -1}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="arena-drawer-body">
-            <DecodeDefaultsPanel
-              columnCount={columnCount}
-              description={
-                activeDim ? dimSubtitle(t, activeDim.id, activeDim.subtitle) : ""
-              }
-            />
-          </div>
-        </aside>
-
         <main className="arena-stage">
           <div className="arena-stage-toolbar">
             <div role="tablist" aria-label={t("arena.stage.tabsAria")} className="arena-stage-tabs">
@@ -619,50 +562,17 @@ export function ArenaClient() {
           </div>
         </main>
 
-        <aside
-          className="arena-drawer"
-          data-side="right"
-          data-open={showRightPanel ? "true" : undefined}
-          aria-label={t("arena.label.workspace")}
-          aria-hidden={!showRightPanel}
-          inert={!showRightPanel ? true : undefined}
-        >
-          <div className="arena-drawer-head">
-            <p className="eyebrow">{t("arena.label.workspace")}</p>
-            {workspaceChoices.length > 1 && (
-              <UiSelect
-                className="!h-7 min-w-0 flex-1 text-[11px]"
-                value={workspaceFocusLabel ?? workspaceChoices[0]?.label ?? ""}
-                onChange={(next) => setWorkspaceFocusLabel(next)}
-                ariaLabel={t("arena.drawer.pickWorkspaceAria")}
-                options={workspaceChoices.map((choice) => ({
-                  value: choice.label,
-                  label: resolvePipelineLabel(choice.label),
-                }))}
-              />
-            )}
-            <button
-              type="button"
-              className="btn-ghost !h-7 !w-7 !p-0"
-              onClick={() => setShowRightPanel(false)}
-              aria-label={t("arena.drawer.closeWorkspaceAria")}
-              tabIndex={showRightPanel ? 0 : -1}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="arena-drawer-body !p-0 flex flex-col overflow-hidden">
-            {focusedWorkspace ? (
-              <WorkspacePanel
-                workspaceName={focusedWorkspace}
-                pollInterval={showRightPanel ? (running ? 1500 : 5000) : 0}
-                refreshToken={workspaceRefreshToken}
-              />
-            ) : (
-              <p className="px-3 py-4 text-xs text-muted-foreground">{t("arena.drawer.emptyWorkspace")}</p>
-            )}
-          </div>
-        </aside>
+        {explorerOpen && (
+          <WorkspaceExplorer
+            choices={workspaceChoices}
+            focusLabel={workspaceFocusLabel}
+            onFocusChange={setWorkspaceFocusLabel}
+            resolveLabel={resolvePipelineLabel}
+            running={running}
+            refreshToken={workspaceRefreshToken}
+            onClose={() => setExplorerOpen(false)}
+          />
+        )}
       </div>
     </div>
   );

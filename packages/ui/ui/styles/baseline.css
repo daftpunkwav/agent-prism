@@ -191,6 +191,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.38rem;
+  /* Content-sized and never squeezed: a flex item whose child truncates has a
+     zero min-content width, so without flex-shrink 0 long option names collapse. */
+  flex: 0 0 auto;
+  max-width: 100%;
   min-height: 1.9rem;
   padding: 0.3rem 0.6rem 0.3rem 0.6rem;
   border-radius: 0;

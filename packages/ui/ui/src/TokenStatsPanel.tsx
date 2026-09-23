@@ -51,6 +51,16 @@ function clampPct(pct: number) {
   return Math.max(0, Math.min(100, pct));
 }
 
+/** Compact value: large counts shrink to k-form ("24.2k") so one narrow column fits one line. */
+function formatCompact(n: number) {
+  if (n >= 1000) {
+    const k = n / 1000;
+    const rounded = k >= 100 ? Math.round(k) : Number(k.toFixed(1));
+    return `${rounded}k`;
+  }
+  return n.toLocaleString();
+}
+
 /** Token usage display: compact inline summary or the full labeled breakdown. */
 export function TokenStatsPanel({
   stats,
@@ -65,12 +75,23 @@ export function TokenStatsPanel({
   const inputPct = stats.input_usage_pct ?? 0;
 
   if (compact) {
+    // Single-line chips (k-formatted, exact values in the hover title); wraps to a
+    // second line only in very narrow columns instead of stacking four rows.
+    const items = [
+      { label: labels.compactInput, value: stats.input_tokens },
+      { label: labels.compactOutput, value: stats.output_tokens },
+      { label: labels.compactTotal, value: stats.total_tokens },
+    ] as const;
     return (
-      <div className="font-mono text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
-        <span>{labels.compactInput} {stats.input_tokens.toLocaleString()}</span>
-        <span>{labels.compactOutput} {stats.output_tokens.toLocaleString()}</span>
-        <span>{labels.compactTotal} {stats.total_tokens.toLocaleString()}</span>
-        <span>{labels.compactContext} {contextPct}%</span>
+      <div className="token-compact font-mono text-[11px] text-muted-foreground">
+        {items.map((item) => (
+          <span key={item.label} className="token-compact-item" title={`${item.label}: ${item.value.toLocaleString()}`}>
+            {item.label} {formatCompact(item.value)}
+          </span>
+        ))}
+        <span className="token-compact-item" title={`${labels.compactContext}: ${contextPct}%`}>
+          {labels.compactContext} {contextPct}%
+        </span>
       </div>
     );
   }

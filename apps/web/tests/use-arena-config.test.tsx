@@ -62,6 +62,8 @@ const TEMPLATES = [
 afterEach(() => {
   cleanup();
   searchParams = new URLSearchParams();
+  // Preference persistence writes localStorage; clear it so tests stay order-independent.
+  window.localStorage.clear();
   // restoreAllMocks no longer resets vi.fn() history in Vitest 4.
   vi.clearAllMocks();
 });
@@ -174,5 +176,39 @@ describe("useArenaConfig", () => {
     expect(result.current.activeTemplateId).toBe("tpl-1");
     expect(result.current.dimension).toBe("reasoning");
     expect(setError).toHaveBeenCalledWith(null);
+  });
+
+  it("overlays the stored baseline preference on top of the served defaults", async () => {
+    window.localStorage.setItem("agentprism.arena.baseline.v1", JSON.stringify({ temperature: "1.3" }));
+    metaMock.mockResolvedValue(META);
+    templatesMock.mockResolvedValue(TEMPLATES);
+    const { result } = renderConfig();
+    await waitFor(() => expect(result.current.metaLoading).toBe(false));
+    // Stored keys win; untouched server defaults survive.
+    expect(result.current.baseline).toEqual({ temperature: "1.3", model_id: "ep-1" });
+  });
+
+  it("persists every settled baseline change to localStorage", async () => {
+    metaMock.mockResolvedValue(META);
+    templatesMock.mockResolvedValue(TEMPLATES);
+    const { result } = renderConfig();
+    await waitFor(() => expect(result.current.metaLoading).toBe(false));
+    act(() => result.current.setBaseline((prev) => ({ ...prev, temperature: "0.2" })));
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem("agentprism.arena.baseline.v1") ?? "{}")).toMatchObject({
+        temperature: "0.2",
+      }),
+    );
+  });
+
+  it("resetBaseline clears the stored preference and restores served defaults", async () => {
+    window.localStorage.setItem("agentprism.arena.baseline.v1", JSON.stringify({ temperature: "1.3" }));
+    metaMock.mockResolvedValue(META);
+    templatesMock.mockResolvedValue(TEMPLATES);
+    const { result } = renderConfig();
+    await waitFor(() => expect(result.current.metaLoading).toBe(false));
+    act(() => result.current.resetBaseline());
+    expect(result.current.baseline).toEqual({ temperature: "0.7", model_id: "ep-1" });
+    expect(window.localStorage.getItem("agentprism.arena.baseline.v1")).toBe(JSON.stringify({ temperature: "0.7", model_id: "ep-1" }));
   });
 });

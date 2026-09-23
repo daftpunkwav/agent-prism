@@ -14,7 +14,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { HelpCircle, X } from "lucide-react";
+import { HelpCircle, RotateCcw, X } from "lucide-react";
 import type { ArenaMeta, BaselineOverrides, DimensionId } from "@agentprism/client";
 import { UiSelect } from "@agentprism/ui";
 import { BASELINE_GROUP_ORDER } from "./arenaConstants";
@@ -173,6 +173,8 @@ export interface BaselineModalProps {
   dimension: DimensionId;
   baseline: BaselineOverrides;
   onBaselineFieldChange: (field: string, value: string) => void;
+  /** Clears the stored baseline preference and restores server defaults. */
+  onResetBaseline: () => void;
   showPromptBanner: boolean;
   onDismissPromptBanner: () => void;
 }
@@ -186,6 +188,7 @@ export function BaselineModal({
   dimension,
   baseline,
   onBaselineFieldChange,
+  onResetBaseline,
   showPromptBanner,
   onDismissPromptBanner,
 }: BaselineModalProps) {
@@ -249,6 +252,15 @@ export function BaselineModal({
         <div className="arena-modal-head">
           <p className="arena-modal-title">{t("arena.setup.baselineTitle")}</p>
           <span className="ml-auto font-mono text-[11px] text-muted-foreground">{t("arena.setup.baselineHint")}</span>
+          <button
+            type="button"
+            className="btn-ghost !h-7 !px-2 text-[11px]"
+            onClick={onResetBaseline}
+            title={t("arena.setup.baselineResetTitle")}
+          >
+            <RotateCcw className="h-3 w-3" aria-hidden />
+            {t("arena.setup.baselineReset")}
+          </button>
           <button
             type="button"
             className="btn-ghost !h-7 !w-7 !p-0"

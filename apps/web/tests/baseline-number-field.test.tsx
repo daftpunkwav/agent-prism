@@ -60,6 +60,7 @@ function renderModal(onBaselineFieldChange: (field: string, value: string) => vo
         dimension="framework"
         baseline={baseline as never}
         onBaselineFieldChange={onBaselineFieldChange}
+        onResetBaseline={vi.fn()}
         showPromptBanner={false}
         onDismissPromptBanner={() => {}}
       />
@@ -125,6 +126,7 @@ describe("baseline numeric fields", () => {
           dimension="framework"
           baseline={{ max_steps: "10" } as never}
           onBaselineFieldChange={onChange}
+          onResetBaseline={vi.fn()}
           showPromptBanner={false}
           onDismissPromptBanner={() => {}}
         />
@@ -164,6 +166,7 @@ describe("baseline numeric fields", () => {
           dimension="framework"
           baseline={{ max_steps: "unlimited" } as never}
           onBaselineFieldChange={onChange}
+          onResetBaseline={vi.fn()}
           showPromptBanner={false}
           onDismissPromptBanner={() => {}}
         />
@@ -187,6 +190,7 @@ describe("baseline numeric fields", () => {
           dimension="temperature"
           baseline={{} as never}
           onBaselineFieldChange={() => {}}
+          onResetBaseline={vi.fn()}
           showPromptBanner={false}
           onDismissPromptBanner={() => {}}
         />

@@ -64,6 +64,7 @@ function renderModal(overrides?: {
   baseline?: Record<string, string>;
 }) {
   const onBaselineFieldChange = vi.fn();
+  const onResetBaseline = vi.fn();
   const onClose = vi.fn();
   const onDismissPromptBanner = vi.fn();
   const rendered = render(
@@ -76,15 +77,22 @@ function renderModal(overrides?: {
         dimension={overrides?.dimension ?? "framework"}
         baseline={overrides?.baseline ?? {}}
         onBaselineFieldChange={onBaselineFieldChange}
+        onResetBaseline={onResetBaseline}
         showPromptBanner={overrides?.showPromptBanner ?? false}
         onDismissPromptBanner={onDismissPromptBanner}
       />
     </I18nProvider>,
   );
-  return { ...rendered, onBaselineFieldChange, onClose, onDismissPromptBanner };
+  return { ...rendered, onBaselineFieldChange, onResetBaseline, onClose, onDismissPromptBanner };
 }
 
 describe("BaselineModal", () => {
+  it("reports the restore-default action", () => {
+    const { onResetBaseline } = renderModal();
+    fireEvent.click(screen.getByRole("button", { name: en().baselineReset }));
+    expect(onResetBaseline).toHaveBeenCalledOnce();
+  });
+
   it("renders nothing when closed", () => {
     renderModal({ open: false });
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -136,6 +144,7 @@ describe("BaselineModal", () => {
           dimension="framework"
           baseline={{ max_steps: "unlimited" }}
           onBaselineFieldChange={onBaselineFieldChange}
+          onResetBaseline={vi.fn()}
           showPromptBanner={false}
           onDismissPromptBanner={vi.fn()}
         />

@@ -73,6 +73,5 @@ function Row({ createdAt }: { createdAt: string }) {
 
 - `pnpm --filter @agentprism/web check:i18n` 经
   `apps/web/tests/catalog-parity.test.ts` 检查 catalog key 对等，并对 `src/app` 与
-  `src/components` 做 CJK 扫描。注释与 console 调用豁免，`tokenEstimate.ts` 的示例
-  载荷在白名单中。
+  `src/components` 做 CJK 扫描。注释与 console 调用豁免。
 - `packages/ui` 保持无文案。切换与面板 label 由 shell 经 props 注入。

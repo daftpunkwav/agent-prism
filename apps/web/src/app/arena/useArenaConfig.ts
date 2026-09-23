@@ -24,6 +24,22 @@ import { DIMENSION_FIELD, DIMENSION_IDS } from "./arenaConstants";
 import { templateQuestion } from "./templateLabels";
 import { useT } from "@/i18n/useT";
 
+/** localStorage key for the user's last baseline (preference persistence). */
+const BASELINE_STORAGE_KEY = "agentprism.arena.baseline.v1";
+
+/** Reads the stored baseline overlay; null when absent or corrupted. */
+function loadStoredBaseline(): Partial<BaselineOverrides> | null {
+  try {
+    const raw = typeof window === "undefined" ? null : window.localStorage.getItem(BASELINE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+    return parsed as Partial<BaselineOverrides>;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Loads Arena metadata once and derives dimension/selection state.
  *
@@ -55,7 +71,7 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
       .then((m) => {
         setMeta(m);
         if (m.baseline_defaults) {
-          setBaseline({ ...m.baseline_defaults } as BaselineOverrides);
+          setBaseline({ ...m.baseline_defaults, ...loadStoredBaseline() } as BaselineOverrides);
         }
       })
       .catch((err: Error) => {
@@ -68,6 +84,27 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
       });
     return () => ac.abort();
   }, [setError, t]);
+
+  // Preference persistence: every settled baseline change writes through to
+  // localStorage, so the next visit starts from the user's last configuration.
+  useEffect(() => {
+    if (metaLoading) return;
+    try {
+      window.localStorage.setItem(BASELINE_STORAGE_KEY, JSON.stringify(baseline));
+    } catch {
+      // Private mode / quota: preferences simply reset next visit.
+    }
+  }, [baseline, metaLoading]);
+
+  /** Clears the stored preference and restores the server-served baseline defaults. */
+  const resetBaseline = useCallback(() => {
+    try {
+      window.localStorage.removeItem(BASELINE_STORAGE_KEY);
+    } catch {
+      // Storage unavailable: the in-memory reset below still applies.
+    }
+    setBaseline({ ...(meta?.baseline_defaults ?? {}) } as BaselineOverrides);
+  }, [meta]);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -193,6 +230,7 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
     setDimension,
     baseline,
     setBaseline,
+    resetBaseline,
     metaLoading,
     templates,
     activeTemplateId,

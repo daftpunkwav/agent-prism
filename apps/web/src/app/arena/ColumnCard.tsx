@@ -201,31 +201,37 @@ export const ColumnCard = memo(function ColumnCard({
         </div>
       </div>
       <div className="relative flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain" ref={scrollRef} onScroll={handleScroll}>
-          <TraceView
-            events={col.events}
-            running={columnRunning}
-            colorIndex={lane}
-            frameworkId={col.frameworkId}
-          />
-        </div>
-        {detached && (
-          <button type="button" className="arena-jump-bottom" onClick={jumpToBottom}>
-            <ArrowDown size={12} aria-hidden />
-            {t("arena.results.jumpBottom")}
-          </button>
+        {workspaceOpen && col.workspace ? (
+          // Workspace takeover: the browser fills the whole column body; the
+          // header keeps the toggle so the trace comes back with one click.
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <WorkspacePanel
+              workspaceName={col.workspace}
+              pollInterval={running ? 1500 : 4000}
+              refreshToken={workspaceRefreshToken ?? 0}
+              compact
+              ownerLabel={title}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain" ref={scrollRef} onScroll={handleScroll}>
+              <TraceView
+                events={col.events}
+                running={columnRunning}
+                colorIndex={lane}
+                frameworkId={col.frameworkId}
+              />
+            </div>
+            {detached && (
+              <button type="button" className="arena-jump-bottom" onClick={jumpToBottom}>
+                <ArrowDown size={12} aria-hidden />
+                {t("arena.results.jumpBottom")}
+              </button>
+            )}
+          </>
         )}
       </div>
-      {workspaceOpen && col.workspace && (
-        <div className="column-workspace border-t border-border shrink-0">
-          <WorkspacePanel
-            workspaceName={col.workspace}
-            pollInterval={running ? 1500 : 4000}
-            refreshToken={workspaceRefreshToken ?? 0}
-            compact
-          />
-        </div>
-      )}
       {col.metrics && (
         <div className="column-metrics-bar border-t border-border px-3 py-2 font-mono text-[11px] text-muted-foreground flex gap-3 shrink-0">
           <span>{t("arena.results.toolCalls", { count: col.metrics.tool_calls })}</span>

@@ -296,12 +296,6 @@
   background: color-mix(in srgb, var(--muted) 40%, var(--card));
 }
 
-.column-workspace {
-  max-height: 14rem;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--muted) 28%, transparent);
-}
-
 .arena-chat-history-note {
   font-size: 0.6875rem;
   color: var(--muted-foreground);
@@ -329,6 +323,26 @@
   gap: 0.75rem;
   background: transparent;
   flex-shrink: 0;
+}
+
+/* Compact token chips: one visual row of "In 24.2k"-style chips; wraps only in
+   very narrow columns instead of stacking a chip per metric. */
+.token-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem 0.55rem;
+  min-width: 0;
+}
+
+.token-compact-item {
+  white-space: nowrap;
+}
+
+.token-compact-item + .token-compact-item::before {
+  content: "·";
+  margin-right: 0.55rem;
+  color: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
 }
 
 /* Per-column jump-to-bottom affordance while the user holds scroll position
@@ -393,87 +407,6 @@
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.55; transform: scale(0.85); }
-}
-
-/* Params / workspace: dual-side drawer overlays that do not squeeze the main stage */
-.arena-drawer {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 20;
-  width: min(18.5rem, 86vw);
-  background: var(--card);
-  border: 1px solid var(--ring);
-  border-radius: 0;
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateX(-12px);
-  transition:
-    opacity var(--dur-panel) var(--ease-out),
-    transform var(--dur-panel) var(--ease-out),
-    visibility var(--dur-panel) var(--ease-out);
-}
-
-.arena-drawer[data-side="left"] {
-  left: 0;
-}
-
-.arena-drawer[data-side="right"] {
-  right: 0;
-  width: min(20rem, 88vw);
-  transform: translateX(12px);
-}
-
-.arena-drawer[data-open="true"] {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateX(0);
-}
-
-.arena-drawer-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--muted) 26%, transparent);
-  flex-shrink: 0;
-}
-
-.arena-drawer-body {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow: auto;
-  padding: 0.75rem;
-  scrollbar-width: thin;
-}
-
-.arena-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 15;
-  background: color-mix(in srgb, var(--background) 55%, transparent);
-  border: none;
-  cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    opacity var(--dur) var(--ease-out),
-    visibility var(--dur) var(--ease-out);
-}
-
-.arena-backdrop[data-open="true"] {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
 }
 
 @media (max-height: 860px) {
@@ -636,4 +569,74 @@
   background: var(--muted);
   border-color: var(--ring);
   box-shadow: var(--shadow-xs);
+}
+
+
+/* ===== Workspace panel: two-pane file browser (detail left, tree right) ===== */
+
+/* Owner attribution chip in the panel header (agent this workspace belongs to). */
+.ws-owner {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+/* Divider between detail and tree panes: wide hit area, thin visible line. */
+.ws-divider {
+  width: 7px;
+  cursor: col-resize;
+  position: relative;
+  touch-action: none;
+}
+
+.ws-divider::before {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: var(--border);
+  transition: background var(--dur-fast) ease;
+}
+
+.ws-divider:hover::before,
+.ws-divider:active::before {
+  background: var(--accent);
+}
+
+/* Rendered markdown preview pane (source view swaps to the highlighted code view). */
+.ws-md-preview {
+  border-top: 0;
+}
+
+/* ===== Full-stage workspace explorer (replaces the old side drawer) ===== */
+.workspace-explorer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--ring);
+  border-radius: 0;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: fade-up var(--dur-panel) var(--ease-out) both;
+}
+
+.workspace-explorer-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 26%, transparent);
+  flex-shrink: 0;
+}
+
+.workspace-explorer-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }

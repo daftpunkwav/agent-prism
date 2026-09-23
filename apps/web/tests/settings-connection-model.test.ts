@@ -6,7 +6,6 @@
  * Responsibilities:
  * - Pin flat-endpoint grouping by (base_url, api_format) with legacy single-endpoint form
  * - Lock the flatten round trip, including blank-model skips and local-id clearing
- * - Pin the CJK/non-CJK token estimate heuristic
  */
 
 import { describe, expect, it } from "vitest";
@@ -19,7 +18,6 @@ import {
   isLocalModelId,
   newLocalId,
 } from "../src/app/settings/settingsConnectionModel";
-import { estimatePromptTokens, SAMPLE_SYSTEM, SAMPLE_USER } from "../src/app/arena/tokenEstimate";
 
 function endpoint(partial: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -129,21 +127,5 @@ describe("settings connection model", () => {
     expect(isLocalModelId("new_abc")).toBe(true);
     expect(isLocalModelId("ep-real")).toBe(false);
     expect(newLocalId("c")).toMatch(/^c_[a-z0-9]+$/);
-  });
-});
-
-describe("estimatePromptTokens", () => {
-  it("returns zero for empty prompts", () => {
-    expect(estimatePromptTokens("", "")).toBe(0);
-  });
-
-  it("weights CJK heavier per character than non-CJK text", () => {
-    expect(estimatePromptTokens(SAMPLE_SYSTEM, SAMPLE_USER)).toBeGreaterThan(0);
-    // 8 CJK chars ≈ 8/1.5 ≈ 6 tokens vs 8 latin chars ≈ 2 tokens.
-    const cjkOnly = estimatePromptTokens("一二三四五六七八", "");
-    const latinOnly = estimatePromptTokens("abcdefgh", "");
-    expect(cjkOnly).toBeGreaterThan(latinOnly);
-    expect(cjkOnly).toBe(Math.ceil(8 / 1.5));
-    expect(latinOnly).toBe(2);
   });
 });

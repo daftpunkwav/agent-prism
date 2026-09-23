@@ -68,10 +68,8 @@ function renderSetup(onToggleSelection: (value: string) => void, selections: str
         activeDim={STEPS_DIMENSION}
         activeSelections={selections}
         onToggleSelection={onToggleSelection}
-        showLeftPanel={false}
-        onToggleLeftPanel={() => {}}
-        showRightPanel={false}
-        onToggleRightPanel={() => {}}
+        explorerOpen={false}
+        onToggleExplorer={() => {}}
       />
     </I18nProvider>,
   );

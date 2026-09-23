@@ -72,7 +72,6 @@ imports a single locale's content file directly.
 
 - `pnpm --filter @agentprism/web check:i18n` checks catalog key parity through
   `apps/web/tests/catalog-parity.test.ts`, plus a CJK sweep over `src/app` and
-  `src/components`. Comments and console calls are exempt, and `tokenEstimate.ts` sample
-  payloads are allowlisted.
+  `src/components`. Comments and console calls are exempt.
 - `packages/ui` stays copy-free. Toggle and panel labels are injected as props from the
   shell.

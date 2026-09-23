@@ -6,9 +6,8 @@
  * - Delegate catalog key-parity checks to apps/web/tests (catalog-parity)
  * - Sweep app/components source for inline user-visible CJK copy
  *
- * Comments and console calls are stripped before scanning; the allowlist
- * covers known data-like exemptions. Usage: pnpm --filter @agentprism/web
- * check:i18n
+ * Comments and console calls are stripped before scanning. Usage:
+ * pnpm --filter @agentprism/web check:i18n
  */
 
 import { execFileSync } from "node:child_process";
@@ -22,8 +21,6 @@ const SCAN_ROOTS = [
   path.join(WEB_ROOT, "src", "app"),
   path.join(WEB_ROOT, "src", "components"),
 ];
-// Data-like exemptions: sample model inputs are content, not chrome.
-const FILE_ALLOWLIST = [/tokenEstimate\.ts$/];
 // A line containing this marker is skipped (self-documenting escape hatch for
 // intrinsic non-copy CJK, e.g. native language self-names or backend-output matching).
 const LINE_EXEMPT_MARKER = "i18n-exempt";
@@ -54,7 +51,6 @@ function scanCjk() {
         continue;
       }
       if (!/\.(tsx?|mts)$/.test(entry.name)) continue;
-      if (FILE_ALLOWLIST.some((re) => re.test(entry.name))) continue;
       const lines = stripNonUi(fs.readFileSync(full, "utf8")).split(/\r?\n/);
       lines.forEach((line, index) => {
         if (line.includes(LINE_EXEMPT_MARKER)) return;
