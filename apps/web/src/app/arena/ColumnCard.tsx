@@ -71,8 +71,8 @@ export const ColumnCard = memo(function ColumnCard({
   col: ColumnState;
   running: boolean;
   showStop: boolean;
-  /** Independently stops this column only (other columns keep running). */
-  onStop: () => void;
+  /** Stops this column; called with the column's label (kept stable across renders so the memo holds). */
+  onStop: (label: string) => void;
   /** In-flight per-column stop request (spinner until the backend settles the column). */
   stopping?: boolean;
   lane: number;
@@ -185,7 +185,7 @@ export const ColumnCard = memo(function ColumnCard({
             <button
               type="button"
               className="btn-ghost column-stop-btn !h-7 !px-2 text-[11px]"
-              onClick={onStop}
+              onClick={() => onStop(col.label)}
               disabled={stopping}
               title={t("arena.results.stopColumnTitle")}
               aria-label={t("arena.results.stopColumnTitle")}

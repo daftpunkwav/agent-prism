@@ -85,7 +85,7 @@ export function ArenaResultsGrid(props: {
               col={col}
               running={running}
               showStop={running && !col.metrics && col.events.length > 0}
-              onStop={() => onStopColumn(col.label)}
+              onStop={onStopColumn}
               stopping={stoppingLabels[col.label] === true}
               lane={idx}
               isHistorySeed={historySeedLabel === col.label}
@@ -122,7 +122,7 @@ export function ArenaResultsGrid(props: {
           col={col}
           running={running}
           showStop={running && !col.metrics && col.events.length > 0}
-          onStop={() => onStopColumn(col.label)}
+          onStop={onStopColumn}
           stopping={stoppingLabels[col.label] === true}
           lane={idx}
           isHistorySeed={historySeedLabel === col.label}

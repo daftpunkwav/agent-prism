@@ -178,14 +178,18 @@ export function ArenaClient() {
     }
   }, [columnList, rememberWorkspace]);
 
-  // Stable callback: ColumnCard is memoized, a fresh arrow here would re-render every column each parent render
+  // Stable callback: ColumnCard is memoized, a fresh arrow here would re-render every column each parent render.
+  // The live column list is read through the ref below so this callback never changes identity mid-run.
+  const columnListRef = useRef(columnList);
+  useEffect(() => {
+    columnListRef.current = columnList;
+  }, [columnList]);
   const handleUseAsSeed = useCallback(
     (label: string) => {
-      const labels = columnList.map((c) => c.label);
-      copyTranscriptToAll(label, labels);
+      copyTranscriptToAll(label, columnListRef.current.map((c) => c.label));
       setHistorySeedLabel(label);
     },
-    [columnList, copyTranscriptToAll],
+    [copyTranscriptToAll, setHistorySeedLabel],
   );
 
   // Abort in-flight Arena requests on unmount to avoid lingering connections (state updates settle inside the hooks)

@@ -14,7 +14,7 @@
 
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { ArrowLeftRight, Braces, FileJson, ScrollText } from "lucide-react";
 import type { ArenaEvent, WireLogEntry } from "@agentprism/client";
 import type { ColumnState } from "@agentprism/arena-view";
@@ -54,8 +54,14 @@ function eventLine(event: ArenaEvent): string {
  * One request/response wire record block. The expansion renders the captured
  * payload as-is (pretty-printed JSON) — the wire view is an inspection surface,
  * so fidelity beats prettification.
+ *
+ * Compared by the record's immutable identity instead of reference: every poll
+ * re-parses the JSONL tail into fresh objects, and a reference-based memo would
+ * re-pretty-print every captured payload (hundreds of KB each, full fidelity)
+ * every two seconds for the whole tail.
  */
-const WireEntry = memo(function WireEntry({ entry }: { entry: WireLogEntry }) {
+const WireEntry = memo(
+  function WireEntry({ entry }: { entry: WireLogEntry }) {
   const t = useT();
   const { record } = entry;
   if (record.kind === "llm_error") {
@@ -104,7 +110,16 @@ const WireEntry = memo(function WireEntry({ entry }: { entry: WireLogEntry }) {
       </pre>
     </details>
   );
-});
+  },
+  // (ts, seq) is a record's identity in the append-only JSONL logs: one write
+  // site stamps a monotonic seq per run, and runs of one column are ordered in
+  // time, so equal identity implies equal content. turn/kind guard the summary.
+  (prev, next) =>
+    prev.entry.ts === next.entry.ts &&
+    prev.entry.seq === next.entry.seq &&
+    prev.entry.turn === next.entry.turn &&
+    prev.entry.record.kind === next.entry.record.kind,
+);
 
 function Chevronish() {
   return (
@@ -134,6 +149,11 @@ function ColumnLogsCard({
   // A settled column's logs are final: poll only while it has no metrics yet.
   const pollMs = running && column.metrics === undefined ? 2000 : 0;
   const logs = useColumnLogs(column.workspace, column.label, pollMs);
+  // One joined text for the raw-event view, rebuilt only when a poll brings new rows.
+  const eventsText = useMemo(
+    () => (logs === null ? "" : logs.events.map(eventLine).join("\n")),
+    [logs],
+  );
   return (
     <div className="panel-surface !shadow-none p-3 space-y-2 min-w-0">
       <div className="flex items-center gap-2 flex-wrap">
@@ -152,9 +172,10 @@ function ColumnLogsCard({
           <p className="text-[11px] italic text-muted-foreground">{t("arena.logs.emptyWire")}</p>
         ) : (
           <div className="space-y-1.5">
-            {logs.wire.map((entry, index) => (
-              // seq restarts per run file; ts+seq+index stays unique across merged turns.
-              <WireEntry key={`${entry.ts}_${entry.seq}_${index}`} entry={entry} />
+            {logs.wire.map((entry) => (
+              // (ts, seq) is stable across polls: once the tail cap slides the
+              // window, an index-based key would remount the whole list each poll.
+              <WireEntry key={`${entry.ts}_${entry.seq}`} entry={entry} />
             ))}
           </div>
         )
@@ -162,7 +183,7 @@ function ColumnLogsCard({
         <p className="text-[11px] italic text-muted-foreground">{t("arena.logs.emptyEvents")}</p>
       ) : (
         <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap break-words rounded-none border border-border bg-muted/30 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
-          {logs.events.map(eventLine).join("\n")}
+          {eventsText}
           {logs.truncated ? `\n${t("arena.trace.truncatedMark")}` : ""}
         </pre>
       )}
