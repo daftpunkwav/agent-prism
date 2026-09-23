@@ -13,14 +13,13 @@
 
 import { useMemo } from "react";
 import { BarChart3, FileText, MessageSquareText, Activity, Zap, Braces, CircleCheck, CircleX } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   buildTraceComparison,
   extractFinalAnswer,
   type ColumnState,
 } from "@agentprism/arena-view";
 import type { ComparisonReportPayload } from "@agentprism/client";
+import { MarkdownBlock } from "@/components/MarkdownBlock";
 import { useT } from "@/i18n/useT";
 import { CopyButton } from "./CopyButton";
 import { AnswerAlignment, EntityOverlap } from "./AnswerCompare";
@@ -348,8 +347,8 @@ export function ComparisonReport({
                   <summary className="cursor-pointer text-muted-foreground">
                     {row.text.slice(0, 120)}{row.text.length > 120 ? "…" : ""}
                   </summary>
-                  <div className="prose prose-sm dark:prose-invert mt-2 max-h-56 overflow-auto max-w-none prose-p:my-1 prose-p:text-foreground">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{row.text.slice(0, 2000)}</ReactMarkdown>
+                  <div className="mt-2 max-h-56 overflow-auto">
+                    <MarkdownBlock text={row.text.slice(0, 2000)} />
                   </div>
                 </details>
               )}
@@ -564,13 +563,7 @@ export function ComparisonReport({
       <section className="panel-surface !shadow-none p-4 space-y-2">
         <h4 className="text-sm font-semibold">{t("arena.report.narrativeTitle")}</h4>
         {narrativeBody !== "" ? (
-          <div
-            className="prose prose-sm dark:prose-invert max-w-none
-              prose-p:my-2 prose-p:text-foreground
-              prose-headings:text-foreground prose-headings:my-2"
-          >
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{narrativeBody}</ReactMarkdown>
-          </div>
+          <MarkdownBlock text={narrativeBody} />
         ) : (
           <p className="text-xs leading-relaxed text-muted-foreground">{t("arena.report.narrativeEmpty")}</p>
         )}

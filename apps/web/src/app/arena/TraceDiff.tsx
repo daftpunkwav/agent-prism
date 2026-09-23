@@ -14,13 +14,12 @@
 
 "use client";
 
-import { memo, useMemo, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useMemo, useState } from "react";
 import { ArrowLeftRight, Braces, ChevronDown, ChevronUp, FileText, GitCommitHorizontal, ListOrdered, ScrollText, Zap } from "lucide-react";
 import type { ArenaEvent } from "@agentprism/client";
 import type { ColumnState } from "@agentprism/arena-view";
 import { buildTraceComparison, mergeEvents, type TraceCompareColumn } from "@agentprism/arena-view";
+import { MarkdownBlock } from "@/components/MarkdownBlock";
 import { useT } from "@/i18n/useT";
 import { CopyButton } from "./CopyButton";
 import { AnswerAlignment, EntityOverlap } from "./AnswerCompare";
@@ -34,20 +33,6 @@ interface TraceDiffProps {
 
 /** Long-text truncation threshold with an expand interaction. */
 const TRUNCATE_AT = 600;
-
-/** Markdown block memoized per text. */
-const MarkdownBlock = memo(function MarkdownBlock({ text }: { text: string }) {
-  return (
-    <div
-      className="prose prose-sm dark:prose-invert max-w-none
-        prose-p:my-1 prose-p:text-foreground
-        prose-pre:my-1 prose-pre:rounded-none prose-pre:border prose-pre:border-border
-        prose-code:text-[11px] prose-code:px-1 prose-code:rounded-none prose-code:bg-muted"
-    >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
-    </div>
-  );
-});
 
 /** Expandable long text: truncated with a toggle beyond TRUNCATE_AT characters. */
 function LongText({ text }: { text: string }) {
