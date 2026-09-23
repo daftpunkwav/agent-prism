@@ -188,4 +188,44 @@ describe("actorTagOf", () => {
     expect(actorTagOf("action", "[AutoGen coder]")).toBeNull();
     expect(actorTagOf("thought", "no label here")).toBeNull();
   });
+
+  it("classifies thought step roles from event order, not text", () => {
+    const segs = mergeEvents([
+      ev("thought", 1, { content: "plan the work" }),
+      ev("action", 1, { tool: "write", args: { path: "a.txt" } }),
+      ev("observation", 1, { result: "wrote a.txt" }),
+      ev("thought", 2, { content: "result looks good; next I will read it back" }),
+      ev("action", 2, { tool: "read", args: { path: "a.txt" } }),
+      ev("observation", 2, { result: "contents" }),
+      ev("thought", 3, { content: "all verified; done" }),
+    ]);
+    const thoughts = segs.filter((seg) => seg.kind === "thought" && !seg.meta);
+    expect(thoughts).toHaveLength(3);
+    // Thought leading into the FIRST call: action.
+    expect(thoughts[0]!.stepRole).toBe("action");
+    // Sandwiched between a folded result and the next call: both roles at once — unlabeled.
+    expect(thoughts[1]!.stepRole).toBeUndefined();
+    // Wrap-up after the last result with no further call: observation.
+    expect(thoughts[2]!.stepRole).toBe("observation");
+  });
+
+  it("stays unlabeled for tool-free chat and skips thinking when classifying", () => {
+    const plain = mergeEvents([
+      ev("thought", 1, { content: "just chatting" }),
+      ev("thought_end", 1),
+    ]);
+    expect(plain.find((seg) => seg.kind === "thought")?.stepRole).toBeUndefined();
+
+    const segs = mergeEvents([
+      ev("thought", 1, { content: "hidden reasoning then act" }),
+      ev("thinking", 1, { content: "internal monologue" }),
+      ev("action", 1, { tool: "bash" }),
+      ev("observation", 1, { result: "ok" }),
+      ev("thought", 2, { content: "wrap up" }),
+    ]);
+    const thoughts = segs.filter((seg) => seg.kind === "thought");
+    // The thinking segment between thought and action does not break the action classification.
+    expect(thoughts[0]!.stepRole).toBe("action");
+    expect(thoughts[1]!.stepRole).toBe("observation");
+  });
 });

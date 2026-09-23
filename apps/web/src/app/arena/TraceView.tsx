@@ -270,20 +270,31 @@ const TraceStep = memo(function TraceStep({
     }
     const streaming = !seg.completed;
     const interim = !streaming && !seg.final;
+    // Deterministic step-role label (classified from event order in mergeEvents):
+    // the thought leading into a tool call reads as Action, the post-result wrap-up
+    // as Observation, everything else (uncertain) stays plain output.
+    const roleLabel =
+      seg.stepRole === "action"
+        ? t("arena.trace.stepAction")
+        : seg.stepRole === "observation"
+          ? t("arena.trace.stepObservation")
+          : t("arena.trace.output");
+    const RoleIcon = seg.stepRole === "action" ? Zap : seg.stepRole === "observation" ? Terminal : Lightbulb;
     return (
       <div
         className={`trace-seg ${interim ? "trace-interim" : "trace-thought"}`}
         data-kind="answer"
+        data-step-role={seg.stepRole}
         data-final={seg.final ? "true" : undefined}
         style={{ borderLeftColor: interim ? "var(--border)" : accentColor }}
       >
         <span className="trace-tag flex items-center gap-1.5 flex-wrap">
           <span className="trace-kind-badge" data-kind={interim ? "interim" : seg.final ? "final" : "answer"} style={{ borderColor: interim ? undefined : `color-mix(in srgb, ${accentColor} 45%, transparent)`, color: interim ? undefined : accentColor }}>
-            <Lightbulb className="h-3 w-3" aria-hidden />
-            {/* One stable label for every model-output segment: multi-turn agents
-                produce many turns, and a "final" badge that keeps jumping between
-                segments reads as flicker, not as information. */}
-            {t("arena.trace.output")}
+            <RoleIcon className="h-3 w-3" aria-hidden />
+            {/* Role label when determinable (action/observation), else the stable
+                plain-output label: multi-turn agents produce many turns, and a
+                "final" badge that keeps jumping between segments reads as flicker. */}
+            {roleLabel}
           </span>
           <span className="font-mono text-muted-foreground">{t("arena.trace.stepAnswer", { step: seg.step })}</span>
           {streaming && <span className="ml-1 text-muted-foreground">{t("arena.trace.thinkingStreaming")}<span className="trace-cursor" /></span>}

@@ -268,6 +268,8 @@ export const arena = {
     thinkingStreaming: "思考中",
     answer: "回答",
     output: "输出",
+    stepAction: "动作",
+    stepObservation: "观察",
     stepAnswer: "步骤 {step} · 回答",
     legendThinking: "思考过程",
     legendAnswer: "模型回答",

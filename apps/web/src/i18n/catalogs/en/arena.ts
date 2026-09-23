@@ -269,6 +269,8 @@ export const arena = {
     thinkingStreaming: "thinking",
     answer: "Answer",
     output: "Output",
+    stepAction: "Action",
+    stepObservation: "Observation",
     stepAnswer: "Step {step} · Answer",
     legendThinking: "Thinking",
     legendAnswer: "Answer",

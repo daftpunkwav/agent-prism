@@ -64,6 +64,15 @@ export interface DisplaySegment {
    * Absent for single-agent flows, which need no attribution.
    */
   actor?: string;
+  /**
+   * Deterministic step role for thought segments, classified from the event
+   * ORDER after the merge pass (never from the text content): a thought leading
+   * into a tool call is the action statement; the first settled thought after a
+   * tool result with no further call is the observation wrap-up. A thought both
+   * following a result and leading into another call plays two roles at once —
+   * uncertain by contract, so it stays unlabeled and renders as plain output.
+   */
+  stepRole?: "action" | "observation";
 }
 
 /**
@@ -339,6 +348,7 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
     // Ignore pure metadata such as complete / token_update / report
   }
   markFinalAnswerSegments(segs);
+  markStepRoles(segs);
   return segs;
 }
 
@@ -358,6 +368,61 @@ function markFinalAnswerSegments(segs: DisplaySegment[]): void {
   }
   for (const idx of lastSettledThought.values()) {
     segs[idx]!.final = true;
+  }
+}
+
+/** Segment kinds that never carry step-role semantics (skipped by the role classifier). */
+const ROLE_SKIP_KINDS = new Set<string>(["thinking", "step"]);
+
+/** True when the segment is tool activity (a call with its folded result, or a stray result). */
+function isToolActivity(seg: DisplaySegment | undefined): boolean {
+  return seg !== undefined && (seg.kind === "action" || seg.kind === "observation");
+}
+
+/** Nearest non-skip segment before index i, or undefined. */
+function prevContentSegment(segs: DisplaySegment[], i: number): DisplaySegment | undefined {
+  for (let j = i - 1; j >= 0; j -= 1) {
+    const seg = segs[j]!;
+    if (ROLE_SKIP_KINDS.has(seg.kind) || seg.meta) continue;
+    return seg;
+  }
+  return undefined;
+}
+
+/** Nearest non-skip segment after index i, or undefined. */
+function nextContentSegment(segs: DisplaySegment[], i: number): DisplaySegment | undefined {
+  for (let j = i + 1; j < segs.length; j += 1) {
+    const seg = segs[j]!;
+    if (ROLE_SKIP_KINDS.has(seg.kind)) continue;
+    return seg;
+  }
+  return undefined;
+}
+
+/**
+ * Classifies settled, non-banner thought segments into step roles from the
+ * segment ORDER alone (the text is never inspected — model-written labels must
+ * not influence the classification):
+ * - next content segment is a tool call and previous is not tool activity → action
+ *   (the thought is the statement leading into the call);
+ * - previous segment is tool activity and there is no further call → observation
+ *   (the wrap-up after the last result);
+ * - everything else — most notably a thought sandwiched between a result and the
+ *   next call, which plays both roles at once — stays unlabeled and renders as
+ *   plain output.
+ */
+function markStepRoles(segs: DisplaySegment[]): void {
+  for (let i = 0; i < segs.length; i += 1) {
+    const seg = segs[i]!;
+    if (seg.kind !== "thought" || seg.meta || !seg.completed || seg.text.trim() === "") continue;
+    const next = nextContentSegment(segs, i);
+    const prev = prevContentSegment(segs, i);
+    if (next?.kind === "action") {
+      if (!isToolActivity(prev)) seg.stepRole = "action";
+      // prev is tool activity: result summary AND next step in one segment — uncertain, unlabeled.
+      continue;
+    }
+    if (isToolActivity(prev)) seg.stepRole = "observation";
   }
 }
 
