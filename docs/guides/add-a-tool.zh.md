@@ -24,7 +24,7 @@ tool 名加入 `packages/contracts/contracts/src/enums.ts` 中的
 
 - 输入校验失败关闭，对重复、空值或超限输入抛错。上限以 `MAX_*` 常量暴露，见
   `todo.ts` 与 `ask-user.ts`。
-- 输出经 `definitions/helpers.ts` 中的共享 helper。`truncate()` 在
+- 输出经 `definitions/caps.ts` 中的共享 helper。`truncate()` 在
   `MAX_OUTPUT = 32 * 1024` 字符处中部修剪。`boundText()` 先持久化再修剪到 workspace
   的 `.spills/` 目录。见 [../reference/tools.zh.md](../reference/tools.zh.md)。
 - `execute()` 返回结构化 `ToolExecutionResult`，即 `{result, fileDiff, ok, code?}`。

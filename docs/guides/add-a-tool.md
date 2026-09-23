@@ -23,7 +23,7 @@ from `contracts` with `name`, `description`, `jsonSchema`, `mutatesWorkspace`, o
 
 - Input validation fails closed and throws on duplicates, empty values, or oversize
   input. Limits are exposed as `MAX_*` constants, as in `todo.ts` and `ask-user.ts`.
-- Output is routed through the shared helpers in `definitions/helpers.ts`. `truncate()`
+- Output is routed through the shared helpers in `definitions/caps.ts`. `truncate()`
   middle-prunes at `MAX_OUTPUT = 32 * 1024` characters. `boundText()` persists then
   prunes to the workspace `.spills/` directory. See
   [../reference/tools.md](../reference/tools.md).

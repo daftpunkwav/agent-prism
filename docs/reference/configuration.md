@@ -35,7 +35,7 @@ out-of-box behavior equals the default column.
 | `LLM_TEMPERATURE` | `0.0` | 0 to 2 |
 | `LLM_TIMEOUT_MS` | `120000` | per-call chat-model timeout, applied to column models, judge, narrative, and builder |
 | `LLM_MAX_RETRIES` | `2`, range 0 to 5 | SDK-level transient-failure retry count for chat models |
-| `LLM_RETRY_DELAY_MS` | `500`, range 0 to 10 000 | judge-path retry backoff between attempts |
+| `LLM_RETRY_DELAY_MS` | `500`, range 0 to 10 000 | parsed but currently unused: retries ride the chat-model SDK (`LLM_MAX_RETRIES`), which manages its own backoff; kept for compatibility |
 
 ## Concurrency, breakers, and interaction
 
