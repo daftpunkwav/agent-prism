@@ -26,6 +26,8 @@ export const DECODE_FIELD_RANGES = {
   frequency_penalty: { min: -2, max: 2, step: 0.1 },
   presence_penalty: { min: -2, max: 2, step: 0.1 },
   max_output_tokens: { min: 64, max: 384_000, step: 64 },
+  // Anthropic budget_tokens override: 0 means "follow the thinking level".
+  thinking_budget: { min: 0, max: 1_000_000, step: 1024 },
   // Runtime step budget, not an API-bounded decode parameter: any positive int
   // is legal, and -1 (UNLIMITED_STEPS) means "no step budget at all".
   max_steps: { min: 1, max: 100_000, step: 1 },

@@ -30,6 +30,7 @@
     "@agentprism/builder-service": "workspace:*",
     "@agentprism/builder-turns": "workspace:*",
     "@agentprism/config": "workspace:*",
+    "@agentprism/context-assembly": "workspace:*",
     "@agentprism/contracts": "workspace:*",
     "@agentprism/dimensions": "workspace:*",
     "@agentprism/driver-autogen": "workspace:*",

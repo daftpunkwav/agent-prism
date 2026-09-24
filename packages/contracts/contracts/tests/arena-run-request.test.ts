@@ -38,6 +38,24 @@ describe("ArenaRunRequestSchema baseline wire format", () => {
     expect(parsed.data.baseline?.max_steps).toBe("10");
   });
 
+  it("keeps thinking_budget and dynamic context ids on the wire", () => {
+    // Regression: a missing wire key let zod silently strip the baseline
+    // panel's thinking_budget, and the closed context enum rejected
+    // registered context-strategy plugin ids (both fields are served as
+    // baseline selects/inputs via /meta baseline_fields).
+    const parsed = ArenaRunRequestSchema.safeParse({
+      question: "compare thinking budgets",
+      dimension: "model",
+      selections: [],
+      baseline: { thinking_budget: "8192", context: "some_registered_plugin" },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.baseline?.thinking_budget).toBe("8192");
+    expect(parsed.data.baseline?.context).toBe("some_registered_plugin");
+  });
+
   it("accepts independent column_sessions keyed by pipeline label", () => {
     const parsed = ArenaRunRequestSchema.safeParse({
       question: "add a scoreboard",

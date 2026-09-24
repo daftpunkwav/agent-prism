@@ -47,6 +47,9 @@ importers:
       '@agentprism/config':
         specifier: workspace:*
         version: link:../../packages/config/config
+      '@agentprism/context-assembly':
+        specifier: workspace:*
+        version: link:../../packages/context/context-assembly
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts/contracts
@@ -430,6 +433,12 @@ importers:
       '@types/node':
         specifier: ^24
         version: 24.13.4
+
+  packages/context/context-assembly:
+    dependencies:
+      '@agentprism/contracts':
+        specifier: workspace:*
+        version: link:../../contracts/contracts
 
   packages/context/context-budget:
     devDependencies:

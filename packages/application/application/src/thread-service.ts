@@ -296,6 +296,7 @@ export const THREAD_BASELINE_FIELDS = [
   "temperature",
   "endpoint_id",
   "thinking_level",
+  "thinking_budget",
   "top_p",
   "frequency_penalty",
   "presence_penalty",

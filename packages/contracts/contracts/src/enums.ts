@@ -19,6 +19,7 @@ export const DimensionIdSchema = z.enum([
   "temperature",
   "model",
   "thinking",
+  "thinking_budget",
   "max_steps",
   "toolset",
   "mcp",

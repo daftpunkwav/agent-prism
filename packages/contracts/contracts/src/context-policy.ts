@@ -29,6 +29,19 @@ export interface ContextPolicy {
   apply(input: ContextPolicyInput): Promise<LlmMessage[]> | LlmMessage[];
 }
 
+/**
+ * Externally contributed context strategy (the custom-dimension subpackage
+ * seam). A subpackage exports plugins; the host registers them and the
+ * context dimension surfaces id/label automatically. apply() only shapes the
+ * replayed message list — sanitize and tool grounding run afterwards.
+ */
+export interface ContextStrategyPlugin {
+  readonly id: string;
+  readonly label: string;
+  readonly description?: string;
+  apply(messages: LlmMessage[]): LlmMessage[];
+}
+
 /** Registry of context policies; unknown strategy ids fail closed. */
 export interface ContextPolicyRegistry {
   register(policy: ContextPolicy): void;

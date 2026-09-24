@@ -21,6 +21,7 @@ import {
 } from "@agentprism/dimensions";
 import {
   createBuiltinContextPolicyRegistry,
+  listContextStrategyPlugins,
   getBuiltinPromptSectionRegistry,
 } from "@agentprism/harness";
 
@@ -45,10 +46,16 @@ export function buildCapabilityOptionProjection(): Partial<Record<DimensionId, D
     REASONING_MODE_META.map((meta) => meta.mode).filter((mode) => reasoningFromSections.has(mode)),
   );
   const toolsetRegistered = new Set(Object.keys(TOOL_NAMES_BY_TOOLSET));
+  // Custom-dimension subpackages: registered plugins append their own labels
+  // after the builtin rows; ARENA_CUSTOM_DIMENSIONS=off turns them off.
+  const customEnabled = process.env.ARENA_CUSTOM_DIMENSIONS !== "off";
+  const pluginRows = customEnabled
+    ? listContextStrategyPlugins().map((plugin) => ({ field: "context", value: plugin.id, label: plugin.label }))
+    : [];
 
   return {
     prompt: project(PROMPT_OPTIONS, idsWithPrefix(sectionIds, "profile:")),
-    context: project(CONTEXT_OPTIONS, contextRegistered),
+    context: [...project(CONTEXT_OPTIONS, contextRegistered), ...pluginRows],
     harness: project(HARNESS_OPTIONS, idsWithPrefix(sectionIds, "harness:")),
     reasoning: REASONING_MODE_META.filter((meta) => reasoningRegistered.has(meta.mode)).map(
       (meta): DimensionOptionTriple => ({

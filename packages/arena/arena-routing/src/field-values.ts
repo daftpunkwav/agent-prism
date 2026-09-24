@@ -8,7 +8,7 @@
  */
 
 const FLOAT_FIELDS = new Set(["temperature", "top_p", "frequency_penalty", "presence_penalty"]);
-const INT_FIELDS = new Set(["max_steps", "max_output_tokens"]);
+const INT_FIELDS = new Set(["max_steps", "max_output_tokens", "thinking_budget"]);
 
 /** Baseline token for "no step budget" (max_steps only); coerces to the -1 sentinel. */
 const UNLIMITED_TOKEN = "unlimited";

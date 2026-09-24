@@ -23,6 +23,8 @@ import {
   WorkspaceFileService,
 } from "@agentprism/application";
 import { buildComparisonReport, extractNarrativeText, judgeAnswers, judgeAnswersAsync, type ReportDeps } from "@agentprism/evaluation";
+import { registerContextStrategyPlugins } from "@agentprism/harness";
+import { contextAssemblyPlugins } from "@agentprism/context-assembly";
 import type { ContextTuning } from "@agentprism/harness";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import {
@@ -110,6 +112,12 @@ import type {
   ReportPublisher,
 } from "@agentprism/contracts";
 import { isLoopbackHost } from "@agentprism/contracts";
+
+// Custom-dimension subpackages: register at composition root so the context
+// dimension auto-surfaces them (ARENA_CUSTOM_DIMENSIONS=off disables).
+if (process.env.ARENA_CUSTOM_DIMENSIONS !== "off") {
+  registerContextStrategyPlugins(contextAssemblyPlugins);
+}
 
 export interface RuntimeComponents {
   settings: Settings;

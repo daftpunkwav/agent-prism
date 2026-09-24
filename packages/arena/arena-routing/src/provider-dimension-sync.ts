@@ -12,7 +12,7 @@
 
 import type { ProviderConfig, ProviderLookup } from "@agentprism/contracts";
 import { MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, TEMPERATURE_OPTIONS, TOP_P_OPTIONS } from "@agentprism/contracts";
-import { currentEndpointLabel, DimensionCatalog, type DimensionOptionTriple } from "@agentprism/dimensions";
+import { currentEndpointLabel, DimensionCatalog, THINKING_BUDGET_OPTIONS, type DimensionOptionTriple } from "@agentprism/dimensions";
 import { snapIntToOptions, snapToOptions } from "./field-values.js";
 
 /** Config sync dependencies: catalog + provider lookup port (wired at the composition root; the instance is created and held by DimensionRouter). */
@@ -119,6 +119,14 @@ export class ProviderDimensionSync {
       this.dimensionCatalog.setDefaultBase(
         "thinking_level",
         defaultEndpoint.thinking_capable ? defaultEndpoint.thinking_level : "off",
+      );
+      // The budget dimension only exists for Anthropic Messages models: other
+      // formats express thinking intensity as level strings, not token counts.
+      const budgetApplicable = defaultEndpoint.api_format === "anthropic_messages" && defaultEndpoint.thinking_capable;
+      this.dimensionCatalog.setDimensionOptions("thinking_budget", budgetApplicable ? THINKING_BUDGET_OPTIONS : []);
+      this.dimensionCatalog.setDefaultBase(
+        "thinking_budget",
+        budgetApplicable ? defaultEndpoint.thinking_budget_tokens : 0,
       );
     }
     this.dimensionCatalog.setDefaultBase("temperature", snapToOptions(provider.temperature, TEMPERATURE_OPTIONS));

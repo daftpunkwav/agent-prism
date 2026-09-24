@@ -196,6 +196,7 @@ function toPipelineConfig(data: Record<string, unknown>): PipelineConfig {
     presence_penalty: data.presence_penalty as PipelineConfig["presence_penalty"],
     max_output_tokens: data.max_output_tokens as PipelineConfig["max_output_tokens"],
     thinking_level: data.thinking_level as PipelineConfig["thinking_level"],
+    thinking_budget: Number(data.thinking_budget ?? 0),
     thinking_capable: data.thinking_capable as PipelineConfig["thinking_capable"],
     max_steps: data.max_steps as PipelineConfig["max_steps"],
     toolset: data.toolset as PipelineConfig["toolset"],

@@ -60,6 +60,8 @@ export const PipelineConfigSchema = z.object({
   presence_penalty: z.number().default(0.0),
   max_output_tokens: z.number().int().min(64).max(128_000).default(96000),
   thinking_level: ThinkingLevelSchema.default("off"),
+  // Anthropic budget_tokens override (tokens); 0 = follow the thinking level.
+  thinking_budget: z.number().int().min(0).max(1_000_000).default(0),
   thinking_capable: z.boolean().default(false),
   // -1 (UNLIMITED_STEPS) means "no step budget": the loop runs until the model
   // stops calling tools or the run is aborted.
@@ -93,13 +95,17 @@ export type PipelineConfig = z.infer<typeof PipelineConfigSchema>;
 export const BaselineOverridesSchema = z.object({
   framework: z.string().nullish(),
   reasoning: ReasoningModeSchema.nullish(),
-  context: ContextStrategySchema.nullish(),
+  // Like framework, a dynamic-valued field: registered context-strategy plugin
+  // ids are legal alongside the builtin enum. resolveBaselineOverrides still
+  // rejects unknown ids against the synced option set (fail loud).
+  context: z.string().nullish(),
   harness: HarnessLevelSchema.nullish(),
   prompt_profile: PromptProfileSchema.nullish(),
   temperature: z.string().nullish(),
   endpoint_id: z.string().nullish(),
   model_id: z.string().nullish(),
   thinking_level: ThinkingLevelSchema.nullish(),
+  thinking_budget: z.string().nullish(),
   top_p: z.string().nullish(),
   frequency_penalty: z.string().nullish(),
   presence_penalty: z.string().nullish(),

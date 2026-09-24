@@ -18,6 +18,7 @@ import { maybeAppendContextReminder } from "./remaining.js";
 import { sanitizeMessagesForModel } from "./sanitize.js";
 import { withToolGrounding } from "./anchoring.js";
 import { UnknownPromptConfigError } from "../prompt/errors.js";
+import { contextStrategyPlugin } from "./strategy-plugins.js";
 
 const KNOWN_STRATEGIES = new Set(["sliding", "summary", "vector", "hybrid", "tool_tail", "token_budget", "budget", "checkpoint"]);
 
@@ -33,19 +34,42 @@ export interface ContextPipelineOptions extends AssembleOptions {
 }
 
 /**
+ * Shared post-transform tail: sanitize + tool grounding plus the optional
+ * budget reminder. Custom strategies run through the same tail so every
+ * column stays comparable.
+ */
+export function finishContextPipeline(trimmed: LlmMessage[], options: ContextPipelineOptions = {}): LlmMessage[] {
+  const grounded = options.sanitizeAndGround === false
+    ? trimmed
+    : withToolGrounding(sanitizeMessagesForModel(trimmed));
+  if (options.contextBudgetTokens === undefined) {
+    return grounded;
+  }
+  return maybeAppendContextReminder(grounded, {
+    budgetTokens: options.contextBudgetTokens,
+    thresholdRatio: options.contextReminderThreshold,
+    charsPerToken: options.charsPerToken,
+  }).messages;
+}
+
+/**
  * Applies the column context strategy then (by default) sanitize + grounding.
  * When a context budget is configured, a wrap-up reminder is appended once
- * estimated usage crosses the threshold. Unknown strategies fail closed.
+ * estimated usage crosses the threshold. Registered plugin strategies
+ * (custom-dimension subpackages) run through the same tail as the builtins;
+ * anything neither builtin nor registered fails closed.
  */
 export function applyContextPipeline(
   messages: LlmMessage[],
   strategy: string,
   options: ContextPipelineOptions = {},
 ): LlmMessage[] {
-  if (!KNOWN_STRATEGIES.has(strategy)) {
+  const isBuiltin = KNOWN_STRATEGIES.has(strategy);
+  const plugin = isBuiltin ? undefined : contextStrategyPlugin(strategy);
+  if (!isBuiltin && plugin === undefined) {
     throw new UnknownPromptConfigError("context", strategy);
   }
-  const trimmed = prepareMessagesForLlm(messages, strategy, options);
+  const trimmed = plugin !== undefined ? plugin.apply(messages) : prepareMessagesForLlm(messages, strategy, options);
   if (options.analytics !== undefined) {
     recordPreparedUsage(options.analytics, trimmed);
     // Every strategy is observed, not just the lossy budget ones: kept/dropped
@@ -62,15 +86,5 @@ export function applyContextPipeline(
       observeStrategy(options.analytics, strategy, messages, trimmed, ledgerEmitted);
     }
   }
-  const grounded = options.sanitizeAndGround === false
-    ? trimmed
-    : withToolGrounding(sanitizeMessagesForModel(trimmed));
-  if (options.contextBudgetTokens === undefined) {
-    return grounded;
-  }
-  return maybeAppendContextReminder(grounded, {
-    budgetTokens: options.contextBudgetTokens,
-    thresholdRatio: options.contextReminderThreshold,
-    charsPerToken: options.charsPerToken,
-  }).messages;
+  return finishContextPipeline(trimmed, options);
 }

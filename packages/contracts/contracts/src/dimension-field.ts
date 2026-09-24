@@ -21,6 +21,7 @@ export const DIMENSION_FIELD: Record<DimensionId, string> = {
   temperature: "temperature",
   model: "endpoint_id",
   thinking: "thinking_level",
+  thinking_budget: "thinking_budget",
   max_steps: "max_steps",
   toolset: "toolset",
   mcp: "mcp_policy",

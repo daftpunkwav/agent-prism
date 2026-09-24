@@ -11,10 +11,11 @@ import type {
   ContextPolicyInput,
   ContextPolicyRegistry,
   ContextStrategy,
+  ContextStrategyPlugin,
   LlmMessage,
 } from "@agentprism/contracts";
 import { UnknownPromptConfigError } from "../prompt/errors.js";
-import { applyContextPipeline } from "./pipeline.js";
+import { applyContextPipeline, finishContextPipeline } from "./pipeline.js";
 
 class StrategyPolicy implements ContextPolicy {
   constructor(readonly id: ContextStrategy) {}
@@ -59,11 +60,36 @@ export class MapContextPolicyRegistry implements ContextPolicyRegistry {
   }
 }
 
-/** Creates a registry with sliding/summary/vector/hybrid/tool_tail/token_budget policies. */
+class PluginPolicy implements ContextPolicy {
+  // Plugin ids live outside the ContextStrategy enum; the registry treats ids
+  // as opaque strings, so the cast only satisfies the port's nominal type.
+  readonly id: ContextStrategy;
+
+  constructor(readonly plugin: ContextStrategyPlugin) {
+    this.id = plugin.id as ContextStrategy;
+  }
+
+  // The plugin shapes replayed messages; sanitize + tool grounding still run
+  // through the shared pipeline tail so custom strategies stay comparable.
+  apply(input: ContextPolicyInput): LlmMessage[] {
+    return finishContextPipeline(this.plugin.apply(input.messages), {});
+  }
+}
+
+// Public API re-export: the plugin map lives in its own module so the live
+// pipeline (applyContextPipeline) can dispatch plugin ids without a cycle
+// back into this file.
+export { registerContextStrategyPlugins, listContextStrategyPlugins } from "./strategy-plugins.js";
+import { listContextStrategyPlugins as listPlugins } from "./strategy-plugins.js";
+
+/** Creates a registry with the builtin policies plus every registered plugin. */
 export function createBuiltinContextPolicyRegistry(): MapContextPolicyRegistry {
   const registry = new MapContextPolicyRegistry();
   for (const id of ["sliding", "summary", "vector", "hybrid", "tool_tail", "token_budget"] as const) {
     registry.register(new StrategyPolicy(id));
+  }
+  for (const plugin of listPlugins()) {
+    registry.register(new PluginPolicy(plugin));
   }
   return registry;
 }

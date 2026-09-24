@@ -96,6 +96,9 @@ export function compositionToPipelineConfig(
     presence_penalty: composition.presence_penalty,
     max_output_tokens: composition.max_output_tokens,
     thinking_level: composition.thinking_level,
+    // Builder compositions select a level, not a token budget: 0 follows the
+    // level mapping (and the endpoint budget pair when configured).
+    thinking_budget: 0,
     thinking_capable: options.thinkingCapable,
     max_steps: composition.max_steps,
     toolset: baseToolsetFor(composition.tools),
