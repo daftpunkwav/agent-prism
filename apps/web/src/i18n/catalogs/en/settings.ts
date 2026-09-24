@@ -73,6 +73,7 @@ export const settings = {
     thinkingBudgetTokens: "Thinking budget tokens (budget_tokens)",
     thinkingOutputTokens: "Thinking output tokens (max_tokens)",
     thinkingBudgetError: "Thinking output tokens must exceed the thinking budget tokens",
+    modalGuideHint: "See the Guide tab in Settings for the full explanation of every option.",
     customLevelRemoveAria: "Remove custom level {index}",
     labelPlaceholder: "Display name",
     labelAria: "Model {index} display name",
@@ -119,8 +120,46 @@ export const settings = {
     memory: "Memory",
     skills: "Skills",
     mcp: "MCP",
+    guide: "Guide",
     navAria: "Settings sections",
   },
+  skin: {
+    label: "Theme skin",
+    "21th": "Default (21th)",
+    claude: "Claude",
+  },
+  guide: {
+    intro: "Every settings group explained in one place; the sections themselves keep only controls.",
+    connections: {
+      title: "Models & connections",
+      body: "One provider connection (base URL / API key / API format) hosts multiple model slots. The API format picks the protocol adapter: anthropic_messages speaks the Anthropic Messages protocol; openai_chat / openai_responses speak the OpenAI family. Context window / max input / max output are capability declarations used for context budgeting and truncation.",
+    },
+    thinking: {
+      title: "Thinking (level & budget)",
+      body: "With thinking enabled the two controls are independent: (1) Level: off/low/medium/high or vendor modes (e.g. adaptive). OpenAI formats send it verbatim as reasoning_effort; anthropic named levels map to the fixed budgets (2k/8k/16k); other strings ride thinking.type verbatim. (2) Budget (Anthropic only): budget_tokens + max_tokens as two numbers; when set it outranks the level mapping, output must exceed the budget, and 0 auto-raises to budget + 1024. Both exist as independent Arena dimensions.",
+    },
+    decode: {
+      title: "Decode defaults",
+      body: "Seeds the Arena baseline: temperature / top_p / frequency_penalty / presence_penalty / max_output_tokens. Explicit per-column settings override these during comparisons.",
+    },
+    runtime: {
+      title: "Runtime knobs",
+      body: "Timeouts, retries and other runtime knobs. Hot-applied on the next request; no restart needed.",
+    },
+    memory: {
+      title: "Memory",
+      body: "Cross-session memory (episodic / semantic / full) mounted into the prompt; data lives in data/memory_*.json.",
+    },
+    skills: {
+      title: "Skills",
+      body: "Manage the skill library: bundled plus data/skills custom skills; the model loads them on demand via the skill tool.",
+    },
+    mcp: {
+      title: "MCP",
+      body: "External MCP servers (filesystem / fetch, ...) bridged into the tool list. Hot-applied.",
+    },
+  },
+
   rail: {
     title: "Providers",
     add: "Add provider",

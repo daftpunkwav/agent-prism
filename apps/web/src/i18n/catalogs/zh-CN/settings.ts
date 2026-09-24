@@ -73,6 +73,7 @@ export const settings = {
     thinkingBudgetTokens: "思考预算 tokens（budget_tokens）",
     thinkingOutputTokens: "思考输出 tokens（max_tokens）",
     thinkingBudgetError: "思考输出 tokens 必须大于思考预算 tokens",
+    modalGuideHint: "各项设置的完整说明见「设置指南」标签。",
     customLevelRemoveAria: "删除自定义档位 {index}",
     labelPlaceholder: "显示名称",
     labelAria: "模型 {index} 显示名称",
@@ -118,8 +119,46 @@ export const settings = {
     memory: "记忆",
     skills: "技能",
     mcp: "MCP",
+    guide: "设置指南",
     navAria: "设置分区",
   },
+  skin: {
+    label: "主题外观",
+    "21th": "默认（21th）",
+    claude: "Claude",
+  },
+  guide: {
+    intro: "本页汇总全部设置项的含义与作用域，正文各分区只保留控件。",
+    connections: {
+      title: "模型与连接",
+      body: "供应商连接（Base URL / API Key / API 格式）下可挂多个模型槽位。API 格式决定协议适配：anthropic_messages 走 Anthropic Messages 协议，openai_chat / openai_responses 走 OpenAI 系。上下文窗口 / 最大输入 / 最大输出是模型能力声明，用于上下文预算与截断。",
+    },
+    thinking: {
+      title: "思考（档位与预算）",
+      body: "支持思考开启后可分别设置：① 思考档位：off/low/medium/high 或厂商自定义档位（如 adaptive），openai 格式作为 reasoning_effort 原样透传，anthropic 命名档位映射固定预算（2k/8k/16k），其余字符串作为 thinking.type 原样透传。② 思考预算（仅 Anthropic 格式）：budget_tokens + max_tokens 两个数值，配置后优先于档位映射；输出必须大于思考，留 0 自动抬升为预算 + 1024。Arena 中两者是独立对比维度。",
+    },
+    decode: {
+      title: "解码默认",
+      body: "Arena 基线的种子值：temperature / top_p / frequency_penalty / presence_penalty / max_output_tokens。对比实验时列上的显式设置覆盖这里。",
+    },
+    runtime: {
+      title: "运行参数",
+      body: "超时、重试等运行时旋钮，热生效（下次请求即用新值），无需重启。",
+    },
+    memory: {
+      title: "记忆",
+      body: "跨会话记忆（情景 / 语义 / 完整）挂载进 prompt，数据存于 data/memory_*.json。",
+    },
+    skills: {
+      title: "技能",
+      body: "技能库的增删改与启停：bundled 内置 + data/skills 自定义，模型经 skill 工具按需加载。",
+    },
+    mcp: {
+      title: "MCP",
+      body: "外部 MCP 服务器（filesystem / fetch 等）桥接进工具列表，配置热生效。",
+    },
+  },
+
   rail: {
     title: "供应商",
     add: "添加供应商",

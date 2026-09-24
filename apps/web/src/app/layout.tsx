@@ -48,6 +48,11 @@ export default async function RootLayout({
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('agentprism-skin');if(s==='claude'){document.documentElement.dataset.theme='claude';}}catch(e){}})();`,
+          }}
+        />
         <script dangerouslySetInnerHTML={{ __html: localeBootstrapScript }} />
       </head>
       <body className="antialiased">

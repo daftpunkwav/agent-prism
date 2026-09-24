@@ -13,7 +13,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Brain, Cable, Gauge, Loader2, Plug, SlidersHorizontal, Sparkles } from "lucide-react";
+import { BookOpen, Brain, Cable, Gauge, Loader2, Plug, SlidersHorizontal, Sparkles } from "lucide-react";
 import { ProviderConfig, fetchProvider, saveProvider } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 import {
@@ -31,8 +31,9 @@ import { SkillsSection } from "./SkillsSection";
 import { DecodeDefaultsSection } from "./DecodeDefaultsSection";
 import { MemorySection } from "./MemorySection";
 import { RuntimeKnobsSection } from "./RuntimeKnobsSection";
+import { GuideSection } from "./GuideSection";
 
-type SectionId = "connections" | "decode" | "runtime" | "memory" | "skills" | "mcp";
+type SectionId = "connections" | "decode" | "runtime" | "memory" | "skills" | "mcp" | "guide";
 
 /** Settings route: sectioned provider/runtime/memory configuration. */
 export default function SettingsPage() {
@@ -178,6 +179,7 @@ export default function SettingsPage() {
     { id: "memory", label: t("settings.section.memory"), icon: Brain },
     { id: "skills", label: t("settings.section.skills"), icon: Sparkles },
     { id: "mcp", label: t("settings.section.mcp"), icon: Plug },
+    { id: "guide", label: t("settings.section.guide"), icon: BookOpen },
   ];
 
   if (loading) {
@@ -320,6 +322,7 @@ export default function SettingsPage() {
           {section === "memory" && <MemorySection onFlash={flash} />}
           {section === "skills" && <SkillsSection onFlash={flash} />}
           {section === "mcp" && <McpSection onFlash={flash} />}
+          {section === "guide" && <GuideSection />}
         </div>
       </div>
 

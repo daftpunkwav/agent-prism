@@ -22,6 +22,7 @@ const FIELD_TO_DIMENSION: Record<string, string> = {
   temperature: "temperature",
   endpoint_id: "model",
   thinking_level: "thinking",
+  thinking_budget: "thinking_budget",
   max_steps: "max_steps",
   toolset: "toolset",
   mcp_policy: "mcp",

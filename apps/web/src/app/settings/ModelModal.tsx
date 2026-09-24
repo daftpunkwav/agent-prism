@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import { UiSelect } from "@agentprism/ui";
+import { NumberInput, UiSelect } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
 import type { ModelSlot } from "./settingsConnectionModel";
 import { Field } from "./Field";
@@ -40,12 +40,8 @@ function levelOptions(
   return ["off", "low", "medium", "high"].map((value) => ({ value, label: label(value) }));
 }
 
-/** Token-count input clamp: mirrors the backend parse range so a stray typed value never becomes a 422. */
+/** Token-count input ceiling: mirrors the backend parse range so a stray typed value never becomes a 422. */
 const TOKEN_INPUT_MAX = 10_000_000;
-
-function clampTokenInput(raw: string): number {
-  return Math.min(TOKEN_INPUT_MAX, Math.max(0, Number.parseInt(raw, 10) || 0));
-}
 
 /** Independent model editor dialog: add and edit share this one window. */
 export function ModelModal({ initial, isNew, defaultEndpointId, onSetDefault, onClose, onSave }: ModelModalProps) {
@@ -174,30 +170,30 @@ export function ModelModal({ initial, isNew, defaultEndpointId, onSetDefault, on
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <Field label={t("settings.model.contextWindow")}>
-              <input
+              <NumberInput
                 className="form-input font-mono text-sm"
-                type="number"
+                integer
                 min={1024}
                 value={draft.context_window}
-                onChange={(e) => patch({ context_window: parseInt(e.target.value, 10) || 0 })}
+                onChange={(context_window) => patch({ context_window })}
               />
             </Field>
             <Field label={t("settings.model.maxInput")}>
-              <input
+              <NumberInput
                 className="form-input font-mono text-sm"
-                type="number"
+                integer
                 min={256}
                 value={draft.max_input_tokens}
-                onChange={(e) => patch({ max_input_tokens: parseInt(e.target.value, 10) || 0 })}
+                onChange={(max_input_tokens) => patch({ max_input_tokens })}
               />
             </Field>
             <Field label={t("settings.model.maxOutput")}>
-              <input
+              <NumberInput
                 className="form-input font-mono text-sm"
-                type="number"
+                integer
                 min={64}
                 value={draft.max_output_tokens}
-                onChange={(e) => patch({ max_output_tokens: parseInt(e.target.value, 10) || 0 })}
+                onChange={(max_output_tokens) => patch({ max_output_tokens })}
               />
             </Field>
           </div>
@@ -281,21 +277,23 @@ export function ModelModal({ initial, isNew, defaultEndpointId, onSetDefault, on
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label={t("settings.model.thinkingBudgetTokens")}>
-                    <input
+                    <NumberInput
                       className="form-input font-mono text-sm"
-                      type="number"
+                      integer
                       min={0}
+                      max={TOKEN_INPUT_MAX}
                       value={draft.thinking_budget_tokens}
-                      onChange={(e) => patch({ thinking_budget_tokens: clampTokenInput(e.target.value) })}
+                      onChange={(thinking_budget_tokens) => patch({ thinking_budget_tokens })}
                     />
                   </Field>
                   <Field label={t("settings.model.thinkingOutputTokens")}>
-                    <input
+                    <NumberInput
                       className="form-input font-mono text-sm"
-                      type="number"
+                      integer
                       min={0}
+                      max={TOKEN_INPUT_MAX}
                       value={draft.thinking_max_tokens}
-                      onChange={(e) => patch({ thinking_max_tokens: clampTokenInput(e.target.value) })}
+                      onChange={(thinking_max_tokens) => patch({ thinking_max_tokens })}
                     />
                   </Field>
                 </div>
@@ -336,17 +334,11 @@ export function ModelModal({ initial, isNew, defaultEndpointId, onSetDefault, on
                     <Plus className="h-3.5 w-3.5" />
                     {t("settings.model.customLevelAdd")}
                   </button>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    {t("settings.model.customLevelsHint")}
-                  </p>
                 </div>
               </>
             )}
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              {t("settings.model.thinkingBudgetHint")}
-            </p>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              {t("settings.model.thinkingHint")}
+              {t("settings.model.modalGuideHint")}
             </p>
           </div>
 

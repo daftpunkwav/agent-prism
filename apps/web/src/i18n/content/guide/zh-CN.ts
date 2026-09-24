@@ -61,6 +61,12 @@ const fieldMatrix: Array<{
     lockedWhen: "对比「模型」时",
   },
   {
+    dimension: "thinking_budget",
+    type: "number",
+    defaultValue: "0",
+    lockedWhen: "对比「思考预算」时；0 = 跟随档位",
+  },
+  {
     dimension: "thinking",
     type: "ThinkingLevel",
     defaultValue: "接入点默认（不支持则 off）",
@@ -649,6 +655,40 @@ const dimensions: DimDoc[] = [
       "部分代理对 reasoning_effort / thinking 字段支持不一致，异常时检查 Provider 日志。",
       "思考流会作为独立 SSE thinking 事件，与最终回答分离；判分仅看最终答案。",
       "高档思考会显著增加 output_tokens 与耗时，多轮叠加时成本需纳入实验设计。",
+    ],
+  },
+  {
+    id: "thinking_budget",
+    label: "思考预算",
+    reality: "full",
+    summary:
+      "独立设置 Anthropic budget_tokens（思考 token 预算），与思考档位分开选用。数值优先于档位映射；0 表示跟随档位。仅 Anthropic Messages 端点可用。",
+    controls:
+      "PipelineConfig.thinking_budget + endpoint.thinking_budget_tokens/thinking_max_tokens → buildThinkingClientOptions 预算覆盖。",
+    options: [
+      { value: "0", label: "0（跟随档位）", effect: "按思考档位的固定预算映射。" },
+      { value: "2048", label: "2048", effect: "budget_tokens=2048。" },
+      { value: "8192", label: "8192", effect: "budget_tokens=8192。" },
+      { value: "16384", label: "16384", effect: "budget_tokens=16384。" },
+      { value: "32768", label: "32768", effect: "budget_tokens=32768。" },
+      { value: "65536", label: "65536", effect: "budget_tokens=65536；基线可自由输入任意数值。" },
+    ],
+    path: [
+      "Provider 配置：thinking_budget_tokens + thinking_max_tokens 写入 LlmEndpoint（输出必须大于思考）。",
+      "Arena 运行级 thinking_budget > 0 时优先；否则用端点默认预算对。",
+      "max_tokens 过小时自动抬升为 budget + 1024（Anthropic 协议要求 budget < max_tokens）。",
+    ],
+    langChain: "createChatModel 预算覆盖经 buildThinkingClientOptions 注入 thinking 块。",
+    langGraph: "与 LangChain 相同。",
+    modules: [
+      "packages/providers/provider-capability/src/thinking.ts",
+      "packages/contracts/contracts/src/provider-types.ts",
+      "packages/providers/provider-langchain/src/model-factory.ts",
+    ],
+    baselineTip: "对比预算维时钉住模型与档位；预算变化会同步抬高 max_tokens，注意成本与耗时随预算近似线性增长。",
+    caveats: [
+      "仅 Anthropic Messages 端点生效；非 Anthropic 端点该维不可选。",
+      "部分网关对极大 budget_tokens 有上限或直接拒绝，异常时先查 Provider 日志。",
     ],
   },
   {

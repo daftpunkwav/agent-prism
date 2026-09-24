@@ -96,7 +96,9 @@ describe("RuntimeKnobsSection", () => {
     const context = await screen.findByLabelText(
       getCatalog("en").settings.runtime.fields.contextWindowMessages,
     ) as HTMLInputElement;
+    fireEvent.focus(context);
     fireEvent.change(context, { target: { value: "200" } });
+    fireEvent.blur(context);
     fireEvent.click(screen.getByRole("button", { name: getCatalog("en").settings.runtime.save }));
     await waitFor(() => expect(onFlash).toHaveBeenCalledWith(getCatalog("en").settings.runtime.saved));
     expect(saveMock).toHaveBeenCalledWith(

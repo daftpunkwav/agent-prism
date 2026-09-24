@@ -9,7 +9,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { BuilderCatalog, BuilderComposition } from "@agentprism/client";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
-import { BlockBoard, finiteOr } from "../src/app/builder/BlockBoard.js";
+import { BlockBoard } from "../src/app/builder/BlockBoard.js";
 
 const CATALOG = {
   capabilities: [
@@ -118,13 +118,18 @@ describe("BlockBoard", () => {
     expect((screen.getByRole("button", { name: new RegExp(en().applySwap) }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("keeps the previous value for non-numeric decode input", () => {
+  it("commits numeric input on blur and keeps the previous value for blank input", () => {
     const { onChange } = renderBoard();
     const temperature = screen.getByLabelText(en().temperature) as HTMLInputElement;
+    fireEvent.focus(temperature);
     fireEvent.change(temperature, { target: { value: "1.5" } });
+    fireEvent.blur(temperature);
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ temperature: 1.5 }));
+    fireEvent.focus(temperature);
     fireEvent.change(temperature, { target: { value: "" } });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ temperature: 0.7 }));
+    fireEvent.blur(temperature);
+    // Blank input reverts silently: no extra commit, the value stays 1.5.
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 
   it("reports restore-default clicks", () => {
@@ -132,14 +137,5 @@ describe("BlockBoard", () => {
     const restore = screen.getByRole("button", { name: en().restoreDefaults });
     fireEvent.click(restore);
     expect(onRestoreDefaults).toHaveBeenCalledOnce();
-  });
-});
-
-describe("finiteOr", () => {
-  it("falls back on blank and non-numeric input", () => {
-    expect(finiteOr("", 5)).toBe(5);
-    expect(finiteOr("  ", 5)).toBe(5);
-    expect(finiteOr("abc", 5)).toBe(5);
-    expect(finiteOr("2.5", 5)).toBe(2.5);
   });
 });

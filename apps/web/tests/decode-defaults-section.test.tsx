@@ -35,20 +35,23 @@ function renderSection(onChange = vi.fn()) {
 }
 
 describe("DecodeDefaultsSection", () => {
-  it("binds the number inputs to the contract ranges", () => {
+  it("shows the loaded values", () => {
     renderSection();
-    const temperature = screen.getByLabelText("Temperature") as HTMLInputElement;
-    expect(temperature.min).toBe(String(DECODE_FIELD_RANGES.temperature.min));
-    expect(temperature.max).toBe(String(DECODE_FIELD_RANGES.temperature.max));
     const maxOutput = screen.getByLabelText(getCatalog("en").settings.decode.maxOutput) as HTMLInputElement;
     expect(maxOutput.value).toBe("4096");
   });
 
-  it("hands numeric patches to the form", () => {
+  it("hands numeric patches to the form on blur", () => {
     const onChange = renderSection();
-    fireEvent.change(screen.getByLabelText("Temperature"), { target: { value: "1.5" } });
+    const temperature = screen.getByLabelText("Temperature");
+    fireEvent.focus(temperature);
+    fireEvent.change(temperature, { target: { value: "1.5" } });
+    fireEvent.blur(temperature);
     expect(onChange).toHaveBeenCalledWith({ temperature: 1.5 });
-    fireEvent.change(screen.getByLabelText("Top P"), { target: { value: "0.3" } });
+    const topP = screen.getByLabelText("Top P");
+    fireEvent.focus(topP);
+    fireEvent.change(topP, { target: { value: "0.3" } });
+    fireEvent.blur(topP);
     expect(onChange).toHaveBeenCalledWith({ top_p: 0.3 });
   });
 

@@ -62,6 +62,12 @@ const fieldMatrix: Array<{
     lockedWhen: "when comparing model",
   },
   {
+    dimension: "thinking_budget",
+    type: "number",
+    defaultValue: "0",
+    lockedWhen: "Comparing the thinking budget; 0 = follow the level",
+  },
+  {
     dimension: "thinking",
     type: "ThinkingLevel",
     defaultValue: "Endpoint default (off when unsupported)",
@@ -650,6 +656,40 @@ const dimensions: DimDoc[] = [
       "Some proxies handle the reasoning_effort / thinking fields inconsistently; check Provider logs when errors appear.",
       "The thinking stream arrives as a separate SSE thinking event, separate from the final answer; scoring only looks at the final answer.",
       "High thinking tiers significantly increase output_tokens and duration; account for the cost when stacking multi-turn experiments.",
+    ],
+  },
+  {
+    id: "thinking_budget",
+    label: "Thinking budget",
+    reality: "full",
+    summary:
+      "Sets the Anthropic budget_tokens (thinking token budget) independently from the thinking level. Numeric values outrank the level mapping; 0 follows the level. Applies to Anthropic Messages endpoints only.",
+    controls:
+      "PipelineConfig.thinking_budget + endpoint.thinking_budget_tokens/thinking_max_tokens → buildThinkingClientOptions budget override.",
+    options: [
+      { value: "0", label: "0 (follow level)", effect: "Uses the fixed budget mapped from the level." },
+      { value: "2048", label: "2048", effect: "budget_tokens=2048." },
+      { value: "8192", label: "8192", effect: "budget_tokens=8192." },
+      { value: "16384", label: "16384", effect: "budget_tokens=16384." },
+      { value: "32768", label: "32768", effect: "budget_tokens=32768." },
+      { value: "65536", label: "65536", effect: "budget_tokens=65536; the baseline accepts any in-range number." },
+    ],
+    path: [
+      "Provider config: thinking_budget_tokens + thinking_max_tokens stored on LlmEndpoint (output must exceed budget).",
+      "A run-level thinking_budget > 0 wins; otherwise the endpoint default pair applies.",
+      "max_tokens below budget + 1024 is auto-raised (the Anthropic protocol requires budget < max_tokens).",
+    ],
+    langChain: "createChatModel injects the thinking block through the buildThinkingClientOptions override.",
+    langGraph: "Same as LangChain.",
+    modules: [
+      "packages/providers/provider-capability/src/thinking.ts",
+      "packages/contracts/contracts/src/provider-types.ts",
+      "packages/providers/provider-langchain/src/model-factory.ts",
+    ],
+    baselineTip: "Pin the model and level when comparing budgets; budget raises max_tokens too, so cost and latency grow roughly linearly.",
+    caveats: [
+      "Applies to Anthropic Messages endpoints only; the dimension is unavailable elsewhere.",
+      "Some gateways cap or reject very large budget_tokens; check the provider log on errors.",
     ],
   },
   {
