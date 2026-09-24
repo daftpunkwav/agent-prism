@@ -9,5 +9,6 @@
 
 export * from "./ThemeToggle.js";
 export * from "./LanguageToggle.js";
+export * from "./NumberInput.js";
 export * from "./TokenStatsPanel.js";
 export * from "./Select.js";

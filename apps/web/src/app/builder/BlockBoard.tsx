@@ -13,7 +13,7 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { UiSelect, type UiSelectEntry } from "@agentprism/ui";
+import { NumberInput, UiSelect, type UiSelectEntry } from "@agentprism/ui";
 import type { BuilderCatalog, BuilderComposition } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 
@@ -250,56 +250,58 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
         <div className="builder-decode">
           <label>
             <span>{t("builder.temperature")}</span>
-            <input
-              type="number" min={0} max={2} step={0.1}
+            <NumberInput
               className="form-input builder-num"
+              min={0} max={2}
               value={composition.temperature}
-              onChange={(event) => set({ temperature: finiteOr(event.target.value, composition.temperature) })}
+              onChange={(temperature) => set({ temperature })}
             />
           </label>
           <label>
             <span>{t("builder.topP")}</span>
-            <input
-              type="number" min={0} max={1} step={0.05}
+            <NumberInput
               className="form-input builder-num"
+              min={0} max={1}
               value={composition.top_p}
-              onChange={(event) => set({ top_p: finiteOr(event.target.value, composition.top_p) })}
+              onChange={(top_p) => set({ top_p })}
             />
           </label>
           <label>
             <span>{t("builder.maxTokens")}</span>
-            <input
-              type="number" min={64} max={384000} step={64}
+            <NumberInput
               className="form-input builder-num"
+              integer
+              min={64} max={384000}
               value={composition.max_output_tokens}
-              onChange={(event) => set({ max_output_tokens: finiteOr(event.target.value, composition.max_output_tokens) })}
+              onChange={(max_output_tokens) => set({ max_output_tokens })}
             />
           </label>
           <label>
             <span>{t("builder.maxSteps")}</span>
-            <input
-              type="number" min={1} step={1}
+            <NumberInput
               className="form-input builder-num"
+              integer
+              min={1} max={1000000}
               value={composition.max_steps}
-              onChange={(event) => set({ max_steps: Math.max(1, finiteOr(event.target.value, composition.max_steps)) })}
+              onChange={(max_steps) => set({ max_steps })}
             />
           </label>
           <label>
             <span>{t("builder.freqPenalty")}</span>
-            <input
-              type="number" min={-2} max={2} step={0.1}
+            <NumberInput
               className="form-input builder-num"
+              min={-2} max={2}
               value={composition.frequency_penalty}
-              onChange={(event) => set({ frequency_penalty: finiteOr(event.target.value, composition.frequency_penalty) })}
+              onChange={(frequency_penalty) => set({ frequency_penalty })}
             />
           </label>
           <label>
             <span>{t("builder.presencePenalty")}</span>
-            <input
-              type="number" min={-2} max={2} step={0.1}
+            <NumberInput
               className="form-input builder-num"
+              min={-2} max={2}
               value={composition.presence_penalty}
-              onChange={(event) => set({ presence_penalty: finiteOr(event.target.value, composition.presence_penalty) })}
+              onChange={(presence_penalty) => set({ presence_penalty })}
             />
           </label>
         </div>
@@ -308,9 +310,3 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
   );
 }
 
-/** Parses a numeric field; non-numeric or empty input keeps the previous value. */
-export function finiteOr(raw: string, fallback: number): number {
-  if (!raw.trim()) return fallback;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : fallback;
-}

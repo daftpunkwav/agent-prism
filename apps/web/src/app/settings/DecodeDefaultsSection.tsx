@@ -9,6 +9,7 @@
 "use client";
 
 import { DECODE_FIELD_RANGES } from "@agentprism/client";
+import { NumberInput } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
 import type { SettingsForm } from "./settingsConnectionModel";
 import { Field } from "./Field";
@@ -35,36 +36,31 @@ export function DecodeDefaultsSection({ form, onChange }: DecodeDefaultsSectionP
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
         <Field label="Temperature">
-          <input
+          <NumberInput
             className="form-input"
-            type="number"
-            step={DECODE_FIELD_RANGES.temperature.step}
             min={DECODE_FIELD_RANGES.temperature.min}
             max={DECODE_FIELD_RANGES.temperature.max}
             value={form.temperature}
-            onChange={(e) => onChange({ temperature: parseFloat(e.target.value) || 0 })}
+            onChange={(temperature) => onChange({ temperature })}
           />
         </Field>
         <Field label="Top P">
-          <input
+          <NumberInput
             className="form-input"
-            type="number"
-            step={DECODE_FIELD_RANGES.top_p.step}
             min={DECODE_FIELD_RANGES.top_p.min}
             max={DECODE_FIELD_RANGES.top_p.max}
             value={form.top_p}
-            onChange={(e) => onChange({ top_p: parseFloat(e.target.value) || 0 })}
+            onChange={(top_p) => onChange({ top_p })}
           />
         </Field>
         <Field label={t("settings.decode.maxOutput")}>
-          <input
+          <NumberInput
             className="form-input font-mono text-sm"
-            type="number"
-            step={DECODE_FIELD_RANGES.max_output_tokens.step}
+            integer
             min={DECODE_FIELD_RANGES.max_output_tokens.min}
             max={DECODE_FIELD_RANGES.max_output_tokens.max}
             value={form.max_output_tokens}
-            onChange={(e) => onChange({ max_output_tokens: parseInt(e.target.value, 10) || 0 })}
+            onChange={(max_output_tokens) => onChange({ max_output_tokens })}
           />
         </Field>
       </div>

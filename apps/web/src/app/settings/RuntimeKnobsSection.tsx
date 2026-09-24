@@ -18,7 +18,7 @@ import {
   type RuntimeKnobFieldMeta,
   type RuntimeKnobsPayload,
 } from "@agentprism/client";
-import { UiSelect } from "@agentprism/ui";
+import { NumberInput, UiSelect } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
 import type { MessageKey } from "@/i18n/catalogs/types";
 import { Field } from "./Field";
@@ -164,17 +164,13 @@ export function RuntimeKnobsSection({ onFlash }: { onFlash(message: string): voi
                       />
                     ) : (
                       <div className="flex items-center gap-1.5">
-                        <input
+                        <NumberInput
                           className="form-input font-mono text-sm"
-                          type="number"
+                          integer
                           min={meta.min}
                           max={meta.max}
-                          step={meta.step}
-                          value={String(draft[meta.key] ?? meta.default)}
-                          onChange={(e) => {
-                            const parsed = parseInt(e.target.value, 10);
-                            setDraft((d) => ({ ...d, [meta.key]: Number.isFinite(parsed) ? parsed : meta.default as number }));
-                          }}
+                          value={Number(draft[meta.key] ?? meta.default)}
+                          onChange={(value) => setDraft((d) => ({ ...d, [meta.key]: value }))}
                         />
                         <button
                           type="button"
