@@ -66,15 +66,27 @@ export function buildPromptParts(inputs: PromptInputs): PromptParts {
   if (inputs.cwd && inputs.cwd !== "") {
     user += `\n\nCurrent working directory: ${inputs.cwd}`;
   }
-  // Localized DSH time-context: one UTC date line so recency judgments ground out.
+  // Time grounding: UTC date line plus the machine's UTC offset — shell tools
+  // print local time with no offset, so models otherwise misread it as UTC.
   // Formatting only (never a time source): the instant always arrives injected.
   // formatUtcDate is byte-identical here (the guard above excludes its unknown branch).
   if (inputs.now !== undefined && Number.isFinite(inputs.now) && inputs.now > 0) {
     user += `\n\nToday is ${formatUtcDate(inputs.now)}.`;
+    user += ` Machine local timezone: ${formatUtcOffset(inputs.now)}; shell commands return local time.`;
   }
 
   if (system === "" || user.trim() === "") {
     throw new UnknownPromptConfigError("profile", String(inputs.profile));
   }
   return { system, user };
+}
+
+/** Renders the machine's UTC offset at the given instant (e.g. "UTC+08:00"). */
+function formatUtcOffset(now: number): string {
+  const offsetMinutes = -new Date(now).getTimezoneOffset();
+  const sign = offsetMinutes < 0 ? "-" : "+";
+  const abs = Math.abs(offsetMinutes);
+  const hours = String(Math.floor(abs / 60)).padStart(2, "0");
+  const minutes = String(abs % 60).padStart(2, "0");
+  return `UTC${sign}${hours}:${minutes}`;
 }

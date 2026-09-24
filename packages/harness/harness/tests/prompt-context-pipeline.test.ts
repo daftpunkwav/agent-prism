@@ -116,17 +116,20 @@ describe("prompt time context", () => {
   it("appends a UTC date line when now is injected", () => {
     const parts = buildPromptParts({ ...base, now: 1700000000000 });
     expect(parts.user).toContain("Today is 2023-11-14 (UTC).");
+    expect(parts.user).toMatch(/Machine local timezone: UTC[+-]\d{2}:\d{2}; shell commands return local time\./);
   });
 
   it("stays timeless without now (replays keep old prompts byte-identical)", () => {
     const parts = buildPromptParts({ ...base });
     expect(parts.user).not.toContain("Today is");
+    expect(parts.user).not.toContain("Machine local timezone");
   });
 
   it("ignores non-positive or non-finite instants fail-closed", () => {
     for (const now of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
       const parts = buildPromptParts({ ...base, now });
       expect(parts.user).not.toContain("Today is");
+      expect(parts.user).not.toContain("Machine local timezone");
     }
   });
 });
