@@ -28,8 +28,12 @@ export interface LlmEndpoint {
   /** Disabled endpoints are excluded from the model dimension options and refused at model construction. */
   enabled: boolean;
   thinking_level: string;
-  /** Vendor-defined thinking levels offered by this model (OpenAI-compatible only); empty means the standard low/medium/high set. */
+  /** Vendor-defined thinking levels offered by this model; empty means the standard low/medium/high set. */
   thinking_levels: string[];
+  /** Anthropic thinking budget in tokens (0 = unset: the level mapping applies). */
+  thinking_budget_tokens: number;
+  /** Total output cap that accompanies the budget (0 = unset: auto-raised to budget + 1024). Must exceed the budget. */
+  thinking_max_tokens: number;
 }
 
 /** Provider config entity: endpoint collection + shared decode defaults + top-level legacy mirror fields. */
@@ -59,9 +63,11 @@ export interface ProviderConfig {
 
 /**
  * Thinking level actually in effect for an endpoint: unsupported capability or
- * illegal levels resolve to off. Custom levels (endpoint.thinking_levels) apply
- * to OpenAI-compatible formats only; Anthropic keeps the standard set. The
- * result is a plain string because custom levels are vendor-defined.
+ * illegal levels resolve to off. Custom levels (endpoint.thinking_levels)
+ * replace the standard set for every format — openai passes the string
+ * verbatim, anthropic maps numeric levels to budget_tokens and rides vendor
+ * thinking modes through thinking.type. The result is a plain string because
+ * custom levels are vendor-defined.
  */
 export function effectiveThinkingLevel(
   endpoint: Pick<LlmEndpoint, "thinking_capable" | "thinking_level" | "thinking_levels" | "api_format">,
@@ -71,10 +77,6 @@ export function effectiveThinkingLevel(
   const level = requested ?? endpoint.thinking_level;
   if (level === "off") return "off";
   const custom = endpoint.thinking_levels ?? [];
-  const allowed =
-    custom.length > 0 &&
-    (endpoint.api_format === "openai_chat" || endpoint.api_format === "openai_responses")
-      ? custom
-      : ["low", "medium", "high"];
+  const allowed = custom.length > 0 ? custom : ["low", "medium", "high"];
   return allowed.includes(level) ? level : "off";
 }

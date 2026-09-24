@@ -177,6 +177,8 @@ function toPublicEndpoint(endpoint: LlmEndpoint) {
     thinking_capable: endpoint.thinking_capable,
     thinking_level: endpoint.thinking_level,
     thinking_levels: Array.isArray(endpoint.thinking_levels) ? [...endpoint.thinking_levels] : [],
+    thinking_budget_tokens: endpoint.thinking_budget_tokens,
+    thinking_max_tokens: endpoint.thinking_max_tokens,
     image_input: endpoint.image_input,
     video_input: endpoint.video_input,
   };

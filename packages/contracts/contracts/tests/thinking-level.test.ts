@@ -31,15 +31,20 @@ describe("effectiveThinkingLevel", () => {
     expect(effectiveThinkingLevel(endpoint, null)).toBe("off");
   });
 
-  it("honors vendor-defined levels on openai formats only", () => {
+  it("honors vendor-defined levels on every format", () => {
     const openai = { thinking_capable: true, thinking_level: "xhigh", thinking_levels: ["low", "xhigh", "max"], api_format: "openai_chat" };
     expect(effectiveThinkingLevel(openai)).toBe("xhigh");
     expect(effectiveThinkingLevel(openai, "max")).toBe("max");
     expect(effectiveThinkingLevel(openai, "high")).toBe("off");
     const responses = { ...openai, api_format: "openai_responses" };
     expect(effectiveThinkingLevel(responses, "max")).toBe("max");
+    // Anthropic keeps the same list semantics: named levels map to budget
+    // tokens, numeric levels become budgets, vendor modes ride thinking.type.
     const anthropic = { ...openai, api_format: "anthropic_messages" };
-    expect(effectiveThinkingLevel(anthropic, "xhigh")).toBe("off");
-    expect(effectiveThinkingLevel(anthropic, "high")).toBe("high");
+    expect(effectiveThinkingLevel(anthropic, "xhigh")).toBe("xhigh");
+    // A configured list replaces the standard set, so unlisted "high" is off.
+    expect(effectiveThinkingLevel(anthropic, "high")).toBe("off");
+    expect(effectiveThinkingLevel({ ...anthropic, thinking_levels: ["32768"] }, "32768")).toBe("32768");
+    expect(effectiveThinkingLevel({ ...anthropic, thinking_levels: ["adaptive"] }, "adaptive")).toBe("adaptive");
   });
 });

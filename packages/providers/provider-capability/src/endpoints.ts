@@ -138,12 +138,18 @@ export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
   const apiFormat = source.api_format === "openai_chat" || source.api_format === "openai_responses" ? source.api_format : "anthropic_messages";
   // Effectiveness still gates on the consumer-side effectiveThinkingLevel: parse
   // only coerces unlisted selections to off so hand-edited configs stay runnable.
+  // Custom level lists apply to every format: openai passes the string verbatim,
+  // anthropic maps numeric levels to budget_tokens and named levels to the table.
   const thinkingLevels = normalizeThinkingLevels(source.thinking_levels);
-  const allowedLevels =
-    thinkingLevels.length > 0 && (apiFormat === "openai_chat" || apiFormat === "openai_responses")
-      ? thinkingLevels
-      : ["low", "medium", "high"];
+  const allowedLevels = thinkingLevels.length > 0 ? thinkingLevels : ["low", "medium", "high"];
   const thinkingLevel = readString(source, "thinking_level", "off", 32);
+  // Thinking budget pair: a configured budget must be smaller than its output
+  // cap; a violating cap is dropped to 0 so the runtime auto-raise applies.
+  const thinkingBudgetTokens = clampInt(source.thinking_budget_tokens, { min: 0, max: 10_000_000, fallback: 0 });
+  let thinkingMaxTokens = clampInt(source.thinking_max_tokens, { min: 0, max: 10_000_000, fallback: 0 });
+  if (thinkingBudgetTokens > 0 && thinkingMaxTokens > 0 && thinkingMaxTokens <= thinkingBudgetTokens) {
+    thinkingMaxTokens = 0;
+  }
   return {
     id,
     label: readString(source, "label", "", STRING_MAX.label),
@@ -168,6 +174,8 @@ export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
     // never ends up "UI echoes the raw value while thinking params are silently absent".
     thinking_level: thinkingLevel === "off" || allowedLevels.includes(thinkingLevel) ? thinkingLevel : "off",
     thinking_levels: thinkingLevels,
+    thinking_budget_tokens: thinkingBudgetTokens,
+    thinking_max_tokens: thinkingMaxTokens,
   };
 }
 

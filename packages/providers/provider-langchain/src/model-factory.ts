@@ -9,7 +9,7 @@
  */
 
 import { ChatOpenAI } from "@langchain/openai";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatAnthropic, type ChatAnthropicInput } from "@langchain/anthropic";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { Callbacks } from "@langchain/core/callbacks/manager";
 import type { LlmEndpoint, PipelineConfig, ProviderConfig } from "@agentprism/contracts";
@@ -100,8 +100,13 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
   const thinkingLevel =
     overrides.thinkingLevel ?? (endpoint ? effectiveThinkingLevel(endpoint, endpoint.thinking_level) : "off");
   const baseMaxTokens = overrides.maxTokens ?? provider.max_output_tokens;
+  // Endpoint-level budget pair (anthropic): outranks the level mapping when set.
+  const budgetOverride =
+    endpoint && endpoint.thinking_budget_tokens > 0
+      ? { budgetTokens: endpoint.thinking_budget_tokens, maxTokens: endpoint.thinking_max_tokens }
+      : undefined;
 
-  const thinking = buildThinkingClientOptions(apiFormat, thinkingLevel, thinkingCapable, baseMaxTokens);
+  const thinking = buildThinkingClientOptions(apiFormat, thinkingLevel, thinkingCapable, baseMaxTokens, budgetOverride);
   const maxTokens = thinking?.maxTokens ?? baseMaxTokens;
   const timeoutMs = options.timeoutMs ?? LLM_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? LLM_MAX_RETRIES;
@@ -146,7 +151,11 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
     },
     // @langchain/anthropic rejects top_p client-side when thinking is enabled, same constraint family as temperature
     ...(overrides.topP !== undefined && thinking?.thinking === undefined ? { topP: overrides.topP } : {}),
-    ...(thinking?.thinking !== undefined ? { thinking: thinking.thinking } : {}),
+    // Vendor thinking modes ("adaptive", …) ride the type field verbatim; the
+    // SDK serializes the block untouched and the upstream API validates it.
+    ...(thinking?.thinking !== undefined
+      ? { thinking: thinking.thinking as ChatAnthropicInput["thinking"] }
+      : {}),
   });
 }
 

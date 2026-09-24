@@ -77,17 +77,38 @@ describe("parseLlmEndpoint", () => {
     );
     expect(openai.thinking_levels).toEqual(["low", "xhigh", "max"]);
     expect(openai.thinking_level).toBe("xhigh");
-    // The same list is inert on anthropic: the standard set applies instead.
+    // The list applies to anthropic too: numeric levels become budget tokens,
+    // named strings ride thinking.type verbatim.
     const anthropic = parseLlmEndpoint(
       { api_format: "anthropic_messages", thinking_level: "xhigh", thinking_levels: ["low", "xhigh"] },
       ids,
     );
     expect(anthropic.thinking_levels).toEqual(["low", "xhigh"]);
-    expect(anthropic.thinking_level).toBe("off");
+    expect(anthropic.thinking_level).toBe("xhigh");
+    // A configured list replaces the standard set, so unlisted "high" is off.
     expect(
       parseLlmEndpoint({ api_format: "anthropic_messages", thinking_level: "high", thinking_levels: ["low", "xhigh"] }, ids)
         .thinking_level,
-    ).toBe("high");
+    ).toBe("off");
+    // An unlisted selection still coerces to off on every format.
+    expect(
+      parseLlmEndpoint({ api_format: "anthropic_messages", thinking_level: "bogus", thinking_levels: ["low"] }, ids)
+        .thinking_level,
+    ).toBe("off");
+  });
+
+  it("normalizes the thinking budget pair and drops a violating output cap", () => {
+    const pair = parseLlmEndpoint({ thinking_budget_tokens: 32768, thinking_max_tokens: 64000 }, ids);
+    expect(pair.thinking_budget_tokens).toBe(32768);
+    expect(pair.thinking_max_tokens).toBe(64000);
+    // max <= budget violates the protocol rule: the cap drops to 0 (auto-raise).
+    const violating = parseLlmEndpoint({ thinking_budget_tokens: 32768, thinking_max_tokens: 32768 }, ids);
+    expect(violating.thinking_budget_tokens).toBe(32768);
+    expect(violating.thinking_max_tokens).toBe(0);
+    // Absent fields stay unset.
+    const unset = parseLlmEndpoint({}, ids);
+    expect(unset.thinking_budget_tokens).toBe(0);
+    expect(unset.thinking_max_tokens).toBe(0);
   });
 
   it("preserves the openai_responses format instead of coercing it", () => {
