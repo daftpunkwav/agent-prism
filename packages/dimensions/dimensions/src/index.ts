@@ -9,6 +9,7 @@
 export * from "./dimension-catalog.js";
 export * from "./fields.js";
 export { CONTEXT_OPTIONS } from "./dimensions/context.js";
+export { THINKING_BUDGET_OPTIONS, THINKING_OPTIONS } from "./dimensions/thinking.js";
 export { HARNESS_OPTIONS } from "./dimensions/harness.js";
 export { PROMPT_OPTIONS } from "./dimensions/prompt.js";
 export { REASONING_OPTIONS } from "./dimensions/reasoning.js";

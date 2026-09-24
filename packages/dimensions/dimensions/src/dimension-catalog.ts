@@ -16,7 +16,7 @@ import { FRAMEWORK_OPTIONS } from "./dimensions/framework.js";
 import { MAX_STEPS_OPTIONS } from "./dimensions/max-steps.js";
 import { MODEL_OPTIONS } from "./dimensions/model.js";
 import { TEMPERATURE_OPTIONS } from "./dimensions/temperature.js";
-import { THINKING_OPTIONS } from "./dimensions/thinking.js";
+import { THINKING_BUDGET_OPTIONS, THINKING_OPTIONS } from "./dimensions/thinking.js";
 import { MCP_OPTIONS } from "./dimensions/mcp.js";
 import { SKILL_POLICY_OPTIONS } from "./dimensions/skill.js";
 import { ORCHESTRATION_OPTIONS } from "./dimensions/orchestration.js";
@@ -38,6 +38,7 @@ const STATIC_DIMENSION_OPTIONS: Record<DimensionId, DimensionOptionTriple[]> = {
   temperature: TEMPERATURE_OPTIONS,
   model: MODEL_OPTIONS,
   thinking: THINKING_OPTIONS,
+  thinking_budget: THINKING_BUDGET_OPTIONS,
   max_steps: MAX_STEPS_OPTIONS,
   toolset: [],
   mcp: MCP_OPTIONS,
@@ -63,6 +64,7 @@ const STATIC_DEFAULT_BASE: Record<string, string | number> = {
   sandbox_mode: "off",
   orchestration: "direct",
   memory: "none",
+  thinking_budget: 0,
   history_mode: "minimal",
 };
 
