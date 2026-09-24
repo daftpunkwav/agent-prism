@@ -243,7 +243,7 @@ const toolsetTable: Array<{
   {
     id: "full",
     label: "All tools",
-    tools: "read, write, edit, ls, bash, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter (the coding-agent default surface)",
+    tools: "read, write, edit, ls, bash, apply_patch, glob, grep, web_fetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter (the coding-agent default surface)",
   },
   {
     id: "edit_run",

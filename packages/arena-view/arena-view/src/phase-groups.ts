@@ -37,7 +37,8 @@ const WRITE_TOOLS = new Set(["write", "edit", "apply_patch"]);
 // "run" stays recognized for pre-rename journals (display only).
 const CODE_TOOLS = new Set(["bash", "run", "run_job", "bash_session"]);
 const PLAN_TOOLS = new Set(["todo_write", "plan", "goal", "ralph_loop"]);
-const NET_TOOLS = new Set(["webfetch", "web_search"]);
+// "webfetch" stays recognized for pre-rename journals (display only), same as "run".
+const NET_TOOLS = new Set(["web_fetch", "webfetch", "web_search"]);
 const AGENT_TOOLS = new Set(["subagent", "skill", "session_query", "scatter"]);
 
 /**

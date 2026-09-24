@@ -9,8 +9,8 @@ Sources of truth: toolset membership in `TOOL_NAMES_BY_TOOLSET` in
 
 | Toolset | Tools, 22 / 19 / 10 |
 |---|---|
-| `full` | read, write, edit, ls, bash, apply_patch, glob, grep, webfetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter |
-| `edit_run` | `full` minus `ls`, `webfetch`, and `web_search`, keeping glob and grep |
+| `full` | read, write, edit, ls, bash, apply_patch, glob, grep, web_fetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter |
+| `edit_run` | `full` minus `ls`, `web_fetch`, and `web_search`, keeping glob and grep |
 | `read_only` | read, ls, glob, grep, subagent, skill, ralph_loop, session_query, symbols, scatter |
 
 Resolution semantics in `tool-registry/src/toolset.ts`: an unknown toolset resolves to
@@ -29,7 +29,7 @@ to `edit_run` and `calc_time` or `workspace_read` to `read_only`.
 | `apply_patch` | V4A multi-file patch with `*** Begin Patch` and Add, Update, Delete, and Move-to directives; not atomic, so earlier hunks persist | full, edit_run |
 | `glob` | glob search with `**`, `*`, `?`, `[abc]`, and `{a,b}` | all |
 | `grep` | regex content search returning `path:line: text`; at most 200 match lines; per-line window of 20 000 characters | all |
-| `webfetch` | http or https to readable text; 15-second timeout; body capped at 512 KB before HTML stripping | full |
+| `web_fetch` | http or https to readable text; 15-second timeout; body capped at 512 KB before HTML stripping | full |
 | `todo_write` | whole-list replace plan list; 50 items of 500 characters; persists `.agent-todos.json` | full, edit_run |
 | `ask_user` | records questions to `.agent-questions.json`, at most 5 per call and 50 stored; headless runs never block and tell the model to continue, interactive runs hand the batch to the human inline (bounded wait, then the same defer); questions may carry options and `multiSelect` for ticking several | full, edit_run |
 | `web_search` | Exa or Tavily through `SEARCH_PROVIDER` and `SEARCH_API_KEY`; unconfigured fails closed with a setup hint; 15-second timeout; 1 to 10 results with a default of 5 | full |
@@ -74,7 +74,7 @@ overrides by name at execution, or bind an injected port such as `SessionQueryPo
   `mcp__fetch_url` for http or https only with a default of 8 000 characters and a cap of
   16 000.
 - Policy to tools: `off` mounts none; `fs` mounts `fs_list` and `fs_read`; `full` adds
-  `fetch_url`, which is `full`-toolset only like webfetch and web_search.
+  `fetch_url`, which is `full`-toolset only like web_fetch and web_search.
 - Remote stdio servers come from the `MCP_SERVERS` env var, a JSON array of
   `{command, args?, env?, timeoutMs?, tools?}` where per-server `timeoutMs` defaults to
   30 000 ms. Tools are namespaced `mcp__<server>__<tool>` and mounted best-effort on arena

@@ -287,7 +287,7 @@ export function buildToolAccess(
   }
   const registry = full.select([...names]);
   // MCP attachment: filesystem servers join every toolset; the fetch server only
-  // joins full (mirrors webfetch/web_search staying out of edit_run/read_only).
+  // joins full (mirrors web_fetch/web_search staying out of edit_run/read_only).
   // Explicit toolNames overrides (builder sessions) stay authoritative: MCP joins
   // only the toolset-derived path so an operator allowlist is never broadened.
   if (toolNames === undefined) {

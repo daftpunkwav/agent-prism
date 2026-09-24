@@ -91,7 +91,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 | `TOOL_FILE_MAX_CHARS` | `262144`，范围 4 096 至 4 194 304 | 单次 read、write 或 edit 文件上限 |
 | `TOOL_RUN_TIMEOUT_DEFAULT_S` | `30`，范围 1 至 600 | 模型省略时 run 与 bash 的超时 |
 | `TOOL_RUN_TIMEOUT_MAX_S` | `120`，范围 1 至 3 600 | 模型提供超时的上限，必须至少为默认值，作为快速失败检查 |
-| `WEB_FETCH_TIMEOUT_MS` | `15000`，范围 1 000 至 300 000 | webfetch HTTP 超时 |
+| `WEB_FETCH_TIMEOUT_MS` | `15000`，范围 1 000 至 300 000 | web_fetch HTTP 超时 |
 | `WEB_SEARCH_TIMEOUT_MS` | `15000`，范围 1 000 至 300 000 | web_search HTTP 超时 |
 | `MCP_REQUEST_TIMEOUT_MS` | `30000`，范围 1 000 至 600 000 | 默认每请求 MCP 超时，被 `MCP_SERVERS` 中 per-server 的 `timeoutMs` 覆盖 |
 | `MCP_FETCH_TIMEOUT_MS` | `15000`，范围 1 000 至 300 000 | mcp_fetch 每次 fetch 超时 |

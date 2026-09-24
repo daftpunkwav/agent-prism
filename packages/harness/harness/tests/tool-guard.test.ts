@@ -14,7 +14,7 @@ import { assessToolRelevance, blockedToolMessageContent } from "@agentprism/harn
 
 describe("toolset single source of truth", () => {
   it("toolset is derived from contracts with stable sort", () => {
-    expect(selectToolNames("full")).toEqual(["apply_patch", "ask_user", "bash", "bash_session", "edit", "glob", "goal", "grep", "ls", "plan", "ralph_loop", "read", "run_job", "scatter", "session_query", "skill", "subagent", "symbols", "todo_write", "web_search", "webfetch", "write"]);
+    expect(selectToolNames("full")).toEqual(["apply_patch", "ask_user", "bash", "bash_session", "edit", "glob", "goal", "grep", "ls", "plan", "ralph_loop", "read", "run_job", "scatter", "session_query", "skill", "subagent", "symbols", "todo_write", "web_fetch", "web_search", "write"]);
     expect(selectToolNames("read_only")).toEqual(["glob", "grep", "ls", "ralph_loop", "read", "scatter", "session_query", "skill", "subagent", "symbols"]);
     expect(Object.keys(TOOL_NAMES_BY_TOOLSET)).toEqual(["full", "edit_run", "read_only"]);
   });

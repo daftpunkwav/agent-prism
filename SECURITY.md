@@ -22,7 +22,7 @@ Security-relevant surfaces, in rough priority order:
   `process-runner.ts`): process isolation, reparse-point/junction traversal,
   hardlink handling, and filesystem scoping.
 - **SSRF guard** — `packages/agent/agent/src/tool-access.ts` (`safeFetchUrl`):
-  URL validation applied before outbound webfetch requests.
+  URL validation applied before outbound web_fetch requests.
 - **Tool access control** — `packages/agent/agent/src/tool-access.ts`:
   tool allowlists and approval gating for agent tool calls.
 - **Workspace containment** — `packages/agent/agent/src/run-workspace.ts`:

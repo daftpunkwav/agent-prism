@@ -11,7 +11,7 @@
 tool 名加入 `packages/contracts/contracts/src/enums.ts` 中的
 `TOOL_NAMES_BY_TOOLSET`，它是"哪个 toolset 携带哪个 tool"的唯一事实来源。放置规则：
 
-- 网络能力 tool `webfetch` 与 `web_search` 仅属于 `full`。
+- 网络能力 tool `web_fetch` 与 `web_search` 仅属于 `full`。
 - 有变更潜力的 tool 绝不进入 `read_only`。
 - 编排与读取辅助类 `subagent`、`skill`、`ralph_loop`、`session_query`、`symbols`、
   `scatter` 三个 toolset 全开。

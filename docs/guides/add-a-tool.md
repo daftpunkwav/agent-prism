@@ -10,7 +10,7 @@ The tool name is added to `TOOL_NAMES_BY_TOOLSET` in
 `packages/contracts/contracts/src/enums.ts`, which is the single source of truth for
 which toolset carries which tool. Placement rules:
 
-- Network-capability tools `webfetch` and `web_search` belong only to `full`.
+- Network-capability tools `web_fetch` and `web_search` belong only to `full`.
 - Tools with mutation potential never enter `read_only`.
 - Orchestration and read helpers `subagent`, `skill`, `ralph_loop`, `session_query`,
   `symbols`, and `scatter` are open on all three toolsets.

@@ -93,7 +93,7 @@ content wants a lower `CONTEXT_CHARS_PER_TOKEN`.
 | `TOOL_FILE_MAX_CHARS` | `262144`, range 4 096 to 4 194 304 | single read, write, or edit file cap |
 | `TOOL_RUN_TIMEOUT_DEFAULT_S` | `30`, range 1 to 600 | run and bash timeout when the model omits it |
 | `TOOL_RUN_TIMEOUT_MAX_S` | `120`, range 1 to 3 600 | upper clamp for model-supplied timeouts, which must be at least the default as a fail-fast check |
-| `WEB_FETCH_TIMEOUT_MS` | `15000`, range 1 000 to 300 000 | webfetch HTTP timeout |
+| `WEB_FETCH_TIMEOUT_MS` | `15000`, range 1 000 to 300 000 | web_fetch HTTP timeout |
 | `WEB_SEARCH_TIMEOUT_MS` | `15000`, range 1 000 to 300 000 | web_search HTTP timeout |
 | `MCP_REQUEST_TIMEOUT_MS` | `30000`, range 1 000 to 600 000 | default per-request MCP timeout, overridden by the per-server `timeoutMs` in `MCP_SERVERS` |
 | `MCP_FETCH_TIMEOUT_MS` | `15000`, range 1 000 to 300 000 | mcp_fetch per-fetch timeout |

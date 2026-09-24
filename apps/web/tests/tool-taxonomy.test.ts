@@ -35,7 +35,8 @@ describe("toolCategory", () => {
     for (const tool of ["todo_write", "plan", "goal", "ralph_loop"]) {
       expect(toolCategory(tool)).toBe("plan");
     }
-    for (const tool of ["webfetch", "web_search"]) {
+    // "webfetch" is the pre-rename name; old journals must keep classifying as net.
+    for (const tool of ["web_fetch", "webfetch", "web_search"]) {
       expect(toolCategory(tool)).toBe("net");
     }
     for (const tool of ["subagent", "skill", "session_query", "scatter"]) {
@@ -48,7 +49,7 @@ describe("toolCategory", () => {
   });
 
   it("never classifies interactive, planning, network, or agent tools as file ops", () => {
-    for (const tool of ["ask_user", "todo_write", "webfetch", "web_search", "subagent", "skill"]) {
+    for (const tool of ["ask_user", "todo_write", "web_fetch", "web_search", "subagent", "skill"]) {
       expect(["read", "write", "code"]).not.toContain(toolCategory(tool));
     }
   });

@@ -264,10 +264,10 @@ describe("BuilderService.chatTurn", () => {
 
     const swap = service.patchComposition(
       view.id,
-      BuilderPatchRequestSchema.parse({ composition: { framework: "other", tools: ["webfetch", "session_query"] } }),
+      BuilderPatchRequestSchema.parse({ composition: { framework: "other", tools: ["web_fetch", "session_query"] } }),
     );
     expect(swap.changed_fields).toContain("framework");
-    expect(swap.tools_added).toEqual(["webfetch", "session_query"]);
+    expect(swap.tools_added).toEqual(["web_fetch", "session_query"]);
     // Trace records the swap event.
     const swapDetail = await service.getSessionDetail(view.id);
     expect(swapDetail.records.some((record) => record.kind === "trace" && record.entry.kind === "swap")).toBe(true);
@@ -275,8 +275,8 @@ describe("BuilderService.chatTurn", () => {
     await collect(service.chatTurn(view.id, "second"));
     const context = harness.contexts.at(-1);
     expect(context?.notices?.join(" ")).toMatch(/hot-swapped/i);
-    expect(context?.notices?.join(" ")).toMatch(/-read|\+webfetch/);
-    expect([...(context?.tools.names ?? [])]).toEqual(["session_query", "webfetch"]);
+    expect(context?.notices?.join(" ")).toMatch(/-read|\+web_fetch/);
+    expect([...(context?.tools.names ?? [])]).toEqual(["session_query", "web_fetch"]);
   });
 
   it("defaults omitted tools to the working set while explicit [] stays tool-free", async () => {

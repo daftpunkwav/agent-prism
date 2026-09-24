@@ -60,7 +60,7 @@ describe("ApprovalGate", () => {
     const gate = new ApprovalGate("unless_trusted");
     expect(gate.review("write", { path: "x", content: "y" })).toBeNull();
     expect(gate.review("edit", { path: "x", old_text: "a", new_text: "b" })).toBeNull();
-    expect(gate.review("webfetch", { url: "https://example.com" })).toBeNull();
+    expect(gate.review("web_fetch", { url: "https://example.com" })).toBeNull();
     expect(gate.review("subagent", { task: "do things" })).toBeNull();
   });
 });
