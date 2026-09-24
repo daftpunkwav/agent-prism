@@ -6,12 +6,12 @@
  * Responsibilities:
  * - Pin toolTuningValue fallback semantics (unset, set, non-finite)
  * - Pin the read cap following the tuned maxFileChars on a real execute
- * - Pin the webfetch definition metadata timeout following the tuned value
+ * - Pin the web_fetch definition metadata timeout following the tuned value
  */
 
 import { afterEach, describe, expect, it } from "vitest";
 import { ScopedFileSystem } from "@agentprism/environment";
-import { readTool, setToolTuning, toolTuningValue, webfetchTool } from "../src/index.js";
+import { readTool, setToolTuning, toolTuningValue, webFetchTool } from "../src/index.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -55,10 +55,10 @@ describe("tool tuning seam", () => {
     }
   });
 
-  it("webfetch definition timeout metadata follows the tuned value", () => {
+  it("web_fetch definition timeout metadata follows the tuned value", () => {
     setToolTuning({ webFetchTimeoutMs: 45_000 });
-    expect(webfetchTool.timeoutMs).toBe(45_000);
+    expect(webFetchTool.timeoutMs).toBe(45_000);
     setToolTuning({});
-    expect(webfetchTool.timeoutMs).toBe(15_000);
+    expect(webFetchTool.timeoutMs).toBe(15_000);
   });
 });

@@ -21,7 +21,7 @@ export interface ToolTuning {
   runTimeoutDefaultS?: number;
   /** Upper clamp for model-supplied run/bash timeouts in seconds (default 120). */
   runTimeoutMaxS?: number;
-  /** webfetch HTTP timeout in ms (default 15000). */
+  /** web_fetch HTTP timeout in ms (default 15000). */
   webFetchTimeoutMs?: number;
   /** web_search HTTP timeout in ms (default 15000). */
   webSearchTimeoutMs?: number;

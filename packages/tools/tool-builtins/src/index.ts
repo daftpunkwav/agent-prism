@@ -16,10 +16,10 @@ export { bashTool } from "./definitions/bash.js";
 export { applyPatchTool, parseV4aPatch, applyChunks } from "./definitions/apply-patch.js";
 export { globTool, globToRegExp } from "./definitions/glob.js";
 export { readInt } from "./definitions/caps.js";
-export { safeFetchText } from "./definitions/safe-fetch.js";
+export { safeFetchText, resolveCharset, readBodyCapped, CHARSET_SNIFF_BYTES } from "./definitions/safe-fetch.js";
 export { boundText, utf8Bytes, SPILL_DIR, SPILL_THRESHOLD_BYTES, MAX_SPILL_FILES } from "./definitions/spill.js";
 export { grepTool } from "./definitions/grep.js";
-export { webfetchTool, htmlToText } from "./definitions/webfetch.js";
+export { webFetchTool, htmlToText, extractHtmlTitle } from "./definitions/web-fetch.js";
 export { todoTool, TODO_JSON_SCHEMA, TODO_STORE_FILE } from "./definitions/todo.js";
 export {
   askUserTool,

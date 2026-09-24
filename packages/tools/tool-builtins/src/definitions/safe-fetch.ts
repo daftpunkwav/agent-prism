@@ -1,11 +1,12 @@
 /**
  * @file tools/safe-fetch
- * @description SSRF-guarded fetch shared by webfetch and the MCP fetch server.
+ * @description SSRF-guarded fetch shared by web_fetch and the MCP fetch server.
  *
  * Responsibilities:
  * - Validate the URL (scheme + host) and re-validate every DNS-resolved address
  * - Follow redirects manually, re-validating every hop against the same guards
  * - Read response bodies through a hard char cap (bounded memory)
+ * - Resolve the body charset (BOM > header > meta sniff) before decoding
  *
  * Single source for outbound fetch policy: the string-level check cannot see
  * DNS rebinding, and redirect:"follow" would bypass any first-hop check, so
@@ -19,6 +20,8 @@ import { assertResolvedIpAllowed, UrlValidationError, validateFetchUrl } from "@
 export const SAFE_FETCH_MAX_REDIRECTS = 5;
 /** Raw body cap in chars; bounds memory before any caller-side truncation. */
 export const SAFE_FETCH_MAX_CHARS = 512 * 1024;
+/** Bytes inspected for a charset declaration (BOM, meta tag, XML declaration). */
+export const CHARSET_SNIFF_BYTES = 2048;
 
 /** Result of a guarded fetch: the final response plus its capped body text. */
 export interface SafeFetchResult {
@@ -35,18 +38,56 @@ export interface SafeFetchOptions {
 }
 
 /**
- * Reads a response body up to maxChars characters, cancelling the download early
- * when the cap is reached. Falls back to response.text() when streaming is unavailable.
+ * Resolves the TextDecoder label for a body: BOM first, then the Content-Type
+ * charset parameter, then a meta/XML declaration sniffed in the first bytes.
+ * Charset declarations are ASCII, so scanning a byte-wise projection of the
+ * prefix is safe even when the body itself is encoded in GBK or similar.
+ * Unknown or unsupported labels fall back to UTF-8.
  */
-async function readBodyCapped(response: Response, maxChars: number, signal: AbortSignal): Promise<string> {
+export function resolveCharset(contentType: string | null | undefined, prefix: Uint8Array): string {
+  if (prefix.length >= 3 && prefix[0] === 0xef && prefix[1] === 0xbb && prefix[2] === 0xbf) return "utf-8";
+  if (prefix.length >= 2 && prefix[0] === 0xff && prefix[1] === 0xfe) return "utf-16le";
+  if (prefix.length >= 2 && prefix[0] === 0xfe && prefix[1] === 0xff) return "utf-16be";
+  const fromHeader = /charset\s*=\s*"?([\w-]+)"?/i.exec(contentType ?? "")?.[1];
+  if (fromHeader !== undefined) return normalizeCharset(fromHeader);
+  let ascii = "";
+  for (const byte of prefix.subarray(0, CHARSET_SNIFF_BYTES)) ascii += String.fromCharCode(byte);
+  const declared =
+    /<meta[^>]+charset\s*=\s*["']?([\w-]+)/i.exec(ascii)?.[1] ??
+    /<\?xml[^>]+encoding\s*=\s*["']([\w-]+)/i.exec(ascii)?.[1];
+  return declared === undefined ? "utf-8" : normalizeCharset(declared);
+}
+
+/** Validates the label against the runtime's supported encodings; unknown labels fall back to UTF-8. */
+function normalizeCharset(label: string): string {
+  const candidate = label.trim().toLowerCase();
+  try {
+    new TextDecoder(candidate);
+    return candidate;
+  } catch {
+    return "utf-8";
+  }
+}
+
+/**
+ * Reads a response body up to maxChars characters, cancelling the download early
+ * when the cap is reached. The charset is decided once from the first chunk, then
+ * the whole body streams through one decoder, keeping multi-byte sequences that
+ * split across chunk boundaries intact. Falls back to response.text() when
+ * streaming is unavailable (that path always assumes UTF-8).
+ */
+export async function readBodyCapped(response: Response, maxChars: number, signal: AbortSignal): Promise<string> {
   const body = response.body;
   if (body === null || typeof body.getReader !== "function") {
     return (await response.text()).slice(0, maxChars);
   }
   const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
   try {
+    const first = await reader.read();
+    if (first.done) return "";
+    const prefix = first.value ?? new Uint8Array();
+    const decoder = new TextDecoder(resolveCharset(response.headers.get("content-type"), prefix));
+    let text = decoder.decode(prefix, { stream: true });
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;

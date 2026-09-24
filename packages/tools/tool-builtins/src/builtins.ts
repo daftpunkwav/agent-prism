@@ -28,12 +28,12 @@ import { planTool } from "./definitions/plan.js";
 import { sessionQueryPlaceholderTool } from "./definitions/session-query.js";
 import { symbolsTool } from "@agentprism/tool-symbols";
 import { scatterPlaceholderTool } from "./definitions/scatter.js";
-import { webfetchTool } from "./definitions/webfetch.js";
+import { webFetchTool } from "./definitions/web-fetch.js";
 import { writeTool } from "./definitions/write.js";
 import { MapToolRegistry } from "@agentprism/tool-registry";
 import { setToolTuning, type ToolTuning } from "./tuning.js";
 
-const BUILTIN_TOOLS = [readTool, writeTool, editTool, lsTool, bashTool, applyPatchTool, globTool, grepTool, webfetchTool, todoTool, askUserTool, webSearchTool, runJobTool, bashSessionTool, subagentPlaceholderTool, skillTool, goalTool, ralphPlaceholderTool, planTool, sessionQueryPlaceholderTool, symbolsTool, scatterPlaceholderTool] as const;
+const BUILTIN_TOOLS = [readTool, writeTool, editTool, lsTool, bashTool, applyPatchTool, globTool, grepTool, webFetchTool, todoTool, askUserTool, webSearchTool, runJobTool, bashSessionTool, subagentPlaceholderTool, skillTool, goalTool, ralphPlaceholderTool, planTool, sessionQueryPlaceholderTool, symbolsTool, scatterPlaceholderTool] as const;
 
 /**
  * Creates a registry with all builtin workspace tools registered. The optional
