@@ -113,6 +113,23 @@ describe("AutogenDriver", () => {
     expect(complete?.metrics?.steps).toBe(2);
   });
 
+  it("mirrors the terminating verdict onto thoughts when the coder left a stale intent", async () => {
+    const verdict = `${AUTOGEN_TERMINATE_KEYWORD}: result is 42 minutes`;
+    const llm = stubLlm(
+      ["coder", "reviewer"],
+      [
+        { text: "I will fetch the time now", toolCalls: [{ id: "c1", name: "read", args: { path: "hi.txt" } }] },
+        { text: verdict },
+      ],
+    );
+    const events = await collect(new AutogenDriver(), contextWith(llm));
+    // The coder's last speech predates the tool result, so the verdict is the
+    // chat's only result and must win answer extraction.
+    expect(extractAnswerFromEvents(events)).toBe(verdict);
+    const complete = events.find((event) => event.type === "complete");
+    expect(complete?.metrics?.success).toBe(true);
+  });
+
   it("falls back to the coder when the selection reply is garbage", async () => {
     const llm = stubLlm(
       ["the task looks fine"],

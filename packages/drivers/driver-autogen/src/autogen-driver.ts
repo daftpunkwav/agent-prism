@@ -5,6 +5,7 @@
  * Responsibilities:
  * - Run coder/reviewer group-chat rounds; the user proxy executes tool calls
  * - Keep selections and critiques on reflect events; coder thoughts carry the answer
+ * - Mirror a terminating reviewer verdict onto thoughts when the coder left no fresh answer
  * - Translate rounds/tools into the shared ArenaEvent stream
  *
  * Faithful-pattern implementation of AutoGen's conversable multi-agent group
@@ -200,6 +201,9 @@ export class AutogenDriver implements AgentDriver {
     let reviewerRoundsLeft = reviewerBudgetFor(config.reasoning);
     let lastSpeaker: GroupChatSpeaker | null = null;
     let terminated = false;
+    // False while the coder's last speech precedes a pending tool result —
+    // only a coder turn without tool calls leaves a fresh final answer.
+    let coderAnswerFresh = false;
 
     try {
       // Per-call budget granularity: the selection call and the speaker turn
@@ -233,6 +237,19 @@ export class AutogenDriver implements AgentDriver {
           });
           if (isTerminationMessage(reviewerMessage.content)) {
             terminated = true;
+            // AutoGen's chat result is the last transcript message. When the
+            // coder never spoke past a pending tool result, that verdict is
+            // the only result the chat produced, so it must ride the thought
+            // channel or answer extraction keeps a stale intent line.
+            if (!coderAnswerFresh) {
+              yield eventOf({
+                type: "thought",
+                pipeline: label,
+                step: stats.step,
+                content: reviewerMessage.content,
+                workspace: workspaceName,
+              });
+            }
           }
         } else {
           let coderMessage: LlmAssistantMessage | null = null;
@@ -243,6 +260,7 @@ export class AutogenDriver implements AgentDriver {
           if (coderMessage === null) break;
           const priorToolNames = collectPriorToolNames(messages);
           messages.push(coderMessage);
+          coderAnswerFresh = (coderMessage.toolCalls ?? []).length === 0;
           if ((coderMessage.toolCalls ?? []).length > 0) {
             for await (const item of executeToolCalls(context, coderMessage, question, priorToolNames, stats)) {
               if (isToolMessage(item)) messages.push(item);
