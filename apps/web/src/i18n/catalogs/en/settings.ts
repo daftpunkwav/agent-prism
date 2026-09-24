@@ -66,12 +66,13 @@ export const settings = {
     enabledLabel: "Enabled",
     customLevels: "Custom thinking levels",
     customLevelsHint:
-      "Vendor-defined levels, one per row (e.g. low, mid, high, max). They replace the standard set and are sent as reasoning effort.",
-    customLevelsUnavailable:
-      "Custom levels apply to OpenAI-compatible formats; Anthropic uses Low / Medium / High.",
+      "Vendor-defined levels, one per row (e.g. low, mid, high, max, 8192). OpenAI-compatible formats send them verbatim as reasoning effort; on Anthropic numeric levels (≥1024) pass through as thinking budget tokens and named levels map to the fixed budget table.",
     customLevelPlaceholder: "Level name (e.g. xhigh)",
     customLevelAria: "Custom level {index}",
     customLevelAdd: "Add level",
+    thinkingBudgetTokens: "Thinking budget tokens (budget_tokens)",
+    thinkingOutputTokens: "Thinking output tokens (max_tokens)",
+    thinkingBudgetError: "Thinking output tokens must exceed the thinking budget tokens",
     customLevelRemoveAria: "Remove custom level {index}",
     labelPlaceholder: "Display name",
     labelAria: "Model {index} display name",
@@ -100,6 +101,8 @@ export const settings = {
     unnamed: "Unnamed model",
     thinkingHint:
       "The Anthropic path maps to thinking.budget_tokens; OpenAI-compatible paths try reasoning_effort. For comparison runs, the generation cap still follows the Arena baseline.",
+    thinkingBudgetHint:
+      "The thinking budget applies to the Anthropic Messages format only: when set it outranks the level mapping. The paired output tokens cap the whole response; 0 auto-raises to budget + 1024 and must exceed the budget.",
   },
   decode: {
     title: "Shared Decode Defaults (Arena baseline seed)",

@@ -20,7 +20,6 @@ function renderModal(overrides: Partial<Parameters<typeof ModelModal>[0]> = {}) 
   const merged: Parameters<typeof ModelModal>[0] = {
     initial,
     isNew: false,
-    apiFormat: "openai_chat",
     defaultEndpointId: "",
     onSetDefault,
     onClose,

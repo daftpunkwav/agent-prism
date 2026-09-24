@@ -22,8 +22,12 @@ export type ModelSlot = {
   max_output_tokens: number;
   thinking_capable: boolean;
   thinking_level: string;
-  /** Vendor-defined thinking levels (OpenAI-compatible only); empty means the standard low/medium/high set. */
+  /** Vendor-defined thinking levels; empty means the standard low/medium/high set. */
   thinking_levels: string[];
+  /** Anthropic thinking budget in tokens (0 = unset: the level mapping applies). */
+  thinking_budget_tokens: number;
+  /** Total output cap accompanying the budget (0 = unset: auto-raised). Must exceed the budget. */
+  thinking_max_tokens: number;
   image_input: boolean;
   video_input: boolean;
   enabled: boolean;
@@ -94,6 +98,8 @@ export function blankModel(): ModelSlot {
     thinking_capable: false,
     thinking_level: "off",
     thinking_levels: [],
+    thinking_budget_tokens: 0,
+    thinking_max_tokens: 0,
     image_input: false,
     video_input: false,
     enabled: true,
@@ -138,6 +144,8 @@ export function groupEndpoints(cfg: ProviderConfig): ConnectionGroup[] {
         thinking_capable: false,
         thinking_level: "off",
         thinking_levels: [],
+        thinking_budget_tokens: 0,
+        thinking_max_tokens: 0,
         image_input: false,
         video_input: false,
         enabled: true,
@@ -185,6 +193,8 @@ export function groupEndpoints(cfg: ProviderConfig): ConnectionGroup[] {
       // The public view is a string; illegal values are rejected by the backend zod — pass through, storage clamps
       thinking_level: ep.thinking_level || "off",
       thinking_levels: Array.isArray(ep.thinking_levels) ? ep.thinking_levels.filter((l): l is string => typeof l === "string") : [],
+      thinking_budget_tokens: typeof ep.thinking_budget_tokens === "number" ? ep.thinking_budget_tokens : 0,
+      thinking_max_tokens: typeof ep.thinking_max_tokens === "number" ? ep.thinking_max_tokens : 0,
     });
   }
   const groups: ConnectionGroup[] = [];
@@ -221,6 +231,8 @@ export function flattenConnections(connections: ConnectionGroup[]): LlmEndpointU
         video_input: m.video_input,
         thinking_level: m.thinking_capable ? m.thinking_level : "off",
         thinking_levels: m.thinking_levels.filter((l) => l.trim() !== ""),
+        thinking_budget_tokens: m.thinking_budget_tokens,
+        thinking_max_tokens: m.thinking_max_tokens,
         enabled: m.enabled !== false,
       });
     }

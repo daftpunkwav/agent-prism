@@ -23,8 +23,6 @@ import { Field } from "./Field";
 export interface ModelModalProps {
   initial: ModelSlot;
   isNew: boolean;
-  /** Connection api_format: the custom-level editor only applies to OpenAI-compatible formats. */
-  apiFormat: string;
   defaultEndpointId: string;
   onSetDefault(modelId: string): void;
   onClose(): void;
@@ -34,18 +32,23 @@ export interface ModelModalProps {
 /** Effective level options: vendor-defined levels replace the standard set when present. */
 function levelOptions(
   thinkingLevels: string[],
-  isOpenAI: boolean,
   label: (value: string) => string,
 ): Array<{ value: string; label: string }> {
-  const customs = isOpenAI ? thinkingLevels : [];
-  if (customs.length > 0) {
-    return [{ value: "off", label: label("off") }, ...customs.map((name) => ({ value: name, label: name }))];
+  if (thinkingLevels.length > 0) {
+    return [{ value: "off", label: label("off") }, ...thinkingLevels.map((name) => ({ value: name, label: name }))];
   }
   return ["off", "low", "medium", "high"].map((value) => ({ value, label: label(value) }));
 }
 
+/** Token-count input clamp: mirrors the backend parse range so a stray typed value never becomes a 422. */
+const TOKEN_INPUT_MAX = 10_000_000;
+
+function clampTokenInput(raw: string): number {
+  return Math.min(TOKEN_INPUT_MAX, Math.max(0, Number.parseInt(raw, 10) || 0));
+}
+
 /** Independent model editor dialog: add and edit share this one window. */
-export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSetDefault, onClose, onSave }: ModelModalProps) {
+export function ModelModal({ initial, isNew, defaultEndpointId, onSetDefault, onClose, onSave }: ModelModalProps) {
   const t = useT();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<ModelSlot>(initial);
@@ -81,7 +84,6 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const isOpenAI = apiFormat === "openai_chat" || apiFormat === "openai_responses";
   const levelLabel = (value: string) =>
     value === "low"
       ? t("settings.model.levelLow")
@@ -90,8 +92,12 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
         : value === "high"
           ? t("settings.model.levelHigh")
           : t("settings.model.levelOff");
-  const options = levelOptions(draft.thinking_levels, isOpenAI, levelLabel);
-  const canSave = draft.model.trim() !== "";
+  const options = levelOptions(draft.thinking_levels, levelLabel);
+  const budgetError =
+    draft.thinking_budget_tokens > 0 &&
+    draft.thinking_max_tokens > 0 &&
+    draft.thinking_max_tokens <= draft.thinking_budget_tokens;
+  const canSave = draft.model.trim() !== "" && !budgetError;
 
   const patch = (p: Partial<ModelSlot>) => setDraft((d) => ({ ...d, ...p }));
 
@@ -104,7 +110,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
   const commit = () => {
     if (!canSave) return;
     const levels = draft.thinking_levels.map((l) => l.trim()).filter((l, i, arr) => l !== "" && arr.indexOf(l) === i).slice(0, 16);
-    const effective = isOpenAI && levels.length > 0 ? levels : [];
+    const effective = levels.length > 0 ? levels : [];
     const levelKept = draft.thinking_level === "off" || (effective.length > 0 ? effective.includes(draft.thinking_level) : ["low", "medium", "high"].includes(draft.thinking_level));
     onSave({
       ...draft,
@@ -143,7 +149,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="arena-modal-body">
+        <div className="arena-modal-body space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <Field label={t("settings.model.labelPlaceholder")}>
               <input
@@ -166,7 +172,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <Field label={t("settings.model.contextWindow")}>
               <input
                 className="form-input font-mono text-sm"
@@ -196,7 +202,8 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          {/* Toggle cluster: two aligned columns, one control per row. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 text-sm">
             <label className="flex items-center gap-2 text-xs text-foreground">
               <input
                 type="checkbox"
@@ -237,7 +244,11 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 {t("settings.model.setDefaultTitle")}
               </label>
             )}
-            <label className="flex items-center gap-2 text-xs text-foreground sm:col-span-2">
+          </div>
+
+          {/* Thinking: capability, level, budget pair, vendor levels. */}
+          <div className="rounded-lg border border-border/60 p-3.5 space-y-3">
+            <label className="flex items-center gap-2 text-xs text-foreground">
               <input
                 type="checkbox"
                 className="accent-[var(--primary)]"
@@ -256,67 +267,88 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
               />
               {t("settings.model.thinkingCapable")}
             </label>
-          </div>
-
-          <Field label={t("settings.model.defaultThinkingLevel")}>
-            <UiSelect
-              className="w-full"
-              disabled={!draft.thinking_capable}
-              value={draft.thinking_capable ? draft.thinking_level : "off"}
-              onChange={(value) => patch({ thinking_level: value })}
-              ariaLabel={t("settings.model.defaultThinkingLevel")}
-              options={options}
-            />
-          </Field>
-          {isOpenAI ? (
-            <div className="space-y-2">
-              <p className="eyebrow">{t("settings.model.customLevels")}</p>
-              {draft.thinking_levels.map((lv, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input
-                    className="form-input font-mono text-sm"
-                    value={lv}
-                    placeholder={t("settings.model.customLevelPlaceholder")}
-                    aria-label={t("settings.model.customLevelAria", { index: index + 1 })}
-                    onChange={(e) => {
-                      const next = [...draft.thinking_levels];
-                      next[index] = e.target.value;
-                      setLevels(next);
-                    }}
-                  />
+            <Field label={t("settings.model.defaultThinkingLevel")}>
+              <UiSelect
+                className="w-full"
+                disabled={!draft.thinking_capable}
+                value={draft.thinking_capable ? draft.thinking_level : "off"}
+                onChange={(value) => patch({ thinking_level: value })}
+                ariaLabel={t("settings.model.defaultThinkingLevel")}
+                options={options}
+              />
+            </Field>
+            {draft.thinking_capable && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field label={t("settings.model.thinkingBudgetTokens")}>
+                    <input
+                      className="form-input font-mono text-sm"
+                      type="number"
+                      min={0}
+                      value={draft.thinking_budget_tokens}
+                      onChange={(e) => patch({ thinking_budget_tokens: clampTokenInput(e.target.value) })}
+                    />
+                  </Field>
+                  <Field label={t("settings.model.thinkingOutputTokens")}>
+                    <input
+                      className="form-input font-mono text-sm"
+                      type="number"
+                      min={0}
+                      value={draft.thinking_max_tokens}
+                      onChange={(e) => patch({ thinking_max_tokens: clampTokenInput(e.target.value) })}
+                    />
+                  </Field>
+                </div>
+                {budgetError && (
+                  <p className="text-[11px] text-destructive leading-relaxed">{t("settings.model.thinkingBudgetError")}</p>
+                )}
+                <div className="space-y-2">
+                  <p className="eyebrow">{t("settings.model.customLevels")}</p>
+                  {draft.thinking_levels.map((lv, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <input
+                        className="form-input font-mono text-sm"
+                        value={lv}
+                        placeholder={t("settings.model.customLevelPlaceholder")}
+                        aria-label={t("settings.model.customLevelAria", { index: index + 1 })}
+                        onChange={(e) => {
+                          const next = [...draft.thinking_levels];
+                          next[index] = e.target.value;
+                          setLevels(next);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-ghost !h-8 !w-8 !p-0 shrink-0"
+                        aria-label={t("settings.model.customLevelRemoveAria", { index: index + 1 })}
+                        onClick={() => setLevels(draft.thinking_levels.filter((_, i) => i !== index))}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
                   <button
                     type="button"
-                    className="btn-ghost !h-8 !w-8 !p-0 shrink-0"
-                    aria-label={t("settings.model.customLevelRemoveAria", { index: index + 1 })}
-                    onClick={() => setLevels(draft.thinking_levels.filter((_, i) => i !== index))}
+                    className="btn-ghost !h-8 text-xs"
+                    disabled={draft.thinking_levels.length >= 16}
+                    onClick={() => setLevels([...draft.thinking_levels, ""])}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Plus className="h-3.5 w-3.5" />
+                    {t("settings.model.customLevelAdd")}
                   </button>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {t("settings.model.customLevelsHint")}
+                  </p>
                 </div>
-              ))}
-              <button
-                type="button"
-                className="btn-ghost !h-8 text-xs"
-                disabled={draft.thinking_levels.length >= 16}
-                onClick={() => setLevels([...draft.thinking_levels, ""])}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {t("settings.model.customLevelAdd")}
-              </button>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                {t("settings.model.customLevelsHint")}
-              </p>
-            </div>
-          ) : (
-            draft.thinking_capable && (
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                {t("settings.model.customLevelsUnavailable")}
-              </p>
-            )
-          )}
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            {t("settings.model.thinkingHint")}
-          </p>
+              </>
+            )}
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              {t("settings.model.thinkingBudgetHint")}
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              {t("settings.model.thinkingHint")}
+            </p>
+          </div>
 
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" className="btn-ghost !h-9 text-xs" onClick={onClose}>

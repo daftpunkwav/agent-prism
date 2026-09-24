@@ -241,6 +241,8 @@ export function ConnectionsSection({
                   ? level
                   : "off",
               thinking_levels: levels,
+              thinking_budget_tokens: typeof m.thinking_budget_tokens === "number" ? m.thinking_budget_tokens : base.thinking_budget_tokens,
+              thinking_max_tokens: typeof m.thinking_max_tokens === "number" ? m.thinking_max_tokens : base.thinking_max_tokens,
               image_input: m.image_input === true,
               video_input: m.video_input === true,
               enabled: m.enabled !== false,
@@ -671,7 +673,6 @@ export function ConnectionsSection({
                   <ModelModal
                     initial={modelModal.draft}
                     isNew={modelModal.isNew}
-                    apiFormat={c.api_format}
                     defaultEndpointId={defaultEndpointId}
                     onSetDefault={onSetDefault}
                     onClose={() => setModelModal(null)}

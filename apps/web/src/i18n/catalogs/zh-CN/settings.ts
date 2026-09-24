@@ -66,12 +66,13 @@ export const settings = {
     enabledLabel: "启用",
     customLevels: "自定义思考强度",
     customLevelsHint:
-      "厂商自定义档位，每行一个（如 low、mid、high、max）。设置后替代标准档位，将作为 reasoning effort 透传。",
-    customLevelsUnavailable:
-      "自定义档位仅适用于 OpenAI 兼容格式；Anthropic 使用低 / 中 / 高。",
+      "厂商自定义档位，每行一个（如 low、mid、high、max、8192）。OpenAI 兼容格式作为 reasoning effort 原样透传；Anthropic 格式数值档位（≥1024）作为思考预算 tokens 透传，命名档位映射固定预算。",
     customLevelPlaceholder: "档位名（如 xhigh）",
     customLevelAria: "自定义档位 {index}",
     customLevelAdd: "添加档位",
+    thinkingBudgetTokens: "思考预算 tokens（budget_tokens）",
+    thinkingOutputTokens: "思考输出 tokens（max_tokens）",
+    thinkingBudgetError: "思考输出 tokens 必须大于思考预算 tokens",
     customLevelRemoveAria: "删除自定义档位 {index}",
     labelPlaceholder: "显示名称",
     labelAria: "模型 {index} 显示名称",
@@ -100,6 +101,8 @@ export const settings = {
     unnamed: "未命名模型",
     thinkingHint:
       "Anthropic 路径映射为 thinking.budget_tokens；OpenAI 兼容路径尝试 reasoning_effort。对比实验时生成上限仍以 Arena 基线为准。",
+    thinkingBudgetHint:
+      "思考预算仅作用于 Anthropic Messages 格式：配置后优先于档位映射，思考输出 tokens 为该次请求的总输出上限，为 0 时自动抬升为预算 + 1024，且必须大于思考预算。",
   },
   decode: {
     title: "共享解码默认（Arena 基线种子）",
