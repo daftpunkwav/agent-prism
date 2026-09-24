@@ -83,7 +83,8 @@ export const mcpFsListTool: ToolDefinition = {
     const fs = asFs(workspace);
     if (fs === null) return { result: "Error: workspace filesystem unavailable", fileDiff: null, ok: false, code: "workspace_error" };
     try {
-      const entries = fs.listFiles(raw === "." ? "." : raw, { recursive: false });
+      // The scoped filesystem treats "" as the root; "." canonicalizes to null and lists nothing.
+      const entries = fs.listFiles(raw === "." ? "" : raw, { recursive: false });
       const lines = [...entries].sort().slice(0, 200);
       return { result: lines.length > 0 ? cap(lines.join("\n"), 8000) : "(empty directory)", fileDiff: null, ok: true };
     } catch {

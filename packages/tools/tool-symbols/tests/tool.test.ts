@@ -16,7 +16,7 @@ function workspace(files: Record<string, string>) {
         if (hit === undefined) throw new Error("missing");
         return hit;
       },
-      listFiles: (dir: string) => (dir === "." ? Object.keys(files) : []),
+      listFiles: (dir: string) => (dir === "" ? Object.keys(files) : []),
     },
   };
 }

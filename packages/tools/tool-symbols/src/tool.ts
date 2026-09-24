@@ -49,7 +49,8 @@ function asFs(workspace: ToolWorkspace): StructuralFs | null {
 function loadCandidates(fs: StructuralFs): Array<{ path: string; text: string }> {
   let files: string[];
   try {
-    files = fs.listFiles(".", { recursive: true });
+    // The scoped filesystem treats "" as the root; "." canonicalizes to null and lists nothing.
+    files = fs.listFiles("", { recursive: true });
   } catch {
     return [];
   }
