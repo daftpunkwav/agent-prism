@@ -56,17 +56,19 @@ describe("skin registry", () => {
     ]);
   });
 
-  it("has a self-contained CSS file per non-default skin, imported by the registry", () => {
+  it("has a self-contained dual-mode CSS file per non-default skin, imported by the registry", () => {
     // Vitest runs from the repo root (root vitest.config.ts), so the shared ui
     // package styles resolve from there.
     const skinsDir = resolve(process.cwd(), "packages/ui/ui/styles/skins");
     const registry = readFileSync(join(skinsDir, "index.css"), "utf8");
     for (const skin of SKINS) {
       if (skin === DEFAULT_SKIN) continue;
-      // The registry must import the file, and the file must target the id.
+      // The registry must import the file, and the file must ship both mode
+      // blocks: light on [data-theme] and dark on [data-theme].dark.
       expect(registry).toContain(`@import "./${skin}.css"`);
       const css = readFileSync(join(skinsDir, `${skin}.css`), "utf8");
       expect(css).toContain(`[data-theme="${skin}"]`);
+      expect(css).toContain(`[data-theme="${skin}"].dark`);
     }
   });
 

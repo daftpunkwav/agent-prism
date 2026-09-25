@@ -1,9 +1,10 @@
 /*
-  Google skin — Material-flavored: white surfaces, hairline gray borders,
-  Google blue as the single primary, brand four-color set for data lanes.
-  Token source: design library "Google" (dl_builtin_google prototype tokens).
-  Light-only: declared after .dark and wins the cascade regardless of the
-  dark-mode class.
+  Google skin — Material-flavored: white surfaces with hairline gray borders
+  (light) / Material dark surfaces (dark), Google blue as the single primary,
+  brand four-color set for data lanes.
+  Token source: design library "Google" (dl_builtin_google prototype tokens);
+  the dark set is derived from Material dark conventions (the prototype ships
+  light only). The reference amber fails 3:1 as status text; darkened.
 */
 
 [data-theme="google"] {
@@ -28,8 +29,9 @@
   --ring: #4285f4;
   --destructive: #ea4335;
   --destructive-foreground: #ffffff;
-  --success: #34a853;
-  --warning: #fbbc05;
+  /* Reference yellow (#fbbc05) is 1.7:1 as status text; darkened. */
+  --success: #188038;
+  --warning: #b06000;
 
   /* The four Google brand colors + deep blue: full hue separation for
      simultaneous comparison lanes. */
@@ -57,4 +59,52 @@
   --shadow-md: 0 1px 3px 0 rgba(60, 64, 67, 0.15), 0 4px 8px -3px rgba(60, 64, 67, 0.12);
   --shadow-lg: 0 4px 8px -2px rgba(60, 64, 67, 0.15), 0 8px 20px -6px rgba(60, 64, 67, 0.18);
   --shadow-xl: 0 8px 16px -6px rgba(60, 64, 67, 0.18), 0 16px 32px -12px rgba(60, 64, 67, 0.22);
+}
+
+[data-theme="google"].dark {
+  --background: #131314;
+  --foreground: #e3e3e3;
+  --card: #1e1f20;
+  --card-foreground: #e3e3e3;
+  --popover: #1e1f20;
+  --popover-foreground: #e3e3e3;
+  --muted: #2d2f31;
+  --muted-foreground: #9aa0a6;
+  --border: #3c4043;
+  --input: #2d2f31;
+  --primary: #4285f4;
+  --primary-foreground: #ffffff;
+  --secondary: #253b56;
+  --secondary-foreground: #cfe1f9;
+  --accent: #8ab4f0;
+  --accent-foreground: #062e6f;
+  --ring: #8ab4f0;
+  --destructive: #f28b82;
+  --destructive-foreground: #131314;
+  --success: #81c995;
+  --warning: #fdd663;
+
+  /* Material dark brights: full hue separation on dark cards. */
+  --spectrum-1: #8ab4f0;
+  --spectrum-2: #f28b82;
+  --spectrum-3: #fdd663;
+  --spectrum-4: #81c995;
+  --spectrum-5: #c58af9;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.40);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 1px 3px 0 rgba(0, 0, 0, 0.50), 0 4px 8px -3px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 4px 8px -2px rgba(0, 0, 0, 0.50), 0 8px 20px -6px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 8px 16px -6px rgba(0, 0, 0, 0.55), 0 16px 32px -12px rgba(0, 0, 0, 0.60);
 }

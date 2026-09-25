@@ -1,12 +1,66 @@
 /*
-  Motion Fit skin — neon-on-charcoal athletic dashboard: black surfaces,
-  electric orange primary with dark text on it, square corners, neon data lanes.
-  Token source: design library "Motion Fit" (motion-fit-universal-prototype).
-  Inherently dark: the reference only ships a dark surface set, so the skin
-  keeps it under both mode classes (same cascade rule as claude).
+  Motion Fit skin — athletic black + neon orange (dark, straight from the
+  reference) / white + the same neon (light, derived). Square corners, neon
+  data lanes.
+  Token source: design library "Motion Fit" (motion-fit-universal-prototype);
+  the light set is derived from the same ink+neon family (the prototype ships
+  dark only). Reference ships no success/warning tokens; they are drawn from
+  its chart palette in dark and deepened in light.
 */
 
 [data-theme="motion-fit"] {
+  --background: #ffffff;
+  --foreground: #18181b;
+  --card: #f4f4f5;
+  --card-foreground: #18181b;
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+  --muted: #e4e4e7;
+  --muted-foreground: #52525b;
+  --border: #d4d4d8;
+  --input: #ffffff;
+  --primary: #ff4000;
+  --primary-foreground: #ffffff;
+  --secondary: #e4e4e7;
+  --secondary-foreground: #18181b;
+  --accent: #ff4000;
+  --accent-foreground: #ffffff;
+  --ring: #ff4000;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  /* Derived (reference ships no status colors): deepened for light surfaces. */
+  --success: #0f9d58;
+  --warning: #b45309;
+
+  /* Neon lane set deepened for light surfaces. */
+  --spectrum-1: #00a85a;
+  --spectrum-2: #7a2fe0;
+  --spectrum-3: #e07800;
+  --spectrum-4: #2563eb;
+  --spectrum-5: #db2777;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Square-first like the default skin: reference declares radius 0. */
+  --radius: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+
+  /* Quiet gray elevation derived from the reference ink family. */
+  --shadow-xs: 0 1px 2px 0 rgba(24, 24, 27, 0.06);
+  --shadow-sm: 0 2px 4px 0 rgba(24, 24, 27, 0.08);
+  --shadow-md: 0 4px 8px -2px rgba(24, 24, 27, 0.10);
+  --shadow-lg: 0 8px 16px -4px rgba(24, 24, 27, 0.12);
+  --shadow-xl: 0 16px 32px -8px rgba(24, 24, 27, 0.16);
+}
+
+[data-theme="motion-fit"].dark {
+  /* Reference :root block, mapped token-for-token. */
   --background: #0a0a0a;
   --foreground: #e2e8f0;
   --card: #161616;
@@ -26,7 +80,7 @@
   --ring: #ff4000;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  /* Reference ships no success/warning tokens; drawn from its own chart palette. */
+  /* Reference ships no success/warning tokens; drawn from its chart palette. */
   --success: #00ff85;
   --warning: #ffa500;
 
@@ -42,7 +96,6 @@
   --chart-3: var(--spectrum-3);
   --chart-4: var(--spectrum-4);
 
-  /* Square-first like the default skin: reference declares radius 0. */
   --radius: 0px;
   --radius-sm: 0px;
   --radius-md: 0px;

@@ -1,9 +1,10 @@
 /*
-  VibeCamp skin — warm-canvas creative camp: greige canvas background, cream
-  cards, flame-orange brand on near-black ink, playful rounded corners.
-  Token source: design library "VibeCamp" (vibe-camp design-system page tokens).
-  Light-only: declared after .dark and wins the cascade regardless of the
-  dark-mode class.
+  VibeCamp skin — warm-canvas creative camp: greige canvas with cream cards
+  (light) / warm ink camp at night (dark, derived from the same warm family),
+  flame-orange brand, playful rounded corners.
+  Token source: design library "VibeCamp" (vibe-camp design-system page tokens);
+  the dark set is derived from the reference's warm gray family (it ships light
+  only). Reference status hues below 3:1 as status text are darkened one step.
 */
 
 [data-theme="vibecamp"] {
@@ -58,4 +59,53 @@
   --shadow-md: 0 4px 16px 0 rgba(33, 29, 26, 0.06);
   --shadow-lg: 0 12px 32px 0 rgba(33, 29, 26, 0.08);
   --shadow-xl: 0 16px 40px -8px rgba(33, 29, 26, 0.12);
+}
+
+[data-theme="vibecamp"].dark {
+  /* Night camp: warm ink surfaces from the same family as the canvas. */
+  --background: #1d1a17;
+  --foreground: #f3efe9;
+  --card: #262220;
+  --card-foreground: #f3efe9;
+  --popover: #2b2724;
+  --popover-foreground: #f3efe9;
+  --muted: #33302c;
+  --muted-foreground: #b5aca1;
+  --border: #3d3833;
+  --input: #3d3833;
+  --primary: #ff6a3d;
+  --primary-foreground: #211d1a;
+  --secondary: #33302c;
+  --secondary-foreground: #f3efe9;
+  --accent: #ff845f;
+  --accent-foreground: #211d1a;
+  --ring: #ff845f;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --success: #3ccf8e;
+  --warning: #f4b366;
+
+  /* Brand brights carry lane identity on warm ink. */
+  --spectrum-1: #ff845f;
+  --spectrum-2: #f4b366;
+  --spectrum-3: #3ccf8e;
+  --spectrum-4: #b3a6ff;
+  --spectrum-5: #e8cba0;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --shadow-xs: 0 2px 8px 0 rgba(0, 0, 0, 0.30);
+  --shadow-sm: 0 2px 8px 0 rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 16px 0 rgba(0, 0, 0, 0.40);
+  --shadow-lg: 0 12px 32px 0 rgba(0, 0, 0, 0.45);
+  --shadow-xl: 0 16px 40px -8px rgba(0, 0, 0, 0.50);
 }

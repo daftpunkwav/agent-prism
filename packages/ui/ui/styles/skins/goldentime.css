@@ -1,9 +1,9 @@
 /*
-  GoldenTime skin — warm sand-and-caramel journal look: cream backgrounds,
-  caramel-brown text, caramel orange accent, large cozy radii, warm shadows.
+  GoldenTime skin — warm sand-and-caramel journal look: cream backgrounds with
+  caramel text (light) / warm night-sand dark (dark, straight from the
+  reference :root.dark block), caramel orange accent, large cozy radii.
   Token source: design library "GoldenTime" (golden-prototype colors_and_type.css).
-  Light-only: declared after .dark and wins the cascade regardless of the
-  dark-mode class.
+  The light warning is darkened one step for 3:1 status text.
 */
 
 [data-theme="goldentime"] {
@@ -27,8 +27,9 @@
   --ring: #f79b45;
   --destructive: #b34a3c;
   --destructive-foreground: #ffffff;
-  --success: #6b8e4e;
-  --warning: #d68a3c;
+  /* Reference warning (#d68a3c) sits under 3:1 as status text; darkened. */
+  --success: #55703c;
+  --warning: #a05a03;
 
   /* Reference chart hues; the palest two are kept as fill-only lanes, matching
      the default skin's faint-tail ramp precedent. */
@@ -56,4 +57,54 @@
   --shadow-md: 0 2px 4px -2px rgba(87, 77, 66, 0.05), 0 8px 20px -6px rgba(87, 77, 66, 0.10);
   --shadow-lg: 0 4px 8px -4px rgba(87, 77, 66, 0.06), 0 16px 36px -10px rgba(87, 77, 66, 0.14);
   --shadow-xl: 0 8px 16px -8px rgba(87, 77, 66, 0.10), 0 20px 44px -12px rgba(87, 77, 66, 0.18);
+}
+
+[data-theme="goldentime"].dark {
+  /* Reference :root.dark block ("暖夜沙金"), mapped token-for-token. */
+  --background: #060201;
+  --foreground: #e3dfd6;
+  --card: #1a1612;
+  --card-foreground: #e3dfd6;
+  --popover: #1a1612;
+  --popover-foreground: #e3dfd6;
+  --muted: #2d2924;
+  --muted-foreground: #a89c8a;
+  --border: #2d2b26;
+  --input: #2d2924;
+  --primary: #e3dfd6;
+  --primary-foreground: #060201;
+  --secondary: #2d2924;
+  --secondary-foreground: #e3dfd6;
+  --accent: #f79b45;
+  --accent-foreground: #060201;
+  --ring: #f79b45;
+  --destructive: #d96457;
+  --destructive-foreground: #060201;
+  /* Reference ships no dark status colors; lightened for dark surfaces. */
+  --success: #9dbb7e;
+  --warning: #e8a35c;
+
+  /* Warm chart hues lightened for lane identity on night sand. */
+  --spectrum-1: #f79b45;
+  --spectrum-2: #c2bd85;
+  --spectrum-3: #a07a7a;
+  --spectrum-4: #d0d3c0;
+  --spectrum-5: #8a9a7a;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  --radius: 16px;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.40);
+  --shadow-sm: 0 2px 6px -1px rgba(0, 0, 0, 0.45), 0 1px 2px 0 rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 2px 4px -2px rgba(0, 0, 0, 0.45), 0 8px 20px -6px rgba(0, 0, 0, 0.50);
+  --shadow-lg: 0 4px 8px -4px rgba(0, 0, 0, 0.50), 0 16px 36px -10px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 8px 16px -8px rgba(0, 0, 0, 0.55), 0 20px 44px -12px rgba(0, 0, 0, 0.60);
 }
