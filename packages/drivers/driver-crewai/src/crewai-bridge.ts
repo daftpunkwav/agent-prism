@@ -4,12 +4,14 @@
  *              model and tool ports into the bootstrap process over NDJSON.
  *
  * Responsibilities:
- * - Build the startup handshake (question, history, tool catalog, budget, locale)
+ * - Build the startup handshake (question, tool catalog, budget)
  * - Answer llm_request lines through the harness LlmAdapter (usage lands in the tracker)
+ *   and enforce the step budget against it (the crewai bootstrap has no
+ *   internal budget, unlike the autogen MaxMessageTermination bound)
  * - Answer tool_request lines through the shared tool-batch executor (events preserved)
- * - Translate bridge events into ArenaEvents (role speech rides the thought
- *   channel when it is the crew answer, the reflect channel otherwise) and
- *   surface the final complete event
+ * - Translate bridge events into ArenaEvents (role speech rides the reflect
+ *   channel; the crew's final answer is the bridge's own final outcome, not a
+ *   channel extraction) and surface the final complete event
  *
  * The framework keeps the orchestration (role crew, sequential/hierarchical
  * process, delegation); the arena keeps the model, the tools, the budget, and
@@ -28,6 +30,10 @@ import {
   stepBudgetFor,
   type ChildBridgeHandlers,
 } from "@agentprism/driver-run-support";
+
+/** Completion served once the step budget is spent (see llmComplete). */
+const BRIDGE_BUDGET_EXHAUSTED_NOTE =
+  "[arena] Step budget exhausted: stop calling tools and reply with the best final answer for what is done.";
 
 /** Absolute path of the bundled bootstrap script (package root /python). */
 export function bootstrapScriptPath(importMetaUrl: string): string {
@@ -76,6 +82,12 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
     llmComplete: async (request) => {
       stats.turns += 1;
       stats.step += 1;
+      if (stats.turns > maxSteps) {
+        // The crewai bootstrap has no internal budget knob: a crew looping on
+        // a task would keep consuming the arena model. Past the budget, stop
+        // paying for completions and push the crew to wrap up.
+        return BRIDGE_BUDGET_EXHAUSTED_NOTE;
+      }
       const messages: LlmMessage[] = request.messages.map(toLlmMessage);
       const result = await context.llm.invoke(messages, { signal: context.signal });
       return JSON.stringify({
@@ -121,14 +133,12 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
     start: {
       type: "start",
       question,
-      history: historyOf(context),
       tools: toolDefinitions.map((definition) => ({
         name: definition.name,
         description: definition.description,
         parameters: (definition.jsonSchema ?? { type: "object", properties: {} }) as Record<string, unknown>,
       })),
       maxSteps,
-      language: context.language ?? "",
     },
     handlers,
     onEvent: (message) => {
@@ -192,14 +202,6 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
     agentId: context.identity.agentId,
     timestamp: context.clock.now(),
   });
-}
-
-/** Neutral history projection (role + text only; bridge history is prompt context). */
-function historyOf(context: AgentExecutionContext): Array<{ role: string; content: string }> {
-  return context.history.map((message) => ({
-    role: message.role,
-    content: typeof message.content === "string" ? message.content : "",
-  }));
 }
 
 /** Converts one neutral bridge message into the harness LlmMessage shape. */

@@ -24,3 +24,6 @@ cov-report/
 
 # local read-only mirror of an external repository, never committed
 /reference/
+
+# python bytecode caches from the framework bootstraps
+__pycache__/

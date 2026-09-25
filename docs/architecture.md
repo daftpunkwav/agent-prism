@@ -49,8 +49,8 @@ package exposes and that can be replaced by another implementation.
 | `drivers/driver-langgraph` | LangGraph reasoning-graph backend | registered as `langgraph` on `DriverLookup` |
 | `drivers/driver-plan-execute` | Plan-Execute backend: planner pass plus a ReAct executor with one budgeted replan | registered as `plan_execute` on `DriverLookup` |
 | `drivers/driver-self-critique` | Self-Critique backend: a tool-less critic scores each tool batch and redirects | registered as `self_critique` on `DriverLookup` |
-| `drivers/driver-autogen` | AutoGen-pattern backend: group chat with LLM speaker selection | registered as `autogen` on `DriverLookup` |
-| `drivers/driver-crewai` | CrewAI-pattern backend: role crew running a task pipeline | registered as `crewai` on `DriverLookup` |
+| `drivers/driver-autogen` | AutoGen-pattern backend: group chat with LLM speaker selection; dual runtime — real `autogen-agentchat` bridge or TypeScript pattern fallback | registered as `autogen` on `DriverLookup` |
+| `drivers/driver-crewai` | CrewAI-pattern backend: role crew running a task pipeline; dual runtime — real `crewai` bridge or TypeScript pattern fallback | registered as `crewai` on `DriverLookup` |
 | `providers/provider-catalog` | Provider seam, no SDK | `ProviderLookupAdapter` implements `contracts.ProviderLookup`; `EndpointCatalog`, `ProviderConfigStore` |
 | `providers/provider-langchain` | SDK adaptation and model construction | `createChatModel`, `createColumnRuntime`, `testProviderConnection` |
 | `transport/http-runtime` | HTTP shell: middleware, health checks, error mapping | `createHttpApplication`, `HttpApplicationDeps`, `HttpApp` |

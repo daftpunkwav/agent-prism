@@ -1,6 +1,6 @@
 {
   "name": "@agentprism/driver-run-support",
-  "description": "Shared driver run support: arena event translation, tool batch execution, step budgets, and reasoning mode helpers.",
+  "description": "Shared driver run support: arena event translation, tool batch execution, step budgets, reasoning mode helpers, and the NDJSON framework-bridge transport with the Python runtime probe.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

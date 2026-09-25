@@ -3,6 +3,8 @@
  * @description CrewAI-pattern framework driver: role crew running a task pipeline.
  *
  * Responsibilities:
+ * - Pick the runtime per run: the Python framework bridge when the probe finds
+ *   an interpreter with the crewai package, the pattern fallback otherwise
  * - Run the sequential task pipeline (research → implement → verify) with role
  *   workers, or the hierarchical process under ARENA_CREWAI_PROCESS=hierarchical
  * - Keep task boundaries and manager delegations on reflect events; worker

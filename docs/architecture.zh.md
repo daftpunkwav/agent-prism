@@ -50,8 +50,8 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 | `drivers/driver-langgraph` | LangGraph reasoning-graph backend | 以 `langgraph` 注册到 `DriverLookup` |
 | `drivers/driver-plan-execute` | Plan-Execute backend：planner 一趟加一个 ReAct executor，允许一次有预算的 replan | 以 `plan_execute` 注册到 `DriverLookup` |
 | `drivers/driver-self-critique` | Self-Critique backend：无 tool 的 critic 对每批 tool 打分并改向 | 以 `self_critique` 注册到 `DriverLookup` |
-| `drivers/driver-autogen` | AutoGen 模式 backend：带 LLM speaker 选择的 group chat | 以 `autogen` 注册到 `DriverLookup` |
-| `drivers/driver-crewai` | CrewAI 模式 backend：角色 crew 运行任务 pipeline | 以 `crewai` 注册到 `DriverLookup` |
+| `drivers/driver-autogen` | AutoGen 模式 backend：带 LLM speaker 选择的 group chat；双运行时——真实 `autogen-agentchat` 桥或 TypeScript 模式回退 | 以 `autogen` 注册到 `DriverLookup` |
+| `drivers/driver-crewai` | CrewAI 模式 backend：角色 crew 运行任务 pipeline；双运行时——真实 `crewai` 桥或 TypeScript 模式回退 | 以 `crewai` 注册到 `DriverLookup` |
 | `providers/provider-catalog` | Provider seam，无 SDK | `ProviderLookupAdapter` 实现 `contracts.ProviderLookup`；`EndpointCatalog`、`ProviderConfigStore` |
 | `providers/provider-langchain` | SDK 适配与模型构造 | `createChatModel`、`createColumnRuntime`、`testProviderConnection` |
 | `transport/http-runtime` | HTTP 外壳：middleware、health checks、error mapping | `createHttpApplication`、`HttpApplicationDeps`、`HttpApp` |

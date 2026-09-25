@@ -68,6 +68,13 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
       if (child.stdin?.writable) child.stdin.write(`${JSON.stringify(payload)}\n`);
     };
 
+    // A handler may still resolve after the child died (e.g. abort killed it
+    // mid llm_request); writing to the dead child's stdin raises EPIPE, and an
+    // unhandled 'error' event would take the server down. The write guard
+    // above narrows but cannot close that race, so swallow the error — the
+    // session outcome comes from the 'close' handler.
+    child.stdin?.on("error", () => {});
+
     const finish = (outcome: ChildBridgeOutcome): void => {
       if (settled) return;
       settled = true;

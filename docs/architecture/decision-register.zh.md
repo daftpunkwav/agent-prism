@@ -22,5 +22,6 @@
 | 凭证引用 `${env:NAME}` | 存储配置保持引用；已解析密钥绝不写回 | `provider-catalog/src/endpoints.ts` `resolveCredentialReference` |
 | MCP、skill、orchestration 作为 dimensions | 每次 run 隔离一个变量，使对比保持单变量 | `DIMENSION_FIELD`、`DimensionCatalog` |
 | Loop-architecture driver 共享 harness seam | 循环差异必须是架构性的，而非 prompt 后缀 | `driver-plan-execute` 与 `driver-self-critique` 基于 `buildSystemUser` 与 `applyContextPipeline` |
+| 双运行时 driver 先探测再运行 | `autogen` 与 `crewai` 保持单一 `AgentDriver` 面：探测到带框架包的解释器时走 Python 框架桥，否则走 TypeScript 模式回退；强制 `python` 时探测失败即失败关闭 | `driver-run-support/src/python-probe.ts` 与 `driver-autogen/src/autogen-driver.ts`、`driver-crewai/src/crewai-driver.ts` 的运行时选择器 |
 | `apps/web` 只依赖 `client`、`ui`、`arena-view` | 前端保持为 contracts 类型 client 之上的薄视图 | `check-boundaries.mjs` 的 web 规则 |
 | Package 私有 | 无任何发布 | 每个 leaf 的 `package.json`、`apps/web` 的 UI 文案 i18n 门禁 |

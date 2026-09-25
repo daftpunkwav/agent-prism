@@ -31,5 +31,11 @@ if (scenario === "happy") {
   });
 } else if (scenario === "error") {
   emit({ type: "error", message: "framework exploded" });
+} else if (scenario === "hang") {
+  // One llm request, then nothing: the host's abort/kill is the only way out,
+  // and the late llm_response write lands on the dead child's stdin. The
+  // interval holds the process open until the kill arrives.
+  emit({ type: "llm_request", id: "llm-1", messages: [{ role: "user", content: "q?" }] });
+  setInterval(() => {}, 1_000);
 }
 // scenario "silent": exit with no protocol lines at all.

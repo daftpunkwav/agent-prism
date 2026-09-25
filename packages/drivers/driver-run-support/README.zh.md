@@ -5,7 +5,8 @@
 Driver seam：`FrameworkDriverRegistry`，实现 `contracts.DriverLookup`；未知 framework
 抛 `DriverNotFoundError`，保留项抛 `DriverReservedError`；可注入 loader 的注册 helper
 `registerDriversBestEffort`；以及所有 backend 共享的 run 支持，含
-`event-translation`、`capability-banner`、`reasoning-constants`、`recursion-limit`。
+`event-translation`、`tool-batch`、`reasoning-constants`、`recursion-limit`；再加上 NDJSON 框架桥传输层
+（`bridge-protocol`、`child-bridge`）与运行时探测（`python-probe`）。
 
 ## 依赖
 

@@ -21,5 +21,6 @@ rationale, and the code that enforces it.
 | Credential references `${env:NAME}` | Stored config keeps references; resolved secrets are never written back | `provider-catalog/src/endpoints.ts` `resolveCredentialReference` |
 | MCP, skill, and orchestration as dimensions | Each run isolates one variable so comparisons stay single-variable | `DIMENSION_FIELD`, `DimensionCatalog` |
 | Loop-architecture drivers share harness seams | Loop differences must be architectural rather than prompt suffixes | `driver-plan-execute` and `driver-self-critique` on `buildSystemUser` and `applyContextPipeline` |
+| Dual-runtime drivers probe before run | `autogen` and `crewai` keep one `AgentDriver` surface: a Python framework bridge when the probe finds an interpreter with the package, the TypeScript pattern fallback otherwise; forcing `python` fails closed | `driver-run-support/src/python-probe.ts` and the runtime pickers in `driver-autogen/src/autogen-driver.ts` and `driver-crewai/src/crewai-driver.ts` |
 | `apps/web` depends only on `client`, `ui`, and `arena-view` | The frontend stays a thin view over contracts-typed clients | `check-boundaries.mjs` web rule |
 | Private packages | Nothing is published | each leaf `package.json`, the `apps/web` i18n gate for UI copy |

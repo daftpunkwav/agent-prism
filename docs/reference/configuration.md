@@ -144,7 +144,10 @@ These are deliberately not env-tunable.
 | `ARENA_BASE` | `scripts/run-matrix.mjs` | base URL of a running server, default `http://localhost:8281` |
 | `ARENA_TOT_WIDTH` | `driver-run-support/src/reasoning-constants.ts` (`totWidth`), consumed by the native, langgraph, and plan-execute drivers | ToT branch width, clamped 2 to 5, default 3; inside the server the runtime knob wins — `assemble.ts` seeds this variable from the effective knob at boot and on every knobs hot-apply |
 | `ARENA_SELF_CONSISTENCY_N` | same helper (`selfConsistencyAttempts`) | self-consistency attempt count, clamped 2 to 9, default 5; model calls scale with it; same seeding precedence |
-| `ARENA_CREWAI_PROCESS` | `driver-crewai/src/crew.ts` | `hierarchical` switches the crew to the manager process, anything else keeps `sequential`; same seeding precedence |
+| `ARENA_CREWAI_PROCESS` | `driver-crewai/src/crew.ts` and `driver-crewai/python/bootstrap.py` | `hierarchical` switches the crew to the manager process, anything else keeps `sequential`; same seeding precedence |
+| `ARENA_PYTHON` | `driver-run-support/src/python-probe.ts` | interpreter override for the framework runtime probes; unset or blank falls back to `python`, then `python3` |
+| `ARENA_AUTOGEN_RUNTIME` | `driver-autogen/src/autogen-driver.ts` | `python` forces the real `autogen-agentchat` bridge (fails closed when the probe finds no interpreter with the package), `ts` forces the TypeScript pattern fallback, anything else is `auto` |
+| `ARENA_CREWAI_RUNTIME` | `driver-crewai/src/crewai-driver.ts` | same contract as `ARENA_AUTOGEN_RUNTIME` for the `crewai` bridge |
 
 ## Runtime knobs
 

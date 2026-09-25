@@ -3,7 +3,8 @@
  * @file child-bridge tests
  * @description Covers the NDJSON bridge engine with a fake bootstrap: event
  *              pass-through, tool round-trip, llm round-trip, final answer,
- *              and the failure path when the child exits without one.
+ *              the failure path when the child exits without one, and the
+ *              abort path (kill + abort reason as the failure).
  */
 
 import { describe, expect, it } from "vitest";
@@ -24,10 +25,8 @@ function baseOptions(overrides: Record<string, unknown> = {}): ChildBridgeOption
     start: {
       type: "start",
       question: "q?",
-      history: [],
       tools: [{ name: "read", description: "reads", parameters: { type: "object", properties: {} } }],
       maxSteps: 6,
-      language: "",
     },
     handlers: {
       llmComplete: async () => JSON.stringify({ content: "model says hi", toolCalls: [] }),
@@ -62,4 +61,31 @@ describe("runChildBridge", () => {
       expect(outcome.message).toContain("without a final answer");
     }
   });
+
+  it("kills the child on abort and reports the abort reason as a failure", async () => {
+    const controller = new AbortController();
+    // Abort fires while the llm handler is still in flight: the session must
+    // settle through the child kill, and the late handler result must hit the
+    // guarded dead-stdin write without taking the process down.
+    const timer = setTimeout(() => controller.abort(new Error("stopped by test")), 100);
+    try {
+      const outcome: ChildBridgeOutcome = await runChildBridge({
+        ...baseOptions({ scenario: "hang" }),
+        signal: controller.signal,
+        handlers: {
+          llmComplete: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 2_000));
+            return JSON.stringify({ content: "too late", toolCalls: [] });
+          },
+          toolExecute: async () => "unused",
+        },
+      });
+      expect(outcome.ok).toBe(false);
+      if (!outcome.ok) {
+        expect(outcome.message).toContain("stopped by test");
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  }, 15_000);
 });

@@ -1,8 +1,7 @@
 """CrewAI framework bootstrap for the driver-crewai Python bridge.
 
-Reads one NDJSON handshake from stdin (question, history, tool catalog,
-budget, locale), runs a real crewai Crew over the arena model, and streams
-NDJSON lines back:
+Reads one NDJSON handshake from stdin (question, tool catalog), runs a real
+crewai Crew over the arena model, and streams NDJSON lines back:
 
 - llm_request lines ask the host for one model completion (the arena model
   stays on the host side; this process never sees provider credentials)
@@ -12,14 +11,21 @@ NDJSON lines back:
 
 The process honours the ARENA_CREWAI_PROCESS knob (sequential default,
 hierarchical = manager delegation) exactly like the TypeScript pattern
-fallback. crewai drives everything synchronously, so the bridge is a plain
-threading design: a daemon reader thread settles concurrent.futures futures
-while the crew blocks the main thread. All protocol lines are single-line
-JSON on stdout.
+fallback; the step budget itself is enforced host-side in the bridge. crewai
+drives everything synchronously, so the bridge is a plain threading design: a
+daemon reader thread settles concurrent.futures futures while the crew blocks
+the main thread. All protocol lines are single-line JSON on stdout.
+
+Tested against crewai source 0.114-1.x (the requirements.txt range): the
+bridge LLM subclasses crewai.llms.base_llm.BaseLLM, the custom-LLM seam
+crewai has provided since 0.114 — earlier releases lack the module, and 1.x
+rejects non-BaseLLM objects at Agent construction (the llm field validates
+`str | BaseLLM | None` and the executor isinstance-checks it).
 """
 
 from __future__ import annotations
 
+import itertools
 import json
 import os
 import sys
@@ -28,6 +34,8 @@ from concurrent.futures import Future
 from typing import Any
 
 from crewai import Agent, Crew, Process, Task
+from crewai.llms.base_llm import BaseLLM
+from crewai.tools import BaseTool
 
 TERMINATE = "CREW_COMPLETE"
 CODER_NAME = "coder"
@@ -64,24 +72,29 @@ class BridgeSession:
             except json.JSONDecodeError:
                 continue
             if message.get("type") in ("tool_result", "llm_response"):
-                future = self._pending.pop(message.get("id"), None)
+                with self._lock:
+                    future = self._pending.pop(message.get("id"), None)
                 if future is not None and not future.done():
                     future.set_result(str(message.get("result", "") or message.get("content", "")))
 
 
-class BridgeLLM:
-    """Duck-typed crewai LLM: round-trips every completion to the host.
+class BridgeLLM(BaseLLM):
+    """crewai BaseLLM that round-trips every completion to the host.
 
-    crewai calls `call(messages, tools, callbacks, available_functions)` for
+    Subclassing BaseLLM (not duck typing) is required: crewai's Agent llm
+    field only accepts `str | BaseLLM` and the executor isinstance-checks it.
+    BaseLLM.__init__(model=...) covers both the plain-ABC releases (0.114 to
+    0.203) and the pydantic-model releases (1.x). crewai calls `call(...)` for
     every agent step; the neutral messages cross the bridge and the completion
     text comes back. crewai's own ReAct-style protocol handles function
-    calling, so only names and descriptions cross the bridge here.
+    calling (supports_function_calling() is False), so only tool names and
+    descriptions cross the bridge here.
     """
 
     def __init__(self, session: BridgeSession, model: str = "arena-bridge") -> None:
+        super().__init__(model=model)
         self._session = session
         self._counter = 0
-        self.model = model
 
     def call(
         self,
@@ -106,6 +119,8 @@ class BridgeLLM:
         )
 
     def supports_function_calling(self) -> bool:
+        # The ReAct-style text protocol on the crewai side owns tool calls;
+        # the host model's own toolCalls never reach this process.
         return False
 
     def supports_stop_words(self) -> bool:
@@ -122,8 +137,17 @@ def _neutral_message(message: Any) -> dict[str, Any]:
 
 
 def _remote_tools(session: BridgeSession, specs: list[dict[str, Any]]) -> list[Any]:
-    """Builds crewai Tool objects whose run round-trips to the host."""
-    from crewai.tools import BaseTool
+    """Builds crewai BaseTool objects whose execution round-trips to the host.
+
+    The class lives inside the factory so `_run` closes over the session —
+    BaseTool is a pydantic model, so arbitrary instance attributes are not an
+    option. The `_run(argument: str)` signature is the crewai-visible schema:
+    the crew passes the arena tool's argument object as one JSON string, which
+    the host parses. The description states that contract explicitly — without
+    it the crew sees the arena tool's parameter names but an `argument`-string
+    schema and sends raw objects, executing the tool with no args.
+    """
+    request_counter = itertools.count(1)
 
     class ArenaBridgeTool(BaseTool):
         """One arena tool exposed to the crew; args travel as a JSON string."""
@@ -133,20 +157,25 @@ def _remote_tools(session: BridgeSession, specs: list[dict[str, Any]]) -> list[A
         tool_name: str = ""
 
         def _run(self, argument: str = "") -> str:
-            request_id = f"tool-{self.tool_name}-{id(argument) % 10**8}"
             return session.request(
-                {"type": "tool_request", "id": request_id, "name": self.tool_name, "args": argument}
+                {
+                    "type": "tool_request",
+                    "id": f"tool-{self.tool_name}-{next(request_counter)}",
+                    "name": self.tool_name,
+                    "args": argument,
+                }
             )
 
     tools: list[Any] = []
     for spec in specs:
-        tools.append(
-            ArenaBridgeTool(
-                name=str(spec["name"]),
-                description=str(spec["description"]) or "arena tool",
-                tool_name=str(spec["name"]),
+        name = str(spec["name"])
+        description = str(spec["description"]) or "arena tool"
+        properties = (spec.get("parameters") or {}).get("properties") or {}
+        if properties:
+            description += (
+                " Pass the whole argument object as a single JSON string in the `argument` field."
             )
-        )
+        tools.append(ArenaBridgeTool(name=name, description=description, tool_name=name))
     return tools
 
 

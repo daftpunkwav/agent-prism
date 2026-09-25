@@ -1,8 +1,8 @@
 """AutoGen framework bootstrap for the driver-autogen Python bridge.
 
-Reads one NDJSON handshake from stdin (question, history, tool catalog,
-budget, locale), runs a real autogen-agentchat RoundRobinGroupChat coder/
-reviewer conversation, and streams NDJSON lines back:
+Reads one NDJSON handshake from stdin (question, tool catalog, budget), runs
+a real autogen-agentchat RoundRobinGroupChat coder/reviewer conversation, and
+streams NDJSON lines back:
 
 - llm_request lines ask the host for one model completion (the arena model
   stays on the host side; this process never sees provider credentials)
@@ -14,6 +14,14 @@ All protocol lines are single-line JSON on stdout; anything else printed to
 stdout is dropped by the host, so framework prints are harmless. Host lines
 are consumed by a daemon thread: asyncio pipe readers are not portable to
 Windows for stdin, while a blocking readline loop is.
+
+Tested against autogen-agentchat 0.4/0.5/0.6 (the requirements.txt range):
+- ChatCompletionClient's abstract surface differs slightly across releases,
+  so the bridge client implements the union (capabilities + model_info,
+  create/create_stream, count_tokens/remaining_tokens, usage, close).
+- AssistantAgent hands BaseTool instances to the client on 0.4/0.5 but
+  ToolSchema dicts (via the agent workbench) on 0.6; _tool_schema accepts
+  both shapes.
 """
 
 from __future__ import annotations
@@ -24,11 +32,18 @@ import sys
 import threading
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
+
 from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
 from autogen_agentchat.teams import RoundRobinGroupChat
-from autogen_core import CancellationToken
-from autogen_core.models import ChatCompletionClient, CreateResult, FunctionCall, RequestUsage
+from autogen_core import FunctionCall
+from autogen_core.models import (
+    ChatCompletionClient,
+    CreateResult,
+    RequestUsage,
+)
+from autogen_core.tools import BaseTool
 
 TERMINATE = "TERMINATE"
 CODER_NAME = "coder"
@@ -51,7 +66,8 @@ class BridgeSession:
     async def request(self, payload: dict[str, Any]) -> str:
         loop = asyncio.get_running_loop()
         future: asyncio.Future[str] = loop.create_future()
-        self._pending[payload["id"]] = future
+        with self._lock:
+            self._pending[payload["id"]] = future
         self.send(payload)
         return await future
 
@@ -63,9 +79,13 @@ class BridgeSession:
             except json.JSONDecodeError:
                 continue
             if message.get("type") in ("tool_result", "llm_response"):
-                future = self._pending.pop(message.get("id"), None)
+                with self._lock:
+                    future = self._pending.pop(message.get("id"), None)
                 if future is not None and not future.done():
-                    loop.call_soon_threadsafe(future.set_result, str(message.get("result", "") or message.get("content", "")))
+                    loop.call_soon_threadsafe(
+                        future.set_result,
+                        str(message.get("result", "") or message.get("content", "")),
+                    )
 
 
 class BridgeChatCompletionClient(ChatCompletionClient):
@@ -94,6 +114,15 @@ class BridgeChatCompletionClient(ChatCompletionClient):
         }
 
     @property
+    def capabilities(self) -> dict[str, Any]:
+        # Deprecated but still abstract across the pinned range.
+        return {
+            "vision": False,
+            "function_calling": True,
+            "json_output": True,
+        }
+
+    @property
     def model(self) -> str:
         return "arena-bridge"
 
@@ -103,6 +132,12 @@ class BridgeChatCompletionClient(ChatCompletionClient):
 
     def remaining_tokens(self, messages: Any, tools: Any = None) -> int:
         return 10**9
+
+    def actual_usage(self) -> RequestUsage:
+        return RequestUsage(prompt_tokens=0, completion_tokens=0)
+
+    def total_usage(self) -> RequestUsage:
+        return RequestUsage(prompt_tokens=0, completion_tokens=0)
 
     async def create(
         self,
@@ -118,7 +153,11 @@ class BridgeChatCompletionClient(ChatCompletionClient):
             {
                 "type": "llm_request",
                 "id": request_id,
-                "messages": [_neutral_message(message) for message in messages],
+                "messages": [
+                    item
+                    for message in messages
+                    for item in _neutral_messages(message)
+                ],
                 "tools": [_tool_schema(tool) for tool in (tools or [])],
             }
         )
@@ -153,10 +192,73 @@ class BridgeChatCompletionClient(ChatCompletionClient):
         return None
 
 
-def _neutral_message(message: Any) -> dict[str, Any]:
-    """Projects an autogen LLMMessage into the bridge's neutral shape."""
+class _BridgeToolArgs(BaseModel):
+    """Catch-all args model: raw tool arguments pass through untouched."""
+
+    model_config = ConfigDict(extra="allow")
+
+
+class BridgeTool(BaseTool):
+    """One arena tool exposed to the group chat; execution round-trips to the host.
+
+    FunctionTool cannot express a dynamic parameter schema, so the bridge
+    subclasses BaseTool directly: `schema` returns the arena tool's real
+    parameters and `run` forwards the received arguments as a JSON string.
+    """
+
+    def __init__(
+        self,
+        session: BridgeSession,
+        name: str,
+        description: str,
+        parameters: dict[str, Any],
+    ) -> None:
+        self._session = session
+        self._tool_name = name
+        self._parameters = parameters if parameters else {"type": "object", "properties": {}}
+        self._counter = 0
+        super().__init__(_BridgeToolArgs, str, name, description)
+
+    @property
+    def schema(self) -> dict[str, Any]:
+        return {
+            "name": self._name,
+            "description": self._description,
+            "parameters": self._parameters,
+        }
+
+    async def run(self, args: Any, cancellation_token: Any) -> str:
+        self._counter += 1
+        request_id = f"tool-{self._tool_name}-{self._counter}"
+        return await self._session.request(
+            {
+                "type": "tool_request",
+                "id": request_id,
+                "name": self._tool_name,
+                "args": json.dumps(args.model_dump()),
+            }
+        )
+
+
+def _neutral_messages(message: Any) -> list[dict[str, Any]]:
+    """Projects one autogen LLMMessage into the bridge's neutral shape.
+
+    A FunctionExecutionResultMessage with N results expands to N tool messages
+    so every parallel tool output reaches the model (checked before the generic
+    list-content branch: the result message's content is also a list).
+    """
     kind = getattr(message, "type", None)
     content = message.content
+    if kind == "FunctionExecutionResultMessage":
+        return [
+            {
+                "role": "tool",
+                "content": str(getattr(result, "content", "")),
+                "toolCallId": str(getattr(result, "call_id", "")),
+                "name": str(getattr(result, "name", "") or ""),
+            }
+            for result in content
+        ]
     if isinstance(content, list):
         # AssistantMessage carrying FunctionCall entries.
         calls = [
@@ -164,50 +266,25 @@ def _neutral_message(message: Any) -> dict[str, Any]:
             for call in content
             if getattr(call, "name", None) is not None
         ]
-        return {"role": "assistant", "content": "", "toolCalls": calls}
+        return [{"role": "assistant", "content": "", "toolCalls": calls}]
     source = getattr(message, "source", "")
     if kind == "SystemMessage":
-        return {"role": "system", "content": str(content)}
-    if kind == "FunctionExecutionResultMessage":
-        results = getattr(message, "content", [])
-        payload: dict[str, Any] = {"role": "tool", "content": ""}
-        if results:
-            first = results[0]
-            payload["content"] = str(getattr(first, "content", ""))
-            payload["toolCallId"] = str(getattr(first, "call_id", ""))
-            payload["name"] = str(getattr(first, "name", "") or "")
-        return payload
+        return [{"role": "system", "content": str(content)}]
     if source in (CODER_NAME, REVIEWER_NAME) or kind == "AssistantMessage":
-        return {"role": "assistant", "content": str(content)}
-    return {"role": "user", "content": str(content)}
+        return [{"role": "assistant", "content": str(content)}]
+    return [{"role": "user", "content": str(content)}]
 
 
 def _tool_schema(tool: Any) -> dict[str, Any]:
-    """Projects an autogen Tool schema into the bridge's neutral shape."""
-    schema = getattr(tool, "schema", None) or {}
+    """Projects an autogen tool (BaseTool instance or ToolSchema dict) into
+    the bridge's neutral shape. AssistantAgent hands BaseTool instances to the
+    client on 0.4/0.5 and ToolSchema dicts (from the agent workbench) on 0.6."""
+    schema = tool if isinstance(tool, dict) else getattr(tool, "schema", None) or {}
     return {
-        "name": str(schema.get("name") or getattr(tool, "name", "")),
-        "description": str(schema.get("description") or getattr(tool, "description", "")),
+        "name": str(schema.get("name", "")),
+        "description": str(schema.get("description", "")),
         "parameters": schema.get("parameters") or {"type": "object", "properties": {}},
     }
-
-
-def _remote_tool(session: BridgeSession, name: str, description: str, parameters: dict[str, Any]) -> Any:
-    """Builds an autogen function tool whose body round-trips to the host."""
-    from autogen_core.tools import FunctionTool
-
-    async def _call(**kwargs: Any) -> str:
-        request_id = f"tool-{name}-{id(kwargs) % 10**8}"
-        return await session.request(
-            {"type": "tool_request", "id": request_id, "name": name, "args": json.dumps(kwargs)}
-        )
-
-    return FunctionTool(
-        name=name,
-        description=description,
-        func=_call,
-        parameters=parameters if parameters else {"type": "object", "properties": {}},
-    )
 
 
 async def main() -> None:
@@ -224,7 +301,7 @@ async def main() -> None:
 
     client = BridgeChatCompletionClient(session)
     remote_tools = [
-        _remote_tool(session, tool["name"], tool["description"], tool["parameters"])
+        BridgeTool(session, str(tool["name"]), str(tool["description"]), tool.get("parameters") or {})
         for tool in start.get("tools", [])
     ]
     coder = AssistantAgent(
@@ -251,19 +328,31 @@ async def main() -> None:
     )
 
     last_coder = ""
+    last_reviewer = ""
     try:
-        async for message in team.run_stream(task=question, cancellation_token=CancellationToken.default()):
+        # No cancellation token: abort is a host-side process kill.
+        async for message in team.run_stream(task=question):
             source = getattr(message, "source", "")
             content = getattr(message, "content", "")
             if source in (CODER_NAME, REVIEWER_NAME) and isinstance(content, str) and content:
                 session.send({"type": "event", "kind": "assistant", "speaker": source, "content": content})
                 if source == CODER_NAME:
                     last_coder = content
+                else:
+                    last_reviewer = content
     except Exception as error:  # noqa: BLE001 - the failure must cross the bridge
         session.send({"type": "error", "message": f"{type(error).__name__}: {error}"})
         return
 
-    session.send({"type": "final", "answer": last_coder.strip()})
+    answer = last_coder.strip()
+    if answer == "" and last_reviewer.strip() != "":
+        # The coder's last turn was tool calls, so the terminating verdict is
+        # the only answer the chat produced — mirror it onto the coder channel
+        # or the run ends with success but no answer (same rule the TypeScript
+        # pattern fallback applies).
+        session.send({"type": "event", "kind": "assistant", "speaker": CODER_NAME, "content": last_reviewer})
+        answer = last_reviewer.strip()
+    session.send({"type": "final", "answer": answer})
 
 
 if __name__ == "__main__":

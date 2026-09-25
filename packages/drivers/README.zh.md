@@ -11,11 +11,11 @@
 
 | Package | 职责 | 挂接位置 |
 |---|---|---|
-| [`driver-run-support/`](driver-run-support/README.md) | Driver 服务：`DriverLookup` registry、尽力而为的注册 helper、共享 run 支持，含 event translation、capability banner 与 recursion cap | Seam，零 backend 依赖 |
+| [`driver-run-support/`](driver-run-support/README.md) | Driver 服务：`DriverLookup` registry、尽力而为的注册 helper、共享 run 支持，含 event translation、tool batch 与 recursion cap；以及 NDJSON 框架桥传输层与 Python 运行时探测 | Seam，零 backend 依赖 |
 | [`driver-native/`](driver-native/README.md) | 进程内 native driver，无外部 framework | 以 `native` 注册进 `DriverLookup` |
 | [`driver-langchain/`](driver-langchain/README.md) | LangChain driver；拥有 LC 与 message bridge | 以 `langchain` 注册进 `DriverLookup` |
 | [`driver-langgraph/`](driver-langgraph/README.md) | LangGraph reasoning-graph driver | 以 `langgraph` 注册进 `DriverLookup` |
 | [`driver-plan-execute/`](driver-plan-execute/README.md) | Plan-Execute driver：planner 一趟加一个 ReAct executor，允许一次有预算的 replan | 以 `plan_execute` 注册进 `DriverLookup` |
 | [`driver-self-critique/`](driver-self-critique/README.md) | Self-Critique driver：无 tool 的 critic 对每批 tool 打分并改向 | 以 `self_critique` 注册进 `DriverLookup` |
-| [`driver-autogen/`](driver-autogen/README.md) | AutoGen 模式 driver：带 LLM speaker 选择的 group chat | 以 `autogen` 注册进 `DriverLookup` |
-| [`driver-crewai/`](driver-crewai/README.md) | CrewAI 模式 driver：角色 crew 运行任务 pipeline | 以 `crewai` 注册进 `DriverLookup` |
+| [`driver-autogen/`](driver-autogen/README.md) | AutoGen 模式 driver：带 LLM speaker 选择的 group chat；双运行时——真实 `autogen-agentchat` 桥或 TypeScript 模式回退 | 以 `autogen` 注册进 `DriverLookup` |
+| [`driver-crewai/`](driver-crewai/README.md) | CrewAI 模式 driver：角色 crew 运行任务 pipeline；双运行时——真实 `crewai` 桥或 TypeScript 模式回退 | 以 `crewai` 注册进 `DriverLookup` |

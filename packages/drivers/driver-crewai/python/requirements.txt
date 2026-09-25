@@ -1,3 +1,5 @@
 # Python runtime for the CrewAI framework bridge (host-side TS needs none).
 # Install into the interpreter that ARENA_PYTHON points at (default: `python`).
-crewai>=0.70.0,<2.0
+# Floor 0.114.0: the first release with crewai.llms.base_llm.BaseLLM, which
+# the bridge LLM subclasses (1.x additionally rejects non-BaseLLM llm objects).
+crewai>=0.114.0,<2.0

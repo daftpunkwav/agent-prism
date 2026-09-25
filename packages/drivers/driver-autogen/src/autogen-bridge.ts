@@ -4,7 +4,7 @@
  *              model and tool ports into the bootstrap process over NDJSON.
  *
  * Responsibilities:
- * - Build the startup handshake (question, history, tool catalog, budget, locale)
+ * - Build the startup handshake (question, tool catalog, budget)
  * - Answer llm_request lines through the harness LlmAdapter (usage lands in the tracker)
  * - Answer tool_request lines through the shared tool-batch executor (events preserved)
  * - Translate bridge events into ArenaEvents (coder speech rides the thought
@@ -121,14 +121,12 @@ export async function* runAutogenFrameworkBridge(options: AutogenBridgeOptions):
     start: {
       type: "start",
       question,
-      history: historyOf(context),
       tools: toolDefinitions.map((definition) => ({
         name: definition.name,
         description: definition.description,
         parameters: (definition.jsonSchema ?? { type: "object", properties: {} }) as Record<string, unknown>,
       })),
       maxSteps,
-      language: context.language ?? "",
     },
     handlers,
     onEvent: (message) => {
@@ -196,14 +194,6 @@ export async function* runAutogenFrameworkBridge(options: AutogenBridgeOptions):
     agentId: context.identity.agentId,
     timestamp: context.clock.now(),
   });
-}
-
-/** Neutral history projection (role + text only; bridge history is prompt context). */
-function historyOf(context: AgentExecutionContext): Array<{ role: string; content: string }> {
-  return context.history.map((message) => ({
-    role: message.role,
-    content: typeof message.content === "string" ? message.content : "",
-  }));
 }
 
 /** Converts one neutral bridge message into the harness LlmMessage shape. */

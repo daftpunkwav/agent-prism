@@ -14,7 +14,7 @@ capability families and dependency rules.
 | **Run** | One comparison execution: a question plus per-column selections | `@agentprism/arena` (`arena-runner`) |
 | **Column / pipeline** | One side-by-side variant inside a run; the SSE `pipeline` field is its display label and aggregation key | `contracts/events.ts` (`ArenaEventBase`) |
 | **Dimension** | One variable axis of comparison, with 14 ids: framework, prompt, reasoning, context, harness, temperature, model, thinking, max_steps, toolset, mcp, skill, orchestration, memory | `contracts/enums.ts`, `@agentprism/dimensions` |
-| **Driver** | A loop-architecture backend implementing the `AgentDriver` port: native, langchain, langgraph, plan_execute, self_critique | `@agentprism/driver-*` |
+| **Driver** | A loop-architecture backend implementing the `AgentDriver` port: native, langchain, langgraph, plan_execute, self_critique, autogen, crewai | `@agentprism/driver-*` |
 | **Harness** | Neutral execution semantics: prompt assembly, context pipeline, reasoning modes, verification and reflection loops | `@agentprism/harness` |
 | **Toolset** | A named tool table scope: `full` with 22 tools, `edit_run` with 19, `read_only` with 10 | `contracts/enums.ts` (`TOOL_NAMES_BY_TOOLSET`) |
 | **Workspace** | A per-run or per-column scratch directory on disk under `data/runs/<runId>/<workspace>/` | `@agentprism/runtime` (`WorkspaceRegistry`) |

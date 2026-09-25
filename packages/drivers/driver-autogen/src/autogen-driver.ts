@@ -3,6 +3,8 @@
  * @description AutoGen-pattern framework driver: group chat with LLM speaker selection.
  *
  * Responsibilities:
+ * - Pick the runtime per run: the Python framework bridge when the probe finds
+ *   an interpreter with the autogen package, the pattern fallback otherwise
  * - Run coder/reviewer group-chat rounds; the user proxy executes tool calls
  * - Keep selections and critiques on reflect events; coder thoughts carry the answer
  * - Mirror a terminating reviewer verdict onto thoughts when the coder left no fresh answer
