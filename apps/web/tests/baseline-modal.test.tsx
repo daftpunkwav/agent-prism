@@ -99,10 +99,11 @@ describe("BaselineModal", () => {
   });
 
   it("renders grouped baseline fields with the locked comparison field marked", () => {
-    const { container } = renderModal();
+    renderModal();
     expect(screen.getByRole("dialog", { name: en().baselineTitle })).toBeDefined();
     expect(screen.getByText("Framework" + en().lockedSuffix)).toBeDefined();
-    const lockedLabel = container.querySelector('[data-locked="true"]');
+    // The dialog portals to document.body, so query the body rather than the render container.
+    const lockedLabel = document.body.querySelector('[data-locked="true"]');
     expect(lockedLabel?.getAttribute("title")).toBe(en().lockedFieldTitle);
     expect(screen.getByText(getCatalog("en").arena.group.pipeline)).toBeDefined();
     expect(screen.getByText(getCatalog("en").arena.group.decode)).toBeDefined();

@@ -14,6 +14,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Trash2, X } from "lucide-react";
 import { NumberInput, UiSelect } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
@@ -117,7 +118,10 @@ export function ModelModal({ initial, isNew, defaultEndpointId, onSetDefault, on
     });
   };
 
-  return (
+  // Portal to body: a filled page-enter animation leaves an identity transform on
+  // <main>, which becomes the containing block for position:fixed children and
+  // drags the centered dialog off the viewport on scrollable pages.
+  return createPortal(
     <>
       <button
         type="button"
@@ -352,6 +356,7 @@ export function ModelModal({ initial, isNew, defaultEndpointId, onSetDefault, on
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

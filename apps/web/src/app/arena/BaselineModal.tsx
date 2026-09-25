@@ -14,6 +14,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { HelpCircle, RotateCcw, X } from "lucide-react";
 import type { ArenaMeta, BaselineOverrides, DimensionId } from "@agentprism/client";
 import { UiSelect } from "@agentprism/ui";
@@ -232,7 +233,10 @@ export function BaselineModal({
 
   if (!open) return null;
 
-  return (
+  // Portal to body: a filled page-enter animation leaves an identity transform on
+  // <main>, which becomes the containing block for position:fixed children and
+  // breaks viewport centering.
+  return createPortal(
     <>
       <button
         type="button"
@@ -381,6 +385,7 @@ export function BaselineModal({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

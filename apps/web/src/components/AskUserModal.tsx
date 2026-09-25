@@ -17,6 +17,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { HelpCircle, Send, X } from "lucide-react";
 import type { AskUserQuestion } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
@@ -325,10 +326,14 @@ export function AskUserModal({ pending, submitting, onAnswer, onClose, variant =
   if (variant === "inline") {
     return <div className="arena-ask-inline">{dialog}</div>;
   }
-  return (
+  // Centered placement portals to body: a filled page-enter animation leaves an
+  // identity transform on <main>, which becomes the containing block for
+  // position:fixed children and drags the dialog off the viewport on scroll.
+  return createPortal(
     <>
       <div className="arena-modal-backdrop" aria-hidden onClick={dismiss} />
       {dialog}
-    </>
+    </>,
+    document.body,
   );
 }
