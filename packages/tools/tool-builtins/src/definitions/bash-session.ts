@@ -5,6 +5,7 @@
  * Responsibilities:
  * - Start a POSIX bash that outlives single calls (cd/export persist)
  * - Send commands framed by exit-code sentinels; report output plus status
+ * - Honor the caller's abort signal mid-send (throws AbortError; shell survives)
  * - Close the shell on demand
  *
  * Persistent shell: every `bash` call starts fresh, so `cd`
@@ -50,7 +51,7 @@ function markerFor(seq: number): string {
   return `__AP_DONE_${seq}__`;
 }
 
-async function executeBashSession(workspace: ToolWorkspace, args: ToolArgs): Promise<ToolExecutionResult> {
+async function executeBashSession(workspace: ToolWorkspace, args: ToolArgs, signal?: AbortSignal): Promise<ToolExecutionResult> {
   try {
     const view = asWorkspaceView(workspace);
     // Action names are case-tolerant so a cased call still binds instead of error-looping.
@@ -119,6 +120,16 @@ async function executeBashSession(workspace: ToolWorkspace, args: ToolArgs): Pro
         }
       }
       if (!record.shell.alive()) break;
+      if (signal?.aborted) {
+        // Abort parity with the bash tool: a cancelled run must stop polling for
+        // the sentinel instead of burning the full deadline in 20ms sleeps (the
+        // registry rethrows AbortError to the driver, converging the run). The
+        // shell stays alive and its output cursor is untouched — close/start
+        // resets clean, per the documented bleed-through semantics.
+        const abortError = new Error("Aborted");
+        abortError.name = "AbortError";
+        throw abortError;
+      }
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     }
     if (foundAt < 0 && !record.shell.alive()) {

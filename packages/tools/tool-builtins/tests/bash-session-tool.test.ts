@@ -5,6 +5,7 @@
  * Responsibilities:
  * - Pin session lifecycle: start/exec/stop with per-call state
  * - Pin the sandbox-hint refusal and sentinel/timeout edge handling
+ * - Pin the mid-send abort contract: AbortError out, shell stays alive
  */
 
 import { describe, expect, it } from "vitest";
@@ -76,6 +77,28 @@ describe.runIf(POSIX)("bashSessionTool", () => {
         expect(out.code).toBe("workspace_error");
       }
     } finally {
+      ws.cleanup();
+    }
+  });
+
+  it("aborts a mid-send wait with AbortError and keeps the shell alive", async () => {
+    const ws = tempWorkspace();
+    try {
+      expect((await bashSessionTool.execute(ws, { action: "start" })).ok).toBe(true);
+      const controller = new AbortController();
+      controller.abort();
+      // Pre-aborted signal: the send must stop waiting for the sentinel
+      // instead of burning its full deadline in poll sleeps.
+      await expect(
+        bashSessionTool.execute(ws, { action: "send", command: "sleep 2" }, controller.signal),
+      ).rejects.toMatchObject({ name: "AbortError" });
+      // The shell survives the abort and still frames the next command.
+      const after = await bashSessionTool.execute(ws, { action: "send", command: "echo alive" });
+      expect(after.ok).toBe(true);
+      expect(after.result).toContain("alive");
+      expect(after.result).toContain("[exit 0]");
+    } finally {
+      await bashSessionTool.execute(ws, { action: "close" }).catch(() => {});
       ws.cleanup();
     }
   });
