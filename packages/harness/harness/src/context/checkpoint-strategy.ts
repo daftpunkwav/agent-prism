@@ -51,11 +51,16 @@ function compactWithDetails(
   rest: readonly LlmMessage[],
   target: number,
 ): { messages: LlmMessage[]; span: NonNullable<ReturnType<typeof selectSpan>> | null; checkpoint: Checkpoint | null; spanTokens: number } {
-  if (surfaceTokens(rest.map((m, i) => toFrame(m, i, rest.length))) <= target) {
+  // One frame surface for everything below: toFrame flattens every message's
+  // text and this runs on every LLM call under the checkpoint strategy, so
+  // span selection and both token measurements must reuse it instead of
+  // re-flattening the transcript.
+  const frames = rest.map((m, i) => toFrame(m, i, rest.length));
+  const totalTokens = surfaceTokens(frames);
+  if (totalTokens <= target) {
     return { messages: [...rest], span: null, checkpoint: null, spanTokens: 0 };
   }
-  const overflow = Math.max(0, surfaceTokens(rest.map((m, i) => toFrame(m, i, rest.length))) - target);
-  const frames = rest.map((m, i) => toFrame(m, i, rest.length));
+  const overflow = Math.max(0, totalTokens - target);
   const span = selectSpan(frames, Math.min(overflow, target));
   if (span === null) return { messages: [...rest], span: null, checkpoint: null, spanTokens: 0 };
 
