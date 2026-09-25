@@ -109,6 +109,31 @@ describe("applyPatchTool", () => {
     }
   });
 
+  it("treats a same-path Move to as an in-place update, not write-then-delete", async () => {
+    const ws = tempWorkspace();
+    try {
+      ws.fs.writeFile("app.py", "def old():\n    return 1\n");
+      const patch = [
+        "*** Begin Patch",
+        "*** Update File: app.py",
+        "*** Move to: app.py",
+        "@@     return 1",
+        "-    return 1",
+        "+    return 2",
+        "*** End Patch",
+      ].join("\n");
+      const outcome = await applyPatchTool.execute(ws, { patch });
+      expect(outcome.ok).toBe(true);
+      // The edited content must survive: a write-then-delete on the same path
+      // would erase the just-updated file instead of editing in place.
+      expect(ws.fs.exists("app.py")).toBe(true);
+      expect(ws.fs.readFile("app.py")).toContain("return 2");
+      expect(outcome.fileDiff).toContain("Edited app.py");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("reports context-not-found as a tool error, not a throw", async () => {
     const ws = tempWorkspace();
     try {

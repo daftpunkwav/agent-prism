@@ -230,10 +230,13 @@ async function executeApplyPatch(workspace: ToolWorkspace, args: ToolArgs): Prom
         continue;
       }
       const updated = applyChunks(view.fs.readFile(hunk.path), hunk.chunks);
-      const target = hunk.movePath ?? hunk.path;
+      // A same-path "*** Move to:" is a plain update: writing then deleting the
+      // same path would erase the just-edited file instead of editing in place.
+      const movePath = hunk.movePath !== hunk.path ? hunk.movePath : undefined;
+      const target = movePath ?? hunk.path;
       view.fs.writeFile(target, updated);
-      if (hunk.movePath !== undefined) view.fs.deleteFile(hunk.path);
-      notes.push(hunk.movePath !== undefined ? `Moved ${hunk.path} → ${hunk.movePath}` : `Edited ${hunk.path}`);
+      if (movePath !== undefined) view.fs.deleteFile(hunk.path);
+      notes.push(movePath !== undefined ? `Moved ${hunk.path} → ${movePath}` : `Edited ${hunk.path}`);
     }
   } catch (error) {
     if (error instanceof WorkspaceError) {
