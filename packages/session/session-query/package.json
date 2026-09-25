@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/session-query",
+  "description": "Session query engine: filtering, aggregation, and export assembly.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

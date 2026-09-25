@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/session-persistence",
+  "description": "File-backed SessionStore implementation over the JSON file port.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

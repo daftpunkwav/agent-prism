@@ -6,5 +6,5 @@
  * - Re-export the in-memory SessionStore implementation (port lives in contracts)
  */
 
-export * from "./memory-store.js";
+export * from "./in-memory-session-store.js";
 export * from "./blob-store.js";

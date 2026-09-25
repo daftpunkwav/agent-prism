@@ -14,7 +14,7 @@
  */
 
 import type { SessionBlobStore } from "@agentprism/contracts";
-import { MAX_ENTRY_CONTENT_CHARS } from "./memory-store.js";
+import { MAX_ENTRY_CONTENT_CHARS } from "./in-memory-session-store.js";
 
 /** Per-blob cap in chars; larger bodies are capped loudly inside the blob. */
 export const LEDGER_BLOB_MAX_CHARS = 128 * 1024;

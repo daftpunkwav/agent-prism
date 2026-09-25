@@ -28,7 +28,7 @@ import { SessionService } from "@agentprism/application";
 import { InMemorySessionStore } from "@agentprism/session";
 import { BuilderError } from "@agentprism/builder-turns";
 import { createBuiltinToolRegistry } from "@agentprism/tool-builtins";
-import { BuilderSessionStore } from "../src/session-store.js";
+import { BuilderSessionStore } from "../src/builder-session-store.js";
 import type { BuilderModelRuntimeFactory } from "@agentprism/builder-turns";
 
 /** Full metrics literal (schema defaults keep it stable across additions). */

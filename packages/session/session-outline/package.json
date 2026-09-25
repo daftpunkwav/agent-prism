@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/session-outline",
+  "description": "Turn outlines folded from arena event streams.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

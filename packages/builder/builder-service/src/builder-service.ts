@@ -52,7 +52,7 @@ import {
   validateComposition,
 } from "@agentprism/builder-turns";
 import { BuilderError } from "@agentprism/builder-turns";
-import { BuilderSessionStore, type BuilderSessionRecord } from "./session-store.js";
+import { BuilderSessionStore, type BuilderSessionRecord } from "./builder-session-store.js";
 import { TraceLog } from "@agentprism/builder-turns";
 import { COMPACT_HANDOFF_SYSTEM } from "./prompts.js";
 import { SessionTraceStore } from "./trace-store.js";

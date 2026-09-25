@@ -11,7 +11,7 @@ import type { BuilderChatMessage, BuilderComposition } from "@agentprism/contrac
 import type { JsonFile } from "@agentprism/persistence";
 import { BuilderCompositionSchema } from "@agentprism/contracts";
 import { BuilderError } from "@agentprism/builder-turns";
-import { BuilderSessionStore } from "../src/session-store.js";
+import { BuilderSessionStore } from "../src/builder-session-store.js";
 
 /** In-memory stand-in for AtomicJsonFile (same port, no disk IO). */
 class MemoryJsonFile implements JsonFile {

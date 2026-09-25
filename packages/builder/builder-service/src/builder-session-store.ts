@@ -1,5 +1,5 @@
 /**
- * @file session-store
+ * @file builder-session-store
  * @description Persistent registry of builder sessions (composition + history).
  *
  * Responsibilities:

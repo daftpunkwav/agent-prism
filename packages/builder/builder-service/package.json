@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/builder-service",
+  "description": "Builder service orchestration: session registry, composition persistence, and turn coordination.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

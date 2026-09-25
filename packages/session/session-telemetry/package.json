@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/session-telemetry",
+  "description": "Session lifecycle counters and text reports.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

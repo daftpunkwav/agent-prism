@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/session",
+  "description": "In-memory SessionStore implementation for tests and tooling.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

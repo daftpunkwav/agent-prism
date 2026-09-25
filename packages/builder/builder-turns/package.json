@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/builder-turns",
+  "description": "Builder turn execution: runner, composition, blocks, and trace log.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

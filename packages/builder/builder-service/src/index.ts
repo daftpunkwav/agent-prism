@@ -9,7 +9,7 @@
  */
 
 export * from "./builder-service.js";
-export * from "./session-store.js";
+export * from "./builder-session-store.js";
 export * from "./trace-store.js";
 // Domain error owned by builder-turns; re-exported here because the service
 // surface (and its consumers) raise and match on it.

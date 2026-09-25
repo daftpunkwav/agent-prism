@@ -1,5 +1,5 @@
 /**
- * @file memory-store
+ * @file in-memory-session-store
  * @description In-memory SessionStore: ephemeral sessions for tests and tooling.
  *
  * Responsibilities:

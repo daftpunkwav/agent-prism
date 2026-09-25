@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/session-format",
+  "description": "Versioned session format: envelopes, migration, and validation.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

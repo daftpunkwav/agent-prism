@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/environment",
+  "description": "Process environment: scoped filesystem, shell-free child processes, and OS write-sandbox spawning.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

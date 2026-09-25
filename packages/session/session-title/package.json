@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/session-title",
+  "description": "Session title normalization and generation.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/session-projection",
+  "description": "Read projections over session documents: digests and LRU view cache.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

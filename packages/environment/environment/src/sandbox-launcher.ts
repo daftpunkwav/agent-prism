@@ -7,6 +7,11 @@
  * - Materialize the helper script under the OS temp dir (once, atomic rename)
  * - Fail closed: any setup failure surfaces as a process error, never an unsandboxed spawn
  *
+ * Terminology note: "sandbox" here means OS-level write containment for one
+ * spawn (restricted token + ACL), not the command safety policy and approval
+ * gates provided by the @agentprism/sandbox package, which decides whether a
+ * command may run at all; the two layers compose but are unrelated.
+ *
  * The transform keeps one spawn contract for the process runner: the helper
  * inherits the host's stdio pipes and exits with the target's exit code, so
  * timeout, abort, and output caps work unchanged. A per-spawn nonce marks
