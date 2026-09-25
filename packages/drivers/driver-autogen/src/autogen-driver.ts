@@ -36,8 +36,11 @@ import {
   eventOf,
   executeToolCalls,
   formatCapabilityPluginIds,
+  probeFrameworkRuntime,
+  runtimeFromEnv,
   stepBudgetFor,
 } from "@agentprism/driver-run-support";
+import { runAutogenFrameworkBridge, bootstrapScriptPath } from "./autogen-bridge.js";
 import {
   CODER_INSTRUCTION,
   isTerminationMessage,
@@ -168,7 +171,35 @@ export class AutogenDriver implements AgentDriver {
   readonly frameworkId = "autogen";
   readonly displayName = "AutoGen Group-Chat";
 
+  /**
+   * Runtime picker: the real AutoGen framework (Python bridge) when the
+   * interpreter and the autogen_agentchat package are available, the
+   * TypeScript pattern fallback otherwise. ARENA_AUTOGEN_RUNTIME forces a
+   * side; `python` fails closed when the probe finds nothing.
+   */
   async *run(context: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
+    const runtime = runtimeFromEnv(process.env["ARENA_AUTOGEN_RUNTIME"]);
+    const interpreter = runtime === "ts" ? null : probeFrameworkRuntime("autogen_agentchat");
+    if (interpreter !== null) {
+      yield* runAutogenFrameworkBridge({
+        context,
+        interpreter,
+        bootstrapPath: bootstrapScriptPath(import.meta.url),
+      });
+      return;
+    }
+    if (runtime === "python") {
+      throw new Error(
+        "ARENA_AUTOGEN_RUNTIME=python requires a Python interpreter with the autogen-agentchat package " +
+          "(pip install -r packages/drivers/driver-autogen/python/requirements.txt); " +
+          "see packages/drivers/driver-autogen/README.md",
+      );
+    }
+    yield* this.runPatternFallback(context);
+  }
+
+  /** TypeScript pattern fallback: neutral-transcript group chat loop. */
+  private async *runPatternFallback(context: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
     const { config, question, history, tracker, workspace } = context;
     const label = config.label;
     const workspaceName = workspace.name;

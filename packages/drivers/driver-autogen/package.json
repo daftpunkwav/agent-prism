@@ -1,6 +1,6 @@
 {
   "name": "@agentprism/driver-autogen",
-  "description": "AutoGen-pattern group-chat driver: coder/reviewer conversation with LLM speaker selection (pattern re-implementation, no framework dependency).",
+  "description": "AutoGen driver: real autogen-agentchat group chat over a Python bridge when available, TypeScript pattern fallback otherwise.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "python"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

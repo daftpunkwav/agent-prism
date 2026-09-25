@@ -55,3 +55,11 @@ loader 加入 `apps/server/src/load-drivers.ts` 中的 `builtinDriverLoaders`。
   `provider-langchain.createColumnRuntime` 实现。
 - 取消传播。driver 尊重 context 的 abort signal，遵循 subagent abort rethrow 语义。
 - 失败的 driver 注册只告警，但空的 registry 使启动失败。
+
+## 双运行时 driver
+
+`autogen` 与 `crewai` 每次列运行时在两个后端间选择：真实框架桥（Python 引导进程经
+NDJSON 与宿主通信——模型补全与工具执行都回环到 arena 的模型端口与工具注册表）和
+TypeScript 模式回退。选择逻辑探测解释器与框架包；`ARENA_AUTOGEN_RUNTIME` /
+`ARENA_CREWAI_RUNTIME` 可强制指定（`python` 探测失败即报错，`ts` 跳过探测，`auto`
+为默认）。协议与安装步骤见两个 driver 的 README。

@@ -1,6 +1,6 @@
 {
   "name": "@agentprism/driver-crewai",
-  "description": "CrewAI-pattern crew driver: sequential and hierarchical crew processes (pattern re-implementation, no framework dependency).",
+  "description": "CrewAI driver: real crewai crew over a Python bridge when available, TypeScript pattern fallback otherwise.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "python"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

@@ -27,8 +27,19 @@ export const REVIEWER_INSTRUCTION =
   "[AutoGen reviewer] Review the transcript. If the task is complete, start your reply with TERMINATE and add a one-line verdict. " +
   "Otherwise give the single most important next step.";
 
+/** Participant descriptions offered to the speaker-selection call (the
+    SelectorGroupChat analog renders each participant's description there). */
+export const SPEAKER_DESCRIPTIONS: ReadonlyArray<{ name: GroupChatSpeaker; description: string }> = [
+  { name: "coder", description: "makes progress with tool calls and reports the final answer" },
+  { name: "reviewer", description: "reviews the transcript, gives the next step, or declares completion" },
+];
+
 /** Builds the speaker-selection note appended to the transcript (manager "auto" mode). */
 export function speakerSelectionPrompt(lastSpeaker: GroupChatSpeaker | null): string {
   const last = lastSpeaker === null ? "none (chat start)" : lastSpeaker;
-  return `[AutoGen group chat] Who speaks next: "coder" or "reviewer"? Last speaker: ${last}. Reply with just the name.`;
+  const roster = SPEAKER_DESCRIPTIONS.map((entry) => `- ${entry.name}: ${entry.description}`).join("; ");
+  return (
+    `[AutoGen group chat] Who speaks next? Participants: ${roster}. ` +
+    `Last speaker: ${last}. Reply with just the name.`
+  );
 }

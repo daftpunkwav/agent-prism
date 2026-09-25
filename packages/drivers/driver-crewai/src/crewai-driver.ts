@@ -36,8 +36,11 @@ import {
   eventOf,
   executeToolCalls,
   formatCapabilityPluginIds,
+  probeFrameworkRuntime,
+  runtimeFromEnv,
   stepBudgetFor,
 } from "@agentprism/driver-run-support";
+import { bootstrapScriptPath, runCrewaiFrameworkBridge } from "./crewai-bridge.js";
 import {
   MANAGER_INSTRUCTION,
   SEQUENTIAL_TASKS,
@@ -219,7 +222,35 @@ export class CrewAIDriver implements AgentDriver {
   readonly frameworkId = "crewai";
   readonly displayName = "CrewAI Crew";
 
+  /**
+   * Runtime picker: the real CrewAI framework (Python bridge) when the
+   * interpreter and the crewai package are available, the TypeScript pattern
+   * fallback otherwise. ARENA_CREWAI_RUNTIME forces a side; `python` fails
+   * closed when the probe finds nothing.
+   */
   async *run(context: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
+    const runtime = runtimeFromEnv(process.env["ARENA_CREWAI_RUNTIME"]);
+    const interpreter = runtime === "ts" ? null : probeFrameworkRuntime("crewai");
+    if (interpreter !== null) {
+      yield* runCrewaiFrameworkBridge({
+        context,
+        interpreter,
+        bootstrapPath: bootstrapScriptPath(import.meta.url),
+      });
+      return;
+    }
+    if (runtime === "python") {
+      throw new Error(
+        "ARENA_CREWAI_RUNTIME=python requires a Python interpreter with the crewai package " +
+          "(pip install -r packages/drivers/driver-crewai/python/requirements.txt); " +
+          "see packages/drivers/driver-crewai/README.md",
+      );
+    }
+    yield* this.runPatternFallback(context);
+  }
+
+  /** TypeScript pattern fallback: neutral-transcript crew pipeline. */
+  private async *runPatternFallback(context: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
     const { config, question, history, tracker, workspace } = context;
     const label = config.label;
     const workspaceName = workspace.name;

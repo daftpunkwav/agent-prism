@@ -58,3 +58,13 @@ so no hardcoded frontend list is needed.
 - Cancellation propagates. Drivers honor the context abort signal, following the subagent
   abort rethrow semantics.
 - A failing driver registration only warns, but an empty registry fails startup.
+
+## Dual-runtime drivers
+
+`autogen` and `crewai` run on two interchangeable backends selected per column run:
+a real framework bridge (a Python bootstrap process that talks to the host over
+NDJSON — model completions and tool executions round-trip to the arena model port
+and tool registry) and a TypeScript pattern fallback. Selection probes the
+interpreter and framework package; `ARENA_AUTOGEN_RUNTIME` / `ARENA_CREWAI_RUNTIME`
+force a side (`python` fails closed, `ts` skips the probe, `auto` is the default).
+See the two driver READMEs for the protocol and setup steps.
