@@ -702,8 +702,13 @@ export async function* runAgentExecution(
           deps.clock.now(),
         );
         // The finalize turn is real work: fold it into the terminal metrics.
+        // Token fields come from the tracker (the driver snapshotted them before
+        // the finalize ran); steps reflects the finalize's own step_start.
         if (heldComplete !== null && heldComplete.metrics !== null) {
-          heldComplete = { ...heldComplete, metrics: { ...heldComplete.metrics, steps: finalizeStep } };
+          heldComplete = {
+            ...heldComplete,
+            metrics: { ...heldComplete.metrics, ...tracker.asDict(), steps: finalizeStep },
+          };
         }
       }
     }

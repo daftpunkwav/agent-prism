@@ -5,6 +5,8 @@
  * Responsibilities:
  * - Own LC message conversion (llmMessagesToLc)
  * - Provide optional bindTools for the current call
+ * - Map responseFormat onto the wire's native constraint (planInvoke)
+ * - Extract the vendor usage payload for the run's token tracker (usageOf)
  *
  * Native and verification talk only to LlmAdapter; LC/LG drivers needing
  * BaseChatModel still use ColumnRuntime.llmVendor.
@@ -142,6 +144,24 @@ function planInvoke(model: BaseChatModel, options: LlmCallOptions | undefined): 
   return { runnable: bindToolsIfNeeded(model, options?.tools), invokeKwargs: baseKwargs, forcedToolName: null };
 }
 
+/**
+ * Extracts the vendor usage payload from an LC response for LlmInvokeResult.usage:
+ * usage_metadata (LangChain standard) first, then response_metadata.usage and the
+ * legacy token_usage naming. Verification (judge/reflect/evolve) and the structured
+ * finalize record this payload onto the run's token tracker; returning undefined
+ * here silently drops those calls from the metrics.
+ */
+function usageOf(response: BaseMessage): Record<string, unknown> | undefined {
+  const record = response as unknown as Record<string, unknown>;
+  const metadata = record.response_metadata;
+  const usage = record.usage_metadata ??
+    (metadata !== null && typeof metadata === "object"
+      ? (metadata as Record<string, unknown>).usage
+      : undefined) ??
+    record.token_usage;
+  return usage !== null && typeof usage === "object" ? (usage as Record<string, unknown>) : undefined;
+}
+
 /** LlmAdapter backed by a LangChain chat model. */
 export class ChatModelLlmAdapter implements LlmAdapter {
   constructor(private readonly model: BaseChatModel) {}
@@ -162,7 +182,7 @@ export class ChatModelLlmAdapter implements LlmAdapter {
       // A forced-tool reply carries the payload in the tool call args, not message text.
       text: forced !== undefined ? JSON.stringify(forced.args) : textFromContent(response.content),
       toolCalls,
-      usage: undefined,
+      usage: usageOf(response),
     };
   }
 
