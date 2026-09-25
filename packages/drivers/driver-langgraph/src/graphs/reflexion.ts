@@ -11,6 +11,7 @@ import { END, START, StateGraph } from "@langchain/langgraph";
 import { textFromContent } from "@agentprism/contracts";
 import { REFLEXION_RETRY_KEYWORDS } from "@agentprism/driver-registry";
 import { bindToolsSafe, streamToAiMessage } from "@agentprism/driver-langchain";
+import { REFLEXION_REFLECT_PROMPT, reflexionAnswerMessage } from "../prompts.js";
 import { AgentState, hasToolCalls, llmMessages, stepBudgetExhausted, withNodeConfig, type AgentStateType, type ReasoningGraphDeps } from "./state.js";
 import { reactToolNode } from "./tool-node.js";
 
@@ -30,10 +31,8 @@ async function reflexionReflectNode(state: AgentStateType, deps: ReasoningGraphD
   const response = await streamToAiMessage(
     deps.model,
     [
-      new SystemMessage(
-        "\n\n[Reflexion: Reflect]\nEvaluate the quality of the answer above:\n1. Did it answer the question accurately?\n2. Is anything missing?\n3. How can it improve?\n\nIf insufficient, say what to retry or redo.\n\nOutput your reflection.",
-      ),
-      new HumanMessage(`Answer content:\n${lastResponse}`),
+      new SystemMessage(REFLEXION_REFLECT_PROMPT),
+      new HumanMessage(reflexionAnswerMessage(lastResponse)),
     ],
     deps.runnableConfig,
   );

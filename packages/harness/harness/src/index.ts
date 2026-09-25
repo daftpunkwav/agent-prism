@@ -11,6 +11,7 @@ export * from "./prompt/prompt-builder.js";
 export * from "./prompt/errors.js";
 export * from "./prompt/section-registry.js";
 export * from "./prompt/builtin-sections.js";
+export * from "./prompt/phase-blocks.js";
 export * from "./context/message-text.js";
 export * from "./context/messages.js";
 export * from "./context/sanitize.js";

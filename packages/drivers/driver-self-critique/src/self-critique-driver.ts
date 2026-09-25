@@ -39,6 +39,7 @@ import {
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
 import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, stepBudgetFor } from "@agentprism/driver-registry";
+import { CRITIC_INSTRUCTION, criticRedirect } from "./prompts.js";
 
 /** Critic verdict: numeric progress score plus a one-line next action. */
 interface CriticVerdict {
@@ -99,10 +100,7 @@ async function criticPass(
       ...messages,
       {
         role: "user",
-        content:
-          "[Phase: Critic] Review the transcript above. Reply with exactly two lines:\n" +
-          "SCORE: <0-10 progress toward the task>\n" +
-          "NEXT: <one concrete next action, or DONE>",
+        content: CRITIC_INSTRUCTION,
       },
     ],
     context.config.context,
@@ -194,8 +192,8 @@ export class SelfCritiqueDriver implements AgentDriver {
           break;
         }
         redirects += 1;
-        messages.push({ role: "user", content: `[Critic redirect ${redirects}/${maxRedirects} — score ${verdict.score}] ${verdict.note}` });
-        yield eventOf({ type: "reflect", pipeline: label, step: streamStep, content: `[Critic redirect ${redirects}/${maxRedirects} — score ${verdict.score}] ${verdict.note}`, workspace: workspaceName });
+        messages.push({ role: "user", content: criticRedirect(redirects, maxRedirects, verdict.score, verdict.note) });
+        yield eventOf({ type: "reflect", pipeline: label, step: streamStep, content: criticRedirect(redirects, maxRedirects, verdict.score, verdict.note), workspace: workspaceName });
         continue;
       }
 
@@ -244,7 +242,7 @@ export class SelfCritiqueDriver implements AgentDriver {
       yield eventOf({ type: "reflect", pipeline: label, step: stats.step, content: `[Critic score ${verdict.score}] ${verdict.note}`, workspace: workspaceName });
       if (verdict.score < CRITIC_REDIRECT_BELOW && redirects < maxRedirects && !verdict.done) {
         redirects += 1;
-        const redirect = `[Critic redirect ${redirects}/${maxRedirects} — score ${verdict.score}] ${verdict.note}`;
+        const redirect = criticRedirect(redirects, maxRedirects, verdict.score, verdict.note);
         messages.push({ role: "user", content: redirect });
         yield eventOf({ type: "reflect", pipeline: label, step: stats.step, content: redirect, workspace: workspaceName });
       }

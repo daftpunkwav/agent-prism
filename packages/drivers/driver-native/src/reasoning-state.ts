@@ -13,6 +13,9 @@
 
 import type { LlmAssistantMessage, LlmMessage, ReasoningMode } from "@agentprism/contracts";
 import { parseScoreVerdict, REFLEXION_RETRY_KEYWORDS, TOT_WIDTH_DEFAULT } from "@agentprism/driver-registry";
+import { COT_PHASE_HINT, REFLEXION_PHASE_HINT, totBranchHint, totScoreHint } from "./prompts.js";
+
+export { COT_PHASE_HINT, REFLEXION_PHASE_HINT, totBranchHint, totScoreHint };
 
 export type ReasoningPhase = "think" | "act" | "evaluate" | "reflect" | "done";
 
@@ -69,35 +72,17 @@ export function shouldBindTools(state: ReasoningState): boolean {
 /** Phase hints as neutral user messages (avoids multiple system messages). */
 export function phaseHint(state: ReasoningState): LlmMessage[] {
   if (state.mode === "cot_tool" && state.phase === "think") {
-    return [{ role: "user", content: "[Phase: CoT] Reason only; do not call tools. List a plan before acting." }];
+    return [{ role: "user", content: COT_PHASE_HINT }];
   }
   if (state.mode === "tot" && state.phase === "think") {
-    return [
-      {
-        role: "user",
-        content: `[Phase: ToT branch ${state.totRound + 1}/${state.totWidth}] Propose ONE distinct solution approach (at most 4 steps). Do not call tools.`,
-      },
-    ];
+    return [{ role: "user", content: totBranchHint(state.totRound, state.totWidth) }];
   }
   if (state.mode === "tot" && state.phase === "evaluate") {
     const plan = state.plans[state.totRound] ?? "(none)";
-    return [
-      {
-        role: "user",
-        content:
-          `[Phase: ToT score ${state.totRound + 1}/${state.totWidth}] Score this plan 0-10 for likelihood of completing the task. ` +
-          `Reply with "SCORE: <0-10>" then one line of reasoning.\nPlan:\n${plan}`,
-      },
-    ];
+    return [{ role: "user", content: totScoreHint(state.totRound, state.totWidth, plan) }];
   }
   if (state.mode === "reflexion" && state.phase === "reflect") {
-    return [
-      {
-        role: "user",
-        content:
-          "[Phase: Reflect] Evaluate whether the current result completes the task; if insufficient, say what to improve or redo.",
-      },
-    ];
+    return [{ role: "user", content: REFLEXION_PHASE_HINT }];
   }
   return [];
 }

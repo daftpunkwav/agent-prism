@@ -48,6 +48,15 @@ import {
   type CrewProcess,
   type CrewRole,
 } from "./crew.js";
+import {
+  CREW_FINAL_TASK,
+  CREW_PROGRESS_EXPECTED,
+  CREW_VERIFY_EXPECTED,
+  MANAGER_DONE_TASK,
+  TOOL_RESULTS_CONTINUE_NOTE,
+  taskOutputNote,
+  workerReportsNote,
+} from "./prompts.js";
 
 /** Worker turns allowed per sequential task (bounded so one task cannot eat the budget). */
 export function taskTurnCapFor(reasoning: string): number {
@@ -152,7 +161,7 @@ async function* runWorker(
     return { text: response.content, usedTools: true };
   }
   let followUp: LlmAssistantMessage | null = null;
-  for await (const item of streamWorkerTurn(context, messages, stats, retrieveSnippets, toolDefinitions, "[CrewAI] Continue from the tool results above.")) {
+  for await (const item of streamWorkerTurn(context, messages, stats, retrieveSnippets, toolDefinitions, TOOL_RESULTS_CONTINUE_NOTE)) {
     if (isAssistantMessage(item)) followUp = item;
     else yield item;
   }
@@ -263,7 +272,7 @@ export class CrewAIDriver implements AgentDriver {
             if (!usedTools) break;
           }
           if (output !== "") {
-            messages.push({ role: "user", content: `[CrewAI] ${role.role} task output:\n${output}` });
+            messages.push({ role: "user", content: taskOutputNote(role.role, output) });
             yield eventOf({
               type: "reflect",
               pipeline: label,
@@ -292,20 +301,20 @@ export class CrewAIDriver implements AgentDriver {
             // work and produces the final answer (the pipeline's closing pass).
             const reviewer = roleByKey("reviewer");
             if (stats.turns < maxSteps) {
-              yield* runWorker(context, messages, stats, retrieveSnippets, toolDefinitions, question, maxSteps, roleInstruction(reviewer, "The manager declared the crew done. Verify the work and produce the final answer.", "What was done, artifact paths, how to run them."));
+              yield* runWorker(context, messages, stats, retrieveSnippets, toolDefinitions, question, maxSteps, roleInstruction(reviewer, MANAGER_DONE_TASK, CREW_VERIFY_EXPECTED));
             }
             break;
           }
           if (stats.turns < maxSteps) {
-            const { text } = yield* runWorker(context, messages, stats, retrieveSnippets, toolDefinitions, question, maxSteps, roleInstruction(role, assignment.task, "Progress toward the crew goal."));
+            const { text } = yield* runWorker(context, messages, stats, retrieveSnippets, toolDefinitions, question, maxSteps, roleInstruction(role, assignment.task, CREW_PROGRESS_EXPECTED));
             if (text !== "") {
-              messages.push({ role: "user", content: `[CrewAI] ${role.role} reports:\n${text}` });
+              messages.push({ role: "user", content: workerReportsNote(role.role, text) });
             }
           }
         }
         if (lastRole !== "reviewer" && stats.turns < maxSteps) {
           const reviewer = roleByKey("reviewer");
-          yield* runWorker(context, messages, stats, retrieveSnippets, toolDefinitions, question, maxSteps, roleInstruction(reviewer, "Produce the crew's final answer.", "What was done, artifact paths, how to run them."));
+          yield* runWorker(context, messages, stats, retrieveSnippets, toolDefinitions, question, maxSteps, roleInstruction(reviewer, CREW_FINAL_TASK, CREW_VERIFY_EXPECTED));
         }
       }
 

@@ -9,17 +9,14 @@
 import { SystemMessage } from "@langchain/core/messages";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import { bindToolsSafe, streamToAiMessage } from "@agentprism/driver-langchain";
+import { COT_ACT_PROMPT, COT_THINK_PROMPT } from "../prompts.js";
 import { AgentState, hasToolCalls, llmMessages, stepBudgetExhausted, withNodeConfig, type AgentStateType, type ReasoningGraphDeps } from "./state.js";
 import { reactToolNode } from "./tool-node.js";
 
 async function cotThinkNode(state: AgentStateType, deps: ReasoningGraphDeps): Promise<Partial<AgentStateType>> {
   const response = await streamToAiMessage(
     deps.model,
-    llmMessages(state, deps, [
-      new SystemMessage(
-        "\n\n[Phase 1: Reason]\nFully analyze the problem first. List all required steps and tools. Do not call tools; output reasoning only.",
-      ),
-    ]),
+    llmMessages(state, deps, [new SystemMessage(COT_THINK_PROMPT)]),
     deps.runnableConfig,
   );
   return { messages: [response], step_count: (state.step_count ?? 0) + 1 };
@@ -28,9 +25,7 @@ async function cotThinkNode(state: AgentStateType, deps: ReasoningGraphDeps): Pr
 async function cotActNode(state: AgentStateType, deps: ReasoningGraphDeps): Promise<Partial<AgentStateType>> {
   const response = await streamToAiMessage(
     bindToolsSafe(deps.model, deps.lcTools),
-    llmMessages(state, deps, [
-      new SystemMessage("\n\n[Phase 2: Act]\nBased on the reasoning above, now perform the required tool calls."),
-    ]),
+    llmMessages(state, deps, [new SystemMessage(COT_ACT_PROMPT)]),
     deps.runnableConfig,
   );
   return { messages: [response], step_count: (state.step_count ?? 0) + 1 };

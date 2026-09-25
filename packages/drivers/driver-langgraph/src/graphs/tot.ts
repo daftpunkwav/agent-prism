@@ -18,6 +18,7 @@ import { textFromContent } from "@agentprism/contracts";
 import { parseScoreVerdict, totWidth } from "@agentprism/driver-registry";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import { bindToolsSafe, streamToAiMessage } from "@agentprism/driver-langchain";
+import { totBranchPrompt, totScorePrompt, TOT_SELECT_NO_CANDIDATES, totSelectNote } from "../prompts.js";
 import {
   AgentState,
   hasToolCalls,
@@ -38,11 +39,7 @@ async function totBranchNode(
 ): Promise<Partial<AgentStateType>> {
   const response = await streamToAiMessage(
     deps.model,
-    llmMessages(state, deps, [
-      new SystemMessage(
-        `\n\n[ToT branch ${index + 1}/${width}]\nPropose ONE distinct solution approach (at most 4 steps). Do not call tools.`,
-      ),
-    ]),
+    llmMessages(state, deps, [new SystemMessage(totBranchPrompt(index, width))]),
     deps.runnableConfig,
   );
   return { messages: [response], step_count: (state.step_count ?? 0) + 1 };
@@ -58,12 +55,7 @@ async function totScoreNode(
   const plan = textFromContent(messages[messages.length - 1]?.content);
   const response = await streamToAiMessage(
     deps.model,
-    llmMessages(state, deps, [
-      new SystemMessage(
-        `\n\n[ToT score ${index + 1}/${width}]\nScore the plan proposed above 0-10 for likelihood of completing the task. ` +
-          'Reply with "SCORE: <0-10>" then one line of reasoning.',
-      ),
-    ]),
+    llmMessages(state, deps, [new SystemMessage(totScorePrompt(index, width))]),
     deps.runnableConfig,
   );
   const candidate: TotCandidate = { plan, score: parseScoreVerdict(textFromContent(response.content)) ?? 0 };
@@ -90,8 +82,8 @@ function totSelectNode(width: number) {
     const winner = candidates[best];
     const note =
       winner === undefined
-        ? "[ToT select] no candidates were scored; proceeding free-form"
-        : `[ToT select] branch ${best + 1}/${width} wins with score ${winner.score}\n${winner.plan}`;
+        ? TOT_SELECT_NO_CANDIDATES
+        : totSelectNote(best, width, winner.score, winner.plan);
     return { messages: [new SystemMessage(note)] };
   };
 }

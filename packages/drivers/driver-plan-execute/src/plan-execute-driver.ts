@@ -36,6 +36,16 @@ import {
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
 import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, parseScoreVerdict, stepBudgetFor, totWidth } from "@agentprism/driver-registry";
+import {
+  COT_PLAN_SUFFIX,
+  DIRECT_PLAN_SUFFIX,
+  PLAN_PHASE_SUFFIX,
+  REPLAN_INSTRUCTION,
+  agreedPlanMount,
+  planBranchPrompt,
+  planScorePrompt,
+  revisedPlanMount,
+} from "./prompts.js";
 
 /** Executor state: consecutive tool-free turns plus remaining replan budgets. */
 interface ExecutorState {
@@ -51,7 +61,7 @@ export function replanBudgetFor(reasoning: string): number {
 async function invokePlanner(context: AgentExecutionContext, system: string, user: string): Promise<string> {
   const prepared = applyContextPipeline(
     [
-      { role: "system", content: `${system}\n\n[Phase: Plan] Reason only; do not call tools.` },
+      { role: "system", content: `${system}${PLAN_PHASE_SUFFIX}` },
       { role: "user", content: user },
     ],
     context.config.context,
@@ -76,7 +86,7 @@ async function plannerPass(context: AgentExecutionContext, system: string, user:
       const candidate = await invokePlanner(
         context,
         system,
-        `${user}\n\n[Plan branch ${index + 1}/${width}] Propose ONE distinct solution approach (at most 4 steps) for the task above. No tool calls.`,
+        `${user}${planBranchPrompt(index, width)}`,
       );
       if (candidate !== "") candidates.push(candidate);
     }
@@ -86,7 +96,7 @@ async function plannerPass(context: AgentExecutionContext, system: string, user:
       const verdict = await invokePlanner(
         context,
         system,
-        `Score this plan 0-10 for likelihood of completing the task. Reply with "SCORE: <0-10>" first.\n\nTask:\n${user}\n\nPlan:\n${candidate}`,
+        planScorePrompt(user, candidate),
       );
       scores.push(parseScoreVerdict(verdict) ?? 0);
     }
@@ -100,13 +110,13 @@ async function plannerPass(context: AgentExecutionContext, system: string, user:
     return invokePlanner(
       context,
       system,
-      `${user}\n\nFirst analyze the problem and lay out your reasoning chain, then produce a short numbered plan (at most 6 steps). No tool calls.`,
+      `${user}${COT_PLAN_SUFFIX}`,
     );
   }
   return invokePlanner(
     context,
     system,
-    `${user}\n\nProduce a short numbered plan (at most 6 steps) for the task above. No tool calls.`,
+    `${user}${DIRECT_PLAN_SUFFIX}`,
   );
 }
 
@@ -241,7 +251,7 @@ export class PlanExecuteDriver implements AgentDriver {
     const state: ExecutorState = { quietTurns: 0, replansLeft: replanBudgetFor(config.reasoning) };
     const messages: LlmMessage[] = buildInitialMessages(
       system,
-      plan === "" ? user : `${user}\n\n[Agreed plan]\n${plan}\nFollow these steps; report deviations explicitly.`,
+      plan === "" ? user : `${user}\n\n${agreedPlanMount(plan)}`,
       history,
     );
     if (plan !== "") {
@@ -266,7 +276,7 @@ export class PlanExecuteDriver implements AgentDriver {
           try {
             revised = await context.llm.invoke(
               applyContextPipeline(
-                [...messages, { role: "user", content: "[Phase: Replan] Progress stalled without tool use. Revise the remaining steps briefly." }],
+                [...messages, { role: "user", content: REPLAN_INSTRUCTION }],
                 config.context,
                 { retrieveSnippets, ...context.contextTuning },
               ),
@@ -278,7 +288,7 @@ export class PlanExecuteDriver implements AgentDriver {
           }
           if (revised !== "") {
             plan = revised;
-            messages.push({ role: "user", content: `[Revised plan]\n${revised}` });
+            messages.push({ role: "user", content: revisedPlanMount(revised) });
             yield eventOf({ type: "reflect", pipeline: label, step: stats.step, content: `[Plan-Execute replan]\n${revised}`, workspace: workspaceName });
           }
           state.quietTurns = 0;
