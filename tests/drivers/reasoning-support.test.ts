@@ -3,8 +3,8 @@
  * @description Locks the framework × reasoning support table against drift.
  */
 import { describe, expect, it } from "vitest";
-import { FrameworkDriverRegistry, registerDriversBestEffort } from "@agentprism/driver-registry";
-import { REASONING_SUPPORT, reasoningSupportFor } from "@agentprism/driver-registry";
+import { FrameworkDriverRegistry, registerDriversBestEffort } from "@agentprism/driver-run-support";
+import { REASONING_SUPPORT, reasoningSupportFor } from "@agentprism/driver-run-support";
 
 describe("REASONING_SUPPORT", () => {
   it("covers every registered driver with no spare entries", { timeout: 60000 }, async () => {

@@ -13,7 +13,7 @@ A driver leaf lives at `packages/drivers/driver-<name>/` and follows the leaf an
 are enforced by `pnpm boundaries`:
 
 - Allowed: `contracts`, `environment`, `runtime`, `telemetry`, `harness`, and
-  `driver-registry`.
+  `driver-run-support`.
 - Never: providers, tool packages, arena, agent, or transport. Tool access goes through
   `contracts` types such as `ToolDefinition` only.
 - External SDK dependencies such as `@langchain/*` live only in the leaf that needs them.
@@ -22,7 +22,7 @@ are enforced by `pnpm boundaries`:
 ## Harness seams
 
 Drivers reuse `buildSystemUser`, `applyContextPipeline`, and the shared event translation
-from `driver-registry`, so loop differences stay architectural rather than prompt
+from `driver-run-support`, so loop differences stay architectural rather than prompt
 differences. Reasoning-mode behavior belongs in the driver's own control flow and is
 graded in the reasoning support table described below.
 
@@ -38,7 +38,7 @@ else the last observation, stays unpolluted.
 
 Driver banners join the `PIPELINE_BANNER_PREFIX` single source, and the
 `driver-banner-consistency` test locks banners across backends. Capability suffixes stay
-reproducible column to column. The reasoning support table in `driver-registry` grades
+reproducible column to column. The reasoning support table in `driver-run-support` grades
 each driver as structural, budget, or skeleton per reasoning mode.
 
 ## Registration

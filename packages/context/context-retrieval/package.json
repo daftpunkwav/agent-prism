@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/context-retrieval",
+  "description": "Workspace retrieval: BM25 ranking, rank fusion, MMR, and chunk indexing.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

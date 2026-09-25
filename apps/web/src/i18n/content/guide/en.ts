@@ -576,7 +576,7 @@ const dimensions: DimDoc[] = [
     ],
     langChain: "createColumnModel builds the model from config.temperature.",
     langGraph: "Same as LangChain: the model is fully constructed during column assembly.",
-    modules: ["packages/providers/provider-langchain/src/model-factory.ts", "packages/arena/arena-routing/src/router.ts", "packages/arena/arena-runner/src/runner.ts"],
+    modules: ["packages/providers/provider-langchain/src/model-factory.ts", "packages/arena/arena-dimensions/src/router.ts", "packages/arena/arena-runner/src/runner.ts"],
     baselineTip: "Use 0 to reduce sampling noise when comparing frameworks/reasoning; for creative tasks (e.g. copywriting) compare 0.7 vs 1.0.",
     caveats: [
       "The Provider's raw temperature snaps to the nearest tier (0 / 0.3 / 0.7 / 1) as the default baseline.",
@@ -613,7 +613,7 @@ const dimensions: DimDoc[] = [
     langGraph: "Same as LangChain: the endpoint is resolved during column assembly.",
     modules: [
       "packages/contracts/contracts/src/provider.ts · LlmEndpoint / ProviderConfig.endpoints",
-      "packages/arena/arena-routing/src/router.ts · syncModelOptionsFromProvider",
+      "packages/arena/arena-dimensions/src/router.ts · syncModelOptionsFromProvider",
       "packages/providers/provider-langchain/src/model-factory.ts",
     ],
     baselineTip: "When comparing other dimensions, keep the endpoint baseline at the default endpoint; when comparing this dimension, pin temperature and thinking level in the baseline to avoid hidden variables.",
@@ -647,7 +647,7 @@ const dimensions: DimDoc[] = [
     langChain: "createChatModel injects the thinking fields according to endpoint capability.",
     langGraph: "Same as LangChain.",
     modules: [
-      "packages/providers/provider-capability/src/thinking.ts",
+      "packages/providers/provider-catalog/src/thinking.ts",
       "packages/providers/provider-langchain/src/model-factory.ts",
       "packages/contracts/contracts/src/provider-types.ts · effectiveThinkingLevel",
     ],
@@ -682,7 +682,7 @@ const dimensions: DimDoc[] = [
     langChain: "createChatModel injects the thinking block through the buildThinkingClientOptions override.",
     langGraph: "Same as LangChain.",
     modules: [
-      "packages/providers/provider-capability/src/thinking.ts",
+      "packages/providers/provider-catalog/src/thinking.ts",
       "packages/contracts/contracts/src/provider-types.ts",
       "packages/providers/provider-langchain/src/model-factory.ts",
     ],

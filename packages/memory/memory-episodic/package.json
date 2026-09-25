@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/memory-episodic",
+  "description": "Episodic memory: task post-run reports with record, recall, and dedup.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

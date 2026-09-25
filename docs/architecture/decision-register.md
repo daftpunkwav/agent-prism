@@ -18,7 +18,7 @@ rationale, and the code that enforces it.
 | Persist-then-prune for oversized artifacts | Over-budget artifacts are dumped in full to disk with a locator and preview rather than silently lost | `tool-builtins/definitions/spill.ts`, `session/blob-store.ts` |
 | `ask_user` records but never blocks | No synchronous human channel exists, so blocking or faking an answer would be misleading | `tool-builtins/definitions/ask-user.ts` |
 | `subagent` depth cap 1 and toolset inheritance minus itself | Prevents unbounded recursion and privilege escalation | `agent/agent-execution` live body |
-| Credential references `${env:NAME}` | Stored config keeps references; resolved secrets are never written back | `provider-capability/src/endpoints.ts` `resolveCredentialReference` |
+| Credential references `${env:NAME}` | Stored config keeps references; resolved secrets are never written back | `provider-catalog/src/endpoints.ts` `resolveCredentialReference` |
 | MCP, skill, and orchestration as dimensions | Each run isolates one variable so comparisons stay single-variable | `DIMENSION_FIELD`, `DimensionCatalog` |
 | Loop-architecture drivers share harness seams | Loop differences must be architectural rather than prompt suffixes | `driver-plan-execute` and `driver-self-critique` on `buildSystemUser` and `applyContextPipeline` |
 | `apps/web` depends only on `client`, `ui`, and `arena-view` | The frontend stays a thin view over contracts-typed clients | `check-boundaries.mjs` web rule |

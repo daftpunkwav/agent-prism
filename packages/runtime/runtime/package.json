@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/runtime",
+  "description": "Runtime primitives: workspace registry, semaphore, circuit breaker, clock, and event channel.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

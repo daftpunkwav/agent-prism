@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/telemetry",
+  "description": "Token accounting and hard-metric aggregation.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

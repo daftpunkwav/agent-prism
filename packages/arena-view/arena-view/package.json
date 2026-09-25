@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/arena-view",
+  "description": "Event-stream to view projections: trace folding, phase grouping, final-answer extraction, and answer comparison.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

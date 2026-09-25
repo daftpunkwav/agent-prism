@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/context-budget",
+  "description": "Per-source context budgets: allocation and ledger rendering.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/tool-registry",
+  "description": "Tool registry seam and toolset resolution; ships no tool implementations.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

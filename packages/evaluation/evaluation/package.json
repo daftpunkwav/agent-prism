@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/evaluation",
+  "description": "Answer evaluation: deterministic judges, LLM-as-judge, comparison reports, ablation, and trajectory scoring.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

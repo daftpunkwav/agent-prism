@@ -6,24 +6,24 @@
  * Rules:
  * - contracts: no @agentprism/* imports
  * - harness: no @langchain/*
- * - arena-routing: only contracts / dimensions / harness (+ foundation);
+ * - arena-dimensions: only contracts / dimensions / harness (+ foundation);
  *   no @langchain/*, no providers, never the runner
- * - arena-runner: + agent / runtime / arena-routing; no @langchain/*, no providers
+ * - arena-runner: + agent / runtime / arena-dimensions; no @langchain/*, no providers
  * - application: no @agentprism/providers, no @agentprism/evaluation, no @agentprism/harness
  * - evaluation: only contracts / runtime (SDK-free judging and reports)
  * - dimensions: only contracts
  * - tool-registry: only contracts (seam stays below every composer)
  * - tool-builtins: only contracts / environment / tool-registry
- * - driver-registry: only contracts / environment / runtime / telemetry / harness
+ * - driver-run-support: only contracts / environment / runtime / telemetry / harness
  *   (seam + shared run-support; zero backend deps)
- * - driver-native: + driver-registry (LangChain-free backend)
- * - driver-langchain: + driver-registry (LC bridge owner; no langgraph)
- * - driver-langgraph: + driver-registry / driver-langchain (graphs over the bridge)
+ * - driver-native: + driver-run-support (LangChain-free backend)
+ * - driver-langchain: + driver-run-support (LC bridge owner; no langgraph)
+ * - driver-langgraph: + driver-run-support / driver-langchain (graphs over the bridge)
  *   (driver plugins consume the harness seam, never composers or providers)
- * - driver-autogen/crewai: + driver-registry (LangChain-free backends, like native)
- * - provider-capability: only contracts / config / persistence / environment /
+ * - driver-autogen/crewai: + driver-run-support (LangChain-free backends, like native)
+ * - provider-catalog: only contracts / config / persistence / environment /
  *   runtime / telemetry (SDK-free seam)
- * - provider-langchain: + provider-capability (SDK adapters stay below composers)
+ * - provider-langchain: + provider-catalog (SDK adapters stay below composers)
  * - memory-store: only contracts / persistence (atomic file + search index base)
  * - memory-episodic / memory-semantic: only contracts / memory-store
  *   (agent + harness consume memories only through the contracts
@@ -56,19 +56,19 @@ const RULES = [
     forbid: /from\s+["']@langchain\//,
   },
   {
-    name: "arena-routing → only dimensions/harness/foundation",
-    roots: ["packages/arena/arena-routing/src"],
+    name: "arena-dimensions → only dimensions/harness/foundation",
+    roots: ["packages/arena/arena-dimensions/src"],
     forbid: /from\s+["']@agentprism\/(?!contracts|dimensions|harness|environment|runtime|telemetry)[^"']+["']/,
   },
   {
     name: "arena family → no @langchain/*",
-    roots: ["packages/arena/arena-routing/src", "packages/arena/arena-runner/src"],
+    roots: ["packages/arena/arena-dimensions/src", "packages/arena/arena-runner/src"],
     forbid: /from\s+["']@langchain\//,
   },
   {
-    name: "arena-runner → + agent/arena-routing",
+    name: "arena-runner → + agent/arena-dimensions",
     roots: ["packages/arena/arena-runner/src"],
-    forbid: /from\s+["']@agentprism\/(?!contracts|dimensions|harness|environment|runtime|telemetry|agent|arena-routing|tool-mcp)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!contracts|dimensions|harness|environment|runtime|telemetry|agent|arena-dimensions|tool-mcp)[^"']+["']/,
   },
   {
     name: "application → no providers/evaluation/harness impl",
@@ -155,49 +155,49 @@ const RULES = [
     forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|tool-builtins|tool-registry|tool-mcp|sandbox)[^"']+["']/,
   },
   {
-    name: "driver-registry → only foundation/harness/telemetry",
-    roots: ["packages/drivers/driver-registry/src"],
+    name: "driver-run-support → only foundation/harness/telemetry",
+    roots: ["packages/drivers/driver-run-support/src"],
     forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness)[^"']+["']/,
   },
   {
-    name: "driver-native → + driver-registry",
+    name: "driver-native → + driver-run-support",
     roots: ["packages/drivers/driver-native/src"],
-    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-registry)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support)[^"']+["']/,
   },
   {
-    name: "driver-autogen/crewai → + driver-registry",
+    name: "driver-autogen/crewai → + driver-run-support",
     roots: ["packages/drivers/driver-autogen/src", "packages/drivers/driver-crewai/src"],
-    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-registry)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support)[^"']+["']/,
   },
   {
-    name: "driver-plan-execute → + driver-registry",
+    name: "driver-plan-execute → + driver-run-support",
     roots: ["packages/drivers/driver-plan-execute/src"],
-    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-registry)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support)[^"']+["']/,
   },
   {
-    name: "driver-self-critique → + driver-registry",
+    name: "driver-self-critique → + driver-run-support",
     roots: ["packages/drivers/driver-self-critique/src"],
-    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-registry)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support)[^"']+["']/,
   },
   {
-    name: "driver-langchain → + driver-registry",
+    name: "driver-langchain → + driver-run-support",
     roots: ["packages/drivers/driver-langchain/src"],
-    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-registry)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support)[^"']+["']/,
   },
   {
     name: "driver-langgraph → + registry/langchain",
     roots: ["packages/drivers/driver-langgraph/src"],
-    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-registry|driver-langchain)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support|driver-langchain)[^"']+["']/,
   },
   {
-    name: "provider-capability → only foundation/config",
-    roots: ["packages/providers/provider-capability/src"],
+    name: "provider-catalog → only foundation/config",
+    roots: ["packages/providers/provider-catalog/src"],
     forbid: /from\s+["']@agentprism\/(?!contracts|config|persistence|environment|runtime|telemetry)[^"']+["']/,
   },
   {
-    name: "provider-langchain → + provider-capability",
+    name: "provider-langchain → + provider-catalog",
     roots: ["packages/providers/provider-langchain/src"],
-    forbid: /from\s+["']@agentprism\/(?!contracts|config|persistence|environment|runtime|telemetry|provider-capability)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!contracts|config|persistence|environment|runtime|telemetry|provider-catalog)[^"']+["']/,
   },
   {
     name: "http-runtime → only application/builder/config/contracts",

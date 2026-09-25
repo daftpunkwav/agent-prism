@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/memory-service",
+  "description": "MemoryServicePort adapter wiring the episodic and semantic stores.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

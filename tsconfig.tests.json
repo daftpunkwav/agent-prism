@@ -11,8 +11,8 @@
       "DOM.Iterable"
     ],
     "paths": {
-      "@agentprism/driver-registry": [
-        "./packages/drivers/driver-registry/src/index.ts"
+      "@agentprism/driver-run-support": [
+        "./packages/drivers/driver-run-support/src/index.ts"
       ],
       "@agentprism/driver-native": [
         "./packages/drivers/driver-native/src/index.ts"
@@ -89,8 +89,8 @@
       "@agentprism/tool-symbols": [
         "./packages/tools/tool-symbols/src/index.ts"
       ],
-      "@agentprism/provider-capability": [
-        "./packages/providers/provider-capability/src/index.ts"
+      "@agentprism/provider-catalog": [
+        "./packages/providers/provider-catalog/src/index.ts"
       ],
       "@agentprism/provider-langchain": [
         "./packages/providers/provider-langchain/src/index.ts"
@@ -113,8 +113,8 @@
       "@agentprism/route-workspace": [
         "./packages/transport/route-workspace/src/index.ts"
       ],
-      "@agentprism/arena-routing": [
-        "./packages/arena/arena-routing/src/index.ts"
+      "@agentprism/arena-dimensions": [
+        "./packages/arena/arena-dimensions/src/index.ts"
       ],
       "@agentprism/arena-runner": [
         "./packages/arena/arena-runner/src/index.ts"

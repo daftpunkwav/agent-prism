@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { PIPELINE_BANNER_FRAMEWORK_IDS } from "@agentprism/contracts";
-import { FrameworkDriverRegistry, registerDriversBestEffort } from "@agentprism/driver-registry";
+import { FrameworkDriverRegistry, registerDriversBestEffort } from "@agentprism/driver-run-support";
 
 /**
  * Cross-package literal contract: isForeignPipelineConfigBanner looks up by

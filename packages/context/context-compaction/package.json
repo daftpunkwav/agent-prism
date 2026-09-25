@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/context-compaction",
+  "description": "Checkpoint compaction: message surface, envelopes, and journals.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

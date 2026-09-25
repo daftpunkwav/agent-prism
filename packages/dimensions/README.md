@@ -6,4 +6,4 @@ Dimension catalog and options.
 
 | Package | Role | Wired at |
 |---|---|---|
-| [`dimensions/`](dimensions/README.md) | Dimension catalog and options | Consumed by arena-routing |
+| [`dimensions/`](dimensions/README.md) | Dimension catalog and options | Consumed by arena-dimensions |

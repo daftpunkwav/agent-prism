@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/context-chunking",
+  "description": "Content chunking: text, code, and markdown splitters with file routing.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

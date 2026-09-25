@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/harness",
+  "description": "Neutral execution semantics: prompt assembly, context pipeline, reasoning, verification, memory, and usage.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

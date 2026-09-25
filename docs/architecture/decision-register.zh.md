@@ -19,7 +19,7 @@
 | 超大产物先持久化再修剪 | 超预算产物完整 dump 到磁盘并带 locator 与预览，而非静默丢失 | `tool-builtins/definitions/spill.ts`、`session/blob-store.ts` |
 | `ask_user` 记录但绝不阻塞 | 不存在同步人工通道，阻塞或伪造答案会产生误导 | `tool-builtins/definitions/ask-user.ts` |
 | `subagent` 深度上限 1，toolset 继承减去自身 | 防止无界递归与权限升级 | `agent/agent-execution` 实体 body |
-| 凭证引用 `${env:NAME}` | 存储配置保持引用；已解析密钥绝不写回 | `provider-capability/src/endpoints.ts` `resolveCredentialReference` |
+| 凭证引用 `${env:NAME}` | 存储配置保持引用；已解析密钥绝不写回 | `provider-catalog/src/endpoints.ts` `resolveCredentialReference` |
 | MCP、skill、orchestration 作为 dimensions | 每次 run 隔离一个变量，使对比保持单变量 | `DIMENSION_FIELD`、`DimensionCatalog` |
 | Loop-architecture driver 共享 harness seam | 循环差异必须是架构性的，而非 prompt 后缀 | `driver-plan-execute` 与 `driver-self-critique` 基于 `buildSystemUser` 与 `applyContextPipeline` |
 | `apps/web` 只依赖 `client`、`ui`、`arena-view` | 前端保持为 contracts 类型 client 之上的薄视图 | `check-boundaries.mjs` 的 web 规则 |

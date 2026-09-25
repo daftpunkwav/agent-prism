@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/memory-store",
+  "description": "Long-term memory store engine: atomic persistence, tokenization, and frequency index.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

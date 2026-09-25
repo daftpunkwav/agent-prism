@@ -575,7 +575,7 @@ const dimensions: DimDoc[] = [
     ],
     langChain: "createColumnModel 按 config.temperature 构造模型。",
     langGraph: "与 LangChain 相同：模型在列装配时构造完成。",
-    modules: ["packages/providers/provider-langchain/src/model-factory.ts", "packages/arena/arena-routing/src/router.ts", "packages/arena/arena-runner/src/runner.ts"],
+    modules: ["packages/providers/provider-langchain/src/model-factory.ts", "packages/arena/arena-dimensions/src/router.ts", "packages/arena/arena-runner/src/runner.ts"],
     baselineTip: "对比框架/推理时常用 0 降低采样噪声；测创造性任务（如文案生成）可对比 0.7 vs 1.0。",
     caveats: [
       "Provider 原始温度会吸附到最近档位（0 / 0.3 / 0.7 / 1）作为默认基线。",
@@ -612,7 +612,7 @@ const dimensions: DimDoc[] = [
     langGraph: "与 LangChain 相同：列装配时解析接入点。",
     modules: [
       "packages/contracts/contracts/src/provider.ts · LlmEndpoint / ProviderConfig.endpoints",
-      "packages/arena/arena-routing/src/router.ts · syncModelOptionsFromProvider",
+      "packages/arena/arena-dimensions/src/router.ts · syncModelOptionsFromProvider",
       "packages/providers/provider-langchain/src/model-factory.ts",
     ],
     baselineTip: "对比其它维时，接入点基线固定为默认接入点；对比本维时请在基线钉死温度与思考强度，避免隐性变量。",
@@ -646,7 +646,7 @@ const dimensions: DimDoc[] = [
     langChain: "createChatModel 按接入点能力注入思考字段。",
     langGraph: "与 LangChain 相同。",
     modules: [
-      "packages/providers/provider-capability/src/thinking.ts",
+      "packages/providers/provider-catalog/src/thinking.ts",
       "packages/providers/provider-langchain/src/model-factory.ts",
       "packages/contracts/contracts/src/provider-types.ts · effectiveThinkingLevel",
     ],
@@ -681,7 +681,7 @@ const dimensions: DimDoc[] = [
     langChain: "createChatModel 预算覆盖经 buildThinkingClientOptions 注入 thinking 块。",
     langGraph: "与 LangChain 相同。",
     modules: [
-      "packages/providers/provider-capability/src/thinking.ts",
+      "packages/providers/provider-catalog/src/thinking.ts",
       "packages/contracts/contracts/src/provider-types.ts",
       "packages/providers/provider-langchain/src/model-factory.ts",
     ],

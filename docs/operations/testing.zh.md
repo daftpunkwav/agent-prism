@@ -97,7 +97,7 @@ runner 会跳过与安全相关的用例。
 | HTTP 契约：auth、limits、errors、SSE | `tests/http-transport/` |
 | 组合装配 | `apps/server/tests/`。`mount-routes` 检查每 leaf 一个 endpoint；`load-drivers` 检查 registry 非空且含 `native` |
 | i18n 完整性 | `apps/web/tests/catalog-parity.test.ts` 检查 en 与 zh-CN key 对等，以及 `pnpm --filter @agentprism/web check:i18n` |
-| Driver banner 一致性 | driver-registry 的 banner 测试，覆盖全部 backend，以 `PIPELINE_BANNER_PREFIX` 为单一来源 |
+| Driver banner 一致性 | driver-run-support 的 banner 测试，覆盖全部 backend，以 `PIPELINE_BANNER_PREFIX` 为单一来源 |
 | Toolset 成员 | contracts enums 与 tool-registry 测试 |
 | Event 契约 | `contracts` 中的 zod schema 与 transport、journey 测试 |
 

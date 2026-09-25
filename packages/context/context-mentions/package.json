@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/context-mentions",
+  "description": "@file mention support: grammar, workspace resolution, and candidate search.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

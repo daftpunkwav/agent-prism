@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/config",
+  "description": "Configuration loading: settings, path anchors, env files, and runtime knobs.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

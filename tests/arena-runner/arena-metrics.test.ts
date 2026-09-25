@@ -21,7 +21,7 @@ import {
   type PipelineMetrics,
 } from "@agentprism/contracts";
 import type { AgentDriver, DriverLookup } from "@agentprism/contracts";
-import { FrameworkDriverRegistry } from "@agentprism/driver-registry";
+import { FrameworkDriverRegistry } from "@agentprism/driver-run-support";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import { ArenaRunner } from "@agentprism/arena-runner";
 

@@ -20,7 +20,7 @@ capability families and dependency rules.
 | **Workspace** | A per-run or per-column scratch directory on disk under `data/runs/<runId>/<workspace>/` | `@agentprism/runtime` (`WorkspaceRegistry`) |
 | **Session ledger** | The durable execution-session record, with kinds `arena`, `agent`, and `builder` and statuses `active`, `completed`, `failed`, and `cancelled` | `contracts/session.ts`, `@agentprism/session` |
 | **Builder** | The conversational assembly service that composes a column from blocks and chats with it turn by turn | `@agentprism/builder` |
-| **Template** | A task with a judge spec, 15 scored and 11 quick, used for one-click comparison matrices | `@agentprism/arena-routing` (`task-templates.ts`) |
+| **Template** | A task with a judge spec, 15 scored and 11 quick, used for one-click comparison matrices | `@agentprism/arena-dimensions` (`task-templates.ts`) |
 | **Matrix** | 1 to 8 template cells executed sequentially through ArenaService with SSE progress | `@agentprism/application` (`MatrixService`) |
 
 ## Layer map

@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/client",
+  "description": "Browser API client for the runtime: typed HTTP and SSE transport without state or retry policy.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

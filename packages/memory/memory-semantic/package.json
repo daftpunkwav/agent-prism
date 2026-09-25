@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/memory-semantic",
+  "description": "Semantic memory: SPO facts with validity windows and recall.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

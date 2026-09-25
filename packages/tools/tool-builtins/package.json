@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/tool-builtins",
+  "description": "Builtin tool registry assembly and tool definitions.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

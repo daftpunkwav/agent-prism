@@ -6,7 +6,7 @@
  * - Define the RuntimeKnobs shape (context budgets, reasoning widths, harness retries)
  * - Provide the settings-UI field metadata (group/kind/range/options/defaults)
  *
- * Defaults must stay in sync with the driver-side fallbacks (driver-registry
+ * Defaults must stay in sync with the driver-side fallbacks (driver-run-support
  * reasoning-constants) and the harness strategy fallbacks; env-derived defaults
  * live in config (defaultRuntimeKnobs over the Settings reads).
  */

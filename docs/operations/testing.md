@@ -105,7 +105,7 @@ suites are Win32-only, so another runner would skip the security-relevant cases.
 | HTTP contract: auth, limits, errors, SSE | `tests/http-transport/` |
 | Composition wiring | `apps/server/tests/`. `mount-routes` checks one endpoint per leaf; `load-drivers` checks the registry is non-empty and includes `native` |
 | i18n integrity | `apps/web/tests/catalog-parity.test.ts` for en and zh-CN key parity, and `pnpm --filter @agentprism/web check:i18n` |
-| Driver banner consistency | the driver-registry banner test across all backends, with `PIPELINE_BANNER_PREFIX` as the single source |
+| Driver banner consistency | the driver-run-support banner test across all backends, with `PIPELINE_BANNER_PREFIX` as the single source |
 | Toolset membership | contracts enums and tool-registry tests |
 | Event contract | zod schemas in `contracts` and transport and journey tests |
 

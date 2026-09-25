@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/tool-symbols",
+  "description": "Workspace code symbol indexing with regex heuristics and the agent query tool.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

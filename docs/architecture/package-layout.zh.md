@@ -36,12 +36,12 @@
    - `tool-registry` 仅依赖 `contracts`。`tool-builtins` 仅依赖 `contracts`、
      `environment`、`tool-registry` 与 `tool-symbols`。`tool-mcp` 仅依赖
      `contracts` 与 `tool-registry`。
-   - `driver-registry` 仅依赖 `contracts`、`environment`、`runtime`、`telemetry`
-     与 `harness`。backend 额外引入 `driver-registry`，`driver-langgraph` 还
+   - `driver-run-support` 仅依赖 `contracts`、`environment`、`runtime`、`telemetry`
+     与 `harness`。backend 额外引入 `driver-run-support`，`driver-langgraph` 还
      引入 `driver-langchain`。
-   - `provider-capability` 仅依赖 `contracts`、`config`、`persistence`、
+   - `provider-catalog` 仅依赖 `contracts`、`config`、`persistence`、
      `environment`、`runtime` 与 `telemetry`。`provider-langchain` 额外引入
-     `provider-capability`。
+     `provider-catalog`。
 4. `arena` 绝不接触 `@langchain/*` 或 providers。`application` 绝不接触
    provider 或 evaluation 实现。
 5. `http-runtime` 与 `route-*` 仅依赖 `application`、`builder`、`config` 与

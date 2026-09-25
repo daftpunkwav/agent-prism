@@ -5,7 +5,7 @@
 事实来源：`packages/contracts/contracts/src/enums.ts` 中的 `DimensionIdSchema`，
 `packages/contracts/contracts/src/dimension-field.ts` 中的 `DIMENSION_FIELD`，
 `packages/dimensions/dimensions/src/dimensions/` 中的选项模块，以及
-`packages/arena/arena-routing/src/task-templates.ts` 中的 templates。
+`packages/arena/arena-dimensions/src/task-templates.ts` 中的 templates。
 
 ## 16 个 dimensions
 

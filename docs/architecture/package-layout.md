@@ -35,12 +35,12 @@ is enforced separately by `pnpm check:deps`. See
    - `tool-registry` depends only on `contracts`. `tool-builtins` only on `contracts`,
      `environment`, `tool-registry`, and `tool-symbols`. `tool-mcp` only on `contracts`
      and `tool-registry`.
-   - `driver-registry` depends only on `contracts`, `environment`, `runtime`,
-     `telemetry`, and `harness`. Backends additionally take `driver-registry`, and
+   - `driver-run-support` depends only on `contracts`, `environment`, `runtime`,
+     `telemetry`, and `harness`. Backends additionally take `driver-run-support`, and
      `driver-langgraph` also takes `driver-langchain`.
-   - `provider-capability` depends only on `contracts`, `config`, `persistence`,
+   - `provider-catalog` depends only on `contracts`, `config`, `persistence`,
      `environment`, `runtime`, and `telemetry`. `provider-langchain` additionally takes
-     `provider-capability`.
+     `provider-catalog`.
 4. `arena` never touches `@langchain/*` or providers. `application` never touches
    provider or evaluation implementations.
 5. `http-runtime` and `route-*` depend only on `application`, `builder`, `config`, and

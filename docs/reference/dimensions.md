@@ -3,7 +3,7 @@
 Sources of truth: `DimensionIdSchema` in `packages/contracts/contracts/src/enums.ts`,
 `DIMENSION_FIELD` in `packages/contracts/contracts/src/dimension-field.ts`, the option
 modules in `packages/dimensions/dimensions/src/dimensions/`, and the templates in
-`packages/arena/arena-routing/src/task-templates.ts`.
+`packages/arena/arena-dimensions/src/task-templates.ts`.
 
 ## The 16 dimensions
 

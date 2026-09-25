@@ -20,7 +20,7 @@ your subpackage (packages/<area>/<your-dimension>)
         ▼ registerContextStrategyPlugins()   ← apps/server/src/assemble.ts (one line)
   harness policy registry                    ← strategies become selectable
         │
-        ▼ buildCapabilityOptionProjection()  ← packages/arena/arena-routing
+        ▼ buildCapabilityOptionProjection()  ← packages/arena/arena-dimensions
   meta endpoint → Arena baseline + dimension cards (auto)
 ```
 

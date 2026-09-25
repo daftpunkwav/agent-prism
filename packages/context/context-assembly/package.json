@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/context-assembly",
+  "description": "Example context-strategy plugins: tool-call replay granularity strategies serving as the reference implementation.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

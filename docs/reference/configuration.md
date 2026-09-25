@@ -142,7 +142,7 @@ These are deliberately not env-tunable.
 | `SEARCH_API_URL` | same | endpoint override for tests, defaulting to Exa at `https://api.exa.ai/search` and Tavily at `https://api.tavily.com/search` |
 | `NEXT_PUBLIC_API_BASE` | `packages/client/client/src/http.ts` | prefix for all client URLs; a same-origin proxy needs nothing |
 | `ARENA_BASE` | `scripts/run-matrix.mjs` | base URL of a running server, default `http://localhost:8281` |
-| `ARENA_TOT_WIDTH` | `driver-registry/src/reasoning-constants.ts` (`totWidth`), consumed by the native, langgraph, and plan-execute drivers | ToT branch width, clamped 2 to 5, default 3; inside the server the runtime knob wins — `assemble.ts` seeds this variable from the effective knob at boot and on every knobs hot-apply |
+| `ARENA_TOT_WIDTH` | `driver-run-support/src/reasoning-constants.ts` (`totWidth`), consumed by the native, langgraph, and plan-execute drivers | ToT branch width, clamped 2 to 5, default 3; inside the server the runtime knob wins — `assemble.ts` seeds this variable from the effective knob at boot and on every knobs hot-apply |
 | `ARENA_SELF_CONSISTENCY_N` | same helper (`selfConsistencyAttempts`) | self-consistency attempt count, clamped 2 to 9, default 5; model calls scale with it; same seeding precedence |
 | `ARENA_CREWAI_PROCESS` | `driver-crewai/src/crew.ts` | `hierarchical` switches the crew to the manager process, anything else keeps `sequential`; same seeding precedence |
 
@@ -168,7 +168,7 @@ consumers read, so a save reaches the next run immediately.
 ## Credential references
 
 Provider endpoints stored through the settings API may hold an API key that is exactly
-`"${env:NAME}"`. `resolveCredentialReference` in `provider-capability/src/endpoints.ts`
+`"${env:NAME}"`. `resolveCredentialReference` in `provider-catalog/src/endpoints.ts`
 resolves it at the single consumption point where models are constructed. The stored
 value stays a reference, resolved secrets are never written back, and a missing variable
 resolves to `""`, which then fails closed at model construction. There is no partial

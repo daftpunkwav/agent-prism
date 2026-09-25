@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/tool-mcp",
+  "description": "MCP server support: configuration, policy, registry bridge, and remote tools.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

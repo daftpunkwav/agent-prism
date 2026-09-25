@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/context-analytics",
+  "description": "Context usage analytics: per-source usage ledger, effectiveness log, and text reports.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

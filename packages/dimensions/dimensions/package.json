@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/dimensions",
+  "description": "Comparison dimension catalog: field metadata and per-dimension option tables.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

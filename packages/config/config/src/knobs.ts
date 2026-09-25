@@ -9,7 +9,7 @@
  *
  * The knob types and field metadata live in contracts (runtime-knobs) so the
  * web client shares them; defaults here must stay in sync with the driver-side
- * fallbacks (driver-registry reasoning-constants) and harness loop caps.
+ * fallbacks (driver-run-support reasoning-constants) and harness loop caps.
  */
 
 import type { JsonFile } from "@agentprism/persistence";

@@ -10,8 +10,8 @@ When this document disagrees with the code, the code and
 The `packages/<capability-family>/<leaf>` two-level structure rests on three mechanisms.
 
 1. Seams first. Seam packages define abstract services and bind no implementation.
-   `tool-registry` owns `ToolRegistry`, `driver-registry` owns `DriverLookup`, and
-   `provider-capability` owns `ProviderLookup`. Implementations live in separate leaves.
+   `tool-registry` owns `ToolRegistry`, `driver-run-support` owns `DriverLookup`, and
+   `provider-catalog` owns `ProviderLookup`. Implementations live in separate leaves.
 2. Backend registration. Each backend leaf is packaged and declared independently and
    registers at composition time. Driver backends register on `DriverLookup`: `native`
    runs in process, `langchain` and `langgraph` bridge external frameworks, and
@@ -43,7 +43,7 @@ package exposes and that can be replaced by another implementation.
 | `memory/{memory-store, memory-episodic, memory-semantic, memory-service}` | Cross-session memory: atomic store and search index, episodic and semantic layers, and the service port adapter | `MemoryServicePort` adapter consumes `contracts` and `persistence`; mounted by the composition root |
 | `tools/tool-registry` | Tool seam, no implementation | `MapToolRegistry` implements `contracts.ToolRegistry`; `normalizeToolset`, `selectToolNames`, `selectToolRegistry` |
 | `tools/tool-builtins` | Built-in tool implementations | `createBuiltinToolRegistry` with read, write, edit, ls, bash, apply-patch, glob, grep, web_fetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter |
-| `drivers/driver-registry` | Driver seam and shared runtime support | `FrameworkDriverRegistry` implements `contracts.DriverLookup`; `registerDriversBestEffort` takes injected loaders and warns on a failing backend |
+| `drivers/driver-run-support` | Driver seam and shared runtime support | `FrameworkDriverRegistry` implements `contracts.DriverLookup`; `registerDriversBestEffort` takes injected loaders and warns on a failing backend |
 | `drivers/driver-native` | In-process native backend | registered as `native` on `DriverLookup` |
 | `drivers/driver-langchain` | LangChain backend and LC/message bridging | registered as `langchain` on `DriverLookup` |
 | `drivers/driver-langgraph` | LangGraph reasoning-graph backend | registered as `langgraph` on `DriverLookup` |
@@ -51,13 +51,13 @@ package exposes and that can be replaced by another implementation.
 | `drivers/driver-self-critique` | Self-Critique backend: a tool-less critic scores each tool batch and redirects | registered as `self_critique` on `DriverLookup` |
 | `drivers/driver-autogen` | AutoGen-pattern backend: group chat with LLM speaker selection | registered as `autogen` on `DriverLookup` |
 | `drivers/driver-crewai` | CrewAI-pattern backend: role crew running a task pipeline | registered as `crewai` on `DriverLookup` |
-| `providers/provider-capability` | Provider seam, no SDK | `ProviderLookupAdapter` implements `contracts.ProviderLookup`; `EndpointCatalog`, `ProviderConfigStore` |
+| `providers/provider-catalog` | Provider seam, no SDK | `ProviderLookupAdapter` implements `contracts.ProviderLookup`; `EndpointCatalog`, `ProviderConfigStore` |
 | `providers/provider-langchain` | SDK adaptation and model construction | `createChatModel`, `createColumnRuntime`, `testProviderConnection` |
 | `transport/http-runtime` | HTTP shell: middleware, health checks, error mapping | `createHttpApplication`, `HttpApplicationDeps`, `HttpApp` |
 | `transport/route-*` (8 route leaves) | Domain route registrars, including session read/delete, durable threads, and settings knobs | `register*Routes(app, deps)`, mounted by the composition root |
 | `dimensions` | Experiment dimension catalog and options | `DimensionCatalog` |
 | `agent` | Single-column execution lifecycle; assembles the sandbox deny policy by default | no registration key; consumes `harness`, `tool-registry`, `tool-builtins`, `sandbox` |
-| `arena/arena-routing` | Dimension routing and baselines | `DimensionRouter`, `ProviderDimensionSync`, `buildCapabilityOptionProjection`, baselines and templates |
+| `arena/arena-dimensions` | Dimension routing and baselines | `DimensionRouter`, `ProviderDimensionSync`, `buildCapabilityOptionProjection`, baselines and templates |
 | `arena/arena-runner` | Parallel multi-column execution | `ArenaRunner`, column-factory port `contracts.ColumnRuntimeFactory` |
 | `evaluation` | Judging and comparison reports | `judgeAnswers`, `buildComparisonReport` |
 | `application` | Use-case services: arena, provider, workspace, projects, sessions | `ArenaService`, `ProviderService`, `WorkspaceFileService`, `ProjectStore`, `SessionService` |
@@ -84,8 +84,8 @@ http-runtime + route-* ──► application / builder ──► arena ──►
 (route-* ──► http-runtime; the shell never depends back on routes)  │          │          └──────► telemetry ──► contracts
                                            │          └─────► tool-builtins ──► tool-registry ──► contracts
                                            └─────► dimensions ──► contracts
-driver-* ──► driver-registry ──► harness + telemetry; langchain and langgraph leaves additionally carry @langchain/* external deps
-provider-langchain ──► provider-capability ──► config + persistence
+driver-* ──► driver-run-support ──► harness + telemetry; langchain and langgraph leaves additionally carry @langchain/* external deps
+provider-langchain ──► provider-catalog ──► config + persistence
 evaluation ──► contracts + runtime
 client / config / dimensions / ui / arena-view ──► contracts
 contracts / environment / persistence ──► no @agentprism dependencies; leaf nodes
@@ -99,15 +99,15 @@ enforced by `scripts/check-package-deps.mjs` through `pnpm check:deps`.
   `contracts`, `environment`, `tool-registry`, and `tool-symbols`; `tool-mcp` only on
   `contracts` and `tool-registry`. The tool seam sits below both the composer and the
   implementations.
-- `driver-registry` depends only on `contracts`, `environment`, `runtime`, `telemetry`,
+- `driver-run-support` depends only on `contracts`, `environment`, `runtime`, `telemetry`,
   and `harness`, with zero backend dependencies. `driver-native` and `driver-langchain`
-  additionally take `driver-registry`; `driver-langgraph` additionally takes
+  additionally take `driver-run-support`; `driver-langgraph` additionally takes
   `driver-langchain`. Driver plugins consume the harness seam and never depend on a
   composer or on providers. Their relation to tools goes through `contracts` types such
   as `ToolDefinition` and never through concrete tool packages.
-- `provider-capability` depends only on `contracts`, `config`, `persistence`,
+- `provider-catalog` depends only on `contracts`, `config`, `persistence`,
   `environment`, `runtime`, and `telemetry`; `provider-langchain` additionally takes
-  `provider-capability`.
+  `provider-catalog`.
 - `http-runtime` depends only on `application`, `builder`, `config`, and `contracts`.
   `route-*` depends only on `application`, `builder`, `config`, `contracts`, and
   `http-runtime`. Routes depend on the shell; the shell never depends back on routes.

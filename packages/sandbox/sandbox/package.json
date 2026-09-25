@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/sandbox",
+  "description": "Shell command safety policy: deny lists, command analysis, approval gates, and mode normalization.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

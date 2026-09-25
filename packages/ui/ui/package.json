@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/ui",
+  "description": "Shared UI package: theme and language toggles, UiSelect, NumberInput, and token stats.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

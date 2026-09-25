@@ -11,8 +11,8 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 `packages/<capability-family>/<leaf>` 两级结构建立在三个机制之上。
 
 1. Seam 优先。seam package 只定义抽象服务，不绑定实现。
-   `tool-registry` 拥有 `ToolRegistry`，`driver-registry` 拥有
-   `DriverLookup`，`provider-capability` 拥有 `ProviderLookup`。实现位于
+   `tool-registry` 拥有 `ToolRegistry`，`driver-run-support` 拥有
+   `DriverLookup`，`provider-catalog` 拥有 `ProviderLookup`。实现位于
    独立的 leaf。
 2. 后端注册。每个 backend leaf 独立打包和声明，在组合时注册。
    driver backend 注册到 `DriverLookup`：`native` 在进程内运行，
@@ -44,7 +44,7 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 | `memory/{memory-store, memory-episodic, memory-semantic, memory-service}` | 跨 session 记忆：原子 store 与搜索索引、episodic 与 semantic 两层、以及 service port adapter | `MemoryServicePort` adapter 消费 `contracts` 与 `persistence`；由组合根挂载 |
 | `tools/tool-registry` | Tool seam，无实现 | `MapToolRegistry` 实现 `contracts.ToolRegistry`；`normalizeToolset`、`selectToolNames`、`selectToolRegistry` |
 | `tools/tool-builtins` | 内置 tool 实现 | `createBuiltinToolRegistry`，含 read、write、edit、ls、bash、apply-patch、glob、grep、web_fetch、todo_write、ask_user、web_search、run_job、bash_session、subagent、skill、goal、ralph_loop、plan、session_query、symbols、scatter |
-| `drivers/driver-registry` | Driver seam 与共享运行时支持 | `FrameworkDriverRegistry` 实现 `contracts.DriverLookup`；`registerDriversBestEffort` 接受注入的 loader，后端失败时告警 |
+| `drivers/driver-run-support` | Driver seam 与共享运行时支持 | `FrameworkDriverRegistry` 实现 `contracts.DriverLookup`；`registerDriversBestEffort` 接受注入的 loader，后端失败时告警 |
 | `drivers/driver-native` | 进程内 native backend | 以 `native` 注册到 `DriverLookup` |
 | `drivers/driver-langchain` | LangChain backend 与 LC/message 桥接 | 以 `langchain` 注册到 `DriverLookup` |
 | `drivers/driver-langgraph` | LangGraph reasoning-graph backend | 以 `langgraph` 注册到 `DriverLookup` |
@@ -52,13 +52,13 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 | `drivers/driver-self-critique` | Self-Critique backend：无 tool 的 critic 对每批 tool 打分并改向 | 以 `self_critique` 注册到 `DriverLookup` |
 | `drivers/driver-autogen` | AutoGen 模式 backend：带 LLM speaker 选择的 group chat | 以 `autogen` 注册到 `DriverLookup` |
 | `drivers/driver-crewai` | CrewAI 模式 backend：角色 crew 运行任务 pipeline | 以 `crewai` 注册到 `DriverLookup` |
-| `providers/provider-capability` | Provider seam，无 SDK | `ProviderLookupAdapter` 实现 `contracts.ProviderLookup`；`EndpointCatalog`、`ProviderConfigStore` |
+| `providers/provider-catalog` | Provider seam，无 SDK | `ProviderLookupAdapter` 实现 `contracts.ProviderLookup`；`EndpointCatalog`、`ProviderConfigStore` |
 | `providers/provider-langchain` | SDK 适配与模型构造 | `createChatModel`、`createColumnRuntime`、`testProviderConnection` |
 | `transport/http-runtime` | HTTP 外壳：middleware、health checks、error mapping | `createHttpApplication`、`HttpApplicationDeps`、`HttpApp` |
 | `transport/route-*`，8 个 route leaf | 领域路由注册器，含 session 读取/删除、durable threads 与 settings knobs | `register*Routes(app, deps)`，由组合根挂载 |
 | `dimensions` | 实验 dimension 目录与选项 | `DimensionCatalog` |
 | `agent` | 单列执行生命周期；默认装配 sandbox 拒绝策略 | 无 registration key；消费 `harness`、`tool-registry`、`tool-builtins`、`sandbox` |
-| `arena/arena-routing` | Dimension 路由与 baselines | `DimensionRouter`、`ProviderDimensionSync`、`buildCapabilityOptionProjection`、baselines 与 templates |
+| `arena/arena-dimensions` | Dimension 路由与 baselines | `DimensionRouter`、`ProviderDimensionSync`、`buildCapabilityOptionProjection`、baselines 与 templates |
 | `arena/arena-runner` | 并行多列执行 | `ArenaRunner`、column-factory port `contracts.ColumnRuntimeFactory` |
 | `evaluation` | 评判与对比报告 | `judgeAnswers`、`buildComparisonReport` |
 | `application` | 用例服务：arena、provider、workspace、projects、sessions | `ArenaService`、`ProviderService`、`WorkspaceFileService`、`ProjectStore`、`SessionService` |
@@ -84,8 +84,8 @@ http-runtime + route-* ──► application / builder ──► arena ──►
 (route-* ──► http-runtime; the shell never depends back on routes)  │          │          └──────► telemetry ──► contracts
                                            │          └─────► tool-builtins ──► tool-registry ──► contracts
                                            └─────► dimensions ──► contracts
-driver-* ──► driver-registry ──► harness + telemetry; langchain and langgraph leaves additionally carry @langchain/* external deps
-provider-langchain ──► provider-capability ──► config + persistence
+driver-* ──► driver-run-support ──► harness + telemetry; langchain and langgraph leaves additionally carry @langchain/* external deps
+provider-langchain ──► provider-catalog ──► config + persistence
 evaluation ──► contracts + runtime
 client / config / dimensions / ui / arena-view ──► contracts
 contracts / environment / persistence ──► no @agentprism dependencies; leaf nodes
@@ -99,15 +99,15 @@ contracts / environment / persistence ──► no @agentprism dependencies; lea
   `contracts`、`environment`、`tool-registry` 与 `tool-symbols`；`tool-mcp`
   仅依赖 `contracts` 与 `tool-registry`。tool seam 位于 composer 与
   实现两者之下。
-- `driver-registry` 仅依赖 `contracts`、`environment`、`runtime`、`telemetry`
+- `driver-run-support` 仅依赖 `contracts`、`environment`、`runtime`、`telemetry`
   与 `harness`，零 backend 依赖。`driver-native` 与 `driver-langchain`
-  额外引入 `driver-registry`；`driver-langgraph` 额外引入
+  额外引入 `driver-run-support`；`driver-langgraph` 额外引入
   `driver-langchain`。driver plugin 消费 harness seam，绝不依赖
   composer 或 providers。其与 tools 的关系仅经 `contracts` 类型
   如 `ToolDefinition`，绝不依赖具体 tool package。
-- `provider-capability` 仅依赖 `contracts`、`config`、`persistence`、
+- `provider-catalog` 仅依赖 `contracts`、`config`、`persistence`、
   `environment`、`runtime` 与 `telemetry`；`provider-langchain` 额外引入
-  `provider-capability`。
+  `provider-catalog`。
 - `http-runtime` 仅依赖 `application`、`builder`、`config` 与 `contracts`。
   `route-*` 仅依赖 `application`、`builder`、`config`、`contracts` 与
   `http-runtime`。routes 依赖 shell，shell 绝不反向依赖 routes。

@@ -8,4 +8,4 @@ Dimension catalog 与选项。
 
 | Package | 职责 | 挂接位置 |
 |---|---|---|
-| [`dimensions/`](dimensions/README.md) | Dimension catalog 与选项 | 由 arena-routing 消费 |
+| [`dimensions/`](dimensions/README.md) | Dimension catalog 与选项 | 由 arena-dimensions 消费 |

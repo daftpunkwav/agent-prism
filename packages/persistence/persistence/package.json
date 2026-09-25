@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/persistence",
+  "description": "Atomic JSON file primitives: temp-plus-backup writes and concurrent-write serialization.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

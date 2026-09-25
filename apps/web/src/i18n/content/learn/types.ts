@@ -17,6 +17,6 @@ export type WeekStep = {
   items: string[];
   /** Arena comparison dimension id; a typo in /arena's URL params is silently ignored — the type constraint catches it at compile time */
   dimension: DimensionId;
-  /** Arena task-template id; single source packages/arena/arena-routing/src/task-templates.ts */
+  /** Arena task-template id; single source packages/arena/arena-dimensions/src/task-templates.ts */
   template: string;
 };

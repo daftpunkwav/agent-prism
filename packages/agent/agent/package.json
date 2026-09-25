@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/agent",
+  "description": "Single-column agent execution lifecycle: run execution, workspace assembly, and history rendering.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -34,7 +34,7 @@ const PENDING = [
   "createBuiltinPromptSectionRegistry", "estimateMessageTokens", "extractOriginalQuestion",
   "getBuiltinPromptSectionRegistry", "injectToolResultReminder",
   "reinforceSystemWithQuestion", "withToolGrounding",
-  // packages/arena/arena-routing
+  // packages/arena/arena-dimensions
   "coerceFieldValue", "isFloatField", "isUnlimitedToken", "normalizeOptionToken",
   "snapIntToOptions", "snapToOptions",
   // packages/client/client

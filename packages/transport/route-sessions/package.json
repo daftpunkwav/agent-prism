@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/route-sessions",
+  "description": "Session route registrars for the HTTP runtime.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

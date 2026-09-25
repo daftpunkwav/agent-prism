@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/context-instructions",
+  "description": "Layered workspace instructions: AGENTS.md loading, digests, and budgeted rendering.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

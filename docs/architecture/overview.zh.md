@@ -21,7 +21,7 @@ prompt、reasoning mode、model 与 tool policy 下并排运行，对产生的�
 | **Workspace** | 磁盘上 per-run 或 per-column 的临时目录，位于 `data/runs/<runId>/<workspace>/` | `@agentprism/runtime` `WorkspaceRegistry` |
 | **Session ledger** | 持久执行 session 记录，kinds 为 `arena`、`agent`、`builder`，statuses 为 `active`、`completed`、`failed`、`cancelled` | `contracts/session.ts`、`@agentprism/session` |
 | **Builder** | 对话式装配服务，用 block 组合出一列并逐 turn 对话 | `@agentprism/builder` |
-| **Template** | 带 judge spec 的任务，15 个 scored 与 11 个 quick，用于一键对比矩阵 | `@agentprism/arena-routing` `task-templates.ts` |
+| **Template** | 带 judge spec 的任务，15 个 scored 与 11 个 quick，用于一键对比矩阵 | `@agentprism/arena-dimensions` `task-templates.ts` |
 | **Matrix** | 1 至 8 个 template cell，经 ArenaService 顺序执行并带 SSE 进度 | `@agentprism/application` `MatrixService` |
 
 ## 分层图

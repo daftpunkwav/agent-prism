@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/contracts",
+  "description": "Shared vocabulary: schemas, ports, enums, events, and constants.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

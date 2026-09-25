@@ -15,7 +15,7 @@ driver leaf 位于 `packages/drivers/driver-<name>/`，遵循
 leaf 结构。依赖规则由 `pnpm boundaries` 强制：
 
 - 允许：`contracts`、`environment`、`runtime`、`telemetry`、`harness` 与
-  `driver-registry`。
+  `driver-run-support`。
 - 禁止：providers、tool package、arena、agent、transport。tool 访问仅经
   `contracts` 类型如 `ToolDefinition`。
 - 外部 SDK 依赖如 `@langchain/*` 只存在于需要它们的 leaf。`driver-langgraph` 还可
@@ -23,7 +23,7 @@ leaf 结构。依赖规则由 `pnpm boundaries` 强制：
 
 ## Harness seam
 
-driver 复用 `buildSystemUser`、`applyContextPipeline`，以及来自 `driver-registry`
+driver 复用 `buildSystemUser`、`applyContextPipeline`，以及来自 `driver-run-support`
 的共享 event translation，使循环差异保持为架构差异而非 prompt 差异。reasoning-mode
 行为属于 driver 自身的控制流，并在下述 reasoning 支持表中评级。
 
@@ -37,7 +37,7 @@ driver 准确设置。reasoning 与 planner 的思考经 `reflect` event 承载�
 ## Banner 与支持表
 
 driver banner 加入 `PIPELINE_BANNER_PREFIX` 单一来源，`driver-banner-consistency`
-测试跨 backend 锁定 banner。capability 后缀逐 column 保持可复现。`driver-registry`
+测试跨 backend 锁定 banner。capability 后缀逐 column 保持可复现。`driver-run-support`
 中的 reasoning 支持表按 reasoning mode 把每个 driver 评为 structural、budget 或
 skeleton。
 

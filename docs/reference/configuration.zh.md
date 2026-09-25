@@ -137,7 +137,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 | `SEARCH_API_URL` | 同上 | 测试用 endpoint 覆盖，默认 Exa 为 `https://api.exa.ai/search`，Tavily 为 `https://api.tavily.com/search` |
 | `NEXT_PUBLIC_API_BASE` | `packages/client/client/src/http.ts` | 所有 client URL 的前缀；同源 proxy 无需设置 |
 | `ARENA_BASE` | `scripts/run-matrix.mjs` | 运行中 server 的 base URL，默认 `http://localhost:8281` |
-| `ARENA_TOT_WIDTH` | `driver-registry/src/reasoning-constants.ts`（`totWidth`），由 native、langgraph、plan-execute driver 消费 | ToT 分支宽度，钳制 2 至 5，默认 3；server 进程内以 runtime knob 为准——`assemble.ts` 在启动与每次 knobs 热应用时用生效的 knob 值回写该变量 |
+| `ARENA_TOT_WIDTH` | `driver-run-support/src/reasoning-constants.ts`（`totWidth`），由 native、langgraph、plan-execute driver 消费 | ToT 分支宽度，钳制 2 至 5，默认 3；server 进程内以 runtime knob 为准——`assemble.ts` 在启动与每次 knobs 热应用时用生效的 knob 值回写该变量 |
 | `ARENA_SELF_CONSISTENCY_N` | 同一 helper（`selfConsistencyAttempts`） | self-consistency 尝试次数，钳制 2 至 9，默认 5；模型调用随次数放大；回写优先级相同 |
 | `ARENA_CREWAI_PROCESS` | `driver-crewai/src/crew.ts` | `hierarchical` 切换到 manager 流程，其他值保持 `sequential`；回写优先级相同 |
 
@@ -161,7 +161,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 ## 凭证引用
 
 经 settings API 存储的 provider endpoint 可持有恰好为 `"${env:NAME}"` 的 API key。
-`provider-capability/src/endpoints.ts` 中的 `resolveCredentialReference` 在构造模型的
+`provider-catalog/src/endpoints.ts` 中的 `resolveCredentialReference` 在构造模型的
 唯一消费点解析它。存储值保持为引用，已解析的密钥绝不写回，缺失变量解析为 `""`，
 随后在模型构造时失败关闭。不做部分插值。
 

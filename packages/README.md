@@ -25,11 +25,11 @@ Dependency directions between families are fixed by `pnpm boundaries` and
 | [`harness/`](harness/README.md) | harness | Neutral execution semantics: prompt assembly, context pipeline, reasoning modes, verification loop |
 | [`memory/`](memory/README.md) | memory-store, memory-episodic, memory-semantic, memory-service | Cross-session memory: atomic store plus search index, episodic and semantic layers, and the service port adapter |
 | [`agent/`](agent/README.md) | agent | Single-column execution lifecycle |
-| [`drivers/`](drivers/README.md) | driver-registry, driver-native, driver-langchain, driver-langgraph, driver-plan-execute, driver-self-critique, driver-autogen, driver-crewai | Framework-driver registry and seven loop-architecture backends |
+| [`drivers/`](drivers/README.md) | driver-run-support, driver-native, driver-langchain, driver-langgraph, driver-plan-execute, driver-self-critique, driver-autogen, driver-crewai | Shared driver run-support kit and seven loop-architecture backends |
 | [`dimensions/`](dimensions/README.md) | dimensions | Experiment dimension catalog and options |
 | [`evaluation/`](evaluation/README.md) | evaluation | Judging, comparison reports, ablation rows, matrix aggregation |
-| [`providers/`](providers/README.md) | provider-capability, provider-langchain | Provider seam (catalog/config/lookup) and LangChain SDK model construction |
-| [`arena/`](arena/README.md) | arena-routing, arena-runner | Dimension routing + baselines, parallel multi-column runner |
+| [`providers/`](providers/README.md) | provider-catalog, provider-langchain | Provider seam (catalog/config/lookup) and LangChain SDK model construction |
+| [`arena/`](arena/README.md) | arena-dimensions, arena-runner | Dimension routing + baselines, parallel multi-column runner |
 | [`session/`](session/README.md) | session, session-persistence, session-format, session-outline, session-projection, session-query, session-telemetry, session-title | Execution-session ledger: stores plus format, outline, projection, query, telemetry, title leaves |
 | [`builder/`](builder/README.md) | builder-service, builder-turns | Conversational assembly service and turn execution |
 | [`sandbox/`](sandbox/README.md) | sandbox | Shell-command safety policy (deny-list by default) |

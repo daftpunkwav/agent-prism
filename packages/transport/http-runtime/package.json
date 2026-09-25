@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/http-runtime",
+  "description": "HTTP host shell (Hono) with shared route plumbing; domain routes live in the route packages.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -71,7 +71,7 @@ export function isLocalModelId(id: string): boolean {
 /**
  * Connection grouping key for display bucketing only (drift merely mis-buckets, never mis-routes keys).
  * Boundary constraint: apps/web may only import client/ui/arena-view, so this cannot reuse the backend
- * single source (connectionFingerprint in packages/providers/provider-capability/src/endpoints.ts). Keep the equivalence
+ * single source (connectionFingerprint in packages/providers/provider-catalog/src/endpoints.ts). Keep the equivalence
  * contract instead of the implementation text: scheme + host case-insensitive, path/query/hash
  * case-sensitive, trailing slashes stripped, unparseable input fully lowercased, then `::<apiFormat>`.
  * Canonical vectors live in tests/provider-endpoints.test.ts (normalizeBaseUrl).
