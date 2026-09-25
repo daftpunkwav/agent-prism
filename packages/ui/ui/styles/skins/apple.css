@@ -1,0 +1,57 @@
+/*
+  Apple skin — Apple-style surfaces: white on near-white, system blue accent,
+  generous continuous-feel radii, soft diffuse shadows.
+  Token source: design library "Apple" (apple-prototype, colors_and_type block).
+  Light-only: like [data-theme="claude"], this block is declared after .dark and
+  wins the cascade regardless of the dark-mode class.
+*/
+
+[data-theme="apple"] {
+  --background: #ffffff;
+  --foreground: #1d1d1f;
+  --card: #f5f5f7;
+  --card-foreground: #1d1d1f;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
+  --muted: #f2f2f7;
+  --muted-foreground: #6e6e73;
+  --border: #d1d1d6;
+  --input: #ffffff;
+  --primary: #007aff;
+  --primary-foreground: #ffffff;
+  --secondary: #e5e5ea;
+  --secondary-foreground: #1d1d1f;
+  --accent: #007aff;
+  --accent-foreground: #ffffff;
+  --ring: #007aff;
+  --destructive: #ff3b30;
+  --destructive-foreground: #ffffff;
+  --success: #34c759;
+  --warning: #ff9f0a;
+
+  /* Reference chart palette carries lane identity (multi-hue, data elements only). */
+  --spectrum-1: #30d158;
+  --spectrum-2: #2e8dff;
+  --spectrum-3: #ff9f0a;
+  --spectrum-4: #5e5ce6;
+  --spectrum-5: #bf5af2;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Rounded theme: reference scale xs6/sm8/md12/lg19.2 snapped to the app's token steps. */
+  --radius: 8px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Soft diffuse shadows from the reference elevation set. */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 1px 3px -1px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px -2px rgba(0, 0, 0, 0.05), 0 4px 8px -2px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 8px -4px rgba(0, 0, 0, 0.05), 0 8px 24px -8px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 8px 16px -8px rgba(0, 0, 0, 0.06), 0 16px 40px -10px rgba(0, 0, 0, 0.10);
+}

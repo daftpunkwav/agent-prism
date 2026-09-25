@@ -1,0 +1,61 @@
+/*
+  VibeCamp skin — warm-canvas creative camp: greige canvas background, cream
+  cards, flame-orange brand on near-black ink, playful rounded corners.
+  Token source: design library "VibeCamp" (vibe-camp design-system page tokens).
+  Light-only: declared after .dark and wins the cascade regardless of the
+  dark-mode class.
+*/
+
+[data-theme="vibecamp"] {
+  --background: #e3dfd9;
+  --foreground: #211d1a;
+  --card: #f3f0eb;
+  --card-foreground: #211d1a;
+  --popover: #f7f4ef;
+  --popover-foreground: #211d1a;
+  --muted: #ece7e1;
+  --muted-foreground: #5c5650;
+  --border: #d7d1c9;
+  --input: #d7d1c9;
+  --primary: #f1481e;
+  --primary-foreground: #fff7f3;
+  --secondary: #1d1e20;
+  --secondary-foreground: #fff7f3;
+  --accent: #f7663c;
+  /* Coral is light; ink text on it keeps labels readable. */
+  --accent-foreground: #211d1a;
+  --ring: #f7663c;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  /* Reference status hues sit under 3:1 as status text on card; darkened one
+     step for the 10-13px mono text that renders in these tokens. */
+  --success: #1d9e6a;
+  --warning: #c26a00;
+
+  /* Reference chart hues, each darkened one step so lane labels survive on
+     the greige canvas. */
+  --spectrum-1: #f1481e;
+  --spectrum-2: #e0a23e;
+  --spectrum-3: #2eb987;
+  --spectrum-4: #9a8ce8;
+  --spectrum-5: #c9a97e;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Playful rounded scale from the reference (sm8/md12/lg18/xl24). */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  /* Soft warm-canvas shadows from the reference elevation set. */
+  --shadow-xs: 0 2px 8px 0 rgba(33, 29, 26, 0.04);
+  --shadow-sm: 0 2px 8px 0 rgba(33, 29, 26, 0.05);
+  --shadow-md: 0 4px 16px 0 rgba(33, 29, 26, 0.06);
+  --shadow-lg: 0 12px 32px 0 rgba(33, 29, 26, 0.08);
+  --shadow-xl: 0 16px 40px -8px rgba(33, 29, 26, 0.12);
+}

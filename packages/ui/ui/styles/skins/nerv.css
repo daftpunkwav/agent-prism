@@ -1,0 +1,58 @@
+/*
+  Nerv skin — Evangelion-Shinji-dark terminal look: near-black blue-gray
+  surfaces, cold off-white text, signature red accent, large rounded panels.
+  Token source: design library "Nerv" (colors_and_type.css).
+  Inherently dark: the reference only ships a dark surface set, so the skin
+  keeps it under both mode classes (same cascade rule as claude).
+*/
+
+[data-theme="nerv"] {
+  --background: #0f0f10;
+  --foreground: #f4f9ff;
+  --card: #111112;
+  --card-foreground: #f4f9ff;
+  --popover: #191b1e;
+  --popover-foreground: #f4f9ff;
+  --muted: #1d1e20;
+  --muted-foreground: #cfd2dd;
+  --border: #303136;
+  --input: #444650;
+  --primary: #ea343a;
+  --primary-foreground: #ffffff;
+  --secondary: #292d32;
+  --secondary-foreground: #f4f9ff;
+  --accent: #292d32;
+  --accent-foreground: #f4f9ff;
+  --ring: #f4f9ff;
+  --destructive: #ff3434;
+  --destructive-foreground: #ffffff;
+  /* Reference ships no success/warning tokens; dark-mode defaults reused. */
+  --success: #34d399;
+  --warning: #fbbf24;
+
+  /* Reference chart palette: red / violet / ice-blue / magenta / pale-ice. */
+  --spectrum-1: #ea343a;
+  --spectrum-2: #5938ff;
+  --spectrum-3: #94bdff;
+  --spectrum-4: #e070ff;
+  --spectrum-5: #dbf4ff;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Reference radius 8/14/22 (library default 26.4 tightened in the source). */
+  --radius: 14px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 22px;
+  --radius-xl: 26px;
+
+  /* Soft dark shadows from the reference elevation set. */
+  --shadow-xs: 0 2px 6px 0 rgba(36, 37, 35, 0.05);
+  --shadow-sm: 0 2px 6px 0 rgba(36, 37, 35, 0.10);
+  --shadow-md: 0 4px 12px -2px rgba(36, 37, 35, 0.14), 0 8px 24px 0 rgba(36, 37, 35, 0.18);
+  --shadow-lg: 0 8px 20px -4px rgba(36, 37, 35, 0.18), 0 12px 32px -6px rgba(36, 37, 35, 0.22);
+  --shadow-xl: 0 12px 28px -8px rgba(36, 37, 35, 0.22), 0 20px 44px -10px rgba(36, 37, 35, 0.28);
+}

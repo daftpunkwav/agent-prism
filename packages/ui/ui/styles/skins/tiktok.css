@@ -1,0 +1,62 @@
+/*
+  TikTok skin — brand duotone (red #fe2c55 + cyan #25f4ee) on near-white,
+  dark ink foreground, small radii, quiet shadows.
+  Token source: design library "TikTok" (tiktok-design-system colors_and_type.css).
+  Light-only: declared after .dark and wins the cascade regardless of the
+  dark-mode class.
+*/
+
+[data-theme="tiktok"] {
+  --background: #fafafb;
+  --foreground: #161823;
+  --card: #ffffff;
+  --card-foreground: #161823;
+  --popover: #ffffff;
+  --popover-foreground: #161823;
+  --muted: #e8e8ec;
+  /* Reference uses white-800 (#87878f), under 4.5:1 on card; darkened to
+     white-900 since 10-13px mono body text renders in this token. */
+  --muted-foreground: #5e5e66;
+  --border: #dcdce2;
+  --input: #dcdce2;
+  --primary: #fe2c55;
+  --primary-foreground: #ffffff;
+  --secondary: #161823;
+  --secondary-foreground: #ffffff;
+  --accent: #25f4ee;
+  --accent-foreground: #161823;
+  --ring: #fe2c55;
+  --destructive: #fe2c55;
+  --destructive-foreground: #ffffff;
+  /* Reference success (#14d6d0) and warning (#fea82f) sit under 2:1 as status
+     text on white; darkened to the palette's own deeper steps. */
+  --success: #0c8f8b;
+  --warning: #c26a00;
+
+  /* Brand duotone stretched to five lanes with ink and wine; cyan deepened so
+     labels stay readable on light surfaces. */
+  --spectrum-1: #fe2c55;
+  --spectrum-2: #0fb3ae;
+  --spectrum-3: #44454f;
+  --spectrum-4: #d97706;
+  --spectrum-5: #6b061d;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Reference radius scale xs2/sm6/md8/lg12 — the app token steps start at sm. */
+  --radius: 6px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Quiet ink shadows from the reference elevation set (alpha <= 0.05 on cards). */
+  --shadow-xs: 0 1px 2px 0 rgba(22, 24, 35, 0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(22, 24, 35, 0.04), 0 1px 2px -1px rgba(22, 24, 35, 0.05);
+  --shadow-md: 0 2px 4px -2px rgba(22, 24, 35, 0.04), 0 4px 12px -2px rgba(22, 24, 35, 0.05);
+  --shadow-lg: 0 4px 8px -4px rgba(22, 24, 35, 0.05), 0 12px 24px -6px rgba(22, 24, 35, 0.08);
+  --shadow-xl: 0 8px 16px -8px rgba(22, 24, 35, 0.10), 0 20px 40px -8px rgba(22, 24, 35, 0.18);
+}

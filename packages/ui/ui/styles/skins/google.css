@@ -1,0 +1,60 @@
+/*
+  Google skin — Material-flavored: white surfaces, hairline gray borders,
+  Google blue as the single primary, brand four-color set for data lanes.
+  Token source: design library "Google" (dl_builtin_google prototype tokens).
+  Light-only: declared after .dark and wins the cascade regardless of the
+  dark-mode class.
+*/
+
+[data-theme="google"] {
+  --background: #ffffff;
+  --foreground: #0e1115;
+  --card: #ffffff;
+  --card-foreground: #0e1115;
+  --popover: #f9f9fa;
+  --popover-foreground: #0e1115;
+  --muted: #eff1f4;
+  /* Reference text-3 (#7f8d9f) sits under 4.5:1 on white; the app renders
+     10-13px mono body text in this token, so it is darkened one step. */
+  --muted-foreground: #5f6e80;
+  --border: #ebebeb;
+  --input: #ffffff;
+  --primary: #4285f4;
+  --primary-foreground: #ffffff;
+  --secondary: #dbeafe;
+  --secondary-foreground: #0043ad;
+  --accent: #0043ad;
+  --accent-foreground: #ffffff;
+  --ring: #4285f4;
+  --destructive: #ea4335;
+  --destructive-foreground: #ffffff;
+  --success: #34a853;
+  --warning: #fbbc05;
+
+  /* The four Google brand colors + deep blue: full hue separation for
+     simultaneous comparison lanes. */
+  --spectrum-1: #4285f4;
+  --spectrum-2: #ea4335;
+  --spectrum-3: #fbbc05;
+  --spectrum-4: #34a853;
+  --spectrum-5: #0043ad;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Reference declares a single 8px radius; extrapolated Material steps around it. */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Google elevation grays (60,64,67), quietest first. */
+  --shadow-xs: 0 1px 2px 0 rgba(60, 64, 67, 0.08);
+  --shadow-sm: 0 1px 3px 0 rgba(60, 64, 67, 0.12);
+  --shadow-md: 0 1px 3px 0 rgba(60, 64, 67, 0.15), 0 4px 8px -3px rgba(60, 64, 67, 0.12);
+  --shadow-lg: 0 4px 8px -2px rgba(60, 64, 67, 0.15), 0 8px 20px -6px rgba(60, 64, 67, 0.18);
+  --shadow-xl: 0 8px 16px -6px rgba(60, 64, 67, 0.18), 0 16px 32px -12px rgba(60, 64, 67, 0.22);
+}

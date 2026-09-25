@@ -1,0 +1,59 @@
+/*
+  GoldenTime skin — warm sand-and-caramel journal look: cream backgrounds,
+  caramel-brown text, caramel orange accent, large cozy radii, warm shadows.
+  Token source: design library "GoldenTime" (golden-prototype colors_and_type.css).
+  Light-only: declared after .dark and wins the cascade regardless of the
+  dark-mode class.
+*/
+
+[data-theme="goldentime"] {
+  --background: #fbfaf9;
+  --foreground: #3b352b;
+  --card: #ffffff;
+  --card-foreground: #3b352b;
+  --popover: #ffffff;
+  --popover-foreground: #3b352b;
+  --muted: #eae6db;
+  --muted-foreground: #6b6353;
+  --border: #e1dccf;
+  --input: #ffffff;
+  --primary: #574d42;
+  --primary-foreground: #fbfaf9;
+  --secondary: #f5f1e8;
+  --secondary-foreground: #3b352b;
+  --accent: #f79b45;
+  /* Caramel orange is light; dark ink on it keeps labels readable. */
+  --accent-foreground: #3b352b;
+  --ring: #f79b45;
+  --destructive: #b34a3c;
+  --destructive-foreground: #ffffff;
+  --success: #6b8e4e;
+  --warning: #d68a3c;
+
+  /* Reference chart hues; the palest two are kept as fill-only lanes, matching
+     the default skin's faint-tail ramp precedent. */
+  --spectrum-1: #9b965f;
+  --spectrum-2: #5e4545;
+  --spectrum-3: #f79b45;
+  --spectrum-4: #b0b3a2;
+  --spectrum-5: #d6d5c2;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Cozy rounded scale from the reference (sm8/md16/lg24/xl32). */
+  --radius: 16px;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  /* Warm brown shadows from the reference elevation set. */
+  --shadow-xs: 0 1px 2px 0 rgba(59, 53, 43, 0.04);
+  --shadow-sm: 0 2px 6px -1px rgba(87, 77, 66, 0.06), 0 1px 2px 0 rgba(87, 77, 66, 0.04);
+  --shadow-md: 0 2px 4px -2px rgba(87, 77, 66, 0.05), 0 8px 20px -6px rgba(87, 77, 66, 0.10);
+  --shadow-lg: 0 4px 8px -4px rgba(87, 77, 66, 0.06), 0 16px 36px -10px rgba(87, 77, 66, 0.14);
+  --shadow-xl: 0 8px 16px -8px rgba(87, 77, 66, 0.10), 0 20px 44px -12px rgba(87, 77, 66, 0.18);
+}

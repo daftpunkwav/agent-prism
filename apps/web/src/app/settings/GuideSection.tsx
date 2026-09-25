@@ -11,7 +11,7 @@ import { BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UiSelect } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
-import { SKINS, SKIN_STORAGE_KEY, applySkin } from "@/theme";
+import { DEFAULT_SKIN, SKINS, SKIN_STORAGE_KEY, applySkin, normalizeSkin } from "@/theme";
 
 const GROUPS: ReadonlyArray<{ key: string; icon: typeof BookOpen }> = [
   { key: "connections", icon: BookOpen },
@@ -26,9 +26,9 @@ const GROUPS: ReadonlyArray<{ key: string; icon: typeof BookOpen }> = [
 /** Settings guide: documentation-only section describing every settings group. */
 export function GuideSection() {
   const t = useT();
-  const [skin, setSkin] = useState("21th");
+  const [skin, setSkin] = useState(DEFAULT_SKIN);
   useEffect(() => {
-    setSkin(localStorage.getItem(SKIN_STORAGE_KEY) ?? "21th");
+    setSkin(normalizeSkin(localStorage.getItem(SKIN_STORAGE_KEY)));
   }, []);
   const skinOptions = SKINS.map((name) => ({ value: name, label: t(`settings.skin.${name}` as never) }));
   const onSkin = (value: string) => {

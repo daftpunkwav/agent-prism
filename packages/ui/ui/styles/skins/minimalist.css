@@ -1,0 +1,57 @@
+/*
+  Minimalist skin — monochrome paper: pure white surfaces, near-black ink as
+  the primary action color, hairline borders, grayscale data lanes.
+  Token source: design library "Minimalist" (minimalist-prototype).
+  Light-only: declared after .dark and wins the cascade regardless of the
+  dark-mode class.
+*/
+
+[data-theme="minimalist"] {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #fafafa;
+  --popover-foreground: #0a0a0a;
+  --muted: #f5f5f5;
+  --muted-foreground: #525252;
+  --border: #e5e5e5;
+  --input: #ffffff;
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #0a0a0a;
+  --accent: #0a0a0a;
+  --accent-foreground: #ffffff;
+  --ring: #0a0a0a;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #16a34a;
+  --warning: #d97706;
+
+  /* Grayscale chart ramp from the reference (lane identity via value steps). */
+  --spectrum-1: #0a0a0a;
+  --spectrum-2: #525252;
+  --spectrum-3: #a3a3a3;
+  --spectrum-4: #d4d4d4;
+  --spectrum-5: #e5e5e5;
+
+  --chart-1: var(--spectrum-1);
+  --chart-2: var(--spectrum-2);
+  --chart-3: var(--spectrum-3);
+  --chart-4: var(--spectrum-4);
+
+  /* Reference radius scale xs4/sm6/md8/lg12. */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Hairline elevation set from the reference. */
+  --shadow-xs: 0 1px 0 0 rgba(10, 10, 10, 0.04);
+  --shadow-sm: 0 1px 2px 0 rgba(10, 10, 10, 0.04);
+  --shadow-md: 0 2px 4px 0 rgba(10, 10, 10, 0.06);
+  --shadow-lg: 0 4px 12px -2px rgba(10, 10, 10, 0.08);
+  --shadow-xl: 0 8px 24px -8px rgba(10, 10, 10, 0.10);
+}

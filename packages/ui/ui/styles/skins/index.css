@@ -1,0 +1,19 @@
+/*
+  Skin registry — one @import per skin, each file fully self-contained.
+  Adding a skin: drop a <id>.css here, add one @import line, then register the
+  id in apps/web/src/theme.ts (SKINS) and the two i18n catalogs. No skin file
+  may import or depend on another; the cascade order below is irrelevant across
+  skins because every selector is a distinct [data-theme="..."] on <html>.
+  Keep this file imported AFTER tokens.css so skins win over :root/.dark.
+*/
+
+@import "./claude.css";
+@import "./apple.css";
+@import "./google.css";
+@import "./tiktok.css";
+@import "./nerv.css";
+@import "./motion-fit.css";
+@import "./minimalist.css";
+@import "./goldentime.css";
+@import "./vibecamp.css";
+@import "./vercel.css";
