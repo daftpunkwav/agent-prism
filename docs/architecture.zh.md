@@ -131,8 +131,8 @@ contracts / environment / persistence ──► no @agentprism dependencies; lea
   见 `/api/threads` 与 `ThreadService`，支持跨重启的 fork 与 resume。
 - **column**：arena 对比 run 中的一条并行 lane，由一个 pipeline config
   与其 event stream 组成。column label 是 events 与 reports 的聚合键。
-- **worker**：执行一个 column 的被 spawn 的 OS 进程，即 runner 中的
-  `spawnWorker`。一个 worker 恰好运行一个 column。
+- **worker**：执行一个 column 的进程内异步任务，即 runner 中的
+  `spawnWorker`。一个 worker 恰好运行一个 column，且始终留在 server 进程内。
 - **pipeline**：每列配置包 `PipelineConfig`，在 event 与 report map 中
   用作 label 与 key。
 - **job / task / turn**：job 是后台 arena run 进程 `run-job`；task 是

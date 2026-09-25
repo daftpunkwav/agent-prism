@@ -134,8 +134,8 @@ These terms recur across packages with scoped meanings.
 - **column**: one parallel lane in an arena comparison run, consisting of a pipeline
   config and its event stream. Column labels are the aggregation key for events and
   reports.
-- **worker**: the spawned OS process that executes one column, `spawnWorker` in the
-  runner. A worker runs exactly one column.
+- **worker**: the in-process async task that executes one column, `spawnWorker` in the
+  runner. A worker runs exactly one column and never leaves the server process.
 - **pipeline**: the per-column configuration bundle `PipelineConfig`, used as a label
   and key in event and report maps.
 - **job / task / turn**: a job is the background arena run process `run-job`; a task is a
