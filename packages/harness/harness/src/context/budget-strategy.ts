@@ -45,10 +45,13 @@ export function applySourceBudget(
     tools: result.allowances.find((a) => a.source === "tools")?.granted ?? 0,
     history: result.allowances.find((a) => a.source === "history")?.granted ?? 0,
   };
-  // Walk oldest → newest, keeping messages while their source still has
-  // allowance: the newest turns survive, the oldest overflow drops first.
+  // Walk newest → oldest, keeping messages while their source still has
+  // allowance: the newest turns survive and the oldest overflow drops first
+  // (the documented contract). An oldest-first walk would keep the stale head
+  // and shed the live tail exactly when a source is over budget.
   const kept: LlmMessage[] = [];
-  for (const message of rest) {
+  for (let index = rest.length - 1; index >= 0; index -= 1) {
+    const message = rest[index] as LlmMessage;
     const source = sourceOf(message);
     const cost = estimateMessageTokens(message, divisor);
     if (remaining[source] >= cost) {
@@ -56,6 +59,7 @@ export function applySourceBudget(
       kept.push(message);
     }
   }
+  kept.reverse();
   const ledger = renderBudgetLedger(result);
   // Per-source shedding can split an assistant/tool pair (the kept halves are
   // invalid wire shapes providers reject with 400); strip the orphans so the

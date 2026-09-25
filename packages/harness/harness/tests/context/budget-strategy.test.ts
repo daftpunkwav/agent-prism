@@ -5,11 +5,7 @@
  * Responsibilities:
  * - Pin the no-trim passthrough when the budget covers total demand
  * - Pin per-source shedding plus the allocation-ledger emission when it binds
- *
- * NOTE: the keep-walk order within an exhausted source (which specific messages
- * survive) is deliberately not asserted here: the docstring claims newest-first
- * survival while the implementation walks oldest-first — suspected defect, kept
- * out of the pinned contract until resolved.
+ * - Pin the keep direction: the newest messages of an exhausted source survive
  */
 
 import { describe, expect, it } from "vitest";
@@ -58,6 +54,20 @@ describe("applySourceBudget", () => {
     const result = applySourceBudget(messages, { budgetTokens: 4, charsPerToken: 1 });
     const kept = result.messages.filter((m) => m.role !== "system");
     expect(kept).toHaveLength(0);
+    expect(result.ledgerEmitted).toBe(true);
+  });
+
+  it("keeps the newest messages of an exhausted source and sheds the oldest", () => {
+    const messages: LlmMessage[] = [
+      { role: "user", content: "old-1" },
+      { role: "user", content: "old-2" },
+      { role: "user", content: "newest" },
+    ];
+    // 16 estimated tokens of history demand against a 6-token budget: the
+    // granted history allowance covers only the newest 6-token turn, so the
+    // two stale heads must drop — not the live tail.
+    const result = applySourceBudget(messages, { budgetTokens: 6, charsPerToken: 1 });
+    expect(result.messages.filter((m) => m.role !== "system")).toEqual([{ role: "user", content: "newest" }]);
     expect(result.ledgerEmitted).toBe(true);
   });
 });
