@@ -54,6 +54,7 @@ import {
 import { BuilderError } from "@agentprism/builder-turns";
 import { BuilderSessionStore, type BuilderSessionRecord } from "./session-store.js";
 import { TraceLog } from "@agentprism/builder-turns";
+import { COMPACT_HANDOFF_SYSTEM } from "./prompts.js";
 import { SessionTraceStore } from "./trace-store.js";
 import {
   BUILDER_PIPELINE_LABEL,
@@ -377,14 +378,7 @@ export class BuilderService {
       });
       const invoked = await runtime.llm.invoke(
         [
-          {
-            role: "system",
-            content:
-              "Summarize this coding-agent conversation into a compact handoff note (aim under 2000 words). " +
-              "Preserve: the active goal, key decisions and why, files created or modified with paths, " +
-              "test and verification status, open questions and blockers. " +
-              "Drop greetings, dead ends, and verbatim tool output. Reply with the note only.",
-          },
+          { role: "system", content: COMPACT_HANDOFF_SYSTEM },
           { role: "user", content: transcript },
         ],
         { signal: controller.signal },

@@ -10,6 +10,9 @@
 
 import { sanitizeErrorMessage, type JudgeResult, type JudgeSpec, type LlmJudgeAdapter, type LlmJudgeContext } from "@agentprism/contracts";
 import { detectInjection, sanitizeForJson } from "@agentprism/contracts";
+import { llmJudgePrompt as buildLlmJudgePrompt } from "./prompts.js";
+
+export { buildLlmJudgePrompt };
 
 // The info string (language tag) after the opening fence is stripped for any
 // language (```go, ```python3.11, a bare ```), not just python: a tagged fence
@@ -169,20 +172,6 @@ function judgeAnswer(answer: string, spec: JudgeSpec): JudgeResult {
     default:
       return result(false, `Unknown judge type: ${spec.type}`);
   }
-}
-
-/** Builds the LLM judge prompt (rubric-aware, truncated against prompt bloat). */
-export function buildLlmJudgePrompt(answer: string, spec: JudgeSpec, question?: string): string {
-  const rubric = spec.rubric.trim() === "" ? "accuracy and completeness" : spec.rubric.slice(0, 2000);
-  const lines = [
-    `Evaluate the answer on ${rubric}.`,
-    `Output JSON only: {"passed": true/false, "score": 0-1, "reason": "..."}.`,
-  ];
-  if (question !== undefined && question.trim() !== "") {
-    lines.push(`Question: ${question.slice(0, 2000)}`);
-  }
-  lines.push(`Answer: ${answer.slice(0, 2000)}`);
-  return lines.join("\n\n");
 }
 
 /**
