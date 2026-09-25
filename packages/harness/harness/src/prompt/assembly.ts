@@ -15,6 +15,14 @@ import { queryWorkspaceSnippets } from "../memory/rag.js";
 import { buildPromptParts } from "./prompt-builder.js";
 import { renderWorkspaceInstructions } from "./instructions.js";
 import { mcpPolicyNote, orchestrationNote, skillPolicyNote } from "./policy-sections.js";
+import {
+  MEMORY_BLOCK_HEADER,
+  episodicMemoryLine,
+  reflectionBlock,
+  semanticMemoryLine,
+  sessionNoticeLine,
+  toolRosterLine,
+} from "./runtime-copy.js";
 import type { AgentExecutionContext } from "../execution-context.js";
 
 /** Max `@file` mentions resolved per prompt assembly. */
@@ -40,13 +48,13 @@ export function renderMemoryBlock(memory: MemoryRecallResult | undefined | null)
     const outcome = entry.success ? "succeeded" : "failed";
     const via = entry.keyActions.length > 0 ? ` (via ${entry.keyActions.slice(0, 6).join(", ")})` : "";
     const lesson = entry.lessons.trim() !== "" ? `: ${entry.lessons}` : "";
-    lines.push(`- In a similar task "${entry.task}" the run ${outcome}${via}${lesson}`.trim());
+    lines.push(episodicMemoryLine(entry.task, outcome, via, lesson));
   }
   for (const fact of (memory.semantic ?? []).slice(0, MEMORY_BLOCK_LIMITS.semantic)) {
-    lines.push(`- Project convention: ${fact.subject} ${fact.predicate} ${fact.object}.`.trim());
+    lines.push(semanticMemoryLine(fact.subject, fact.predicate, fact.object));
   }
   if (lines.length === 0) return "";
-  return `\n\n[Prior Experience & Relevant Memories]\n${lines.map((line) => truncateMemoryLine(line)).join("\n")}`;
+  return `${MEMORY_BLOCK_HEADER}${lines.map((line) => truncateMemoryLine(line)).join("\n")}`;
 }
 
 /**
@@ -148,15 +156,15 @@ export function buildSystemUser(context: AgentExecutionContext): { system: strin
   // custom system prompt still learns the real roster.
   const toolNames = [...context.tools.names];
   if (toolNames.length > 0) {
-    system += `\n\nAvailable tools: ${toolNames.join(", ")}.`;
+    system += toolRosterLine(toolNames);
   }
   const feedback = (context.verificationFeedback ?? "").trim();
   if (feedback !== "") {
-    system += `\n\n[Previous reflection]\n${feedback}`;
+    system += reflectionBlock(feedback);
   }
   const notices = (context.notices ?? []).map((notice) => notice.trim()).filter((notice) => notice !== "");
   if (notices.length > 0) {
-    system += `\n\n${notices.map((notice) => `[Session update] ${notice}`).join("\n\n")}`;
+    system += `\n\n${notices.map((notice) => sessionNoticeLine(notice)).join("\n\n")}`;
   }
   return { system, user };
 }

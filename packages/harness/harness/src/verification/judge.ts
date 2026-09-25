@@ -11,6 +11,7 @@
 import type { LlmAdapter } from "@agentprism/contracts";
 import type { TokenTracker } from "@agentprism/telemetry";
 import { detectInjection, sanitizeForJson } from "@agentprism/contracts";
+import { judgeInstruction } from "../prompt/runtime-copy.js";
 import { recordAdapterUsage } from "../usage.js";
 
 export interface JudgeOptions {
@@ -31,14 +32,7 @@ export async function verifyResult(
   }
   try {
     const response = await llm.invoke(
-      [
-        {
-          role: "user",
-          content:
-            `Evaluate whether the answer is accurate and complete. Output JSON: {"passed": true/false, "reason": "..."}\n\n` +
-            `Question: ${question}\n\nAnswer: ${answer.slice(0, 2000)}\n\nTool calls: ${toolCalls}`,
-        },
-      ],
+      [{ role: "user", content: judgeInstruction(question, answer, toolCalls) }],
       { signal: options.signal },
     );
     recordAdapterUsage(response.usage, options.tracker);

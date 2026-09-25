@@ -11,6 +11,7 @@
 import type { LlmAdapter } from "@agentprism/contracts";
 import type { JudgeOptions } from "./judge.js";
 import { detectInjection, sanitizeForJson } from "@agentprism/contracts";
+import { evolveInstruction } from "../prompt/runtime-copy.js";
 import { recordAdapterUsage } from "../usage.js";
 
 /** Self-evolution: proposes prompt modifications. */
@@ -29,14 +30,7 @@ export async function proposeHarnessEdit(
   }
   try {
     const response = await llm.invoke(
-      [
-        {
-          role: "user",
-          content:
-            `Output JSON: {"prompt_additions":["..."],"reasoning":"..."}\n\n` +
-            `Question: ${question}\n\nprompt: ${currentPrompt.slice(0, 500)}\n\nReflection: ${reflection}`,
-        },
-      ],
+      [{ role: "user", content: evolveInstruction(question, currentPrompt, reflection) }],
       { signal: options.signal },
     );
     recordAdapterUsage(response.usage, options.tracker);

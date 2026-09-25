@@ -11,6 +11,7 @@
 
 import { TOOL_NAMES_BY_TOOLSET } from "@agentprism/contracts";
 import { injectToolResultReminder } from "../context/anchoring.js";
+import { callDriftRejection, fileDriftRejection } from "../prompt/runtime-copy.js";
 
 // Chinese hints kept via Unicode escapes so Chinese questions still match; English for parity.
 const SUM_HINTS = [
@@ -114,18 +115,12 @@ export function assessToolRelevance(
     }
     if ((toolName === "write" || toolName === "edit") && needsFile) {
       if (blob.length > 80 && overlap < 0.05) {
-        return {
-          allowed: false,
-          reason: `Guard rejected: args for tool ${toolName} are almost unrelated to the user question "${q}" (likely topic drift). Return to the original question; do not start a new task.`,
-        };
+        return { allowed: false, reason: fileDriftRejection(toolName, q) };
       }
       return { allowed: true, reason: "" };
     }
     if (overlap < 0.08 && blob.length > 20) {
-      return {
-        allowed: false,
-        reason: `Guard rejected: calling ${toolName} after prior tool results drifts from the user question "${q}". If the original question can already be answered, give the final answer directly.`,
-      };
+      return { allowed: false, reason: callDriftRejection(toolName, q) };
     }
   }
 

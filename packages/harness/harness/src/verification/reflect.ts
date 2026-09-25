@@ -9,6 +9,7 @@
 import type { LlmAdapter } from "@agentprism/contracts";
 import type { JudgeOptions } from "./judge.js";
 import { detectInjection, sanitizeForJson } from "@agentprism/contracts";
+import { reflectInstruction } from "../prompt/runtime-copy.js";
 import { recordAdapterUsage } from "../usage.js";
 
 /** Reflects on a failure reason and produces an improvement-strategy text. */
@@ -26,14 +27,7 @@ export async function reflectOnFailure(
   }
   try {
     const response = await llm.invoke(
-      [
-        {
-          role: "user",
-          content:
-            `Output JSON: {"insight":"...","strategy":"..."}\n\n` +
-            `Question: ${question}\n\nAnswer: ${answer.slice(0, 2000)}\n\nReason: ${verificationReason}`,
-        },
-      ],
+      [{ role: "user", content: reflectInstruction(question, answer, verificationReason) }],
       { signal: options.signal },
     );
     recordAdapterUsage(response.usage, options.tracker);

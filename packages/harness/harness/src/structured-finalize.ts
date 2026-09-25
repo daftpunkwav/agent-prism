@@ -15,13 +15,8 @@
 
 import { FINAL_ANSWER_RESPONSE_FORMAT, parseStructuredFinalAnswer } from "@agentprism/contracts";
 import type { AgentExecutionContext } from "./execution-context.js";
+import { FINALIZE_SYSTEM, finalizeRestateRequest } from "./prompt/runtime-copy.js";
 import { recordAdapterUsage } from "./usage.js";
-
-/** Finalize system instruction; field names mirror FINAL_ANSWER_RESPONSE_FORMAT. */
-const FINALIZE_SYSTEM =
-  'You restate final answers as strict JSON. Reply with exactly one JSON object with keys ' +
-  '"plan" (string), "files" (array of artifact path strings), "how_to_run" (string). ' +
-  "No prose, no code fences.";
 
 /**
  * Normalizes one final answer into the structured schema. Returns the canonical
@@ -38,12 +33,7 @@ export async function finalizeStructuredAnswer(
     const response = await context.llm.invoke(
       [
         { role: "system", content: FINALIZE_SYSTEM },
-        {
-          role: "user",
-          content:
-            "Restate this final answer as the JSON object described in the system message.\n\n" +
-            `Final answer:\n${trimmed}`,
-        },
+        { role: "user", content: finalizeRestateRequest(trimmed) },
       ],
       { signal: context.signal, responseFormat: FINAL_ANSWER_RESPONSE_FORMAT },
     );

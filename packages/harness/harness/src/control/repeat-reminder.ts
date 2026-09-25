@@ -15,6 +15,8 @@
  * count nor reset the streak.
  */
 
+import { repeatGuardFirst, repeatGuardLoop } from "../prompt/runtime-copy.js";
+
 export interface RepeatReminderOptions {
   /** Consecutive-repeat counts that trigger a reminder (default [3, 5, 8]). */
   thresholds?: number[];
@@ -99,8 +101,8 @@ export class RepeatTracker {
     this.fired.add(firing);
     const preview = canonicalArgsKey(args).slice(0, this.previewChars);
     if (threshold === this.thresholds[0]) {
-      return `[Repeat guard] \`${toolName}\` called ${threshold}x in a row with the same arguments (${preview}). If the result already answers the task, stop and report it; otherwise vary the arguments or try a different tool.`;
+      return repeatGuardFirst(toolName, threshold, preview);
     }
-    return `[Repeat guard] \`${toolName}\` called ${threshold}x in a row unchanged — this looks like a loop. State what new information the next identical call could possibly yield; if none, stop calling it.`;
+    return repeatGuardLoop(toolName, threshold);
   }
 }

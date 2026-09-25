@@ -8,6 +8,7 @@
  */
 
 import type { LlmMessage } from "@agentprism/contracts";
+import { systemTaskAnchor, toolResultAnchor } from "../prompt/runtime-copy.js";
 import { textFromContent } from "./message-text.js";
 
 /** Extracts the first non-anchored user message as the original question. */
@@ -26,9 +27,7 @@ export function extractOriginalQuestion(messages: LlmMessage[]): string {
 export function reinforceSystemWithQuestion(messages: LlmMessage[], question: string): LlmMessage[] {
   if (messages.length === 0 || question.trim() === "") return [...messages];
   const out = [...messages];
-  const anchor =
-    `\n\n[Unique task] ${question.trim()}\n` +
-    "Stop after completing this task. Do not start any new topic or new task.";
+  const anchor = systemTaskAnchor(question);
   const first = out[0];
   if (first !== undefined && first.role === "system") {
     const content = textFromContent(first.content);
@@ -41,12 +40,7 @@ export function reinforceSystemWithQuestion(messages: LlmMessage[], question: st
 
 /** Appends the task anchor to tool-result text, avoiding an extra user turn. */
 export function injectToolResultReminder(result: string, question: string): string {
-  const q = question.trim() || "(unknown)";
-  return (
-    `${result}\n\n` +
-    `—\n[Task anchor] User's original question: ${q}\n` +
-    "If you can answer sufficiently, give the final answer and stop; do not start a new task."
-  );
+  return toolResultAnchor(result, question);
 }
 
 /** Task-anchoring entry: write into the first system message, never a trailing user turn. */
