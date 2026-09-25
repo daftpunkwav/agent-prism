@@ -8,8 +8,8 @@
 
 import { describe, expect, it } from "vitest";
 import type { ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { buildPipelineBase, resolveBaselineOverrides } from "@agentprism/arena-routing";
-import { ProviderDimensionSync } from "@agentprism/arena-routing";
+import { buildPipelineBase, resolveBaselineOverrides } from "@agentprism/arena-dimensions";
+import { ProviderDimensionSync } from "@agentprism/arena-dimensions";
 import { DimensionCatalog } from "@agentprism/dimensions";
 
 function makeEndpoint(id: string, model: string): Record<string, unknown> {

@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { ProviderDimensionSync } from "@agentprism/arena-routing";
+import { ProviderDimensionSync } from "@agentprism/arena-dimensions";
 import { DimensionCatalog } from "@agentprism/dimensions";
 
 function makeEndpoint(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {

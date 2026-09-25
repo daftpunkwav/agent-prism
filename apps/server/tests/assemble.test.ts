@@ -18,7 +18,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DimensionRouter } from "@agentprism/arena-routing";
+import { DimensionRouter } from "@agentprism/arena-dimensions";
 
 // ---------------------------------------------------------------------------
 // Env scrub helpers
@@ -121,7 +121,7 @@ describe("assemble() fail-fast branches", () => {
   it("warns when the provider change listener's cache invalidation throws", { timeout: COMPOSITION_TIMEOUT }, async () => {
     // Capture every change-listener callback registered during assemble, then
     // fire one after the fact to drive the try/catch warn branch.
-    const { ProviderConfigStore } = await import("@agentprism/provider-capability");
+    const { ProviderConfigStore } = await import("@agentprism/provider-catalog");
     const callbacks: Array<() => void> = [];
     vi.spyOn(ProviderConfigStore.prototype, "addChangeListener").mockImplementation((cb: () => void) => {
       callbacks.push(cb);

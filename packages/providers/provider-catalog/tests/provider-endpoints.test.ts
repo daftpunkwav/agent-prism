@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { IdGenerator } from "@agentprism/contracts";
-import { connectionFingerprint, normalizeBaseUrl, parseLlmEndpoint } from "@agentprism/provider-capability";
+import { connectionFingerprint, normalizeBaseUrl, parseLlmEndpoint } from "@agentprism/provider-catalog";
 
 const ids: IdGenerator = { next: () => "gen-id" };
 

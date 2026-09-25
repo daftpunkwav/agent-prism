@@ -35,7 +35,7 @@ import {
   type AgentExecutionContext,
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
-import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, parseScoreVerdict, stepBudgetFor, totWidth } from "@agentprism/driver-registry";
+import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, parseScoreVerdict, stepBudgetFor, totWidth } from "@agentprism/driver-run-support";
 import {
   COT_PLAN_SUFFIX,
   DIRECT_PLAN_SUFFIX,

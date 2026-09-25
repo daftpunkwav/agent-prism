@@ -3,7 +3,8 @@
  * @description Public exports for the application package.
  *
  * Responsibilities:
- * - Re-export the arena/provider/workspace services and error types
+ * - Re-export the arena/session/provider/workspace/matrix use-case services,
+ *   the thread and project stores, and the error types
  */
 
 export * from "./errors.js";

@@ -9,7 +9,7 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import { textFromContent } from "@agentprism/contracts";
-import { REFLEXION_RETRY_KEYWORDS } from "@agentprism/driver-registry";
+import { REFLEXION_RETRY_KEYWORDS } from "@agentprism/driver-run-support";
 import { bindToolsSafe, streamToAiMessage } from "@agentprism/driver-langchain";
 import { REFLEXION_REFLECT_PROMPT, reflexionAnswerMessage } from "../prompts.js";
 import { AgentState, hasToolCalls, llmMessages, stepBudgetExhausted, withNodeConfig, type AgentStateType, type ReasoningGraphDeps } from "./state.js";

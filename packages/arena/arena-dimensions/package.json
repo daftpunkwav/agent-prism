@@ -1,5 +1,6 @@
 {
-  "name": "@agentprism/provider-capability",
+  "name": "@agentprism/arena-dimensions",
+  "description": "Dimension routing for arena runs: expands one comparison dimension into per-column pipeline configs with baselines and decode field normalization.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,10 +19,11 @@
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/config": "workspace:*",
-    "@agentprism/persistence": "workspace:*"
+    "@agentprism/dimensions": "workspace:*",
+    "@agentprism/harness": "workspace:*"
   },
   "devDependencies": {
+    "@agentprism/evaluation": "workspace:*",
     "@types/node": "^24"
   }
 }

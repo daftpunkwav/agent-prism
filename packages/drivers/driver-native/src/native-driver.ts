@@ -24,7 +24,7 @@ import {
 } from "@agentprism/harness";
 import { afterLlm, createReasoningState, isFinished } from "./reasoning-state.js";
 import { runSelfConsistencyLoop } from "./self-consistency.js";
-import { eventOf, formatCapabilityPluginIds, stepBudgetFor, totWidth } from "@agentprism/driver-registry";
+import { eventOf, formatCapabilityPluginIds, stepBudgetFor, totWidth } from "@agentprism/driver-run-support";
 import { executeToolCalls, collectPriorToolNames } from "./tool-batch.js";
 import { streamLlmTurn } from "./stream-turn.js";
 

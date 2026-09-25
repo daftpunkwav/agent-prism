@@ -6,4 +6,4 @@
 
 ## 依赖
 
-- Runtime：`arena-routing / arena-runner / contracts / environment / persistence / runtime`。
+- Runtime：`arena-dimensions / arena-runner / contracts / environment / persistence / runtime`。

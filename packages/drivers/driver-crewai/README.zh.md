@@ -16,4 +16,4 @@ CrewAI 模式 framework driver：角色 crew 运行任务 pipeline。
 
 ## 依赖
 
-- Runtime：`contracts / driver-registry / harness / telemetry`。
+- Runtime：`contracts / driver-run-support / harness / telemetry`。

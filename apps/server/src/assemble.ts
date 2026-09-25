@@ -41,7 +41,7 @@ import {
   DimensionRouter,
   ProviderDimensionSync,
   buildCapabilityOptionProjection,
-} from "@agentprism/arena-routing";
+} from "@agentprism/arena-dimensions";
 import { ArenaRunner } from "@agentprism/arena-runner";
 import { McpServersStore, parseMcpServersEnv, type McpServerConfig } from "@agentprism/tool-mcp";
 import type { HttpApp } from "@agentprism/http-runtime";
@@ -57,7 +57,7 @@ import {
   parseProviderConfig,
   resolveDefaultEndpoint,
   toPublicProviderConfig,
-} from "@agentprism/provider-capability";
+} from "@agentprism/provider-catalog";
 import {
   createChatModel,
   createColumnRuntime,

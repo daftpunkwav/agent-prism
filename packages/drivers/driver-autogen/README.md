@@ -12,4 +12,4 @@ AutoGen-pattern framework driver: a conversable group chat with LLM speaker sele
 
 ## Dependencies
 
-- Runtime: `contracts / driver-registry / harness / telemetry`.
+- Runtime: `contracts / driver-run-support / harness / telemetry`.

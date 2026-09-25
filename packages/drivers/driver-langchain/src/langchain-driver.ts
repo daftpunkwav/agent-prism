@@ -32,7 +32,7 @@ import {
   type ContextAnalytics,
   type ContextTuning,
 } from "@agentprism/harness";
-import { createRunState, emitStreamEvent, emitToolOutcomeEvents, eventOf, finishEvent, recursionLimitFor, formatCapabilityPluginIds } from "@agentprism/driver-registry";
+import { createRunState, emitStreamEvent, emitToolOutcomeEvents, eventOf, finishEvent, recursionLimitFor, formatCapabilityPluginIds } from "@agentprism/driver-run-support";
 import { bindRegistryTools } from "./bind-registry-tools.js";
 import { requireChatModel } from "./require-chat-model.js";
 import { fromLcMessages, toLcMessages } from "./llm-message-bridge.js";

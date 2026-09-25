@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/driver-autogen",
+  "description": "AutoGen-pattern group-chat driver: coder/reviewer conversation with LLM speaker selection (pattern re-implementation, no framework dependency).",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,7 +19,7 @@
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/driver-registry": "workspace:*",
+    "@agentprism/driver-run-support": "workspace:*",
     "@agentprism/harness": "workspace:*",
     "@agentprism/telemetry": "workspace:*"
   },

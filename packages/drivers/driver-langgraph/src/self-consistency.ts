@@ -13,7 +13,7 @@
 
 import type { ArenaEvent } from "@agentprism/contracts";
 import { extractAnswerFromEvents } from "@agentprism/contracts";
-import { selfConsistencyOutcomeEvents } from "@agentprism/driver-registry";
+import { selfConsistencyOutcomeEvents } from "@agentprism/driver-run-support";
 
 /**
  * Runs the self-consistency loop for one langgraph column. The caller supplies

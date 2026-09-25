@@ -38,7 +38,7 @@ import {
   type AgentExecutionContext,
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
-import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, stepBudgetFor } from "@agentprism/driver-registry";
+import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, stepBudgetFor } from "@agentprism/driver-run-support";
 import { CRITIC_INSTRUCTION, criticRedirect } from "./prompts.js";
 
 /** Critic verdict: numeric progress score plus a one-line next action. */

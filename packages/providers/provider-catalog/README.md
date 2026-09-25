@@ -1,4 +1,4 @@
-# `@agentprism/provider-capability`
+# `@agentprism/provider-catalog`
 
 Provider seam: endpoint catalog, config parsing and persistence, lookup adapter, thinking budget. Depends on `config` and `persistence` mostly for types; instances are injected by the composition root (e.g. `AtomicJsonFile`) to stay replaceable.
 

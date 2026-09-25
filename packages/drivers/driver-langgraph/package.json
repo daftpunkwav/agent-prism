@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/driver-langgraph",
+  "description": "LangGraph driver with real reasoning graphs (CoT, ToT, reflexion).",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,7 +20,7 @@
   "dependencies": {
     "@agentprism/contracts": "workspace:*",
     "@agentprism/driver-langchain": "workspace:*",
-    "@agentprism/driver-registry": "workspace:*",
+    "@agentprism/driver-run-support": "workspace:*",
     "@agentprism/harness": "workspace:*",
     "@langchain/core": "^1.0.0",
     "@langchain/langgraph": "^1.0.0"

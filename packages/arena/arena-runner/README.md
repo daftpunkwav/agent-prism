@@ -4,4 +4,4 @@ Parallel multi-column execution: `ArenaRunner` (breaker/semaphore/event-channel 
 
 ## Dependencies
 
-- Runtime: `contracts / runtime / agent`, plus `arena-routing` types.
+- Runtime: `contracts / runtime / agent`, plus `arena-dimensions` types.

@@ -9,5 +9,5 @@ bridge，含 `llm-message-bridge`、`bind-registry-tools`、`bind-tools-safe`、
 
 ## 依赖
 
-- Runtime：`contracts / driver-registry / harness`，加上 `@langchain/core`、
+- Runtime：`contracts / driver-run-support / harness`，加上 `@langchain/core`、
   `langchain`、`zod`。

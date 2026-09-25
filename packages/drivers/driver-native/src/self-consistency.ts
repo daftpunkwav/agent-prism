@@ -15,7 +15,7 @@
 import type { ArenaEvent, ChatTurnMessage, LlmAssistantMessage, LlmMessage, ToolDefinition } from "@agentprism/contracts";
 import { extractAnswerFromEvents } from "@agentprism/contracts";
 import { buildInitialMessages, type AgentExecutionContext } from "@agentprism/harness";
-import { selfConsistencyAttempts, selfConsistencyOutcomeEvents } from "@agentprism/driver-registry";
+import { selfConsistencyAttempts, selfConsistencyOutcomeEvents } from "@agentprism/driver-run-support";
 import { afterLlm, createReasoningState, isFinished } from "./reasoning-state.js";
 import { collectPriorToolNames, executeToolCalls } from "./tool-batch.js";
 import { streamLlmTurn } from "./stream-turn.js";

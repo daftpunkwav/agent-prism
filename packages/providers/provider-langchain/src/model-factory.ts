@@ -14,9 +14,9 @@ import type { BaseChatModel } from "@langchain/core/language_models/chat_models"
 import type { Callbacks } from "@langchain/core/callbacks/manager";
 import type { LlmEndpoint, PipelineConfig, ProviderConfig } from "@agentprism/contracts";
 import { ConfigurationError, effectiveThinkingLevel, validateLlmBaseUrl } from "@agentprism/contracts";
-import { resolveCredentialReference, resolveDefaultEndpoint } from "@agentprism/provider-capability";
-import { lookupEndpoint, type EndpointCatalog } from "@agentprism/provider-capability";
-import { buildThinkingClientOptions } from "@agentprism/provider-capability";
+import { resolveCredentialReference, resolveDefaultEndpoint } from "@agentprism/provider-catalog";
+import { lookupEndpoint, type EndpointCatalog } from "@agentprism/provider-catalog";
+import { buildThinkingClientOptions } from "@agentprism/provider-catalog";
 import { createResponsesCompatFetch } from "./openai-responses-compat.js";
 import { toLlmAdapter } from "./chat-model-adapter.js";
 

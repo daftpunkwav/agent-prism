@@ -7,5 +7,5 @@ leaf 构建的 reasoning-mode 图，含 `react`、`cot-tool`、`reflexion`、`to
 
 ## 依赖
 
-- Runtime：`contracts / driver-langchain / driver-registry / harness`，加上
+- Runtime：`contracts / driver-langchain / driver-run-support / harness`，加上
   `@langchain/core`、`@langchain/langgraph`。

@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/driver-langchain",
+  "description": "LangChain driver with the shared LangChain/LangGraph message bridge kit.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,7 +19,7 @@
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/driver-registry": "workspace:*",
+    "@agentprism/driver-run-support": "workspace:*",
     "@agentprism/harness": "workspace:*",
     "@langchain/core": "^1.0.0",
     "langchain": "^1.0.0",

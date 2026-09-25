@@ -1,6 +1,6 @@
 /**
- * @file driver-registry package barrel
- * @description Public exports for the driver-registry package.
+ * @file driver-run-support package barrel
+ * @description Public exports for the driver-run-support package.
  *
  * Responsibilities:
  * - Re-export the DriverLookup seam, the best-effort registration helper,

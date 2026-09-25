@@ -18,7 +18,7 @@ import {
   buildSystemUser,
   type AgentExecutionContext,
 } from "@agentprism/harness";
-import { createRunState, emitStreamEvent, emitToolOutcomeEvents, eventOf, finishEvent, recursionLimitFor, formatCapabilityPluginIds, normalizeActionArgs, selfConsistencyAttempts } from "@agentprism/driver-registry";
+import { createRunState, emitStreamEvent, emitToolOutcomeEvents, eventOf, finishEvent, recursionLimitFor, formatCapabilityPluginIds, normalizeActionArgs, selfConsistencyAttempts } from "@agentprism/driver-run-support";
 import { bindRegistryTools, requireChatModel, toLcMessages } from "@agentprism/driver-langchain";
 import { buildReasoningGraph } from "./reasoning-graphs.js";
 import { runSelfConsistencyLoop } from "./self-consistency.js";

@@ -15,7 +15,7 @@
 
 import { SystemMessage } from "@langchain/core/messages";
 import { textFromContent } from "@agentprism/contracts";
-import { parseScoreVerdict, totWidth } from "@agentprism/driver-registry";
+import { parseScoreVerdict, totWidth } from "@agentprism/driver-run-support";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import { bindToolsSafe, streamToAiMessage } from "@agentprism/driver-langchain";
 import { totBranchPrompt, totScorePrompt, TOT_SELECT_NO_CANDIDATES, totSelectNote } from "../prompts.js";

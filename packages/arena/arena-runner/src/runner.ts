@@ -15,7 +15,7 @@ import type { ContextTuning } from "@agentprism/harness";
 import type { McpServerConfig } from "@agentprism/tool-mcp";
 import type { SessionQueryPort } from "@agentprism/contracts";
 import { BreakerRegistry, EventChannel, Semaphore, WorkspaceRegistry } from "@agentprism/runtime";
-import type { DimensionRouter } from "@agentprism/arena-routing";
+import type { DimensionRouter } from "@agentprism/arena-dimensions";
 import { RunTraceLogs } from "./column-logs.js";
 
 /** Parallel run dependencies (injected at the composition root). */

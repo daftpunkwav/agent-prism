@@ -14,4 +14,4 @@ CrewAI-pattern framework driver: a role crew running a task pipeline.
 
 ## Dependencies
 
-- Runtime: `contracts / driver-registry / harness / telemetry`.
+- Runtime: `contracts / driver-run-support / harness / telemetry`.

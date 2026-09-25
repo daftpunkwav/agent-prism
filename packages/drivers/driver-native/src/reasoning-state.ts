@@ -12,7 +12,7 @@
  */
 
 import type { LlmAssistantMessage, LlmMessage, ReasoningMode } from "@agentprism/contracts";
-import { parseScoreVerdict, REFLEXION_RETRY_KEYWORDS, TOT_WIDTH_DEFAULT } from "@agentprism/driver-registry";
+import { parseScoreVerdict, REFLEXION_RETRY_KEYWORDS, TOT_WIDTH_DEFAULT } from "@agentprism/driver-run-support";
 import { COT_PHASE_HINT, REFLEXION_PHASE_HINT, totBranchHint, totScoreHint } from "./prompts.js";
 
 export { COT_PHASE_HINT, REFLEXION_PHASE_HINT, totBranchHint, totScoreHint };

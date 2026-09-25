@@ -15,7 +15,7 @@
  * all builtins. Unknown names warn and are ignored.
  */
 
-import { FrameworkDriverRegistry, registerDriversBestEffort, type DriverLoader } from "@agentprism/driver-registry";
+import { FrameworkDriverRegistry, registerDriversBestEffort, type DriverLoader } from "@agentprism/driver-run-support";
 
 /** Builtin backend loaders: fresh in-process, loop variants, LangChain, LangGraph, group chat. */
 export const builtinDriverLoaders: readonly DriverLoader[] = [

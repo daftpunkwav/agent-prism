@@ -7,4 +7,4 @@ column-factory port 以 `ColumnRuntimeFactory` 存在于 contracts。
 
 ## 依赖
 
-- Runtime：`contracts / runtime / agent`，加上 `arena-routing` 的类型。
+- Runtime：`contracts / runtime / agent`，加上 `arena-dimensions` 的类型。

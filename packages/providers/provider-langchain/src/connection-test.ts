@@ -12,8 +12,8 @@ import type { ConnectionTestResult, ConnectionTestTarget, IdGenerator, LlmEndpoi
 import { ConfigurationError } from "@agentprism/contracts";
 import { HumanMessage } from "@langchain/core/messages";
 import { createChatModel } from "./model-factory.js";
-import type { EndpointCatalog } from "@agentprism/provider-capability";
-import { endpointUpdateToEntity } from "@agentprism/provider-capability";
+import type { EndpointCatalog } from "@agentprism/provider-catalog";
+import { endpointUpdateToEntity } from "@agentprism/provider-catalog";
 
 export type { ConnectionTestTarget };
 

@@ -1,6 +1,6 @@
 /**
- * @file arena-routing package barrel
- * @description Public exports for the arena-routing package.
+ * @file arena-dimensions package barrel
+ * @description Public exports for the arena-dimensions package.
  *
  * Responsibilities:
  * - Re-export dimension routing, baselines, capability options, and templates

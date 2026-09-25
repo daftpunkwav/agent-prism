@@ -14,7 +14,7 @@ import {
 } from "@agentprism/harness";
 import { sanitizeErrorMessage } from "@agentprism/contracts";
 import { fromLcMessages } from "@agentprism/driver-langchain";
-import { canonicalToolName } from "@agentprism/driver-registry";
+import { canonicalToolName } from "@agentprism/driver-run-support";
 import type { AgentStateType, ReasoningGraphDeps } from "./state.js";
 
 interface ToolCallLike {

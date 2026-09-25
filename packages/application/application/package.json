@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/application",
+  "description": "Use-case service layer: arena, session, provider, workspace, and matrix services with thread and project stores.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,7 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@agentprism/arena-routing": "workspace:*",
+    "@agentprism/arena-dimensions": "workspace:*",
     "@agentprism/arena-runner": "workspace:*",
     "@agentprism/contracts": "workspace:*",
     "@agentprism/environment": "workspace:*",

@@ -4,4 +4,4 @@ In-process native driver (`NativeDriver`, `frameworkId "native"`): turn flow and
 
 ## Dependencies
 
-- Runtime: `contracts / driver-registry / harness / telemetry`. LangChain-free.
+- Runtime: `contracts / driver-run-support / harness / telemetry`. LangChain-free.

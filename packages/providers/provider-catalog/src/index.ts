@@ -1,6 +1,6 @@
 /**
- * @file provider-capability package barrel
- * @description Public exports for the provider-capability package.
+ * @file provider-catalog package barrel
+ * @description Public exports for the provider-catalog package.
  *
  * Responsibilities:
  * - Re-export the provider seam: endpoint catalog, config parsing/storage,

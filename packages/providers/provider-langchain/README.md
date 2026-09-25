@@ -4,4 +4,4 @@ SDK adapter leaf: builds chat models from config (including thinking-budget mapp
 
 ## Dependencies
 
-- Runtime: `contracts / provider-capability`, plus `@langchain/core`, `@langchain/openai`, `@langchain/anthropic`.
+- Runtime: `contracts / provider-catalog`, plus `@langchain/core`, `@langchain/openai`, `@langchain/anthropic`.

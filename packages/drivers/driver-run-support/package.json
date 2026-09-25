@@ -1,5 +1,6 @@
 {
-  "name": "@agentprism/arena-routing",
+  "name": "@agentprism/driver-run-support",
+  "description": "Shared driver run support: arena event translation, tool batch execution, step budgets, and reasoning mode helpers.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,11 +19,10 @@
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/dimensions": "workspace:*",
-    "@agentprism/harness": "workspace:*"
+    "@agentprism/harness": "workspace:*",
+    "@agentprism/telemetry": "workspace:*"
   },
   "devDependencies": {
-    "@agentprism/evaluation": "workspace:*",
     "@types/node": "^24"
   }
 }

@@ -13,4 +13,4 @@ AutoGen 模式 framework driver：带 LLM speaker 选择的可对话 group chat�
 
 ## 依赖
 
-- Runtime：`contracts / driver-registry / harness / telemetry`。
+- Runtime：`contracts / driver-run-support / harness / telemetry`。

@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { mergeEndpointKeys, connectionFingerprint } from "@agentprism/provider-capability";
+import { mergeEndpointKeys, connectionFingerprint } from "@agentprism/provider-catalog";
 
 describe("mergeEndpointKeys fingerprint inheritance", () => {
   const existing = [

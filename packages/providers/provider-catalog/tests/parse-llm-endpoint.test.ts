@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { IdGenerator } from "@agentprism/contracts";
-import { normalizeModelIds, normalizeThinkingLevels, parseLlmEndpoint } from "@agentprism/provider-capability";
+import { normalizeModelIds, normalizeThinkingLevels, parseLlmEndpoint } from "@agentprism/provider-catalog";
 
 const ids: IdGenerator = { next: () => "gen-1" };
 

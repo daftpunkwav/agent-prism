@@ -25,7 +25,7 @@ import {
   type JudgeResponse,
   type TaskTemplate,
 } from "@agentprism/contracts";
-import { getTemplate, listTemplates, type DimensionRouter } from "@agentprism/arena-routing";
+import { getTemplate, listTemplates, type DimensionRouter } from "@agentprism/arena-dimensions";
 import { outlineDigest, outlineTurns } from "@agentprism/session-outline";
 import type { ArenaRunner } from "@agentprism/arena-runner";
 import { AppError } from "./errors.js";

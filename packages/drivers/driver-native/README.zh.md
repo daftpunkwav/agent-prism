@@ -7,4 +7,4 @@
 
 ## 依赖
 
-- Runtime：`contracts / driver-registry / harness / telemetry`。不使用 LangChain。
+- Runtime：`contracts / driver-run-support / harness / telemetry`。不使用 LangChain。

@@ -10,7 +10,7 @@
 
 import type { ArenaEvent, LlmAssistantMessage, LlmMessage, ToolDefinition } from "@agentprism/contracts";
 import { applyContextPipeline, type AgentExecutionContext } from "@agentprism/harness";
-import { eventOf } from "@agentprism/driver-registry";
+import { eventOf } from "@agentprism/driver-run-support";
 import {
   phaseHint,
   shouldBindTools,

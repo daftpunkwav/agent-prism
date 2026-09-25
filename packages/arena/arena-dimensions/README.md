@@ -1,4 +1,4 @@
-# `@agentprism/arena-routing`
+# `@agentprism/arena-dimensions`
 
 Dimension routing and baselines: pure config semantics from dimensions to pipeline configs, never touching execution.
 

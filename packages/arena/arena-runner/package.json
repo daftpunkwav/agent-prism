@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/arena-runner",
+  "description": "Parallel multi-column arena runner with per-column logs.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,7 +19,7 @@
   },
   "dependencies": {
     "@agentprism/agent": "workspace:*",
-    "@agentprism/arena-routing": "workspace:*",
+    "@agentprism/arena-dimensions": "workspace:*",
     "@agentprism/contracts": "workspace:*",
     "@agentprism/harness": "workspace:*",
     "@agentprism/runtime": "workspace:*",

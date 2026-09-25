@@ -9,5 +9,5 @@ SDK adapter leaf：从 config 构建 chat model，含 thinking-budget 映射与�
 
 ## 依赖
 
-- Runtime：`contracts / provider-capability`，加上 `@langchain/core`、
+- Runtime：`contracts / provider-catalog`，加上 `@langchain/core`、
   `@langchain/openai`、`@langchain/anthropic`。

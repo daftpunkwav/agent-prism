@@ -32,9 +32,9 @@ importers:
       '@agentprism/application':
         specifier: workspace:*
         version: link:../../packages/application/application
-      '@agentprism/arena-routing':
+      '@agentprism/arena-dimensions':
         specifier: workspace:*
-        version: link:../../packages/arena/arena-routing
+        version: link:../../packages/arena/arena-dimensions
       '@agentprism/arena-runner':
         specifier: workspace:*
         version: link:../../packages/arena/arena-runner
@@ -74,9 +74,9 @@ importers:
       '@agentprism/driver-plan-execute':
         specifier: workspace:*
         version: link:../../packages/drivers/driver-plan-execute
-      '@agentprism/driver-registry':
+      '@agentprism/driver-run-support':
         specifier: workspace:*
-        version: link:../../packages/drivers/driver-registry
+        version: link:../../packages/drivers/driver-run-support
       '@agentprism/driver-self-critique':
         specifier: workspace:*
         version: link:../../packages/drivers/driver-self-critique
@@ -101,9 +101,9 @@ importers:
       '@agentprism/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence/persistence
-      '@agentprism/provider-capability':
+      '@agentprism/provider-catalog':
         specifier: workspace:*
-        version: link:../../packages/providers/provider-capability
+        version: link:../../packages/providers/provider-catalog
       '@agentprism/provider-langchain':
         specifier: workspace:*
         version: link:../../packages/providers/provider-langchain
@@ -251,9 +251,9 @@ importers:
 
   packages/application/application:
     dependencies:
-      '@agentprism/arena-routing':
+      '@agentprism/arena-dimensions':
         specifier: workspace:*
-        version: link:../../arena/arena-routing
+        version: link:../../arena/arena-dimensions
       '@agentprism/arena-runner':
         specifier: workspace:*
         version: link:../../arena/arena-runner
@@ -305,7 +305,7 @@ importers:
         specifier: ^24
         version: 24.13.4
 
-  packages/arena/arena-routing:
+  packages/arena/arena-dimensions:
     dependencies:
       '@agentprism/contracts':
         specifier: workspace:*
@@ -329,9 +329,9 @@ importers:
       '@agentprism/agent':
         specifier: workspace:*
         version: link:../../agent/agent
-      '@agentprism/arena-routing':
+      '@agentprism/arena-dimensions':
         specifier: workspace:*
-        version: link:../arena-routing
+        version: link:../arena-dimensions
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../contracts/contracts
@@ -499,9 +499,9 @@ importers:
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../contracts/contracts
-      '@agentprism/driver-registry':
+      '@agentprism/driver-run-support':
         specifier: workspace:*
-        version: link:../driver-registry
+        version: link:../driver-run-support
       '@agentprism/harness':
         specifier: workspace:*
         version: link:../../harness/harness
@@ -524,9 +524,9 @@ importers:
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../contracts/contracts
-      '@agentprism/driver-registry':
+      '@agentprism/driver-run-support':
         specifier: workspace:*
-        version: link:../driver-registry
+        version: link:../driver-run-support
       '@agentprism/harness':
         specifier: workspace:*
         version: link:../../harness/harness
@@ -549,9 +549,9 @@ importers:
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../contracts/contracts
-      '@agentprism/driver-registry':
+      '@agentprism/driver-run-support':
         specifier: workspace:*
-        version: link:../driver-registry
+        version: link:../driver-run-support
       '@agentprism/harness':
         specifier: workspace:*
         version: link:../../harness/harness
@@ -586,9 +586,9 @@ importers:
       '@agentprism/driver-langchain':
         specifier: workspace:*
         version: link:../driver-langchain
-      '@agentprism/driver-registry':
+      '@agentprism/driver-run-support':
         specifier: workspace:*
-        version: link:../driver-registry
+        version: link:../driver-run-support
       '@agentprism/harness':
         specifier: workspace:*
         version: link:../../harness/harness
@@ -614,9 +614,9 @@ importers:
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../contracts/contracts
-      '@agentprism/driver-registry':
+      '@agentprism/driver-run-support':
         specifier: workspace:*
-        version: link:../driver-registry
+        version: link:../driver-run-support
       '@agentprism/harness':
         specifier: workspace:*
         version: link:../../harness/harness
@@ -639,9 +639,9 @@ importers:
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../contracts/contracts
-      '@agentprism/driver-registry':
+      '@agentprism/driver-run-support':
         specifier: workspace:*
-        version: link:../driver-registry
+        version: link:../driver-run-support
       '@agentprism/harness':
         specifier: workspace:*
         version: link:../../harness/harness
@@ -659,7 +659,7 @@ importers:
         specifier: ^24
         version: 24.13.4
 
-  packages/drivers/driver-registry:
+  packages/drivers/driver-run-support:
     dependencies:
       '@agentprism/contracts':
         specifier: workspace:*
@@ -680,9 +680,9 @@ importers:
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../contracts/contracts
-      '@agentprism/driver-registry':
+      '@agentprism/driver-run-support':
         specifier: workspace:*
-        version: link:../driver-registry
+        version: link:../driver-run-support
       '@agentprism/harness':
         specifier: workspace:*
         version: link:../../harness/harness
@@ -827,7 +827,7 @@ importers:
         specifier: ^24
         version: 24.13.4
 
-  packages/providers/provider-capability:
+  packages/providers/provider-catalog:
     dependencies:
       '@agentprism/config':
         specifier: workspace:*
@@ -848,9 +848,9 @@ importers:
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../contracts/contracts
-      '@agentprism/provider-capability':
+      '@agentprism/provider-catalog':
         specifier: workspace:*
-        version: link:../provider-capability
+        version: link:../provider-catalog
       '@langchain/anthropic':
         specifier: ^1.0.0
         version: 1.5.10(@langchain/core@1.2.10(openai@7.14.0(undici@8.10.2)(zod@4.6.1)))

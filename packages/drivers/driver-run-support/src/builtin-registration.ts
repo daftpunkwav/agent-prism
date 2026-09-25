@@ -31,7 +31,7 @@ export async function registerDriversBestEffort(
       registry.register(await loader.load());
     } catch (error) {
       console.warn(
-        `[driver-registry] ${loader.name} driver registration failed: ${error instanceof Error ? error.message : String(error)}`,
+        `[driver-run-support] ${loader.name} driver registration failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

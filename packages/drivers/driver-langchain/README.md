@@ -4,4 +4,4 @@ LangChain driver (`LangChainDriver`, `frameworkId "langchain"`) plus the LC/mess
 
 ## Dependencies
 
-- Runtime: `contracts / driver-registry / harness`, plus `@langchain/core`, `langchain`, `zod`.
+- Runtime: `contracts / driver-run-support / harness`, plus `@langchain/core`, `langchain`, `zod`.

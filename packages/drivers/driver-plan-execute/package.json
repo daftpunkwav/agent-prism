@@ -1,5 +1,6 @@
 {
   "name": "@agentprism/driver-plan-execute",
+  "description": "Plan-execute driver: branching planner plus streaming executor with replan budget.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,7 +19,7 @@
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/driver-registry": "workspace:*",
+    "@agentprism/driver-run-support": "workspace:*",
     "@agentprism/harness": "workspace:*",
     "@agentprism/telemetry": "workspace:*"
   },

@@ -4,4 +4,4 @@ LangGraph driver (`LangGraphDriver`, `frameworkId "langgraph"`): reasoning-mode 
 
 ## Dependencies
 
-- Runtime: `contracts / driver-langchain / driver-registry / harness`, plus `@langchain/core`, `@langchain/langgraph`.
+- Runtime: `contracts / driver-langchain / driver-run-support / harness`, plus `@langchain/core`, `@langchain/langgraph`.

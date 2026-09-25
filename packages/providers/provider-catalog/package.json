@@ -1,5 +1,6 @@
 {
-  "name": "@agentprism/driver-registry",
+  "name": "@agentprism/provider-catalog",
+  "description": "Provider seam: endpoint catalog, config parsing and storage, lookup adapters, and thinking parameter mapping.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,8 +19,8 @@
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/harness": "workspace:*",
-    "@agentprism/telemetry": "workspace:*"
+    "@agentprism/config": "workspace:*",
+    "@agentprism/persistence": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24"

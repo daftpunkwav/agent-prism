@@ -37,7 +37,7 @@ import {
   executeToolCalls,
   formatCapabilityPluginIds,
   stepBudgetFor,
-} from "@agentprism/driver-registry";
+} from "@agentprism/driver-run-support";
 import {
   MANAGER_INSTRUCTION,
   SEQUENTIAL_TASKS,
