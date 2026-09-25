@@ -63,8 +63,10 @@ dimension falls back to the builtin strategies only.
 
 ## Notes and constraints
 
-- Strategy ids must not collide with the builtin ids (`sliding`, `summary`,
-  `vector`, `hybrid`, `tool_tail`, `token_budget`).
+- Strategy ids must not collide with the reserved pipeline ids (`sliding`,
+  `summary`, `vector`, `hybrid`, `tool_tail`, `token_budget`, `budget`,
+  `checkpoint`): a colliding id would be dispatched to the builtin strategy
+  instead of the plugin.
 - Plugins are applied by the shared policy tail: sanitize + tool grounding
   always run, so custom strategies cannot leak unsafe tool output.
 - Localized labels: without a frontend catalog key the English `label` is

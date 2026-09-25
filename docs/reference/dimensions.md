@@ -5,7 +5,7 @@ Sources of truth: `DimensionIdSchema` in `packages/contracts/contracts/src/enums
 modules in `packages/dimensions/dimensions/src/dimensions/`, and the templates in
 `packages/arena/arena-routing/src/task-templates.ts`.
 
-## The 15 dimensions
+## The 16 dimensions
 
 | Dimension | PipelineConfig field | Options, default in bold | Option source |
 |---|---|---|---|
@@ -17,6 +17,7 @@ modules in `packages/dimensions/dimensions/src/dimensions/`, and the templates i
 | `temperature` | `temperature` | **0**, 0.3, 0.7, 1, plus any custom value from 0 to 2 | static |
 | `model` | `endpoint_id` | provider endpoints | runtime-synced from the provider catalog |
 | `thinking` | `thinking_level` | **off**, low, medium, high | static |
+| `thinking_budget` | `thinking_budget` | **0** (follow level), 2048, 8192, 16384, 32768, 65536, plus any custom value from 0 to 1 000 000 | static seeds, overwritten by provider sync (Anthropic Messages default endpoints only) |
 | `max_steps` | `max_steps` | 5, **10**, 15, 20, plus any custom value from 1 to 100 000 or `unlimited` | static |
 | `toolset` | `toolset` | **full**, edit_run, read_only | static |
 | `mcp` | `mcp_policy` | **off**, fs, full | static |

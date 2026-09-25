@@ -7,7 +7,7 @@
 `packages/dimensions/dimensions/src/dimensions/` 中的选项模块，以及
 `packages/arena/arena-routing/src/task-templates.ts` 中的 templates。
 
-## 15 个 dimensions
+## 16 个 dimensions
 
 | Dimension | PipelineConfig 字段 | 选项，默认值加粗 | 选项来源 |
 |---|---|---|---|
@@ -19,6 +19,7 @@
 | `temperature` | `temperature` | **0**、0.3、0.7、1，以及 0 至 2 的任意自定义值 | static |
 | `model` | `endpoint_id` | provider endpoints | 从 provider catalog 运行时同步 |
 | `thinking` | `thinking_level` | **off**、low、medium、high | static |
+| `thinking_budget` | `thinking_budget` | **0**（跟随 level）、2048、8192、16384、32768、65536，以及 0 至 1 000 000 的任意自定义值 | static 种子，由 provider sync 覆盖写（仅限 Anthropic Messages 默认 endpoint） |
 | `max_steps` | `max_steps` | 5、**10**、15、20，以及 1 至 100 000 的任意自定义值或 `unlimited` | static |
 | `toolset` | `toolset` | **full**、edit_run、read_only | static |
 | `mcp` | `mcp_policy` | **off**、fs、full | static |
