@@ -28,7 +28,11 @@ describe.skipIf(process.platform !== "win32")("windows restricted-token sandbox 
     rmSync(outsideFile, { force: true });
   });
 
-  function sandboxed(command: string, timeoutSeconds = 60) {
+  // 90s default process budget: sandbox setup (ACL + restricted token) plus
+  // PS spawn sits near 60s on slow CI runners under coverage parallel load,
+  // returning kind:"timeout" before the vitest 120s ceiling; the extra 30s is
+  // headroom only — real runs settle in a few seconds locally.
+  function sandboxed(command: string, timeoutSeconds = 90) {
     return runProcess({
       argv: ["powershell.exe", ...WIN32_PS_ARGS, command],
       cwd: root,

@@ -27,6 +27,9 @@ function tempWorkspace() {
 }
 
 describe("bashTool", () => {
+  // 90s budget: this spawn test sits near the global 30s timeout on slow CI
+  // runners under coverage parallel load (locally it finishes in ~5s); the
+  // larger ceiling only adds headroom, it never waits on a fast host.
   it("captures command output", async () => {
     const ws = tempWorkspace();
     try {
@@ -36,7 +39,7 @@ describe("bashTool", () => {
     } finally {
       ws.cleanup();
     }
-  });
+  }, 90_000);
 
   it("refuses empty commands as a tool error", async () => {
     const ws = tempWorkspace();
