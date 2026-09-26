@@ -14,7 +14,7 @@ prompt、reasoning mode、model 与 tool policy 下并排运行，对产生的�
 |---|---|---|
 | **Run** | 一次对比执行：一个问题加每列选择 | `@agentprism/arena` `arena-runner` |
 | **Column / pipeline** | 一次 run 内的一条并排变体；SSE `pipeline` 字段是其显示 label 与聚合键 | `contracts/events.ts` `ArenaEventBase` |
-| **Dimension** | 一条对比变量轴，共 14 个 id：framework、prompt、reasoning、context、harness、temperature、model、thinking、max_steps、toolset、mcp、skill、orchestration、memory | `contracts/enums.ts`、`@agentprism/dimensions` |
+| **Dimension** | 一条对比变量轴，共 16 个 id：framework、prompt、reasoning、context、harness、temperature、model、thinking、thinking_budget、max_steps、toolset、mcp、skill、orchestration、memory、history_mode | `contracts/enums.ts`、`@agentprism/dimensions` |
 | **Driver** | 实现 `AgentDriver` port 的 loop-architecture backend：native、langchain、langgraph、plan_execute、self_critique、autogen、crewai | `@agentprism/driver-*` |
 | **Harness** | 中性执行语义：prompt 装配、context pipeline、reasoning 模式、verification 与 reflection 循环 | `@agentprism/harness` |
 | **Toolset** | 具名 tool 表范围：`full` 含 22 个 tool，`edit_run` 含 19 个，`read_only` 含 10 个 | `contracts/enums.ts` `TOOL_NAMES_BY_TOOLSET` |

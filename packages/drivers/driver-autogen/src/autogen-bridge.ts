@@ -13,18 +13,26 @@
  *
  * The framework keeps the orchestration (group chat, speaker selection,
  * termination); the arena keeps the model, the tools, the budget, and the logs.
+ *
+ * Intentionally isomorphic with driver-crewai/src/crewai-bridge.ts: the event
+ * pump, the tool handler, and the outcome tail are mirrored and structural
+ * changes must land in both. The real divergences are the llm handler (tool
+ * binding here vs the crewai step-budget note) and the event-channel mapping
+ * (coder/reviewer thought+reflect here vs crewai reflect-only).
  */
 
 import { fileURLToPath } from "node:url";
-import type { ArenaEvent, LlmAssistantMessage, LlmMessage, ToolDefinition } from "@agentprism/contracts";
+import type { ArenaEvent, LlmAssistantMessage, ToolDefinition } from "@agentprism/contracts";
 import { arenaErrorEvent, completeEvent, sanitizeErrorMessage } from "@agentprism/contracts";
 import { buildMetrics } from "@agentprism/telemetry";
 import type { AgentExecutionContext } from "@agentprism/harness";
+import { recordAdapterUsage } from "@agentprism/harness";
 import {
   eventOf,
   runChildBridge,
   executeToolCalls,
   stepBudgetFor,
+  toLlmMessage,
   type ChildBridgeHandlers,
 } from "@agentprism/driver-run-support";
 
@@ -76,7 +84,20 @@ export async function* runAutogenFrameworkBridge(options: AutogenBridgeOptions):
       stats.turns += 1;
       stats.step += 1;
       const messages = request.messages.map(toLlmMessage);
-      const result = await context.llm.invoke(messages, { signal: context.signal });
+      // Bind the arena definitions the bootstrap forwarded for this completion:
+      // without them the model can never emit the toolCalls the bridge client
+      // turns into autogen FunctionCalls. Tool-less turns (the reviewer agent
+      // has no tools) arrive with an empty list and stay tool-free.
+      const callTools = (request.tools ?? [])
+        .map((tool) => toolDefinitions.find((definition) => definition.name === tool.name))
+        .filter((definition) => definition !== undefined);
+      const result = await context.llm.invoke(messages, {
+        signal: context.signal,
+        ...(callTools.length > 0 ? { tools: callTools } : {}),
+      });
+      // The header contract: bridge completions land in the token tracker like
+      // every other model call (the bootstrap client reports zero usage).
+      recordAdapterUsage(result.usage, tracker);
       return JSON.stringify({
         content: result.text,
         toolCalls: (result.toolCalls ?? []).map((call) => ({
@@ -194,37 +215,4 @@ export async function* runAutogenFrameworkBridge(options: AutogenBridgeOptions):
     agentId: context.identity.agentId,
     timestamp: context.clock.now(),
   });
-}
-
-/** Converts one neutral bridge message into the harness LlmMessage shape. */
-function toLlmMessage(message: {
-  role: string;
-  content: string;
-  name?: string;
-  toolCallId?: string;
-  toolCalls?: Array<{ id: string; name: string; args: string }>;
-}): LlmMessage {
-  if (message.role === "assistant") {
-    const toolCalls = (message.toolCalls ?? []).map((call) => {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(call.args) as Record<string, unknown>;
-      } catch {
-        args = {};
-      }
-      return { id: call.id, name: call.name, args };
-    });
-    return {
-      role: "assistant",
-      content: message.content,
-      ...(toolCalls.length > 0 ? { toolCalls } : {}),
-    };
-  }
-  if (message.role === "tool") {
-    return { role: "tool", content: message.content, toolCallId: message.toolCallId ?? "", name: message.name ?? "" };
-  }
-  if (message.role === "system") {
-    return { role: "system", content: message.content };
-  }
-  return { role: "user", content: message.content };
 }

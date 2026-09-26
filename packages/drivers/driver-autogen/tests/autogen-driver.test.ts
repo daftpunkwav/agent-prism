@@ -2,7 +2,7 @@
  * @file autogen-driver test
  * @description Locks group-chat rounds: selection, tool proxy, termination, budgets.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmStreamPart, ToolDefinition } from "@agentprism/contracts";
 import { extractAnswerFromEvents, PipelineConfigSchema } from "@agentprism/contracts";
 import { RagStoreCache } from "@agentprism/harness";
@@ -156,5 +156,36 @@ describe("AutogenDriver", () => {
     expect(banner?.content).toContain("temp=0");
     expect(banner?.content).toContain("model=");
     expect(banner?.content).toContain("max_steps=16");
+  });
+});
+
+describe("AutogenDriver runtime picker", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("fails closed when ARENA_AUTOGEN_RUNTIME=python and the probe finds no interpreter", async () => {
+    vi.stubEnv("ARENA_AUTOGEN_RUNTIME", "python");
+    // A nonexistent interpreter makes the probe fail deterministically on any
+    // machine, installed framework or not.
+    vi.stubEnv("ARENA_PYTHON", "definitely-not-a-real-interpreter-xyz");
+    await expect(collect(new AutogenDriver(), contextWith(stubLlm([], [])))).rejects.toThrow(
+      /ARENA_AUTOGEN_RUNTIME=python requires a Python interpreter with the autogen-agentchat package/,
+    );
+  });
+
+  it("runs the pattern fallback without probing under ARENA_AUTOGEN_RUNTIME=ts", async () => {
+    vi.stubEnv("ARENA_AUTOGEN_RUNTIME", "ts");
+    const llm = stubLlm(
+      ["reviewer"],
+      [{ text: `${AUTOGEN_TERMINATE_KEYWORD}: nothing to do` }],
+    );
+    const events = await collect(new AutogenDriver(), contextWith(llm));
+    // Pattern-fallback markers: the speaker-selection reflects only the
+    // TypeScript loop emits.
+    const reflects = events.filter((event) => event.type === "reflect").map((event) => event.content);
+    expect(reflects.some((content) => content.includes("speaker: reviewer"))).toBe(true);
+    const complete = events.find((event) => event.type === "complete");
+    expect(complete?.metrics?.success).toBe(true);
   });
 });

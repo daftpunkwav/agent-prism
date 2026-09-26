@@ -5,14 +5,18 @@
  * Responsibilities:
  * - Resolve the interpreter (env override -> python -> python3)
  * - Probe one framework module import per probe call
- * - Cache successful probes module-wide; failures re-probe on demand
+ * - Cache probe outcomes module-wide (success and failure alike) for the
+ *   process lifetime; installing a framework requires a restart
  *
  * Probe policy: `auto` probes and falls back to the TypeScript pattern runtime
  * on any failure; `python` forces the framework runtime (a failed probe throws
  * at the caller); `ts` skips the probe entirely.
  */
 
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 /** Runtime selection for a dual-runtime driver. */
 export type BridgeRuntime = "auto" | "python" | "ts";
@@ -30,14 +34,19 @@ const probeCache = new Map<string, boolean>();
  * (or test worker) gets a stable runtime choice at zero per-run cost. Freshly
  * installing a framework therefore requires a server restart — documented in
  * the driver READMEs alongside the setup steps.
+ *
+ * The probe is async on purpose: importing a heavy framework can take seconds,
+ * and the first probe happens on the request path (a column's driver.run), so
+ * a sync spawn would freeze the whole server event loop for that duration.
  */
-export function canImport(interpreter: string, moduleName: string): boolean {
+export async function canImport(interpreter: string, moduleName: string): Promise<boolean> {
   const key = `${interpreter}:${moduleName}`;
   const cached = probeCache.get(key);
   if (cached !== undefined) return cached;
   try {
-    execFileSync(interpreter, ["-c", `import ${moduleName}`], {
-      stdio: "ignore",
+    // Output is discarded either way: `python -c "import module"` prints
+    // nothing on success, and the rejection path only reads the exit status.
+    await execFileAsync(interpreter, ["-c", `import ${moduleName}`], {
       timeout: 15_000,
     });
     probeCache.set(key, true);
@@ -60,9 +69,12 @@ export function interpreterCandidates(env: NodeJS.ProcessEnv = process.env): str
  * when none does (or none exists). `python` is probed before `python3` because
  * Windows ships only the unversioned name.
  */
-export function probeFrameworkRuntime(moduleName: string, env: NodeJS.ProcessEnv = process.env): string | null {
+export async function probeFrameworkRuntime(
+  moduleName: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | null> {
   for (const interpreter of interpreterCandidates(env)) {
-    if (canImport(interpreter, moduleName)) return interpreter;
+    if (await canImport(interpreter, moduleName)) return interpreter;
   }
   return null;
 }

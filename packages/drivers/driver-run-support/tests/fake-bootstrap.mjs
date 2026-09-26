@@ -31,6 +31,13 @@ if (scenario === "happy") {
   });
 } else if (scenario === "error") {
   emit({ type: "error", message: "framework exploded" });
+} else if (scenario === "junk") {
+  // Valid-JSON lines that are not protocol messages (the bare `null` used to
+  // crash the host): all of them must be dropped, the final must still land.
+  process.stdout.write("null\n");
+  process.stdout.write("\"just a string\"\n");
+  process.stdout.write("[1, 2, 3]\n");
+  emit({ type: "final", answer: "bridge answer" });
 } else if (scenario === "hang") {
   // One llm request, then nothing: the host's abort/kill is the only way out,
   // and the late llm_response write lands on the dead child's stdin. The

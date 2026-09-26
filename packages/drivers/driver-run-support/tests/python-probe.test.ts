@@ -19,14 +19,14 @@ describe("runtimeFromEnv", () => {
 });
 
 describe("canImport", () => {
-  it("caches the probe outcome per interpreter and module", () => {
+  it("caches the probe outcome per interpreter and module", async () => {
     // stdlib module: always importable on the probe interpreter.
-    expect(canImport("python", "json")).toBe(true);
+    expect(await canImport("python", "json")).toBe(true);
     // Second call must hit the cache (identical result, no spawn).
-    expect(canImport("python", "json")).toBe(true);
+    expect(await canImport("python", "json")).toBe(true);
     // Nonexistent module: cached false.
-    expect(canImport("python", "no_such_module_xyz")).toBe(false);
-    expect(canImport("python", "no_such_module_xyz")).toBe(false);
+    expect(await canImport("python", "no_such_module_xyz")).toBe(false);
+    expect(await canImport("python", "no_such_module_xyz")).toBe(false);
   });
 });
 
@@ -39,9 +39,9 @@ describe("interpreterCandidates", () => {
 });
 
 describe("probeFrameworkRuntime", () => {
-  it("finds an interpreter that imports a real module and null for an impossible one", () => {
+  it("finds an interpreter that imports a real module and null for an impossible one", async () => {
     // "json" is stdlib on any real interpreter, so the probe resolves.
-    expect(probeFrameworkRuntime("json", { ARENA_PYTHON: "python" })).toBe("python");
-    expect(probeFrameworkRuntime("no_such_module_xyz", { ARENA_PYTHON: "python" })).toBeNull();
+    expect(await probeFrameworkRuntime("json", { ARENA_PYTHON: "python" })).toBe("python");
+    expect(await probeFrameworkRuntime("no_such_module_xyz", { ARENA_PYTHON: "python" })).toBeNull();
   });
 });

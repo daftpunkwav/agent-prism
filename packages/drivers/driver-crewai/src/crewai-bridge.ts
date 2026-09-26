@@ -16,6 +16,12 @@
  * The framework keeps the orchestration (role crew, sequential/hierarchical
  * process, delegation); the arena keeps the model, the tools, the budget, and
  * the logs.
+ *
+ * Intentionally isomorphic with driver-autogen/src/autogen-bridge.ts: the event
+ * pump, the tool handler, and the outcome tail are mirrored and structural
+ * changes must land in both. The real divergences are the llm handler (the
+ * host-side step-budget note here vs autogen tool binding) and the event-channel
+ * mapping (reflect-only here vs autogen coder/reviewer thought+reflect).
  */
 
 import { fileURLToPath } from "node:url";
@@ -23,11 +29,13 @@ import type { ArenaEvent, LlmAssistantMessage, LlmMessage } from "@agentprism/co
 import { arenaErrorEvent, completeEvent, sanitizeErrorMessage } from "@agentprism/contracts";
 import { buildMetrics } from "@agentprism/telemetry";
 import type { AgentExecutionContext } from "@agentprism/harness";
+import { recordAdapterUsage } from "@agentprism/harness";
 import {
   eventOf,
   runChildBridge,
   executeToolCalls,
   stepBudgetFor,
+  toLlmMessage,
   type ChildBridgeHandlers,
 } from "@agentprism/driver-run-support";
 
@@ -90,6 +98,9 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
       }
       const messages: LlmMessage[] = request.messages.map(toLlmMessage);
       const result = await context.llm.invoke(messages, { signal: context.signal });
+      // The header contract: bridge completions land in the token tracker like
+      // every other model call (the bootstrap LLM reports zero usage).
+      recordAdapterUsage(result.usage, tracker);
       return JSON.stringify({
         content: result.text,
         toolCalls: (result.toolCalls ?? []).map((call) => ({
@@ -202,37 +213,4 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
     agentId: context.identity.agentId,
     timestamp: context.clock.now(),
   });
-}
-
-/** Converts one neutral bridge message into the harness LlmMessage shape. */
-function toLlmMessage(message: {
-  role: string;
-  content: string;
-  name?: string;
-  toolCallId?: string;
-  toolCalls?: Array<{ id: string; name: string; args: string }>;
-}): LlmMessage {
-  if (message.role === "assistant") {
-    const toolCalls = (message.toolCalls ?? []).map((call) => {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(call.args) as Record<string, unknown>;
-      } catch {
-        args = {};
-      }
-      return { id: call.id, name: call.name, args };
-    });
-    return {
-      role: "assistant",
-      content: message.content,
-      ...(toolCalls.length > 0 ? { toolCalls } : {}),
-    };
-  }
-  if (message.role === "tool") {
-    return { role: "tool", content: message.content, toolCallId: message.toolCallId ?? "", name: message.name ?? "" };
-  }
-  if (message.role === "system") {
-    return { role: "system", content: message.content };
-  }
-  return { role: "user", content: message.content };
 }

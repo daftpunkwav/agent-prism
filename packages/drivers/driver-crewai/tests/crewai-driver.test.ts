@@ -2,7 +2,7 @@
  * @file crewai-driver test
  * @description Locks the sequential pipeline, hierarchical manager, and budgets.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmStreamPart, ToolDefinition } from "@agentprism/contracts";
 import { extractAnswerFromEvents, PipelineConfigSchema } from "@agentprism/contracts";
 import { RagStoreCache } from "@agentprism/harness";
@@ -209,5 +209,32 @@ describe("crew primitives", () => {
   it("grants reflexion one extra worker turn per task", () => {
     expect(taskTurnCapFor("react")).toBe(3);
     expect(taskTurnCapFor("reflexion")).toBe(4);
+  });
+});
+
+describe("CrewAIDriver runtime picker", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("fails closed when ARENA_CREWAI_RUNTIME=python and the probe finds no interpreter", async () => {
+    vi.stubEnv("ARENA_CREWAI_RUNTIME", "python");
+    // A nonexistent interpreter makes the probe fail deterministically on any
+    // machine, installed framework or not.
+    vi.stubEnv("ARENA_PYTHON", "definitely-not-a-real-interpreter-xyz");
+    await expect(collect(new CrewAIDriver(), contextWith(stubLlm([], [])))).rejects.toThrow(
+      /ARENA_CREWAI_RUNTIME=python requires a Python interpreter with the crewai package/,
+    );
+  });
+
+  it("runs the pattern fallback without probing under ARENA_CREWAI_RUNTIME=ts", async () => {
+    vi.stubEnv("ARENA_CREWAI_RUNTIME", "ts");
+    const llm = stubLlm([], [{ text: "final answer: done without the bridge" }]);
+    const events = await collect(new CrewAIDriver(), contextWith(llm));
+    // Pattern-fallback markers: the sequential task banners on reflect.
+    const reflects = events.filter((event) => event.type === "reflect").map((event) => event.content);
+    expect(reflects.some((content) => content.includes("task 1/3 → Researcher"))).toBe(true);
+    const complete = events.find((event) => event.type === "complete");
+    expect(complete?.metrics?.success).toBe(true);
   });
 });

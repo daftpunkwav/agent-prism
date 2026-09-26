@@ -10,6 +10,9 @@
  * Termination note: AUTOGEN_TERMINATE_KEYWORD is both the protocol keyword the
  * driver matches replies against and a literal embedded in the reviewer
  * instruction — renaming it changes both the wire contract and the prompt.
+ *
+ * Cross-language mirror: python/bootstrap.py embeds the coder/reviewer
+ * instructions verbatim — keep the two languages in sync.
  */
 
 import type { GroupChatSpeaker } from "./group-chat.js";

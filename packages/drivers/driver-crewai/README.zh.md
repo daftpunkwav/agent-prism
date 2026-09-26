@@ -17,3 +17,21 @@ CrewAI 模式 framework driver：角色 crew 运行任务 pipeline。
 ## 依赖
 
 - Runtime：`contracts / driver-run-support / harness / telemetry`。
+
+## 运行时
+
+该 driver 每次列运行在两个可互换的后端之间选择：
+
+- **Python 桥（真实 CrewAI）**——当带有 `crewai` 包的 Python 解释器可用时为默认。
+  `python/bootstrap.py` 运行真实的 `Crew`（researcher/coder/reviewer，
+  `ARENA_CREWAI_PROCESS` 选择 sequential 还是 hierarchical），经 NDJSON 与宿主通信：
+  每次模型补全都回环到 arena 模型端口，每次 tool 调用都经 arena tool 注册表执行，因此
+  凭据不会离开宿主进程，tool 策略/日志/预算原样生效。安装：将
+  `pip install -r python/requirements.txt` 装进 `ARENA_PYTHON` 指向的解释器（默认
+  `python`，其次 `python3`）。探测结果在 server 进程生命周期内缓存——安装框架后需重启
+  运行时。
+- **TypeScript 模式回退**——探测失败时使用。中性 transcript 的 crew pipeline
+  （sequential 与 hierarchical manager 委派）；相同 event，相同预算。
+
+`ARENA_CREWAI_RUNTIME` 强制指定一侧：`python`（不可用时失败关闭）、`ts`（跳过探测）
+或 `auto`（默认）。

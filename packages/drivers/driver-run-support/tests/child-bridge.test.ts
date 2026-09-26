@@ -54,6 +54,25 @@ describe("runChildBridge", () => {
     expect(outcome).toEqual({ ok: false, message: "framework exploded" });
   });
 
+  it("drops valid-JSON non-protocol lines and still lands the final answer", async () => {
+    // A bare `null` line used to throw inside the async handler (unhandled
+    // rejection); the guard must skip it along with scalars and arrays.
+    const outcome = await runChildBridge(baseOptions({ scenario: "junk" }));
+    expect(outcome).toEqual({ ok: true, answer: "bridge answer" });
+  });
+
+  it("reports a spawn failure as a failure instead of crashing the process", async () => {
+    const outcome: ChildBridgeOutcome = await runChildBridge({
+      ...baseOptions({ scenario: "happy" }),
+      command: "definitely-not-a-real-binary-xyz",
+      args: [],
+    });
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.message).toContain("failed to run bootstrap");
+    }
+  });
+
   it("reports a failure when the child exits without a final", async () => {
     const outcome: ChildBridgeOutcome = await runChildBridge(baseOptions({ scenario: "silent" }));
     expect(outcome.ok).toBe(false);

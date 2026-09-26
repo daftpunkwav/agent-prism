@@ -3,9 +3,9 @@
 > 语言：**简体中文** | [English](add-a-dimension.md)
 
 dimension 是一条对比变量轴。当前集合在
-`packages/contracts/contracts/src/enums.ts` 的 `DimensionIdSchema` 中有 14 个 id：
+`packages/contracts/contracts/src/enums.ts` 的 `DimensionIdSchema` 中有 16 个 id：
 framework、prompt、reasoning、context、harness、temperature、model、thinking、
-max_steps、toolset、mcp、skill、orchestration、memory。
+thinking_budget、max_steps、toolset、mcp、skill、orchestration、memory、history_mode。
 
 ## 词汇
 
@@ -20,7 +20,7 @@ id 加入 `DimensionIdSchema`，并在
 label 以及默认值，参照 `mcp.ts`、`skill.ts` 或 `orchestration.ts`。存在两种形态：
 
 - static 选项直接列出：prompt、reasoning、context、harness、temperature、thinking、
-  max_steps、toolset、mcp、skill、orchestration、memory。
+  thinking_budget、max_steps、toolset、mcp、skill、orchestration、memory、history_mode。
 - runtime-synced 选项起始为空，由 `DimensionCatalog.syncCapabilityOptions` 或
   provider sync 在启动时与 provider 变化时填充：`framework` 来自 driver registry，
   `model` 来自 provider endpoints。

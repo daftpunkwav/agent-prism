@@ -10,6 +10,9 @@
  *
  * Types come from crew via type-only imports (no runtime cycle); crew
  * re-exports the copy symbols so existing imports keep resolving.
+ *
+ * Cross-language mirror: python/bootstrap.py embeds CREW_ROLES and the
+ * sequential task copy verbatim — keep the two languages in sync.
  */
 
 import type { CrewRole, CrewTask } from "./crew.js";

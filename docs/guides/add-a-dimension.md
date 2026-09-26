@@ -1,9 +1,9 @@
 # Comparison dimensions
 
-A dimension is one variable axis of comparison. The current set has 14 ids in
+A dimension is one variable axis of comparison. The current set has 16 ids in
 `DimensionIdSchema` in `packages/contracts/contracts/src/enums.ts`: framework, prompt,
-reasoning, context, harness, temperature, model, thinking, max_steps, toolset, mcp, skill,
-orchestration, and memory.
+reasoning, context, harness, temperature, model, thinking, thinking_budget, max_steps,
+toolset, mcp, skill, orchestration, memory, and history_mode.
 
 ## Vocabulary
 
@@ -19,7 +19,8 @@ mapping is the common case. Precedents are `mcp` to `mcp_policy`, `skill` to
 `orchestration.ts`. Two flavors exist:
 
 - Static options are listed directly: prompt, reasoning, context, harness, temperature,
-  thinking, max_steps, toolset, mcp, skill, orchestration, and memory.
+  thinking, thinking_budget, max_steps, toolset, mcp, skill, orchestration, memory, and
+  history_mode.
 - Runtime-synced options start empty and are filled by
   `DimensionCatalog.syncCapabilityOptions` or provider sync at startup and on provider
   changes: `framework` from the driver registry and `model` from provider endpoints.

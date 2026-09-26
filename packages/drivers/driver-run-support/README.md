@@ -5,4 +5,5 @@ Driver seam: `FrameworkDriverRegistry` (implements `contracts.DriverLookup`; unk
 ## Dependencies
 
 - Runtime: `contracts / harness / telemetry`. No backend dependencies, no LangChain.
-- Dev-only: the three backend leaves (banner-consistency contract tests).
+- The banner-consistency contract test lives at the repo root (`tests/drivers/`) and
+  imports the backend leaves through their public barrels.

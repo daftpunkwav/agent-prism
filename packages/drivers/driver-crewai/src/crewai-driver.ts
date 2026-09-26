@@ -232,7 +232,9 @@ export class CrewAIDriver implements AgentDriver {
    */
   async *run(context: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
     const runtime = runtimeFromEnv(process.env["ARENA_CREWAI_RUNTIME"]);
-    const interpreter = runtime === "ts" ? null : probeFrameworkRuntime("crewai");
+    // Async probe: awaits instead of blocking the server event loop on the
+    // first post-start run (see python-probe.ts).
+    const interpreter = runtime === "ts" ? null : await probeFrameworkRuntime("crewai");
     if (interpreter !== null) {
       yield* runCrewaiFrameworkBridge({
         context,

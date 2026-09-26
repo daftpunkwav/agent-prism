@@ -11,4 +11,4 @@ Driver seam：`FrameworkDriverRegistry`，实现 `contracts.DriverLookup`；未�
 ## 依赖
 
 - Runtime：`contracts / harness / telemetry`。无 backend 依赖，不使用 LangChain。
-- 仅 dev：三个 backend leaf，用于 banner 一致性契约测试。
+- banner 一致性契约测试位于仓库根（`tests/drivers/`），经各 backend 的公共 barrel 导入。

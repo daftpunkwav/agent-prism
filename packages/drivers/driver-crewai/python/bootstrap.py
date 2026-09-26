@@ -106,7 +106,7 @@ class BridgeLLM(BaseLLM):
     ) -> str:
         self._counter += 1
         request_id = f"llm-{self._counter}"
-        return self._session.request(
+        payload = self._session.request(
             {
                 "type": "llm_request",
                 "id": request_id,
@@ -117,6 +117,11 @@ class BridgeLLM(BaseLLM):
                 ],
             }
         )
+        # The wire carries the completion envelope (`{"content": ..., "toolCalls":
+        # [...]}`, one shape for both llm_response and tool_result futures); unwrap
+        # it — crewai gets the plain text and owns tool calls via its ReAct loop.
+        parsed = json.loads(payload) if payload else {"content": ""}
+        return str(parsed.get("content", ""))
 
     def supports_function_calling(self) -> bool:
         # The ReAct-style text protocol on the crewai side owns tool calls;
@@ -204,6 +209,10 @@ def main() -> None:
             verbose=False,
         )
 
+    # Role copy mirrors packages/drivers/driver-crewai/src/prompts.ts
+    # (CREW_ROLES goals/backstories and the sequential task copy) verbatim: the
+    # Python bridge and the TypeScript pattern fallback must speak with the
+    # same voice.
     researcher = agent(
         RESEARCHER_NAME,
         "Gather the context the task needs",

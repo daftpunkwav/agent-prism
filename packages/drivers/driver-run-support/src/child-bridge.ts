@@ -45,6 +45,16 @@ export type ChildBridgeOutcome =
   | { ok: false; message: string };
 
 /**
+ * Cap for the partial-line stdout buffer: framework noise without newlines
+ * (progress-bar redraws emit \r only) would otherwise accumulate for the whole
+ * run. Protocol lines are orders of magnitude smaller; a truncated over-long
+ * line fails JSON.parse and drops like any other noise.
+ */
+const MAX_LINE_BUFFER_CHARS = 1_000_000;
+/** Tail kept when the cap trims the buffer (see MAX_LINE_BUFFER_CHARS). */
+const LINE_BUFFER_TAIL_CHARS = 64_000;
+
+/**
  * Runs one bootstrap session to completion. Resolves with the final answer on
  * success, or a failure object when the child errored, exited without a final,
  * or the signal aborted (message carries the abort reason).
@@ -124,6 +134,8 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
     child.stdout?.setEncoding("utf8");
     child.stdout?.on("data", (chunk: string) => {
       buffer += chunk;
+      // Bound the memory a newline-less stream can pin (see MAX_LINE_BUFFER_CHARS).
+      if (buffer.length > MAX_LINE_BUFFER_CHARS) buffer = buffer.slice(-LINE_BUFFER_TAIL_CHARS);
       let index = buffer.indexOf("\n");
       while (index !== -1) {
         const line = buffer.slice(0, index).trim();
@@ -135,6 +147,12 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
           message = JSON.parse(line) as ChildToHost;
         } catch {
           continue; // framework print noise on stdout is dropped, never parsed
+        }
+        // Valid-JSON non-protocol lines (a bare `null`, a scalar, an array) must
+        // be dropped too: touching `.type` on null would throw inside the async
+        // handler and surface as an unhandled rejection.
+        if (typeof message !== "object" || message === null || typeof message.type !== "string") {
+          continue;
         }
         void handleMessage(message);
       }
@@ -155,6 +173,15 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
         ok: false,
         message: errorMessage ?? `bootstrap exited without a final answer${stderrTail !== "" ? `: ${stderrTail}` : ""}`,
       });
+    });
+
+    // A spawn failure (ENOENT on a probed interpreter, EMFILE under load) emits
+    // 'error'; with no listener it would be raised as an uncaught exception and
+    // take the server down. Record it as the failure — 'close' settles the
+    // session on Node >= 20, and `settled` guards against a late duplicate.
+    child.on("error", (error: Error) => {
+      errorMessage = `failed to run bootstrap: ${error.message}`;
+      finish({ ok: false, message: errorMessage });
     });
 
     options.signal?.addEventListener(

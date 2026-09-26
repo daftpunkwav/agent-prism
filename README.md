@@ -152,7 +152,7 @@ vocabulary.
 | `harness` | Prompt building, context assembly, verification loop |
 | `memory` | Cross-session memory: store, episodic and semantic layers, service port |
 | `agent` | Single-column `runAgentExecution` lifecycle |
-| `drivers` | Driver registry and seven loop-architecture backends |
+| `drivers` | Shared driver run-support kit and seven loop-architecture backends |
 | `dimensions` | Experiment dimension catalog and options |
 | `evaluation` | Judging and comparison reports |
 | `providers` | LLM provider config, endpoint catalog, model construction |

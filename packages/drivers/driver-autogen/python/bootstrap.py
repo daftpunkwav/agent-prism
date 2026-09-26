@@ -69,7 +69,9 @@ class BridgeSession:
         with self._lock:
             self._pending[payload["id"]] = future
         self.send(payload)
-        return await future
+        # Bound the wait like the crewai bridge does: if the host died without
+        # killing this process, stdin EOF leaves the future unsettled forever.
+        return await asyncio.wait_for(future, timeout=600)
 
     def pump_thread(self, loop: asyncio.AbstractEventLoop) -> None:
         """Consumes host lines (llm_response / tool_result) and settles futures."""
@@ -304,6 +306,9 @@ async def main() -> None:
         BridgeTool(session, str(tool["name"]), str(tool["description"]), tool.get("parameters") or {})
         for tool in start.get("tools", [])
     ]
+    # Role copy mirrors packages/drivers/driver-autogen/src/prompts.ts
+    # (CODER_INSTRUCTION / REVIEWER_INSTRUCTION) verbatim: the Python bridge and
+    # the TypeScript pattern fallback must speak with the same voice.
     coder = AssistantAgent(
         CODER_NAME,
         system_message=(

@@ -14,6 +14,8 @@
  * host-side kill, so there is no graceful-stop line.
  */
 
+import type { LlmMessage } from "@agentprism/contracts";
+
 /** Host -> child: the startup handshake (first line the host writes). */
 export interface BridgeStart {
   type: "start";
@@ -38,8 +40,10 @@ export interface BridgeLlmRequest {
     toolCallId?: string;
     toolCalls?: Array<{ id: string; name: string; args: string }>;
   }>;
-  /** Tool schemas the model may call in this completion. */
-  tools?: Array<{ name: string; description: string }>;
+  /** Tool schemas the model may call in this completion. autogen forwards each
+      tool's full parameter schema; crewai sends names and descriptions only
+      (its ReAct text protocol owns tool calls, so `function_calling` is false). */
+  tools?: Array<{ name: string; description: string; parameters?: Record<string, unknown> }>;
 }
 
 /** Host -> child: completion result for the matching id. `content` carries the
@@ -90,3 +94,35 @@ export interface BridgeError {
 
 export type ChildToHost = BridgeLlmRequest | BridgeToolRequest | BridgeEvent | BridgeFinal | BridgeError;
 export type HostToChild = BridgeStart | BridgeLlmResponse | BridgeToolResult;
+
+/**
+ * Projects one neutral wire message into the host LlmMessage shape. Shared by
+ * both framework bridges (autogen, crewai): the projection is pure wire-contract
+ * parsing, so it lives beside the wire types. Tool-call args arrive as JSON
+ * strings; a parse failure degrades to an empty args object.
+ */
+export function toLlmMessage(message: BridgeLlmRequest["messages"][number]): LlmMessage {
+  if (message.role === "assistant") {
+    const toolCalls = (message.toolCalls ?? []).map((call) => {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(call.args) as Record<string, unknown>;
+      } catch {
+        args = {};
+      }
+      return { id: call.id, name: call.name, args };
+    });
+    return {
+      role: "assistant",
+      content: message.content,
+      ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    };
+  }
+  if (message.role === "tool") {
+    return { role: "tool", content: message.content, toolCallId: message.toolCallId ?? "", name: message.name ?? "" };
+  }
+  if (message.role === "system") {
+    return { role: "system", content: message.content };
+  }
+  return { role: "user", content: message.content };
+}
