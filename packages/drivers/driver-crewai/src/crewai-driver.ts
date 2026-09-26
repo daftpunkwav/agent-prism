@@ -30,6 +30,7 @@ import {
   buildInitialMessages,
   buildSystemUser,
   createColumnSnippetRetriever,
+  recordAdapterUsage,
   type AgentExecutionContext,
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
@@ -112,6 +113,8 @@ async function* streamWorkerTurn(
     tools: definitions,
     signal: context.signal,
   })) {
+    // Provider usage rides the adapter stream's final part, not a text or tool part.
+    if (part.usage !== undefined) recordAdapterUsage(part.usage, context.tracker);
     if (part.thinking !== undefined && part.thinking !== "") {
       yield eventOf({ type: "thinking", pipeline: label, step: streamStep, content: part.thinking, workspace: workspaceName });
     }

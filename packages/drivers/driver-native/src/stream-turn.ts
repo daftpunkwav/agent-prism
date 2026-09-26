@@ -9,7 +9,7 @@
  */
 
 import type { ArenaEvent, LlmAssistantMessage, LlmMessage, ToolDefinition } from "@agentprism/contracts";
-import { applyContextPipeline, type AgentExecutionContext } from "@agentprism/harness";
+import { applyContextPipeline, recordAdapterUsage, type AgentExecutionContext } from "@agentprism/harness";
 import { eventOf } from "@agentprism/driver-run-support";
 import {
   phaseHint,
@@ -56,6 +56,8 @@ export async function* streamLlmTurn(
   });
 
   for await (const part of llm.stream(prepared, { tools, signal: context.signal })) {
+    // Provider usage rides the adapter stream's final part, not a text or tool part.
+    if (part.usage !== undefined) recordAdapterUsage(part.usage, context.tracker);
     if (part.thinking !== undefined && part.thinking !== "") {
       yield eventOf({
         type: "thinking",

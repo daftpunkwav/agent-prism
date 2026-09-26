@@ -13,8 +13,16 @@ import { SystemClock } from "@agentprism/runtime";
 import { CrewAIDriver, taskTurnCapFor } from "../src/crewai-driver.js";
 import { CREW_COMPLETE_KEYWORD, crewProcess, parseManagerAssignment } from "../src/crew.js";
 
-/** Scripted LLM: queued invoke replies (manager) and stream replies (worker turns). */
-function stubLlm(invokes: string[], streams: Array<{ text?: string; toolCalls?: Array<{ id: string; name: string; args: Record<string, unknown> }> }>): LlmAdapter {
+/**
+ * Scripted LLM: queued invoke replies (manager) and stream replies (worker turns),
+ * plus optional provider usage reported once — the way the adapter emits it on the
+ * stream's final part.
+ */
+function stubLlm(
+  invokes: string[],
+  streams: Array<{ text?: string; toolCalls?: Array<{ id: string; name: string; args: Record<string, unknown> }> }>,
+  usage?: Record<string, unknown>,
+): LlmAdapter {
   let invokeAt = 0;
   let streamAt = 0;
   return {
@@ -23,9 +31,11 @@ function stubLlm(invokes: string[], streams: Array<{ text?: string; toolCalls?: 
       return { text, toolCalls: [] };
     },
     async *stream(): AsyncGenerator<LlmStreamPart> {
-      const reply = streams[Math.min(streamAt++, streams.length - 1)] ?? {};
+      const call = streamAt++;
+      const reply = streams[Math.min(call, streams.length - 1)] ?? {};
       if (reply.text) yield { text: reply.text };
       if (reply.toolCalls) yield { toolCalls: reply.toolCalls };
+      if (call === 0 && usage !== undefined) yield { usage };
     },
   };
 }
@@ -73,6 +83,21 @@ async function collect(driver: CrewAIDriver, ctx: AgentExecutionContext): Promis
 }
 
 describe("CrewAIDriver sequential process", () => {
+  it("reports the provider's own token counts, not a prompt-size estimate", async () => {
+    const llm = stubLlm(
+      [],
+      [{ text: "final answer: done" }],
+      { input_tokens: 4321, output_tokens: 123 },
+    );
+    const events = await collect(new CrewAIDriver(), contextWith(llm));
+    const complete = events.find((event) => event.type === "complete");
+    // Without the stream-usage wiring the tracker falls back to the seeded prompt
+    // estimate: input/output stay 0 while only the total moves.
+    expect(complete?.metrics?.input_tokens).toBe(4321);
+    expect(complete?.metrics?.output_tokens).toBe(123);
+    expect(complete?.metrics?.total_tokens).toBe(4444);
+  });
+
   it("runs research → implement → verify with task boundaries on reflect", async () => {
     const llm = stubLlm(
       [],

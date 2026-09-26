@@ -6,10 +6,12 @@
  * - Own LC message conversion (llmMessagesToLc)
  * - Provide optional bindTools for the current call
  * - Map responseFormat onto the wire's native constraint (planInvoke)
- * - Extract the vendor usage payload for the run's token tracker (usageOf)
+ * - Extract the vendor usage payload for the run's token tracker (usageOf),
+ *   on both the invoke result and the stream's final part
  *
- * Native and verification talk only to LlmAdapter; LC/LG drivers needing
- * BaseChatModel still use ColumnRuntime.llmVendor.
+ * Native, verification and the OpenAI Agents model bridge talk only to
+ * LlmAdapter; the LangChain-family drivers (LangChain, LangGraph, Deep Agents)
+ * read BaseChatModel through ColumnRuntime.llmVendor.
  */
 
 import { ChatAnthropic } from "@langchain/anthropic";
@@ -207,6 +209,11 @@ export class ChatModelLlmAdapter implements LlmAdapter {
     if (gathered !== null) {
       const toolCalls = normalizeToolCalls(gathered.tool_calls);
       if (toolCalls.length > 0) yield { toolCalls };
+      // Provider usage is only known once the stream ends, so it rides a final
+      // part: streaming consumers (the OpenAI Agents model bridge and the
+      // neutral drivers) need it to report real tokens instead of an estimate.
+      const usage = usageOf(gathered);
+      if (usage !== undefined) yield { usage };
     }
   }
 }

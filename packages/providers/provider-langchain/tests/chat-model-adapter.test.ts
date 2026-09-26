@@ -1,12 +1,15 @@
 /**
  * @file chat-model-adapter test
- * @description Locks responseFormat mapping: OpenAI response_format, Anthropic forced tool.
+ * @description Locks responseFormat mapping and streaming usage emission:
+ *              OpenAI response_format, Anthropic forced tool, and the final
+ *              usage part streaming consumers read for the token ledger.
  */
 import { describe, expect, it, vi } from "vitest";
 import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
 import { FINAL_ANSWER_RESPONSE_FORMAT } from "@agentprism/contracts";
+import type { LlmStreamPart } from "@agentprism/contracts";
 import { ChatModelLlmAdapter } from "@agentprism/provider-langchain";
 
 const USER_MESSAGE = [{ role: "user" as const, content: "x" }];
@@ -62,5 +65,50 @@ describe("ChatModelLlmAdapter responseFormat", () => {
 
     expect(invokeSpy.mock.calls[0]?.[1]).not.toHaveProperty("response_format");
     expect(result.text).toBe("plain");
+  });
+});
+
+describe("ChatModelLlmAdapter streaming", () => {
+  /** Model whose stream completes with vendor usage on the final chunk. */
+  function streamingModel(chunks: AIMessageChunk[]): ChatOpenAI {
+    const model = new ChatOpenAI({ apiKey: "test", model: "gpt-4o" });
+    vi.spyOn(model, "stream").mockResolvedValue(
+      (async function* () {
+        for (const chunk of chunks) yield chunk;
+      })() as never,
+    );
+    return model;
+  }
+
+  it("emits a final usage part so streaming callers can report real tokens", async () => {
+    const model = streamingModel([
+      new AIMessageChunk({ content: "hi " }),
+      new AIMessageChunk({ content: "there", usage_metadata: { input_tokens: 11, output_tokens: 3, total_tokens: 14 } }),
+    ]);
+    const parts: LlmStreamPart[] = [];
+    for await (const part of new ChatModelLlmAdapter(model).stream(USER_MESSAGE)) parts.push(part);
+
+    expect(parts.map((part) => part.text ?? "").join("")).toBe("hi there");
+    // The payload is the vendor's own usage object (LC adds detail maps), so the
+    // test pins the counters the tracker reads, not the whole shape.
+    expect(parts.at(-1)?.usage).toMatchObject({ input_tokens: 11, output_tokens: 3, total_tokens: 14 });
+  });
+
+  it("falls back to response_metadata usage when usage_metadata is absent", async () => {
+    const model = streamingModel([
+      new AIMessageChunk({ content: "x", response_metadata: { usage: { prompt_tokens: 7, completion_tokens: 2 } } }),
+    ]);
+    const parts: LlmStreamPart[] = [];
+    for await (const part of new ChatModelLlmAdapter(model).stream(USER_MESSAGE)) parts.push(part);
+
+    expect(parts.at(-1)?.usage).toMatchObject({ prompt_tokens: 7, completion_tokens: 2 });
+  });
+
+  it("emits no usage part when the provider reports none", async () => {
+    const model = streamingModel([new AIMessageChunk({ content: "no usage here" })]);
+    const parts: LlmStreamPart[] = [];
+    for await (const part of new ChatModelLlmAdapter(model).stream(USER_MESSAGE)) parts.push(part);
+
+    expect(parts.some((part) => part.usage !== undefined)).toBe(false);
   });
 });
