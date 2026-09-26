@@ -53,7 +53,7 @@
 }
 
 .guide-ledger-dim code {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
@@ -137,7 +137,7 @@
   font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
-  color: var(--accent);
+  color: var(--accent-text);
   padding-top: 0.15rem;
 }
 

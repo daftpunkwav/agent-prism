@@ -52,7 +52,7 @@ describe("trace display helpers", () => {
     expect(traceAccent("llm_request")).toBe("var(--spectrum-1)");
     expect(traceAccent("llm_response")).toBe("var(--spectrum-3)");
     expect(traceAccent("llm_error")).toBe("var(--destructive)");
-    expect(traceAccent("swap")).toBe("var(--spectrum-5)");
+    expect(traceAccent("swap")).toBe("var(--spectrum-4)");
     expect(traceAccent("notice")).toBe("var(--spectrum-2)");
     expect(traceAccent("phase" as BuilderTraceEntry["kind"])).toBe("var(--muted-foreground)");
   });

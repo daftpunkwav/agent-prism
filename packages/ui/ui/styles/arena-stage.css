@@ -126,7 +126,7 @@
   font-size: 0.625rem;
   line-height: 1;
   font-family: var(--font-mono);
-  color: var(--accent);
+  color: var(--accent-text);
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   border-radius: 0;
   padding: 2px 5px;
@@ -543,7 +543,8 @@
 }
 
 /* Dimension switcher: a UiSelect dressed as a chip-toggle in the tools row.
-   Reads in the chip voice (near-black label + leading icon), like 基线/实验参数. */
+   Reads in the chip voice (near-black label + leading icon), like the baseline
+   and comparison controls. */
 .arena-setup .dim-select .ui-select-trigger {
   height: calc(1.75rem * var(--setup-k));
   min-height: calc(1.75rem * var(--setup-k));

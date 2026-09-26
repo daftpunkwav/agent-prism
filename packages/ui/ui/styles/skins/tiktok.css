@@ -2,7 +2,7 @@
   TikTok skin — brand duotone (red + cyan) on near-white (light) / ink-black
   (dark, straight from the reference), small radii, quiet shadows.
   Token source: design library "TikTok" (tiktok-design-system colors_and_type.css,
-  light :root + html.dark blocks). Light status hues below 3:1 as status text
+  light :root + html.dark blocks). Light status hues below 4.5:1 as status text
   are darkened to the palette's own deeper steps.
 */
 
@@ -25,20 +25,24 @@
   --secondary-foreground: #ffffff;
   --accent: #25f4ee;
   --accent-foreground: #161823;
+  /* The brand cyan is a glow color (1.1:1 as text on white); text rules use
+     the palette's own deep teal instead. */
+  --accent-text: #06706d;
   --ring: #fe2c55;
-  --destructive: #fe2c55;
+  --destructive: #cd0129;
   --destructive-foreground: #ffffff;
   /* Reference success (#14d6d0) and warning (#fea82f) sit under 2:1 as status
-     text on white; darkened to the palette's own deeper steps. */
-  --success: #0c8f8b;
-  --warning: #c26a00;
+     text on white; darkened to the palette's own deeper steps, tuned to clear
+     4.5:1 on every light surface (the app renders 10-13px status text). */
+  --success: #0a7370;
+  --warning: #995400;
 
-  /* Brand duotone stretched to five lanes with ink and wine; cyan deepened so
-     labels stay readable on light surfaces. */
-  --spectrum-1: #fe2c55;
-  --spectrum-2: #0fb3ae;
+  /* Brand duotone stretched to five lanes with ink and wine; lanes 1-4 double
+     as text (trace badges, guide kickers) so each is a text-safe step. */
+  --spectrum-1: #c30127;
+  --spectrum-2: #096c69;
   --spectrum-3: #44454f;
-  --spectrum-4: #d97706;
+  --spectrum-4: #8e4e04;
   --spectrum-5: #6b061d;
 
   --chart-1: var(--spectrum-1);
@@ -79,6 +83,8 @@
   --secondary-foreground: #161823;
   --accent: #7cf8f4;
   --accent-foreground: #161823;
+  /* The bright cyan clears 4.5:1 as text on the ink surfaces. */
+  --accent-text: var(--accent);
   --ring: #ff6485;
   --destructive: #ff6485;
   --destructive-foreground: #161823;
@@ -86,7 +92,7 @@
   --warning: #fea82f;
 
   /* Brand brights carry lane identity on ink surfaces. */
-  --spectrum-1: #ff6485;
+  --spectrum-1: #ff6e8d;
   --spectrum-2: #7cf8f4;
   --spectrum-3: #fea82f;
   --spectrum-4: #ababb5;

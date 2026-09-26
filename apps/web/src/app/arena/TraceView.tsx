@@ -251,7 +251,7 @@ const TraceStep = memo(function TraceStep({
       const banner = parsePipelineBanner(seg.text);
       return (
         <details className="trace-seg trace-banner" data-kind="banner">
-          <summary className="trace-tag cursor-pointer select-none text-muted-foreground/80">
+          <summary className="trace-tag cursor-pointer select-none text-muted-foreground">
             <ChevronRight className="trace-chevron" aria-hidden />
             <FileText className="h-3 w-3" aria-hidden />
             {banner ? banner.framework : t("arena.trace.bannerTitle")}

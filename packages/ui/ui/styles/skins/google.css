@@ -4,7 +4,8 @@
   brand four-color set for data lanes.
   Token source: design library "Google" (dl_builtin_google prototype tokens);
   the dark set is derived from Material dark conventions (the prototype ships
-  light only). The reference amber fails 3:1 as status text; darkened.
+  light only). The reference amber fails 3:1 as status text; darkened to clear
+  4.5:1.
 */
 
 [data-theme="google"] {
@@ -26,19 +27,23 @@
   --secondary-foreground: #0043ad;
   --accent: #0043ad;
   --accent-foreground: #ffffff;
+  /* Deep blue clears 4.5:1 as text on every light surface. */
+  --accent-text: var(--accent);
   --ring: #4285f4;
-  --destructive: #ea4335;
+  --destructive: #cc2316;
   --destructive-foreground: #ffffff;
-  /* Reference yellow (#fbbc05) is 1.7:1 as status text; darkened. */
-  --success: #188038;
-  --warning: #b06000;
+  /* Reference yellow (#fbbc05) is 1.7:1 as status text; darkened to clear
+     4.5:1 on every light surface (the app renders 10-13px status text). */
+  --success: #177c36;
+  --warning: #a15800;
 
   /* The four Google brand colors + deep blue: full hue separation for
-     simultaneous comparison lanes. */
-  --spectrum-1: #4285f4;
-  --spectrum-2: #ea4335;
-  --spectrum-3: #fbbc05;
-  --spectrum-4: #34a853;
+     simultaneous comparison lanes, each deepened to a text-safe step
+     (lanes 1-4 render as text in trace badges and guide kickers). */
+  --spectrum-1: #0e61eb;
+  --spectrum-2: #cc2316;
+  --spectrum-3: #896602;
+  --spectrum-4: #26793c;
   --spectrum-5: #0043ad;
 
   --chart-1: var(--spectrum-1);
@@ -78,6 +83,8 @@
   --secondary-foreground: #cfe1f9;
   --accent: #8ab4f0;
   --accent-foreground: #062e6f;
+  /* Material dark blue clears 4.5:1 as text on the dark surfaces. */
+  --accent-text: var(--accent);
   --ring: #8ab4f0;
   --destructive: #f28b82;
   --destructive-foreground: #131314;

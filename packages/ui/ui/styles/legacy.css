@@ -124,7 +124,7 @@
   padding: 0.1rem 0.35rem;
   border-radius: 0;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
-  color: var(--accent);
+  color: var(--accent-text);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   flex-shrink: 0;
   animation: fade-up var(--dur) var(--ease-out) both;
@@ -273,7 +273,7 @@
 }
 
 .metric-best-mark {
-  color: var(--accent);
+  color: var(--accent-text);
   margin-left: 4px;
   font-size: 0.6875rem;
 }

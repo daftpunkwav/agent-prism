@@ -3,7 +3,7 @@
   with #1c1c1e cards (dark), system blue accent, generous radii, soft shadows.
   Token source: design library "Apple" (apple-prototype, colors_and_type block);
   dark mode uses Apple's documented system dark colors (the prototype ships
-  light only). Light status hues below 3:1 as status text are darkened.
+  light only). Light status hues below 4.5:1 as status text are darkened.
 */
 
 [data-theme="apple"] {
@@ -23,19 +23,22 @@
   --secondary-foreground: #1d1d1f;
   --accent: #007aff;
   --accent-foreground: #ffffff;
+  /* Text-safe derivative of --accent for accent-colored text rules. */
+  --accent-text: #0064d1;
   --ring: #007aff;
-  --destructive: #ff3b30;
+  --destructive: #c90b00;
   --destructive-foreground: #ffffff;
-  /* System green/amber fail 3:1 as status text on card; darkened to Apple's
+  /* System green/amber fail 4.5:1 as status text on card; darkened to Apple's
      accessible text variants. */
-  --success: #248a3d;
-  --warning: #ad5f00;
+  --success: #1f7634;
+  --warning: #995300;
 
-  /* Reference chart palette carries lane identity (multi-hue, data elements only). */
-  --spectrum-1: #30d158;
-  --spectrum-2: #2e8dff;
-  --spectrum-3: #ff9f0a;
-  --spectrum-4: #5e5ce6;
+  /* Reference chart palette carries lane identity, deepened to text-safe steps
+     (lanes 1-4 render as text in trace badges and guide kickers). */
+  --spectrum-1: #197330;
+  --spectrum-2: #005fd2;
+  --spectrum-3: #8f5700;
+  --spectrum-4: #514fe4;
   --spectrum-5: #bf5af2;
 
   --chart-1: var(--spectrum-1);
@@ -75,17 +78,20 @@
   --secondary-foreground: #f5f5f7;
   --accent: #0a84ff;
   --accent-foreground: #ffffff;
+  /* Text-safe derivative of --accent for accent-colored text rules. */
+  --accent-text: #2e96ff;
   --ring: #0a84ff;
-  --destructive: #ff453a;
-  --destructive-foreground: #ffffff;
+  --destructive: #ff4a3f;
+  --destructive-foreground: #0a0a0c;
   --success: #30d158;
   --warning: #ff9f0a;
 
-  /* System bright chart set: full hue separation on dark cards. */
+  /* System bright chart set: full hue separation on dark cards; lane 4
+     lightened to a text-safe step (lanes 1-4 render as text). */
   --spectrum-1: #30d158;
   --spectrum-2: #64a6ff;
   --spectrum-3: #ffb340;
-  --spectrum-4: #7d7aff;
+  --spectrum-4: #918eff;
   --spectrum-5: #d68af5;
 
   --chart-1: var(--spectrum-1);

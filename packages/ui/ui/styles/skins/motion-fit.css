@@ -19,24 +19,31 @@
   --muted-foreground: #52525b;
   --border: #d4d4d8;
   --input: #ffffff;
-  --primary: #ff4000;
+  /* Primary deepened one step: as text (icons) it must clear 3:1 on muted,
+     which #ff4000 misses. */
+  --primary: #f03c00;
   --primary-foreground: #ffffff;
   --secondary: #e4e4e7;
   --secondary-foreground: #18181b;
   --accent: #ff4000;
   --accent-foreground: #ffffff;
+  /* The neon orange is a surface/energy color (2.8:1 as text on muted); text
+     rules use the deepened ink-orange instead. */
+  --accent-text: #bd2f00;
   --ring: #ff4000;
-  --destructive: #dc2626;
+  --destructive: #c42020;
   --destructive-foreground: #ffffff;
-  /* Derived (reference ships no status colors): deepened for light surfaces. */
-  --success: #0f9d58;
-  --warning: #b45309;
+  /* Derived (reference ships no status colors): deepened to clear 4.5:1 on
+     every light surface (the app renders 10-13px status text). */
+  --success: #0b7341;
+  --warning: #a54c08;
 
-  /* Neon lane set deepened for light surfaces. */
-  --spectrum-1: #00a85a;
+  /* Neon lane set deepened to text-safe steps (lanes 1-4 render as text in
+     trace badges and guide kickers). */
+  --spectrum-1: #00753f;
   --spectrum-2: #7a2fe0;
-  --spectrum-3: #e07800;
-  --spectrum-4: #2563eb;
+  --spectrum-3: #995200;
+  --spectrum-4: #1557e6;
   --spectrum-5: #db2777;
 
   --chart-1: var(--spectrum-1);
@@ -77,18 +84,23 @@
   --secondary-foreground: #ffffff;
   --accent: #27272a;
   --accent-foreground: #e2e8f0;
+  /* The ink accent works as a hover surface but vanishes as text on the dark
+     background; text rules keep the brand's neon voice instead. */
+  --accent-text: #ff8a50;
   --ring: #ff4000;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  --destructive: #f04d4d;
+  --destructive-foreground: #0a0a0a;
   /* Reference ships no success/warning tokens; drawn from its chart palette. */
   --success: #00ff85;
   --warning: #ffa500;
 
-  /* Neon lane set from the reference charts. */
+  /* Neon lane set from the reference charts; lanes 2 and 4 lightened to
+     text-safe steps (they render as text on the --input guide pillar cards
+     as well as on the dark surfaces). */
   --spectrum-1: #00ff85;
-  --spectrum-2: #8a42ff;
+  --spectrum-2: #aa76ff;
   --spectrum-3: #ffa500;
-  --spectrum-4: #3b82f6;
+  --spectrum-4: #4f8ef7;
   --spectrum-5: #f472b6;
 
   --chart-1: var(--spectrum-1);

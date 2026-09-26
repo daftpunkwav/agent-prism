@@ -4,7 +4,7 @@
   flame-orange brand, playful rounded corners.
   Token source: design library "VibeCamp" (vibe-camp design-system page tokens);
   the dark set is derived from the reference's warm gray family (it ships light
-  only). Reference status hues below 3:1 as status text are darkened one step.
+  only). Reference status hues below 4.5:1 as status text are darkened one step.
 */
 
 [data-theme="vibecamp"] {
@@ -18,27 +18,32 @@
   --muted-foreground: #5c5650;
   --border: #d7d1c9;
   --input: #d7d1c9;
-  --primary: #f1481e;
+  /* Primary deepened one step: as text (icons) it must clear 3:1 on the greige
+     canvas, which #f1481e misses. */
+  --primary: #ec3b0f;
   --primary-foreground: #fff7f3;
   --secondary: #1d1e20;
   --secondary-foreground: #fff7f3;
   --accent: #f7663c;
   /* Coral is light; ink text on it keeps labels readable. */
   --accent-foreground: #211d1a;
+  /* The coral is a glow color (2.3:1 as text on the canvas); text rules use
+     the deepened ember instead. */
+  --accent-text: #b62f07;
   --ring: #f7663c;
-  --destructive: #ef4444;
+  --destructive: #c21111;
   --destructive-foreground: #ffffff;
-  /* Reference status hues sit under 3:1 as status text on card; darkened one
-     step for the 10-13px mono text that renders in these tokens. */
-  --success: #1d9e6a;
-  --warning: #c26a00;
+  /* Reference status hues sit under 3:1 as status text on card; darkened to
+     clear 4.5:1 on every light surface (the app renders 10-13px mono text). */
+  --success: #146f4a;
+  --warning: #945100;
 
-  /* Reference chart hues, each darkened one step so lane labels survive on
-     the greige canvas. */
-  --spectrum-1: #f1481e;
-  --spectrum-2: #e0a23e;
-  --spectrum-3: #2eb987;
-  --spectrum-4: #9a8ce8;
+  /* Reference chart hues, each darkened to a text-safe step (lanes 1-4 render
+     as text in trace badges and guide kickers). */
+  --spectrum-1: #a92a0a;
+  --spectrum-2: #775113;
+  --spectrum-3: #196348;
+  --spectrum-4: #533bd7;
   --spectrum-5: #c9a97e;
 
   --chart-1: var(--spectrum-1);
@@ -79,9 +84,13 @@
   --secondary-foreground: #f3efe9;
   --accent: #ff845f;
   --accent-foreground: #211d1a;
+  /* The bright coral clears 4.5:1 as text on the warm ink surfaces. */
+  --accent-text: var(--accent);
   --ring: #ff845f;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  /* Lightened to clear 4.5:1 on the dark background; the foreground flips to
+     the skin ink (same pattern as the Google/TikTok dark palettes). */
+  --destructive: #f26969;
+  --destructive-foreground: #1d1a17;
   --success: #3ccf8e;
   --warning: #f4b366;
 

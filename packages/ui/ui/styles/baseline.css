@@ -433,7 +433,7 @@
 }
 
 .arena-chat-history-list li[data-role="user"] .arena-chat-role {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .arena-chat-history-list li[data-role="assistant"] .arena-chat-role {

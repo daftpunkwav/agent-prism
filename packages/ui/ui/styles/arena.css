@@ -188,7 +188,7 @@ a.panel-surface:hover,
 .chip-toggle-count {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .chip-toggle-chevron {
@@ -263,7 +263,7 @@ a.panel-surface:hover,
   height: 0.8rem;
   margin-top: 0.15rem;
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .composer-suggest-text {

@@ -19,24 +19,31 @@
   --muted-foreground: #46443b;
   --border: #d8d6cd;
   --input: #ffffff;
-  --primary: #d97757;
+  /* Primary deepened one step from the reference terracotta: as text (icons,
+     the settings link) it must clear 3:1 on popover, which #d97757 misses. */
+  --primary: #d25f3a;
   --primary-foreground: #ffffff;
   --secondary: #3a2a22;
   --secondary-foreground: #faf9f5;
   --accent: #b0683f;
   --accent-foreground: #ffffff;
+  /* Text-safe derivative of --accent for accent-colored text rules. */
+  --accent-text: #925634;
   --ring: #d97757;
-  --destructive: #ef4444;
+  --destructive: #cb1111;
   --destructive-foreground: #ffffff;
-  /* Reference green sits at 2.7:1 on card as status text; darkened one step. */
-  --success: #7d9058;
-  --warning: #b45309;
+  /* Reference green sits at 2.7:1 on card as status text; darkened to clear
+     4.5:1 on every light surface (the app renders 10-13px status text). */
+  --success: #5c6a41;
+  --warning: #a54c08;
 
-  /* Clay scale keeps spectrum lanes inside data elements, same rule as 21th. */
-  --spectrum-1: #d97757;
-  --spectrum-2: #e08d6f;
-  --spectrum-3: #e8a98f;
-  --spectrum-4: #f0c6b3;
+  /* The clay ramp doubles as text (trace badges, guide kickers), so light mode
+     uses four distinct text-safe earth hues (sienna / olive / mulberry / pine);
+     the pale tail (lane 5) stays fill-only. */
+  --spectrum-1: #a54525;
+  --spectrum-2: #6e5e2b;
+  --spectrum-3: #8c3a5e;
+  --spectrum-4: #3e6b4f;
   --spectrum-5: #f8e3d8;
 
   --chart-1: var(--spectrum-1);
@@ -76,14 +83,19 @@
   --secondary-foreground: #f5f4ee;
   --accent: #d97757;
   --accent-foreground: #ffffff;
+  /* Text-safe derivative of --accent for accent-colored text rules. */
+  --accent-text: #e08f74;
   --ring: #d97757;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  /* Lightened to clear 4.5:1 on the dark background; the foreground flips to
+     the skin ink (same pattern as the Google/TikTok dark palettes). */
+  --destructive: #f58686;
+  --destructive-foreground: #262624;
   --success: #a3b98a;
   --warning: #d9a05b;
 
-  /* Light end of the clay ramp reads as lane color on dark surfaces. */
-  --spectrum-1: #e08d6f;
+  /* Light end of the clay ramp reads as lane color on dark surfaces; lane 1
+     lightened to a text-safe step. */
+  --spectrum-1: #e29377;
   --spectrum-2: #e8a98f;
   --spectrum-3: #f0c6b3;
   --spectrum-4: #f8e3d8;

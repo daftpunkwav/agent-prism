@@ -23,17 +23,22 @@
   --secondary-foreground: #0a0a0a;
   --accent: #0a0a0a;
   --accent-foreground: #ffffff;
+  /* Ink clears 4.5:1 as text on the light surfaces. */
+  --accent-text: var(--accent);
   --ring: #0a0a0a;
-  --destructive: #dc2626;
+  --destructive: #cc2121;
   --destructive-foreground: #ffffff;
-  --success: #16a34a;
-  --warning: #d97706;
+  --success: #107b38;
+  --warning: #a25905;
 
-  /* Grayscale chart ramp from the reference (lane identity via value steps). */
+  /* Grayscale chart ramp from the reference. Lanes 1-4 double as text (trace
+     badges, guide kickers), so the light ramp compresses into text-safe value
+     steps (lane 4 takes a faint cool tint to stay separable from lane 3);
+     the pale tail (lane 5) stays fill-only. */
   --spectrum-1: #0a0a0a;
-  --spectrum-2: #525252;
-  --spectrum-3: #a3a3a3;
-  --spectrum-4: #d4d4d4;
+  --spectrum-2: #454545;
+  --spectrum-3: #6b6b6b;
+  --spectrum-4: #6f6b75;
   --spectrum-5: #e5e5e5;
 
   --chart-1: var(--spectrum-1);
@@ -74,17 +79,20 @@
   --secondary-foreground: #fafafa;
   --accent: #fafafa;
   --accent-foreground: #0a0a0a;
+  /* Paper clears 4.5:1 as text on the dark surfaces. */
+  --accent-text: var(--accent);
   --ring: #fafafa;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  --destructive: #f05252;
+  --destructive-foreground: #0a0a0a;
   --success: #4ade80;
   --warning: #fbbf24;
 
-  /* Inverted grayscale ramp: lanes stay value-separated on dark. */
+  /* Inverted grayscale ramp: lanes stay value-separated on dark; lane 4
+     lightened to a text-safe step (lanes 1-4 render as text). */
   --spectrum-1: #fafafa;
   --spectrum-2: #d4d4d4;
   --spectrum-3: #a3a3a3;
-  --spectrum-4: #737373;
+  --spectrum-4: #8f8f8f;
   --spectrum-5: #525252;
 
   --chart-1: var(--spectrum-1);

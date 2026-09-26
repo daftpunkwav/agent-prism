@@ -130,7 +130,7 @@
 }
 
 .ui-select-item[aria-selected="true"] {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 

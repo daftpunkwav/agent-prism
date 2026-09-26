@@ -24,18 +24,22 @@
   --secondary-foreground: #17191d;
   --accent: #2b2f36;
   --accent-foreground: #f4f9ff;
+  /* Ink clears 4.5:1 as text on the light surfaces. */
+  --accent-text: var(--accent);
   --ring: #ea343a;
-  --destructive: #d92629;
+  --destructive: #c82326;
   --destructive-foreground: #ffffff;
-  /* Derived (reference ships no status colors): deepened for light surfaces. */
-  --success: #1a7f4e;
-  --warning: #a05a03;
+  /* Derived (reference ships no status colors): deepened to clear 4.5:1 on
+     every light surface (the app renders 10-13px status text). */
+  --success: #177246;
+  --warning: #965403;
 
-  /* Reference chart hues deepened for light surfaces. */
-  --spectrum-1: #ea343a;
+  /* Reference chart hues deepened to text-safe steps (lanes 1-4 render as
+     text in trace badges and guide kickers). */
+  --spectrum-1: #cc151b;
   --spectrum-2: #5938ff;
-  --spectrum-3: #1d7fb8;
-  --spectrum-4: #b83fd0;
+  --spectrum-3: #196d9e;
+  --spectrum-4: #a52ebd;
   --spectrum-5: #4a5d78;
 
   --chart-1: var(--spectrum-1);
@@ -76,6 +80,9 @@
   --secondary-foreground: #f4f9ff;
   --accent: #292d32;
   --accent-foreground: #f4f9ff;
+  /* The ink accent works as a hover surface but vanishes as text on the dark
+     background; text rules use cold steel instead. */
+  --accent-text: #8e9baa;
   --ring: #f4f9ff;
   --destructive: #ff3434;
   --destructive-foreground: #ffffff;
@@ -83,11 +90,13 @@
   --success: #34d399;
   --warning: #fbbf24;
 
-  /* Reference chart palette: red / violet / ice-blue / magenta / pale-ice. */
-  --spectrum-1: #ea343a;
-  --spectrum-2: #5938ff;
+  /* Reference chart palette: red / violet / ice-blue / magenta / pale-ice.
+     Lanes 1, 2 and 4 lightened to text-safe steps (they render as text on the
+     --input guide pillar cards as well as on the dark surfaces). */
+  --spectrum-1: #f49ea0;
+  --spectrum-2: #bbadff;
   --spectrum-3: #94bdff;
-  --spectrum-4: #e070ff;
+  --spectrum-4: #e999ff;
   --spectrum-5: #dbf4ff;
 
   --chart-1: var(--spectrum-1);

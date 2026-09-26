@@ -24,7 +24,9 @@ export function traceAccent(kind: BuilderTraceEntry["kind"]): string {
     case "llm_error":
       return "var(--destructive)";
     case "swap":
-      return "var(--spectrum-5)";
+      // Lane 4, not the pale lane-5 tail: swap renders as 11px label text on
+      // --background and lane 5 is fill-only (below 1.5:1 in light skins).
+      return "var(--spectrum-4)";
     case "notice":
       return "var(--spectrum-2)";
     default:

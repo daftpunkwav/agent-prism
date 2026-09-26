@@ -5,7 +5,8 @@
   Token source: design library "Vercel" (vercel-design-system colors_and_type.css).
   Deviations, noted: the reference maps success to brand blue and leaves the
   warning unusable as status text — success uses a semantic green and warning
-  is darkened one step in light. The reference's primary-foreground implies a
+  is darkened for 4.5:1 status text in light. The reference's
+  primary-foreground implies a
   white primary surface in light; the iconic black primary button is used
   instead (white text passes contrast).
 */
@@ -28,19 +29,23 @@
   --secondary-foreground: #171717;
   --accent: #f5f5f5;
   --accent-foreground: #171717;
+  /* The reference accent is a hover surface (#f5f5f5) and is invisible as text
+     on white; text rules use Vercel's link blue instead. */
+  --accent-text: #0067df;
   --ring: #0a0a0a;
-  --destructive: #ee0000;
+  --destructive: #d50000;
   --destructive-foreground: #ffffff;
   /* Reference maps success to brand blue; a semantic green is used instead and
-     warning is darkened for 3:1 status text. */
+     warning is darkened to clear 4.5:1 status text. */
   --success: #2f7a3d;
-  --warning: #b06000;
+  --warning: #a15700;
 
-  /* Geist lane hues deepened for light surfaces. */
-  --spectrum-1: #0070f3;
+  /* Geist lane hues deepened to text-safe steps (lanes 1-4 render as text in
+     trace badges and guide kickers). */
+  --spectrum-1: #0067df;
   --spectrum-2: #7928ca;
-  --spectrum-3: #0e9384;
-  --spectrum-4: #d97706;
+  --spectrum-3: #0c776b;
+  --spectrum-4: #a25905;
   --spectrum-5: #d6247a;
 
   --chart-1: var(--spectrum-1);
@@ -81,15 +86,19 @@
   --secondary-foreground: #fafafa;
   --accent: #262626;
   --accent-foreground: #fafafa;
+  /* The reference accent is a hover surface (#262626) and vanishes as text on
+     the dark background; text rules use Vercel's dark-mode link blue. */
+  --accent-text: #3693ff;
   --ring: #fafafa;
-  --destructive: #e5484d;
-  --destructive-foreground: #ffffff;
+  --destructive: #e85a5e;
+  --destructive-foreground: #0a0a0a;
   --success: #5db970;
   --warning: #f5a623;
 
-  /* Geist gradient lane set: blue / violet / teal / amber / magenta. */
-  --spectrum-1: #0070f3;
-  --spectrum-2: #7928ca;
+  /* Geist gradient lane set: blue / violet / teal / amber / magenta. Lanes 1-2
+     lightened to text-safe steps on the dark surfaces. */
+  --spectrum-1: #2d8eff;
+  --spectrum-2: #ac74e3;
   --spectrum-3: #50e3c2;
   --spectrum-4: #f5a623;
   --spectrum-5: #ff0080;

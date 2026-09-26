@@ -30,18 +30,25 @@
   --secondary-foreground: #ffffff;
   --accent: #0040ff;
   --accent-foreground: #ffffff;
+  /* Text-safe derivative of --accent: identical hue, deepened so accent-colored
+     text (brand wordmark, selected items, badges, link hover) clears 4.5:1 on
+     every light surface including the gray page background. --accent itself is
+     untouched and keeps its surface role. */
+  --accent-text: #0037dc;
   --ring: #000000;
-  --destructive: #d73333;
+  --destructive: #9e1f1f;
   --destructive-foreground: #ffffff;
-  --success: #15803d;
-  --warning: #b45309;
+  --success: #0f5d2c;
+  --warning: #883f07;
 
-  /* Spectrum lanes: 21th chart palette. Light mode keeps the blue scale inside
-     data elements; lane identity is carried by borders, labels and shadows. */
-  --spectrum-1: #0140ff;
-  --spectrum-2: #386aff;
-  --spectrum-3: #6b90ff;
-  --spectrum-4: #94afff;
+  /* Spectrum lanes: 21th chart palette. Lanes 1-4 double as text (trace badges,
+     guide kickers, column accents), so light mode keeps four DISTINCT deep
+     blue-family steps that each clear 4.5:1 on the gray page background;
+     the pale tail (lane 5) stays fill-only. */
+  --spectrum-1: #0034c8;
+  --spectrum-2: #0b4fb0;
+  --spectrum-3: #3b2bb8;
+  --spectrum-4: #123a78;
   --spectrum-5: #bdcdff;
 
   --chart-1: var(--spectrum-1);
@@ -116,9 +123,12 @@
   --secondary-foreground: #ffffff;
   --accent: #0040ff;
   --accent-foreground: #ffffff;
+  /* Dark surfaces sink the electric blue under 3:1 as text; the text-safe
+     derivative lightens the same hue instead. */
+  --accent-text: #7598ff;
   --ring: #333333;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  --destructive: #f15757;
+  --destructive-foreground: #0a0a0a;
   --success: #34d399;
   --warning: #fbbf24;
 
@@ -164,6 +174,7 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-text: var(--accent-text);
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-success: var(--success);

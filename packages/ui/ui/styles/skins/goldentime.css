@@ -3,7 +3,7 @@
   caramel text (light) / warm night-sand dark (dark, straight from the
   reference :root.dark block), caramel orange accent, large cozy radii.
   Token source: design library "GoldenTime" (golden-prototype colors_and_type.css).
-  The light warning is darkened one step for 3:1 status text.
+  The light warning is darkened for 4.5:1 status text.
 */
 
 [data-theme="goldentime"] {
@@ -24,19 +24,23 @@
   --accent: #f79b45;
   /* Caramel orange is light; dark ink on it keeps labels readable. */
   --accent-foreground: #3b352b;
+  /* The caramel is a glow color (2.1:1 as text on white); text rules use the
+     deep caramel instead. */
+  --accent-text: #a15107;
   --ring: #f79b45;
-  --destructive: #b34a3c;
+  --destructive: #ab4739;
   --destructive-foreground: #ffffff;
-  /* Reference warning (#d68a3c) sits under 3:1 as status text; darkened. */
-  --success: #55703c;
-  --warning: #a05a03;
+  /* Reference warning (#d68a3c) sits under 3:1 as status text; darkened to
+     clear 4.5:1 on every light surface (the app renders 10-13px status text). */
+  --success: #526d3a;
+  --warning: #965403;
 
-  /* Reference chart hues; the palest two are kept as fill-only lanes, matching
-     the default skin's faint-tail ramp precedent. */
-  --spectrum-1: #9b965f;
+  /* Reference chart hues; lanes 1-4 double as text so each is a text-safe
+     step, and the palest lane (5) stays fill-only. */
+  --spectrum-1: #6c6842;
   --spectrum-2: #5e4545;
-  --spectrum-3: #f79b45;
-  --spectrum-4: #b0b3a2;
+  --spectrum-3: #a15107;
+  --spectrum-4: #646755;
   --spectrum-5: #d6d5c2;
 
   --chart-1: var(--spectrum-1);
@@ -77,17 +81,20 @@
   --secondary-foreground: #e3dfd6;
   --accent: #f79b45;
   --accent-foreground: #060201;
+  /* The caramel clears 4.5:1 as text on the night-sand surfaces. */
+  --accent-text: var(--accent);
   --ring: #f79b45;
-  --destructive: #d96457;
+  --destructive: #da685b;
   --destructive-foreground: #060201;
   /* Reference ships no dark status colors; lightened for dark surfaces. */
   --success: #9dbb7e;
   --warning: #e8a35c;
 
-  /* Warm chart hues lightened for lane identity on night sand. */
+  /* Warm chart hues lightened for lane identity on night sand; lane 3
+     lightened to a text-safe step. */
   --spectrum-1: #f79b45;
   --spectrum-2: #c2bd85;
-  --spectrum-3: #a07a7a;
+  --spectrum-3: #ab8989;
   --spectrum-4: #d0d3c0;
   --spectrum-5: #8a9a7a;
 

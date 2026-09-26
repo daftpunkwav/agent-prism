@@ -172,7 +172,7 @@ details[open] > summary .trace-chevron {
   background: transparent;
 }
 .trace-kind-badge[data-kind="final"] {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
