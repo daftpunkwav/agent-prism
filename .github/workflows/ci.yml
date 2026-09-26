@@ -149,6 +149,9 @@ jobs:
       # process tree when a step ends, so a host started in one step is already
       # gone by the next one -- which is exactly how this probe used to fail with
       # "unreachable" while the boot log showed a healthy listener.
+      #
+      # DRIVERS stays unset so the smoke probe can assert that every builtin
+      # backend registered; narrowing it makes that check skip itself.
       - name: Smoke
         shell: pwsh
         run: |

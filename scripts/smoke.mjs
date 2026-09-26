@@ -64,6 +64,26 @@ async function waitForReady() {
   }
 }
 
+/**
+ * Framework ids the built host must register when DRIVERS does not narrow the set.
+ * Registration is best-effort (a backend that fails to load only warns), so this
+ * check is what catches a driver package silently dropping out of the built
+ * composition — a missing runtime dependency, for instance, would otherwise leave
+ * the column missing while every other probe still passes.
+ */
+const EXPECTED_FRAMEWORK_IDS = [
+  "native",
+  "plan_execute",
+  "self_critique",
+  "langchain",
+  "langgraph",
+  "deepagents",
+  "openai_agents",
+  "claude_agent_sdk",
+  "autogen",
+  "crewai",
+];
+
 /** Each check returns null on success, or the failure message. */
 const checks = [
   [
@@ -96,6 +116,15 @@ const checks = [
       if (!Array.isArray(body?.dimensions) || !Array.isArray(body?.frameworks)) {
         return `missing dimensions/frameworks: ${JSON.stringify(body)}`;
       }
+      // An operator-narrowed DRIVERS allowlist legitimately serves fewer backends;
+      // only the unrestricted composition is pinned here.
+      if ((process.env.DRIVERS ?? "").trim() !== "") return null;
+      const registered = new Set(body.frameworks.map((framework) => framework?.id));
+      const missing = EXPECTED_FRAMEWORK_IDS.filter((id) => !registered.has(id));
+      if (missing.length > 0) {
+        return `backends missing from the built composition: ${missing.join(", ")} ` +
+          `(registered: ${[...registered].join(", ")})`;
+      }
       return null;
     },
   ],
@@ -127,7 +156,11 @@ async function main() {
 
   if (failed.length > 0) {
     console.error(`[smoke] ${failed.length} check(s) failed: ${failed.join(", ")}`);
-    process.exit(1);
+    // exitCode rather than process.exit: an immediate exit while HTTP sockets are
+    // still draining aborts libuv on Windows and buries the summary above under an
+    // assertion. Setting the code lets the loop finish and the process end cleanly.
+    process.exitCode = 1;
+    return;
   }
   console.log(`[smoke] ok: ${checks.length}/${checks.length} checks passed`);
 }
