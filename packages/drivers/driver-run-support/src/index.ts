@@ -19,6 +19,7 @@ export * from "./self-consistency.js";
 export * from "./recursion-limit.js";
 export * from "./step-budget.js";
 export * from "./tool-batch.js";
+export * from "./tool-schema.js";
 export * from "./bridge-protocol.js";
 export * from "./child-bridge.js";
 export * from "./python-probe.js";

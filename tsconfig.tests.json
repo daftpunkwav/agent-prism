@@ -29,6 +29,15 @@
       "@agentprism/driver-langgraph": [
         "./packages/drivers/driver-langgraph/src/index.ts"
       ],
+      "@agentprism/driver-deepagents": [
+        "./packages/drivers/driver-deepagents/src/index.ts"
+      ],
+      "@agentprism/driver-openai-agents": [
+        "./packages/drivers/driver-openai-agents/src/index.ts"
+      ],
+      "@agentprism/driver-claude-agent-sdk": [
+        "./packages/drivers/driver-claude-agent-sdk/src/index.ts"
+      ],
       "@agentprism/driver-autogen": [
         "./packages/drivers/driver-autogen/src/index.ts"
       ],

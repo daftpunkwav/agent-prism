@@ -17,6 +17,9 @@ describe("REASONING_SUPPORT", () => {
       { name: "LangGraph", load: () => import("@agentprism/driver-langgraph").then((m) => new m.LangGraphDriver()) },
       { name: "AutoGen", load: () => import("@agentprism/driver-autogen").then((m) => new m.AutogenDriver()) },
       { name: "CrewAI", load: () => import("@agentprism/driver-crewai").then((m) => new m.CrewAIDriver()) },
+      { name: "DeepAgents", load: () => import("@agentprism/driver-deepagents").then((m) => new m.DeepAgentsDriver()) },
+      { name: "OpenAIAgents", load: () => import("@agentprism/driver-openai-agents").then((m) => new m.OpenAIAgentsDriver()) },
+      { name: "ClaudeAgentSdk", load: () => import("@agentprism/driver-claude-agent-sdk").then((m) => new m.ClaudeAgentSdkDriver()) },
     ]);
     const ids = registry.listAvailable().map((driver) => driver.id).sort();
     expect(REASONING_SUPPORT.map((entry) => entry.frameworkId).sort()).toEqual(ids);

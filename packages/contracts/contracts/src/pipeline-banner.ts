@@ -13,10 +13,13 @@
 /** Banner prefix per driver (indexed by framework id). */
 export const PIPELINE_BANNER_PREFIX = {
   autogen: "[AutoGen group-chat]",
+  claude_agent_sdk: "[Claude Agent SDK]",
   crewai: "[CrewAI crew]",
+  deepagents: "[Deep Agents]",
   langchain: "[LangChain create_agent]",
   langgraph: "[LangGraph]",
   native: "[Native Agent]",
+  openai_agents: "[OpenAI Agents SDK]",
   plan_execute: "[Plan-Execute]",
   self_critique: "[Self-Critique]",
 } as const;

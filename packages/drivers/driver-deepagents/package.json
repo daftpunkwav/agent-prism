@@ -1,0 +1,35 @@
+{
+  "name": "@agentprism/driver-deepagents",
+  "description": "Deep Agents driver: planning tool, virtual filesystem and subagents over the LangGraph runtime.",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@agentprism/contracts": "workspace:*",
+    "@agentprism/driver-langchain": "workspace:*",
+    "@agentprism/driver-run-support": "workspace:*",
+    "@agentprism/harness": "workspace:*",
+    "@langchain/core": "^1.0.0",
+    "@langchain/langgraph": "^1.0.0",
+    "deepagents": "^1.14.1"
+  },
+  "devDependencies": {
+    "@agentprism/runtime": "workspace:*",
+    "@agentprism/telemetry": "workspace:*",
+    "@agentprism/tool-builtins": "workspace:*",
+    "@types/node": "^24"
+  }
+}

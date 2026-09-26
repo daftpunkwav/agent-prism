@@ -6,6 +6,8 @@
  * - Run the agent loop with real context middleware
  * - Guard tool calls against drift
  * - Translate events through the shared translation layer
+ * - Export the context middleware and tool binding that the Deep Agents
+ *   backend mounts on its own runtime
  *
  * Verification retries are owned by runVerificationLoop outside drivers.
  */
@@ -38,7 +40,7 @@ import { requireChatModel } from "./require-chat-model.js";
 import { fromLcMessages, toLcMessages } from "./llm-message-bridge.js";
 
 /** Before every model call: shared context pipeline; tool calls go through the drift guard. */
-function contextPolicyMiddleware(
+export function contextPolicyMiddleware(
   contextStrategy: string,
   question: string,
   retrieveSnippets: (query: string) => string,

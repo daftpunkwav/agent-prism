@@ -1,20 +1,19 @@
 /**
- * @file langchain driver run tests
- * @description Runs LangChainDriver end to end on a scripted chat model.
+ * @file deepagents driver tests
+ * @description Runs DeepAgentsDriver end to end on a scripted chat model.
  *
  * Responsibilities:
  * - Pin the happy path event arc: banner → streamed output → complete(success)
  * - Pin the error path: model failure converges into error + complete(success=false)
  *
- * The agent loop is the real langchain createAgent; the model is a scripted
- * BaseChatModel subclass (no network, no SDK mocks).
+ * The agent loop is the real createDeepAgent middleware stack; the model is a
+ * scripted BaseChatModel subclass (no network, no SDK mocks).
  */
 
 import { describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { BaseMessage } from "@langchain/core/messages";
 import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
@@ -24,24 +23,28 @@ import type { ArenaEvent, PipelineConfig } from "@agentprism/contracts";
 import { PipelineConfigSchema } from "@agentprism/contracts";
 import type { AgentExecutionContext } from "@agentprism/harness";
 import { WorkspaceRegistry } from "@agentprism/runtime";
-import { LangChainDriver, contextPolicyMiddleware } from "../src/langchain-driver.js";
 import { TokenTracker } from "@agentprism/telemetry";
+import { createBuiltinToolRegistry } from "@agentprism/tool-builtins";
+import {
+  DEEPAGENTS_RESERVED_TOOL_NAMES,
+  READ_ONLY_FILESYSTEM_TOOLS,
+  DeepAgentsDriver,
+  bindableDefinitions,
+} from "../src/deepagents-driver.js";
 
 /** Chat model yielding one scripted AIMessage per call (never tool-calls). */
 class ScriptedChatModel extends BaseChatModel {
-  private responses: AIMessage[];
   private idx = 0;
 
-  constructor(responses: AIMessage[]) {
+  constructor(private readonly responses: AIMessage[]) {
     super({});
-    this.responses = responses;
   }
 
   override _llmType(): string {
     return "scripted";
   }
 
-  /** createAgent requires bindTools even for an empty toolset; identity binding suffices. */
+  /** The deep-agent middleware binds tools; identity binding suffices for a no-tool script. */
   override bindTools(): Runnable {
     return this;
   }
@@ -55,9 +58,7 @@ class ScriptedChatModel extends BaseChatModel {
     return { generations: [{ text: String(message.content ?? ""), message }] };
   }
 
-  override async *_streamResponseChunks(
-    _messages: BaseMessage[],
-  ): AsyncGenerator<ChatGenerationChunk> {
+  override async *_streamResponseChunks(_messages: BaseMessage[]): AsyncGenerator<ChatGenerationChunk> {
     const message = this.responses[Math.min(this.idx, this.responses.length - 1)]!;
     this.idx += 1;
     yield new ChatGenerationChunk({
@@ -68,9 +69,13 @@ class ScriptedChatModel extends BaseChatModel {
 }
 
 /** Real workspace under a throwaway runs root (buildSystemUser reads cwd/fs). */
-function executionContext(model: BaseChatModel, overrides: Partial<AgentExecutionContext> = {}): AgentExecutionContext & { cleanup: () => void } {
+function executionContext(
+  model: unknown,
+  overrides: Partial<AgentExecutionContext> = {},
+): AgentExecutionContext & { cleanup: () => void } {
+  const registry = createBuiltinToolRegistry();
   const config: PipelineConfig = PipelineConfigSchema.parse({ label: "col", harness: "bare" });
-  const runsRoot = mkdtempSync(join(tmpdir(), "lc-driver-"));
+  const runsRoot = mkdtempSync(join(tmpdir(), "deepagents-driver-"));
   const workspace = new WorkspaceRegistry({ runsRoot, clock: { now: () => 1_700_000_000_000 } }).create("ws");
   const context = {
     identity: { agentId: "a1" } as AgentExecutionContext["identity"],
@@ -85,8 +90,10 @@ function executionContext(model: BaseChatModel, overrides: Partial<AgentExecutio
     llm: {} as AgentExecutionContext["llm"],
     llmVendor: model,
     tools: {
-      registry: { listDefinitions: () => [] },
-      names: new Set<string>(),
+      // The real registry: its full tool set is what the framework's reserved-name
+      // check runs against, so an empty stub would hide a collision.
+      registry,
+      names: new Set(registry.listDefinitions().map((definition) => definition.name)),
       execute: async () => ({ result: "ok", fileDiff: null, ok: true }),
     },
     ...overrides,
@@ -101,39 +108,54 @@ async function collect(generator: AsyncGenerator<ArenaEvent>): Promise<ArenaEven
   return events;
 }
 
-describe("LangChainDriver.run", () => {
+describe("DeepAgentsDriver", () => {
+  it("declares the framework id and display name the registry and banner map use", () => {
+    const driver = new DeepAgentsDriver();
+    expect(driver.frameworkId).toBe("deepagents");
+    expect(driver.displayName).toBe("Deep Agents");
+  });
+
   it("emits the banner, streamed answer, and a successful complete event", { timeout: 60_000 }, async () => {
-    const driver = new LangChainDriver();
+    const driver = new DeepAgentsDriver();
     const model = new ScriptedChatModel([new AIMessage("The answer is 4.")]);
     const context = executionContext(model);
     try {
       const events = await collect(driver.run(context));
       expect(events[0]?.type).toBe("token_update");
-      const banner = events.find((event) => event.type === "thought" && event.content.includes("LangChain"));
+      const banner = events.find((event) => event.type === "thought" && event.content.includes("Deep Agents"));
       expect(banner).toBeDefined();
       // The compare table unions key=value fields: reasoning/prompt must be keyed, never bare modes.
       expect(banner?.content).toContain("prompt=");
       expect(banner?.content).toContain("reasoning=");
-      // The real createAgent loop runs the scripted model to completion: the run
-      // must finish with a complete terminal and no error convergence.
+      // The scripted text must reach the answer channel (thought deltas), not just the terminal.
+      const streamed = events
+        .filter((event) => event.type === "thought_delta")
+        .map((event) => (event as ArenaEvent & { content: string }).content)
+        .join("");
+      expect(streamed).toContain("The answer is 4.");
       expect(events.some((event) => event.type === "error")).toBe(false);
       const terminal = events.at(-1);
       expect(terminal?.type).toBe("complete");
-      expect(terminal?.passed).not.toBe(false);
+      expect((terminal as ArenaEvent & { metrics: { success: boolean } }).metrics.success).toBe(true);
     } finally {
       context.cleanup();
     }
   });
 
   it("converges model failure into an error event followed by an unsuccessful complete", { timeout: 60_000 }, async () => {
-    const driver = new LangChainDriver();
+    const driver = new DeepAgentsDriver();
+    // Duck-typed vendor object: passes requireChatModel and the framework's model
+    // name probe, then fails inside the graph run (the arc this test locks).
     const exploding = {
-      // Duck-typed vendor object: passes requireChatModel, fails inside createAgent streaming.
+      getName: () => "exploding",
       invoke: async () => {
         throw new Error("model exploded with credentials");
       },
+      stream: async function* () {
+        throw new Error("model exploded with credentials");
+      },
     };
-    const context = executionContext(exploding as never);
+    const context = executionContext(exploding);
     try {
       const events = await collect(driver.run(context));
       expect(events.some((event) => event.type === "error" && !event.message.includes("credentials"))).toBe(true);
@@ -146,21 +168,27 @@ describe("LangChainDriver.run", () => {
   });
 });
 
-describe("contextPolicyMiddleware", () => {
-  it("carries the context pipeline into the agent's model calls", async () => {
-    const middleware = contextPolicyMiddleware("sliding", "What is 2+2?", () => "") as unknown as {
-      name: string;
-      wrapModelCall: (request: unknown, handler: (r: unknown) => Promise<unknown>) => Promise<unknown>;
+describe("reserved tool names and read-only filesystem scope", () => {
+  it("drops exactly the registry tools the framework reserves", () => {
+    const registry = createBuiltinToolRegistry();
+    const tools = {
+      registry,
+      names: new Set(registry.listDefinitions().map((definition) => definition.name)),
+      execute: async () => ({ result: "", fileDiff: null, ok: true }),
     };
-    expect(middleware.name).toBe("contextPolicy");
-    const seen: Array<{ messages?: unknown[] }> = [];
-    const out = await middleware.wrapModelCall({ messages: [] }, async (next) => {
-      seen.push(next as { messages?: unknown[] });
-      return "ok";
-    });
-    expect(out).toBe("ok");
-    // The pipeline owns the system message: it is lifted out of the message list
-    // and passed to the handler as systemMessage instead.
-    expect(seen[0]?.messages).toEqual([]);
+    const bound = bindableDefinitions(tools).map((definition) => definition.name);
+    for (const reserved of DEEPAGENTS_RESERVED_TOOL_NAMES) {
+      expect(bound).not.toContain(reserved);
+      // The framework's own read-only version covers the dropped operation.
+      expect(READ_ONLY_FILESYSTEM_TOOLS).toContain(reserved === "ls" ? "ls" : reserved);
+    }
+    expect(bound).toContain("read");
+    expect(bound).toContain("write");
+    expect(bound).toContain("bash");
+    // read_file is mandatory for the framework's filesystem middleware.
+    expect(READ_ONLY_FILESYSTEM_TOOLS).toContain("read_file");
+    // No write/edit tool is handed to the framework's own filesystem layer.
+    expect(READ_ONLY_FILESYSTEM_TOOLS).not.toContain("write_file");
+    expect(READ_ONLY_FILESYSTEM_TOOLS).not.toContain("edit_file");
   });
 });

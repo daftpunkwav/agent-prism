@@ -71,6 +71,24 @@ export const REASONING_SUPPORT: readonly ReasoningSupport[] = [
     modes: ["react", "reflexion"],
     note: "Same crew pipeline every mode; reflexion grants one extra worker turn per task.",
   },
+  {
+    frameworkId: "deepagents",
+    level: "skeleton",
+    modes: [],
+    note: "Fixed planning + filesystem + subagent middleware; reasoning rides the shared system prompt text alone.",
+  },
+  {
+    frameworkId: "openai_agents",
+    level: "skeleton",
+    modes: [],
+    note: "SDK run loop with guardrails and handoffs; reasoning rides the shared system prompt text alone.",
+  },
+  {
+    frameworkId: "claude_agent_sdk",
+    level: "skeleton",
+    modes: [],
+    note: "Claude Code loop with Arena tools over MCP; reasoning rides the shared system prompt text alone.",
+  },
 ];
 
 /** Looks up a framework's support declaration (undefined when unregistered). */

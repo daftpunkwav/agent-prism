@@ -49,6 +49,18 @@ describe("driver frameworkId ↔ banner map consistency", () => {
         name: "CrewAI",
         load: () => import("@agentprism/driver-crewai").then((m) => new m.CrewAIDriver()),
       },
+      {
+        name: "DeepAgents",
+        load: () => import("@agentprism/driver-deepagents").then((m) => new m.DeepAgentsDriver()),
+      },
+      {
+        name: "OpenAIAgents",
+        load: () => import("@agentprism/driver-openai-agents").then((m) => new m.OpenAIAgentsDriver()),
+      },
+      {
+        name: "ClaudeAgentSdk",
+        load: () => import("@agentprism/driver-claude-agent-sdk").then((m) => new m.ClaudeAgentSdkDriver()),
+      },
     ]);
     const frameworkIds = registry.listAvailable().map((framework) => framework.id);
 

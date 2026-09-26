@@ -19,6 +19,8 @@
  * - driver-native: + driver-run-support (LangChain-free backend)
  * - driver-langchain: + driver-run-support (LC bridge owner; no langgraph)
  * - driver-langgraph: + driver-run-support / driver-langchain (graphs over the bridge)
+ * - driver-deepagents: + driver-langchain (deep-agent middleware over the LC bridge)
+ * - driver-openai-agents / driver-claude-agent-sdk: + driver-run-support (SDK transports over the shared ports)
  *   (driver plugins consume the harness seam, never composers or providers)
  * - driver-autogen/crewai: + driver-run-support (LangChain-free backends, like native)
  * - provider-catalog: only contracts / config / persistence / environment /
@@ -188,6 +190,21 @@ const RULES = [
     name: "driver-langgraph → + registry/langchain",
     roots: ["packages/drivers/driver-langgraph/src"],
     forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support|driver-langchain)[^"']+["']/,
+  },
+  {
+    name: "driver-deepagents → + driver-langchain",
+    roots: ["packages/drivers/driver-deepagents/src"],
+    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support|driver-langchain)[^"']+["']/,
+  },
+  {
+    name: "driver-openai-agents → + driver-run-support",
+    roots: ["packages/drivers/driver-openai-agents/src"],
+    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support)[^"']+["']/,
+  },
+  {
+    name: "driver-claude-agent-sdk → + driver-run-support",
+    roots: ["packages/drivers/driver-claude-agent-sdk/src"],
+    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness|driver-run-support)[^"']+["']/,
   },
   {
     name: "provider-catalog → only foundation/config",

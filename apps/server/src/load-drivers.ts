@@ -10,14 +10,16 @@
  * skip individually so one broken transport cannot take down the runtime.
  *
  * The DRIVERS env var optionally restricts the set (comma-separated,
- * case-insensitive, e.g. DRIVERS=native,plan_execute,self_critique to skip
- * the heavy LangChain/LangGraph imports for a fast local loop). Unset means
- * all builtins. Unknown names warn and are ignored.
+ * case-insensitive, e.g. DRIVERS=native,plan_execute,self_critique to skip the
+ * heavy framework imports for a fast local loop). Unset means all builtins.
+ * Unknown names warn and are ignored. The claude_agent_sdk backend needs a
+ * Claude Code CLI on the host and an anthropic-format provider endpoint; it
+ * fails fast per column when either is missing, without blocking startup.
  */
 
 import { FrameworkDriverRegistry, registerDriversBestEffort, type DriverLoader } from "@agentprism/driver-run-support";
 
-/** Builtin backend loaders: fresh in-process, loop variants, LangChain, LangGraph, group chat. */
+/** Builtin backend loaders: in-process loops, the LangChain family, the two SDK bridges, and the Python-bridged group chats. */
 export const builtinDriverLoaders: readonly DriverLoader[] = [
   { name: "Native", load: () => import("@agentprism/driver-native").then((m) => new m.NativeDriver()) },
   {
@@ -35,6 +37,18 @@ export const builtinDriverLoaders: readonly DriverLoader[] = [
   {
     name: "LangGraph",
     load: () => import("@agentprism/driver-langgraph").then((m) => new m.LangGraphDriver()),
+  },
+  {
+    name: "DeepAgents",
+    load: () => import("@agentprism/driver-deepagents").then((m) => new m.DeepAgentsDriver()),
+  },
+  {
+    name: "OpenAIAgents",
+    load: () => import("@agentprism/driver-openai-agents").then((m) => new m.OpenAIAgentsDriver()),
+  },
+  {
+    name: "ClaudeAgentSdk",
+    load: () => import("@agentprism/driver-claude-agent-sdk").then((m) => new m.ClaudeAgentSdkDriver()),
   },
   {
     name: "AutoGen",

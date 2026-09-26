@@ -4,7 +4,8 @@
  *
  * Responsibilities:
  * - Pin the loader list (one entry per builtin backend: Native, PlanExecute,
- *   SelfCritique, LangChain, LangGraph, AutoGen, CrewAI)
+ *   SelfCritique, LangChain, LangGraph, DeepAgents, OpenAIAgents,
+ *   ClaudeAgentSdk, AutoGen, CrewAI)
  * - Pin that the loader list resolves at least the native-family drivers when
  *   imported (sanity check that the imports do not silently no-op)
  * - Pin the DRIVERS env filter (unset = all, subset, normalization, unknown warns)
@@ -23,17 +24,20 @@ import { builtinDriverLoaders, registerFrameworkDrivers, selectDriverLoaders } f
 
 describe("driver composition", () => {
   /**
-   * The five builtin backend loaders must all be declared; this list is
+   * The ten builtin backend loaders must all be declared; this list is
    * the single source of composition (the comment in load-drivers.ts is
    * authoritative). Removing or renaming one requires updating this test.
    */
-  it("declares the seven builtin backend loaders", () => {
+  it("declares the ten builtin backend loaders", () => {
     expect(builtinDriverLoaders.map((loader) => loader.name).sort()).toEqual([
       "AutoGen",
+      "ClaudeAgentSdk",
       "CrewAI",
+      "DeepAgents",
       "LangChain",
       "LangGraph",
       "Native",
+      "OpenAIAgents",
       "PlanExecute",
       "SelfCritique",
     ]);
@@ -82,14 +86,17 @@ describe("selectDriverLoaders", () => {
   it("returns all builtins when DRIVERS is unset or blank", () => {
     expect(selectDriverLoaders(undefined).map((loader) => loader.name).sort()).toEqual([
       "AutoGen",
+      "ClaudeAgentSdk",
       "CrewAI",
+      "DeepAgents",
       "LangChain",
       "LangGraph",
       "Native",
+      "OpenAIAgents",
       "PlanExecute",
       "SelfCritique",
     ]);
-    expect(selectDriverLoaders("   ").length).toBe(7);
+    expect(selectDriverLoaders("   ").length).toBe(10);
   });
 
   it("restricts to the named subset (fast local loop without heavy backends)", () => {
