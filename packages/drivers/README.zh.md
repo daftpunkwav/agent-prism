@@ -19,3 +19,6 @@
 | [`driver-self-critique/`](driver-self-critique/README.md) | Self-Critique driver：无 tool 的 critic 对每批 tool 打分并改向 | 以 `self_critique` 注册进 `DriverLookup` |
 | [`driver-autogen/`](driver-autogen/README.md) | AutoGen 模式 driver：带 LLM speaker 选择的 group chat；双运行时——真实 `autogen-agentchat` 桥或 TypeScript 模式回退 | 以 `autogen` 注册进 `DriverLookup` |
 | [`driver-crewai/`](driver-crewai/README.md) | CrewAI 模式 driver：角色 crew 运行任务 pipeline；双运行时——真实 `crewai` 桥或 TypeScript 模式回退 | 以 `crewai` 注册进 `DriverLookup` |
+| [`driver-deepagents/`](driver-deepagents/README.zh.md) | Deep Agents driver：createDeepAgent 的规划、虚拟文件系统与子代理委派，运行于 LangGraph | 注册进 `DriverLookup` 为 `deepagents` |
+| [`driver-openai-agents/`](driver-openai-agents/README.zh.md) | OpenAI Agents SDK driver：SDK 自带 Runner 跑在 Arena 提供的 `Model` 与 function tool 之上 | 注册进 `DriverLookup` 为 `openai_agents` |
+| [`driver-claude-agent-sdk/`](driver-claude-agent-sdk/README.zh.md) | Claude Agent SDK driver：子进程内跑 Claude Code 循环，Arena 工具经进程内 MCP 提供 | 注册进 `DriverLookup` 为 `claude_agent_sdk` |

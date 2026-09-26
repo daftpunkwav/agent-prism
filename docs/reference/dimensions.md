@@ -9,7 +9,7 @@ modules in `packages/dimensions/dimensions/src/dimensions/`, and the templates i
 
 | Dimension | PipelineConfig field | Options, default in bold | Option source |
 |---|---|---|---|
-| `framework` | `framework` | **native**, langchain, langgraph, plan_execute, self_critique, autogen, crewai | runtime-synced from the driver registry |
+| `framework` | `framework` | **native**, langchain, langgraph, deepagents, openai_agents, claude_agent_sdk, plan_execute, self_critique, autogen, crewai | runtime-synced from the driver registry |
 | `prompt` | `prompt_profile` | **zero_shot**, few_shot, cot_prompt, structured, terse | static |
 | `reasoning` | `reasoning` | **react**, cot_tool, tot, reflexion, self_consistency | derived from contracts `REASONING_MODE_META` |
 | `context` | `context` | **sliding**, summary, vector, hybrid, tool_tail, token_budget, budget, checkpoint | static |

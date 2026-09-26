@@ -1,13 +1,14 @@
 /**
  * @file event-translation
- * @description Shared LC/LG translation onto the unified ArenaEvent stream.
+ * @description Shared LangGraph-stream translation onto the unified ArenaEvent stream.
  *
  * Responsibilities:
  * - Map astream_events v2 raw events onto ArenaEvents via a per-column RunState
  * - Translate harness control events and tool outcome events
  * - Own stream emission and terminal event finishing
  *
- * One translation layer shared by the LangChain and LangGraph drivers.
+ * One translation layer shared by every driver that runs a LangChain/LangGraph
+ * runtime: LangChain, LangGraph and Deep Agents.
  */
 
 import type { ArenaEvent, Clock, ToolExecutionResult } from "@agentprism/contracts";

@@ -5,8 +5,8 @@
  * Responsibilities:
  * - Assert and return the BaseChatModel behind ColumnRuntime.llmVendor
  *
- * Lives in the langchain driver package so contracts stay vendor-free;
- * LC/LG tool loops cast here.
+ * Lives in the langchain driver package so contracts stay vendor-free; the
+ * LangChain-family tool loops (LangChain, LangGraph, Deep Agents) cast here.
  */
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";

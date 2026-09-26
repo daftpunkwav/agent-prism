@@ -420,7 +420,9 @@ export class ArenaRunner {
         const history = session !== undefined ? [...session.messages] : [...request.messages];
         const turn = Math.floor(history.length / 2) + 1;
         // Wire tracer rides on the column model (both the LlmAdapter and the vendor
-        // instance share one BaseChatModel), so native and LC/LG columns are all observed.
+        // instance share one BaseChatModel), so native, the LangChain family and the
+        // OpenAI Agents bridge are all observed; the Claude Agent SDK column is the
+        // exception because its CLI subprocess makes the model calls itself.
         const runtime = this.deps.modelFactory.create(config, {
           wireSink: (record) => logs?.appendWire(config.label, turn, record),
         });

@@ -20,9 +20,13 @@ interface ReservedEntry {
 /** Framework driver registry: throws DriverReservedError when a reserved entry is requested without a registered driver. */
 export class FrameworkDriverRegistry implements DriverLookup {
   private readonly drivers = new Map<string, AgentDriver>();
+  // Placeholders for framework ids the Arena knows about but whose backend may be
+  // missing at runtime (the autogen/crewai bridges need a Python interpreter with
+  // the package). A successful registration deletes its entry, so these only
+  // surface when that backend could not register.
   private readonly reserved = new Map<string, ReservedEntry>([
-    ["autogen", { name: "AutoGen", reason: "Driver pending" }],
-    ["crewai", { name: "CrewAI", reason: "Driver pending" }],
+    ["autogen", { name: "AutoGen", reason: "AutoGen backend unavailable in this runtime" }],
+    ["crewai", { name: "CrewAI", reason: "CrewAI backend unavailable in this runtime" }],
   ]);
 
   register(driver: AgentDriver): void {

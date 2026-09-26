@@ -26,7 +26,7 @@ seam 面与铁律的完整映射见 [docs/architecture.zh.md](../docs/architectu
 | [`harness/`](harness/README.md) | harness | 中性执行语义：prompt 装配、context pipeline、reasoning 模式、verification 循环 |
 | [`memory/`](memory/README.md) | memory-store, memory-episodic, memory-semantic, memory-service | 跨 session 记忆：原子 store 与搜索索引、episodic 与 semantic 两层、以及 service port adapter |
 | [`agent/`](agent/README.md) | agent | 单列执行生命周期 |
-| [`drivers/`](drivers/README.md) | driver-run-support, driver-native, driver-langchain, driver-langgraph, driver-plan-execute, driver-self-critique, driver-autogen, driver-crewai | Driver 共享运行支持（run-support）与七个 loop-architecture backend |
+| [`drivers/`](drivers/README.md) | driver-run-support, driver-native, driver-langchain, driver-langgraph, driver-deepagents, driver-openai-agents, driver-claude-agent-sdk, driver-plan-execute, driver-self-critique, driver-autogen, driver-crewai | Driver 共享运行支持（run-support）与十个 loop-architecture backend |
 | [`dimensions/`](dimensions/README.md) | dimensions | 实验 dimension catalog 与选项 |
 | [`evaluation/`](evaluation/README.md) | evaluation | 评判、对比报告、ablation 行、matrix 聚合 |
 | [`providers/`](providers/README.md) | provider-catalog, provider-langchain | Provider seam，含 catalog、config、lookup；以及 LangChain SDK 模型构造 |

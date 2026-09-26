@@ -17,9 +17,9 @@
 - 单 leaf family 与 family 名同名，例如 `agent/agent` 与 `contracts/contracts`，
   遵循 [architecture.zh.md](../architecture.zh.md) 中的统一布局约定。
 
-当前 families 共 62 个 leaf：`agent`、`application`、`arena-view`、`arena`、
+当前 families 共 65 个 leaf：`agent`、`application`、`arena-view`、`arena`、
 `builder`、`client`、`config`、`context` 含 8 个 `context-*` leaf、`contracts`、
-`dimensions`、`drivers` 含 8 个、`environment`、`evaluation`、`harness`、`memory` 含
+`dimensions`、`drivers` 含 11 个、`environment`、`evaluation`、`harness`、`memory` 含
 4 个、`persistence`、`providers` 含 2 个、`runtime`、`sandbox`、`session` 含 8 个、
 `telemetry`、`tools` 含 4 个、`transport` 含 9 个，以及 `ui`。
 
@@ -36,9 +36,10 @@
    - `tool-registry` 仅依赖 `contracts`。`tool-builtins` 仅依赖 `contracts`、
      `environment`、`tool-registry` 与 `tool-symbols`。`tool-mcp` 仅依赖
      `contracts` 与 `tool-registry`。
-   - `driver-run-support` 仅依赖 `contracts`、`environment`、`runtime`、`telemetry`
-     与 `harness`。backend 额外引入 `driver-run-support`，`driver-langgraph` 还
-     引入 `driver-langchain`。
+   - `driver-run-support` 仅依赖 `contracts`、`environment`、`runtime`、`telemetry`、
+     `harness` 与 `zod`（共享的 tool-schema 派生）。backend 额外引入
+     `driver-run-support`；LangChain 家族还引入 `driver-langchain`
+     （`driver-langgraph`、`driver-deepagents`）。
    - `provider-catalog` 仅依赖 `contracts`、`config`、`persistence`、
      `environment`、`runtime` 与 `telemetry`。`provider-langchain` 额外引入
      `provider-catalog`。

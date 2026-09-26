@@ -3,7 +3,7 @@
 A driver is a loop-architecture backend behind the `AgentDriver` port, which declares
 `run(context): AsyncIterable<ArenaEvent>` in
 `packages/contracts/contracts/src/agent-driver.ts`. The registered backends are `native`,
-`plan_execute`, `self_critique`, `langchain`, `langgraph`, `autogen`, and `crewai`, loaded
+`plan_execute`, `self_critique`, `langchain`, `langgraph`, `deepagents`, `openai_agents`, `claude_agent_sdk`, `autogen`, and `crewai`, loaded
 by `apps/server/src/load-drivers.ts`.
 
 ## Leaf placement
@@ -39,7 +39,7 @@ else the last observation, stays unpolluted.
 Driver banners join the `PIPELINE_BANNER_PREFIX` single source, and the
 `driver-banner-consistency` test locks banners across backends. Capability suffixes stay
 reproducible column to column. The reasoning support table in `driver-run-support` grades
-each driver as structural, budget, or skeleton per reasoning mode.
+each driver as structural, budget, prompt, or skeleton per reasoning mode.
 
 ## Registration
 
@@ -55,6 +55,14 @@ so no hardcoded frontend list is needed.
 - Drivers never construct models themselves. The column model arrives through the
   injected `ColumnRuntimeFactory`, implemented by
   `provider-langchain.createColumnRuntime`.
+- Framework built-ins never replace the arena tool surface. A framework that executes
+  tools itself is wired so writes flow through `tools.execute` (Claude Code built-ins off,
+  its filesystem tools read-only; deepagents reserves `ls`/`glob`/`grep`, so the registry
+  tools with those names are dropped for that column). Otherwise a column bypasses its
+  toolset policy and stops being comparable.
+- Provider usage must reach the tracker. Backends that stream through `LlmAdapter` record
+  the usage part the adapter emits last; without it the column reports a prompt estimate
+  as if it were real tokens.
 - Cancellation propagates. Drivers honor the context abort signal, following the subagent
   abort rethrow semantics.
 - A failing driver registration only warns, but an empty registry fails startup.

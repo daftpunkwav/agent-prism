@@ -5,7 +5,8 @@
  * Responsibilities:
  * - Convert neutral transcripts to and from LC messages
  *
- * Used only inside LC/LG drivers so the harness stays free of vendor types.
+ * Used only inside the LangChain-family drivers (LangChain, LangGraph,
+ * Deep Agents) so the harness stays free of vendor types.
  */
 
 import {

@@ -25,7 +25,7 @@ application       Use-case services (ArenaService and others)
 
 arena             Dimension routing, parallel Runner, breaker
 agent             Single-column execution lifecycle
-drivers           Native / LangChain / LangGraph / PlanExecute / SelfCritique / AutoGen / CrewAI
+drivers           Native / LangChain / LangGraph / DeepAgents / OpenAIAgents / ClaudeAgentSdk / PlanExecute / SelfCritique / AutoGen / CrewAI
 dimensions        Experiment dimension catalog and options
 evaluation        Judging and comparison reports
 providers         LLM provider config and model construction
@@ -152,7 +152,7 @@ vocabulary.
 | `harness` | Prompt building, context assembly, verification loop |
 | `memory` | Cross-session memory: store, episodic and semantic layers, service port |
 | `agent` | Single-column `runAgentExecution` lifecycle |
-| `drivers` | Shared driver run-support kit and seven loop-architecture backends |
+| `drivers` | Shared driver run-support kit and ten loop-architecture backends |
 | `dimensions` | Experiment dimension catalog and options |
 | `evaluation` | Judging and comparison reports |
 | `providers` | LLM provider config, endpoint catalog, model construction |

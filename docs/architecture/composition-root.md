@@ -68,7 +68,7 @@ It returns `{ settings, app }`, typed as `RuntimeComponents`.
 ## Driver registration
 
 `apps/server/src/load-drivers.ts` defines `builtinDriverLoaders`, the dynamic imports of
-the seven backends.
+the ten backends.
 
 | Framework id | Leaf |
 |---|---|
@@ -77,6 +77,9 @@ the seven backends.
 | `self_critique` | `@agentprism/driver-self-critique` |
 | `langchain` | `@agentprism/driver-langchain` |
 | `langgraph` | `@agentprism/driver-langgraph` |
+| `deepagents` | `@agentprism/driver-deepagents` |
+| `openai_agents` | `@agentprism/driver-openai-agents` |
+| `claude_agent_sdk` | `@agentprism/driver-claude-agent-sdk` |
 | `autogen` | `@agentprism/driver-autogen` |
 | `crewai` | `@agentprism/driver-crewai` |
 

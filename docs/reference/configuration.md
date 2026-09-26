@@ -148,6 +148,7 @@ These are deliberately not env-tunable.
 | `ARENA_PYTHON` | `driver-run-support/src/python-probe.ts` | interpreter override for the framework runtime probes; unset or blank falls back to `python`, then `python3` |
 | `ARENA_AUTOGEN_RUNTIME` | `driver-autogen/src/autogen-driver.ts` | `python` forces the real `autogen-agentchat` bridge (fails closed when the probe finds no interpreter with the package), `ts` forces the TypeScript pattern fallback, anything else is `auto` |
 | `ARENA_CREWAI_RUNTIME` | `driver-crewai/src/crewai-driver.ts` | same contract as `ARENA_AUTOGEN_RUNTIME` for the `crewai` bridge |
+| `ARENA_CLAUDE_CODE_PATH` | `driver-claude-agent-sdk/src/cli-path.ts` | Claude Code CLI the `claude_agent_sdk` column runs; unset falls back to a globally installed Claude Code and then to the SDK's bundled binary (skipped via `ignoredOptionalDependencies` in `pnpm-workspace.yaml`); a set-but-missing path fails fast |
 
 ## Runtime knobs
 

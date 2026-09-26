@@ -52,6 +52,9 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 | `drivers/driver-self-critique` | Self-Critique backend：无 tool 的 critic 对每批 tool 打分并改向 | 以 `self_critique` 注册到 `DriverLookup` |
 | `drivers/driver-autogen` | AutoGen 模式 backend：带 LLM speaker 选择的 group chat；双运行时——真实 `autogen-agentchat` 桥或 TypeScript 模式回退 | 以 `autogen` 注册到 `DriverLookup` |
 | `drivers/driver-crewai` | CrewAI 模式 backend：角色 crew 运行任务 pipeline；双运行时——真实 `crewai` 桥或 TypeScript 模式回退 | 以 `crewai` 注册到 `DriverLookup` |
+| `drivers/driver-deepagents` | Deep Agents backend：createDeepAgent 的规划、虚拟文件系统与子代理委派，运行于 LangGraph | 以 `deepagents` 注册到 `DriverLookup` |
+| `drivers/driver-openai-agents` | OpenAI Agents SDK backend：SDK 自带 Runner 跑在 Arena 提供的 `Model` 与 function tool 之上 | 以 `openai_agents` 注册到 `DriverLookup` |
+| `drivers/driver-claude-agent-sdk` | Claude Agent SDK backend：子进程内跑 Claude Code 循环，Arena 工具经进程内 MCP 提供 | 以 `claude_agent_sdk` 注册到 `DriverLookup` |
 | `providers/provider-catalog` | Provider seam，无 SDK | `ProviderLookupAdapter` 实现 `contracts.ProviderLookup`；`EndpointCatalog`、`ProviderConfigStore` |
 | `providers/provider-langchain` | SDK 适配与模型构造 | `createChatModel`、`createColumnRuntime`、`testProviderConnection` |
 | `transport/http-runtime` | HTTP 外壳：middleware、health checks、error mapping | `createHttpApplication`、`HttpApplicationDeps`、`HttpApp` |

@@ -74,7 +74,9 @@ tools 与每列 verdict。cell 会消耗真实模型调用。
 ## 调试辅助
 
 - LLM wire trace：builder turn 记录 `llm_request`、`llm_response`、`llm_error` trace
-  条目，在 builder trace 面板可见。
+  条目，在 builder trace 面板可见（arena 列写入 `<traceDir>/<label>.wire.jsonl`）。
+- wire 抓包要求调用经该列配置的模型发出：除 `claude_agent_sdk` 外各 backend 都满足，
+  该框架由 CLI 子进程直连端点，故该列按设计没有 `.wire.jsonl`。
 - Session 取证：`GET /api/sessions/:id/export` 下载完整记录与条目信封。
 - Spill 取证：超大的 tool 输出原样落在 workspace 的 `.spills/` 目录下，模型可见预览
   中带编号 locator。

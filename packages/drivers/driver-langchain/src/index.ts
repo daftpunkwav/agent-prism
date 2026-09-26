@@ -3,8 +3,9 @@
  * @description Public exports for the driver-langchain package.
  *
  * Responsibilities:
- * - Re-export the LangChain driver and the LangChain/message bridge kit
- *   shared with the LangGraph backend
+ * - Re-export the LangChain driver and the LangChain bridge kit (message
+ *   conversion, tool binding, context middleware) shared with the LangGraph
+ *   and Deep Agents backends
  */
 
 export * from "./langchain-driver.js";

@@ -6,8 +6,9 @@
  * - Define stream/invoke entry points and result shapes over LlmMessage
  *
  * Drivers and verification policies depend only on this interface; concrete
- * Chat SDK classes stay behind the providers adapter. LC/LG drivers convert
- * at the harness/adapter boundary.
+ * Chat SDK classes stay behind the providers adapter. The LangChain-family
+ * drivers (LangChain, LangGraph, Deep Agents) and the OpenAI Agents model
+ * bridge convert at the harness/adapter boundary.
  */
 
 import type { LlmMessage, LlmToolCall } from "./llm-message.js";

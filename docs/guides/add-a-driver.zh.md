@@ -5,7 +5,7 @@
 driver 是 `AgentDriver` port 背后的一个 loop-architecture backend，该 port 在
 `packages/contracts/contracts/src/agent-driver.ts` 中声明
 `run(context): AsyncIterable<ArenaEvent>`。已注册的 backend 为 `native`、
-`plan_execute`、`self_critique`、`langchain`、`langgraph`、`autogen`、`crewai`，由
+`plan_execute`、`self_critique`、`langchain`、`langgraph`、`deepagents`、`openai_agents`、`claude_agent_sdk`、`autogen`、`crewai`，由
 `apps/server/src/load-drivers.ts` 加载。
 
 ## Leaf 放置
@@ -38,8 +38,8 @@ driver 准确设置。reasoning 与 planner 的思考经 `reflect` event 承载�
 
 driver banner 加入 `PIPELINE_BANNER_PREFIX` 单一来源，`driver-banner-consistency`
 测试跨 backend 锁定 banner。capability 后缀逐 column 保持可复现。`driver-run-support`
-中的 reasoning 支持表按 reasoning mode 把每个 driver 评为 structural、budget 或
-skeleton。
+中的 reasoning 支持表按 reasoning mode 把每个 driver 评为 structural、budget、
+prompt 或 skeleton。
 
 ## 注册
 
@@ -53,6 +53,12 @@ loader 加入 `apps/server/src/load-drivers.ts` 中的 `builtinDriverLoaders`。
 
 - driver 绝不自行构造模型。列模型经注入的 `ColumnRuntimeFactory` 抵达，由
   `provider-langchain.createColumnRuntime` 实现。
+- 框架内置工具绝不替代 arena 工具面。自带工具执行的框架必须接成写入经
+  `tools.execute`（Claude Code 关闭内置工具、其文件工具只读；deepagents 保留
+  `ls`/`glob`/`grep`，故这三个同名注册表工具在该列被剔除）。否则列会绕过自身
+  工具集策略，失去可比性。
+- Provider 用量必须进入 tracker。经 `LlmAdapter` 流式的后端要记录适配器最后产出的
+  usage part；否则该列会把 prompt 估算值当作真实 token 上报。
 - 取消传播。driver 尊重 context 的 abort signal，遵循 subagent abort rethrow 语义。
 - 失败的 driver 注册只告警，但空的 registry 使启动失败。
 

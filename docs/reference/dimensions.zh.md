@@ -11,7 +11,7 @@
 
 | Dimension | PipelineConfig 字段 | 选项，默认值加粗 | 选项来源 |
 |---|---|---|---|
-| `framework` | `framework` | **native**、langchain、langgraph、plan_execute、self_critique、autogen、crewai | 从 driver registry 运行时同步 |
+| `framework` | `framework` | **native**、langchain、langgraph、deepagents、openai_agents、claude_agent_sdk、plan_execute、self_critique、autogen、crewai | 从 driver registry 运行时同步 |
 | `prompt` | `prompt_profile` | **zero_shot**、few_shot、cot_prompt、structured、terse | static |
 | `reasoning` | `reasoning` | **react**、cot_tool、tot、reflexion、self_consistency | 从 contracts `REASONING_MODE_META` 派生 |
 | `context` | `context` | **sliding**、summary、vector、hybrid、tool_tail、token_budget、budget、checkpoint | static |

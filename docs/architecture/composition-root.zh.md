@@ -67,7 +67,7 @@ registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf �
 
 ## Driver 注册
 
-`apps/server/src/load-drivers.ts` 定义 `builtinDriverLoaders`，即七个 backend 的
+`apps/server/src/load-drivers.ts` 定义 `builtinDriverLoaders`，即十个 backend 的
 动态 import。
 
 | Framework id | Leaf |
@@ -77,6 +77,9 @@ registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf �
 | `self_critique` | `@agentprism/driver-self-critique` |
 | `langchain` | `@agentprism/driver-langchain` |
 | `langgraph` | `@agentprism/driver-langgraph` |
+| `deepagents` | `@agentprism/driver-deepagents` |
+| `openai_agents` | `@agentprism/driver-openai-agents` |
+| `claude_agent_sdk` | `@agentprism/driver-claude-agent-sdk` |
 | `autogen` | `@agentprism/driver-autogen` |
 | `crewai` | `@agentprism/driver-crewai` |
 

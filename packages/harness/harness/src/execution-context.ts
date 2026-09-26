@@ -35,8 +35,8 @@ export type { AgentIdentity, ToolAccess } from "@agentprism/contracts";
  * Agent execution context: the composed result of dependency injection. Explicitly
  * carries identity/workspace/llm/tools/tracker; any global lookup is forbidden.
  * Step/tool counters are maintained autonomously by each driver, not part of the
- * shared contract. LangChain ChatModel types must not appear here — LC/LG cast
- * llmVendor via requireChatModel inside the drivers package.
+ * shared contract. LangChain ChatModel types must not appear here — the
+ * LangChain family casts llmVendor via requireChatModel inside the drivers package.
  */
 export interface AgentExecutionContext {
   identity: AgentIdentity;
@@ -55,7 +55,7 @@ export interface AgentExecutionContext {
   rag: RagStoreCache;
   /** Framework-neutral LLM port (verification + future Native text path). */
   llm: LlmAdapter;
-  /** Opaque vendor chat model for LC/LG/Native tool-bound loops. */
+  /** Opaque vendor chat model for the tool-bound loops (LangChain family, Native). */
   llmVendor: unknown;
   tools: ToolAccess;
   /**

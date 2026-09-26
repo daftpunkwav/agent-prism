@@ -220,7 +220,7 @@ export function createColumnModel(
   };
 }
 
-/** Builds a ColumnRuntime: LlmAdapter + opaque llmVendor for LC/LG tool loops. */
+/** Builds a ColumnRuntime: LlmAdapter + opaque llmVendor for the LangChain-family tool loops. */
 export function createColumnRuntime(
   deps: { provider: ProviderConfig; catalog?: EndpointCatalog },
   config: PipelineConfig,

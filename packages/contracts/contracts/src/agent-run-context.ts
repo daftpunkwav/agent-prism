@@ -67,7 +67,7 @@ export interface AgentRunContext {
   clock: Clock;
   rag: RagCacheHandle;
   llm: LlmAdapter;
-  /** Opaque vendor model for LC/LG drivers only; Native must ignore this. */
+  /** Opaque vendor model for the LangChain-family drivers; Native must ignore this. */
   llmVendor: unknown;
   tools: ToolAccess;
   contextPolicy: ContextPolicy;

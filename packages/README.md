@@ -25,7 +25,7 @@ Dependency directions between families are fixed by `pnpm boundaries` and
 | [`harness/`](harness/README.md) | harness | Neutral execution semantics: prompt assembly, context pipeline, reasoning modes, verification loop |
 | [`memory/`](memory/README.md) | memory-store, memory-episodic, memory-semantic, memory-service | Cross-session memory: atomic store plus search index, episodic and semantic layers, and the service port adapter |
 | [`agent/`](agent/README.md) | agent | Single-column execution lifecycle |
-| [`drivers/`](drivers/README.md) | driver-run-support, driver-native, driver-langchain, driver-langgraph, driver-plan-execute, driver-self-critique, driver-autogen, driver-crewai | Shared driver run-support kit and seven loop-architecture backends |
+| [`drivers/`](drivers/README.md) | driver-run-support, driver-native, driver-langchain, driver-langgraph, driver-deepagents, driver-openai-agents, driver-claude-agent-sdk, driver-plan-execute, driver-self-critique, driver-autogen, driver-crewai | Shared driver run-support kit and ten loop-architecture backends |
 | [`dimensions/`](dimensions/README.md) | dimensions | Experiment dimension catalog and options |
 | [`evaluation/`](evaluation/README.md) | evaluation | Judging, comparison reports, ablation rows, matrix aggregation |
 | [`providers/`](providers/README.md) | provider-catalog, provider-langchain | Provider seam (catalog/config/lookup) and LangChain SDK model construction |

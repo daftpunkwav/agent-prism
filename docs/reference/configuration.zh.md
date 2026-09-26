@@ -143,6 +143,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 | `ARENA_PYTHON` | `driver-run-support/src/python-probe.ts` | 框架运行时探测的解释器覆盖；未设或空白时依次回退 `python`、`python3` |
 | `ARENA_AUTOGEN_RUNTIME` | `driver-autogen/src/autogen-driver.ts` | `python` 强制真实 `autogen-agentchat` 桥（探测不到带该包的解释器即失败关闭），`ts` 强制 TypeScript 模式回退，其他值为 `auto` |
 | `ARENA_CREWAI_RUNTIME` | `driver-crewai/src/crewai-driver.ts` | `crewai` 桥的取舍约定与 `ARENA_AUTOGEN_RUNTIME` 相同 |
+| `ARENA_CLAUDE_CODE_PATH` | `driver-claude-agent-sdk/src/cli-path.ts` | `claude_agent_sdk` 列所运行的 Claude Code CLI；未设置时回退到全局安装的 Claude Code，再回退到 SDK 自带二进制（已在 `pnpm-workspace.yaml` 的 `ignoredOptionalDependencies` 中跳过）；设置了但文件不存在则立即失败 |
 
 ## Runtime knobs
 

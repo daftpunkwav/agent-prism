@@ -146,7 +146,7 @@ docs/                      documentation tree; see docs/README.md for the map
 | `harness` | Prompt 构建、context 装配、verification 循环 |
 | `memory` | 跨 session 记忆：store、episodic 与 semantic 两层、service port |
 | `agent` | 单列 `runAgentExecution` 生命周期 |
-| `drivers` | 共享 driver run-support 套件与七个 loop-architecture backend |
+| `drivers` | 共享 driver run-support 套件与十个 loop-architecture backend |
 | `dimensions` | 实验 dimension 目录与选项 |
 | `evaluation` | 评判与对比报告 |
 | `providers` | LLM provider config、endpoint catalog、模型构造 |

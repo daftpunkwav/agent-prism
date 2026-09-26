@@ -51,6 +51,9 @@ package exposes and that can be replaced by another implementation.
 | `drivers/driver-self-critique` | Self-Critique backend: a tool-less critic scores each tool batch and redirects | registered as `self_critique` on `DriverLookup` |
 | `drivers/driver-autogen` | AutoGen-pattern backend: group chat with LLM speaker selection; dual runtime — real `autogen-agentchat` bridge or TypeScript pattern fallback | registered as `autogen` on `DriverLookup` |
 | `drivers/driver-crewai` | CrewAI-pattern backend: role crew running a task pipeline; dual runtime — real `crewai` bridge or TypeScript pattern fallback | registered as `crewai` on `DriverLookup` |
+| `drivers/driver-deepagents` | Deep Agents backend: createDeepAgent planning, virtual filesystem and subagent delegation over LangGraph | registered as `deepagents` on `DriverLookup` |
+| `drivers/driver-openai-agents` | OpenAI Agents SDK backend: the SDK Runner over an Arena-backed `Model` and function tools | registered as `openai_agents` on `DriverLookup` |
+| `drivers/driver-claude-agent-sdk` | Claude Agent SDK backend: the Claude Code loop in a subprocess, Arena tools served over in-process MCP | registered as `claude_agent_sdk` on `DriverLookup` |
 | `providers/provider-catalog` | Provider seam, no SDK | `ProviderLookupAdapter` implements `contracts.ProviderLookup`; `EndpointCatalog`, `ProviderConfigStore` |
 | `providers/provider-langchain` | SDK adaptation and model construction | `createChatModel`, `createColumnRuntime`, `testProviderConnection` |
 | `transport/http-runtime` | HTTP shell: middleware, health checks, error mapping | `createHttpApplication`, `HttpApplicationDeps`, `HttpApp` |

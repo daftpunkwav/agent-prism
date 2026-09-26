@@ -16,9 +16,9 @@ two-level path `packages/<family>/<leaf>/`. There are no flat packages.
   `contracts/contracts`, following the uniform-layout convention described in
   [architecture.md](../architecture.md).
 
-Current families cover 62 leaves: `agent`, `application`, `arena-view`, `arena`,
+Current families cover 65 leaves: `agent`, `application`, `arena-view`, `arena`,
 `builder`, `client`, `config`, `context` with 8 `context-*` leaves, `contracts`,
-`dimensions`, `drivers` with 8, `environment`, `evaluation`, `harness`, `memory` with 4,
+`dimensions`, `drivers` with 11, `environment`, `evaluation`, `harness`, `memory` with 4,
 `persistence`, `providers` with 2, `runtime`, `sandbox`, `session` with 8, `telemetry`,
 `tools` with 4, `transport` with 9, and `ui`.
 
@@ -36,8 +36,9 @@ is enforced separately by `pnpm check:deps`. See
      `environment`, `tool-registry`, and `tool-symbols`. `tool-mcp` only on `contracts`
      and `tool-registry`.
    - `driver-run-support` depends only on `contracts`, `environment`, `runtime`,
-     `telemetry`, and `harness`. Backends additionally take `driver-run-support`, and
-     `driver-langgraph` also takes `driver-langchain`.
+     `telemetry`, `harness`, and `zod` (the shared tool-schema derivation). Backends
+     additionally take `driver-run-support`; the LangChain family also takes
+     `driver-langchain` (`driver-langgraph`, `driver-deepagents`).
    - `provider-catalog` depends only on `contracts`, `config`, `persistence`,
      `environment`, `runtime`, and `telemetry`. `provider-langchain` additionally takes
      `provider-catalog`.

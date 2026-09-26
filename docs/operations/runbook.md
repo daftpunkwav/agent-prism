@@ -74,7 +74,11 @@ Operational notes:
 ## Debugging aids
 
 - LLM wire traces: builder turns record `llm_request`, `llm_response`, and `llm_error`
-  trace entries, visible in the builder trace panel.
+  trace entries, visible in the builder trace panel (arena columns write
+them to `<traceDir>/<label>.wire.jsonl`).
+- Wire capture needs the call to leave through the column's configured model: every
+  backend does except `claude_agent_sdk`, whose CLI subprocess talks to the endpoint
+  itself — that column has no `.wire.jsonl` by design.
 - Session forensics: `GET /api/sessions/:id/export` downloads the full record and entry
   envelope.
 - Spill forensics: oversized tool outputs land verbatim under the workspace `.spills/`

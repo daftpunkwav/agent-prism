@@ -197,13 +197,13 @@ const PIPELINE_STAGES: Array<{
   {
     title: "Orchestrated execution",
     detail:
-      "Native loop or a thin LC/LG driver; SSE carries tool_progress / file_diff; the trailing report event includes hard metrics + artifacts + narrative.",
+      "Native loop or a thin framework bridge (LangChain family, SDK bridges); SSE carries tool_progress / file_diff; the trailing report event includes hard metrics + artifacts + narrative.",
     module: "drivers/* · harness/verification/harness-runner.ts · evaluation/report.ts",
   },
   {
     title: "Streaming back",
     detail:
-      "LC/LG via astream_events and Native's in-house loop directly produce → thought / action / observation / token_update / complete; the frontend renders the Trace.",
+      "Every backend produces → thought / action / observation / token_update / complete: the LangChain family (LangChain, LangGraph, Deep Agents) through astream_events, Native and the loop variants directly, the SDK bridges from their own streams; the frontend renders the Trace.",
     module: "drivers/event-translation.ts",
   },
   {
@@ -269,7 +269,7 @@ const dimensions: DimDoc[] = [
     label: "Framework",
     reality: "full",
     summary:
-      "Switches the agent-loop driver (Native / Plan-Execute / Self-Critique / LangChain / LangGraph / AutoGen / CrewAI). Under the same tool surface, the same disk workspace and the same baseline, it compares the behavioral differences between loop implementations.",
+      "Switches the agent-loop driver (Native / Plan-Execute / Self-Critique / LangChain / LangGraph / Deep Agents / OpenAI Agents SDK / Claude Agent SDK / AutoGen / CrewAI). Under the same tool surface, the same disk workspace and the same baseline, it compares the behavioral differences between loop implementations.",
     controls:
       "The framework dimension forces react + the full tool surface; ArenaRunner fetches the matching AgentDriver for each column through the DriverLookup port, with Native as the default in-house loop.",
     options: [
@@ -299,6 +299,24 @@ const dimensions: DimDoc[] = [
         effect: "ReAct executor plus a per-batch numeric critic; low scores redirect within a bounded budget.",
       },
       {
+        value: "deepagents",
+        label: "Deep Agents",
+        effect:
+          "createDeepAgent middleware stack: planning tool, virtual filesystem and subagent delegation, over the same tool registry.",
+      },
+      {
+        value: "openai_agents",
+        label: "OpenAI Agents SDK",
+        effect:
+          "The SDK's own Runner (guardrails, handoffs, sessions); the Arena model port implements its Model interface and registry tools bind as function tools.",
+      },
+      {
+        value: "claude_agent_sdk",
+        label: "Claude Agent SDK",
+        effect:
+          "Claude Code's agent loop in a subprocess: built-in tools disabled, Arena tools served over in-process MCP; needs an anthropic_messages endpoint.",
+      },
+      {
         value: "autogen",
         label: "AutoGen",
         effect: "Group chat with LLM speaker selection: coder proposes tool calls, the user proxy executes them, the reviewer critiques; TERMINATE ends the chat.",
@@ -325,10 +343,15 @@ const dimensions: DimDoc[] = [
       "packages/drivers/driver-self-critique/src/self-critique-driver.ts",
       "packages/drivers/driver-autogen/src/autogen-driver.ts",
       "packages/drivers/driver-crewai/src/crewai-driver.ts",
+      "packages/drivers/driver-deepagents/src/deepagents-driver.ts",
+      "packages/drivers/driver-openai-agents/src/openai-agents-driver.ts",
+      "packages/drivers/driver-claude-agent-sdk/src/claude-driver.ts",
       "packages/arena/arena-runner/src/runner.ts",
     ],
-    baselineTip: "When measuring Prompt / reasoning / context / Harness, keep the framework baseline native; switch to LC/LG only when comparing the framework dimension itself.",
+    baselineTip: "When measuring Prompt / reasoning / context / Harness, keep the framework baseline native; switch away from native only when comparing the framework dimension itself.",
     caveats: [
+      "Deep Agents reserves the built-in tool names ls/glob/grep (the Arena registry tools with those names are dropped for this column) and reads the workspace through its own read-only filesystem tools; all writes stay on the Arena tool surface.",
+      "Claude Agent SDK needs an Anthropic-format provider endpoint (api_format anthropic_messages) and a Claude Code CLI on the host (ARENA_CLAUDE_CODE_PATH).",
       "On the framework dimension the baseline toolset/reasoning is normalized by the router to react + full.",
       "When LangChain / LangGraph are not installed, the corresponding drivers skip registration; native is unaffected.",
     ],
@@ -697,9 +720,9 @@ const dimensions: DimDoc[] = [
     label: "Max Steps",
     reality: "full",
     summary:
-      "Caps the agent loop depth to prevent infinite loops and control cost. Native/LangGraph enforce a business budget counted in LLM turns; LangChain has no business-level turn budget and is only approximately bounded by the underlying recursion_limit. Reports always show step counts in LLM-turn terms.",
+      "Caps the agent loop depth to prevent infinite loops and control cost. Native, the loop variants, OpenAI Agents SDK, Claude Agent SDK, LangGraph and Deep Agents enforce a business budget counted in LLM turns; LangChain has no business-level turn budget and is only approximately bounded by the underlying recursion_limit. Reports always show step counts in LLM-turn terms.",
     controls:
-      "Native/LangGraph enforce a hard budget in LLM turns (one model call plus its tool executions is one turn); LangChain has no business turn budget and recursion_limit = max(50, max_steps×5) is the only cap (actual turns ≈ 2.5×max_steps; the 5-step tier is dominated by the floor of 50, about 25 turns). The baseline accepts any in-range integer, plus unlimited (the -1 sentinel) to remove the turn budget entirely: Native loops until the model stops calling tools or the run is aborted, while LC/LG cap the graph at 200 000 steps.",
+      "Native, Plan-Execute, Self-Critique, AutoGen, OpenAI Agents SDK and Claude Agent SDK cap LLM turns at max_steps (one model call plus its tool executions is one turn; the Claude CLI counts agentic round-trips, OpenAI counts SDK turns); CrewAI applies the same max_steps as an overall budget and additionally caps turns per crew task; LangGraph and Deep Agents derive a graph recursion_limit = max(50, max_steps×5) instead (actual turns ≈ 2.5×max_steps; the 5-step tier is dominated by the floor of 50, about 25 turns); LangChain has no business turn budget and that recursion_limit is its only cap. The baseline accepts any in-range integer, plus unlimited (the -1 sentinel) to remove the turn budget entirely: Native loops until the model stops calling tools or the run is aborted, the LangGraph-family graphs cap at 200 000 steps, and the two SDK bridges pass no turn cap to their runner.",
     options: [
       { value: "5", label: "5 steps", effect: "Ends the loop earlier." },
       { value: "10", label: "10 steps", effect: "Default." },
@@ -1122,7 +1145,7 @@ const hero: GuideHero = {
 /** Copy of the dimension-details index area. */
 const dimIndexDoc = {
   eyebrow: "Dimension details",
-  note: "Uniform structure: what it controls → options → path → LC/LG → code → baseline tips → caveats",
+  note: "Uniform structure: what it controls → options → path → framework specifics → code → baseline tips → caveats",
 };
 
 type TocGroupId = "overview" | "dimensions" | "boundary";

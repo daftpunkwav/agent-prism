@@ -196,13 +196,13 @@ const PIPELINE_STAGES: Array<{
   {
     title: "编排执行",
     detail:
-      "Native loop 或 LC/LG 薄驱动；SSE 含 tool_progress / file_diff；尾部 report 事件含硬指标+产物+叙事。",
+      "Native 循环或薄框架桥（LangChain 家族、SDK 桥）；SSE 含 tool_progress / file_diff；尾部 report 事件含硬指标+产物+叙事。",
     module: "drivers/* · harness/verification/harness-runner.ts · evaluation/report.ts",
   },
   {
     title: "流式回传",
     detail:
-      "LC/LG 经 astream_events、Native 自研循环直接产出 → thought / action / observation / token_update / complete；前端 Trace 渲染。",
+      "各 backend 均产出 → thought / action / observation / token_update / complete：LangChain 家族（LangChain、LangGraph、Deep Agents）经 astream_events，Native 与循环变体直接产出，SDK 桥按各自流翻译；前端 Trace 渲染。",
     module: "drivers/event-translation.ts",
   },
   {
@@ -268,7 +268,7 @@ const dimensions: DimDoc[] = [
     label: "框架",
     reality: "full",
     summary:
-      "切换 Agent 循环驱动（Native / Plan-Execute / Self-Critique / LangChain / LangGraph / AutoGen / CrewAI）。在相同工具面、相同磁盘工作空间与相同基线下，比较不同循环实现的行为差异。",
+      "切换 Agent 循环驱动（Native / Plan-Execute / Self-Critique / LangChain / LangGraph / Deep Agents / OpenAI Agents SDK / Claude Agent SDK / AutoGen / CrewAI）。在相同工具面、相同磁盘工作空间与相同基线下，比较不同循环实现的行为差异。",
     controls:
       "框架维强制 react + full 工具面；ArenaRunner 为每列经 DriverLookup 端口取用对应 AgentDriver，Native 为默认自研循环。",
     options: [
@@ -298,6 +298,21 @@ const dimensions: DimDoc[] = [
         effect: "ReAct 执行 + 每批工具后数字 critic 打分；低分在有限预算内重定向。",
       },
       {
+        value: "deepagents",
+        label: "Deep Agents",
+        effect: "createDeepAgent 中间件栈：规划工具、虚拟文件系统与子代理委派，复用同一工具注册表。",
+      },
+      {
+        value: "openai_agents",
+        label: "OpenAI Agents SDK",
+        effect: "SDK 自带 Runner（护栏、交接、会话）；Arena 模型端口实现其 Model 接口，注册表工具作为 function tool 派发。",
+      },
+      {
+        value: "claude_agent_sdk",
+        label: "Claude Agent SDK",
+        effect: "子进程内跑 Claude Code 循环：关闭内置工具，Arena 工具经进程内 MCP 提供；需要 anthropic_messages 端点。",
+      },
+      {
         value: "autogen",
         label: "AutoGen",
         effect: "群聊 + LLM 发言人选择：coder 提出工具调用，user proxy 真实执行，reviewer 点评；TERMINATE 结束会话。",
@@ -324,10 +339,15 @@ const dimensions: DimDoc[] = [
       "packages/drivers/driver-self-critique/src/self-critique-driver.ts",
       "packages/drivers/driver-autogen/src/autogen-driver.ts",
       "packages/drivers/driver-crewai/src/crewai-driver.ts",
+      "packages/drivers/driver-deepagents/src/deepagents-driver.ts",
+      "packages/drivers/driver-openai-agents/src/openai-agents-driver.ts",
+      "packages/drivers/driver-claude-agent-sdk/src/claude-driver.ts",
       "packages/arena/arena-runner/src/runner.ts",
     ],
-    baselineTip: "测 Prompt / 推理 / 上下文 / Harness 时框架基线保持 native；仅对比框架维时才切换 LC/LG。",
+    baselineTip: "测 Prompt / 推理 / 上下文 / Harness 时框架基线保持 native；仅对比框架维时才切换其他框架。",
     caveats: [
+      "Deep Agents 静态保留 ls/glob/grep 三个内置工具名（本列会剔除注册表中的同名工具），并以自带的只读文件工具读取工作空间；所有写入仍走 Arena 工具面。",
+      "Claude Agent SDK 需要 anthropic_messages 格式的 Provider 端点，以及宿主机上的 Claude Code CLI（可用 ARENA_CLAUDE_CODE_PATH 指定）。",
       "框架维 baseline 的 toolset/reasoning 会被 router 统一为 react + full。",
       "LangChain / LangGraph 未安装时对应驱动跳过注册，不影响 native。",
     ],
@@ -696,9 +716,9 @@ const dimensions: DimDoc[] = [
     label: "最大步数",
     reality: "full",
     summary:
-      "限制 Agent 循环深度，防止无限循环并控制成本。Native/LangGraph 有按 LLM 轮次计的业务预算；LangChain 无业务轮次预算，仅由底层 recursion_limit 近似约束。报告步骤数统一按 LLM 轮次口径展示。",
+      "限制 Agent 循环深度，防止无限循环并控制成本。Native、循环变体、OpenAI Agents SDK、Claude Agent SDK、LangGraph 与 Deep Agents 都有按 LLM 轮次计的业务预算；LangChain 无业务轮次预算，仅由底层 recursion_limit 近似约束。报告步骤数统一按 LLM 轮次口径展示。",
     controls:
-      "Native/LangGraph 按 LLM 轮次硬预算（一次模型调用及其工具执行为一轮）；LangChain 无业务轮次预算，recursion_limit = max(50, max_steps×5) 为唯一上限（实际轮数约 2.5×max_steps，5 步档由下限 50 主导、约 25 轮）。基线支持范围内任意整数，也可选 unlimited（-1 哨兵）取消轮次预算：Native 循环直到模型不再调工具或运行被中止，LC/LG 以 200 000 图步为等效上限。",
+      "Native、Plan-Execute、Self-Critique、AutoGen、OpenAI Agents SDK、Claude Agent SDK 按 LLM 轮次硬预算 max_steps（一次模型调用及其工具执行为一轮；Claude CLI 计 agentic 往返、OpenAI 计 SDK 轮次）；CrewAI 同样以 max_steps 为全局预算，并对每个 crew 任务另设轮次上限；LangGraph 与 Deep Agents 改为图预算 recursion_limit = max(50, max_steps×5)（实际轮数约 2.5×max_steps，5 步档由下限 50 主导、约 25 轮）；LangChain 无业务轮次预算，该 recursion_limit 是唯一上限。基线支持范围内任意整数，也可选 unlimited（-1 哨兵）取消轮次预算：Native 循环直到模型不再调工具或运行被中止，LangGraph 家族图以 200 000 图步为等效上限，两个 SDK 桥则不向 runner 传轮次上限。",
     options: [
       { value: "5", label: "5 步", effect: "更早结束循环。" },
       { value: "10", label: "10 步", effect: "默认。" },
@@ -1121,7 +1141,7 @@ const hero: GuideHero = {
 /** Copy of the dimension-details index area. */
 const dimIndexDoc = {
   eyebrow: "对比维度详情",
-  note: "统一结构：控制什么 → 选项 → 路径 → LC/LG → 代码 → 基线建议 → 边界",
+  note: "统一结构：控制什么 → 选项 → 路径 → 框架细节 → 代码 → 基线建议 → 边界",
 };
 
 type TocGroupId = "overview" | "dimensions" | "boundary";
