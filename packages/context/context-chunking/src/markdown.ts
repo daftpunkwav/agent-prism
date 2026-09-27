@@ -120,8 +120,10 @@ export function chunkMarkdown(text: string, options: { maxChars?: number } = {})
     let consumed = 0;
     for (const content of packed) {
       const at = body.indexOf(content.slice(0, Math.min(48, content.length)), consumed);
-      const start = at === -1 ? consumed : at;
-      const offsetLines = body.slice(0, start).split("\n").length - 1;
+      // A miss (content rewritten by the chunker) must still resolve to a LINE start;
+      // `consumed` points just past the previous chunk's first character.
+      const start = at === -1 ? body.indexOf("\n", consumed) + 1 : at;
+      const offsetLines = body.slice(0, start < 0 ? consumed : start).split("\n").length - 1;
       out.push({
         content: path === "" ? content : `[${path}]\n${content}`,
         section: path,

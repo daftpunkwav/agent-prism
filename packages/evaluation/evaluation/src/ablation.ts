@@ -43,7 +43,9 @@ export function ablateColumn(label: string, input: AblationColumnInput): Ablatio
       const tool = typeof event.tool === "string" ? event.tool : "";
       if (tool.startsWith("mcp__")) mcpCalls += 1;
       if (tool === "skill") skillReads += 1;
-      if (tool === "subagent" || tool === "ralph_loop") delegations += 1;
+      // Keep in sync with the builtin delegation tools (a scatter call derives 2-8
+      // sub-runs); local literals because evaluation may only import contracts/runtime.
+      if (tool === "subagent" || tool === "ralph_loop" || tool === "scatter") delegations += 1;
     } else if (event.type === "reflect") {
       reflects += 1;
     } else if (event.type === "observation") {

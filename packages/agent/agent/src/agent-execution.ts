@@ -768,7 +768,9 @@ export async function* runAgentExecution(
         task: spec.question.slice(0, 500),
         framework: spec.config.framework,
         model: spec.config.model_id,
-        success: true,
+        // The driver's own verdict, not "no exception escaped": drivers converge
+        // internal failures into complete(success:false) and then return normally.
+        success: heldComplete?.metrics?.success !== false,
         keyActions: seenTools,
         lessons: `Completed in ${observedSteps} steps with ${observedToolCalls} tool calls.`,
       });

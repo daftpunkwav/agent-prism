@@ -26,13 +26,15 @@ export interface KindCounters {
   entries: number;
   /** Sum of completed-run durations in ms (for means). */
   completedDurationMs: number;
+  /** How many completed runs contributed a duration (mean denominator). */
+  completedDurationSamples: number;
   /** Slowest completed run in ms (0 when none). */
   maxDurationMs: number;
 }
 
 /** Zeroed counters for one kind. */
 function zeroKind(): KindCounters {
-  return { started: 0, completed: 0, failed: 0, cancelled: 0, entries: 0, completedDurationMs: 0, maxDurationMs: 0 };
+  return { started: 0, completed: 0, failed: 0, cancelled: 0, entries: 0, completedDurationMs: 0, completedDurationSamples: 0, maxDurationMs: 0 };
 }
 
 /** In-memory session telemetry sink. */
@@ -65,12 +67,15 @@ export class SessionTelemetry {
     if (!TERMINAL.includes(status) || this.settled.has(id)) return;
     const start = this.starts.get(id);
     const kind = start?.kind ?? "agent";
-    this.settled.add(id);
+    // Only sessions this sink saw start may close it, or openSessions() would go
+    // negative for a settle whose start happened before telemetry attached.
+    if (start !== undefined) this.settled.add(id);
     const counters = this.counters(kind);
     counters[status === "completed" ? "completed" : status === "failed" ? "failed" : "cancelled"] += 1;
     if (status === "completed" && start !== undefined && Number.isFinite(at) && at >= start.at) {
       const duration = at - start.at;
       counters.completedDurationMs += duration;
+      counters.completedDurationSamples += 1;
       counters.maxDurationMs = Math.max(counters.maxDurationMs, duration);
     }
   }
@@ -94,7 +99,8 @@ export class SessionTelemetry {
   /** Mean completed-run duration in ms per kind (0 when none completed). */
   meanDurationMs(kind: SessionKind): number {
     const counters = this.counters(kind);
-    return counters.completed === 0 ? 0 : counters.completedDurationMs / counters.completed;
+    // Divide by the runs that actually reported a duration, not by every completion.
+    return counters.completedDurationSamples === 0 ? 0 : counters.completedDurationMs / counters.completedDurationSamples;
   }
 
   /** Currently open (started but unsettled) session count. */

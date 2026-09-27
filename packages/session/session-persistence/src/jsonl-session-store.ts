@@ -75,6 +75,7 @@ export class JsonlSessionStore implements SessionStore {
   private readonly blobs: SessionBlobStore;
   private corrupt = 0;
   private loaded = false;
+  private loadPromise: Promise<void> | null = null;
 
   constructor(deps: JsonlSessionStoreDeps) {
     this.log = deps.log;
@@ -90,10 +91,12 @@ export class JsonlSessionStore implements SessionStore {
   }
 
   private async ensureLoaded(): Promise<void> {
-    if (!this.loaded) {
+    // Memoize the PROMISE: a concurrent caller must await the same load instead of
+    // reading an empty ledger while the first load is still in flight.
+    this.loadPromise ??= this.load().then(() => {
       this.loaded = true;
-      await this.load();
-    }
+    });
+    await this.loadPromise;
   }
 
   /** Creates an active session; rejects blank titles and a full store. */

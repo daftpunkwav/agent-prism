@@ -20,7 +20,8 @@ export { buildLlmJudgePrompt };
 const CODE_FENCE = /```[^\n`]*\n([\s\S]*?)\n?\s*```/;
 
 function extractNumbers(text: string): number[] {
-  const cleaned = text.replaceAll(",", "");
+  // Fold thousands separators only: a bare comma may be a decimal mark ("1,5").
+  const cleaned = text.replace(/(\d),(\d{3})\b/g, "$1$2");
   const matches = cleaned.match(/-?\d+(?:\.\d+)?/g) ?? [];
   return matches.map((m) => Number.parseFloat(m));
 }

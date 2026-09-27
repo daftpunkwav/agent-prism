@@ -16,14 +16,18 @@ const DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/;
 
 /** Formats an instant as `YYYY-MM-DD (UTC)` for prompt time lines. */
 export function formatUtcDate(nowMs: number): string {
-  if (!Number.isFinite(nowMs) || nowMs <= 0) return "unknown date";
-  return `${new Date(nowMs).toISOString().slice(0, 10)} (UTC)`;
+  // toISOString throws RangeError past |8.64e15|, so validate the instant itself
+  // instead of only finiteness (nanosecond epochs arrive as finite huge numbers).
+  const date = new Date(nowMs);
+  if (!Number.isFinite(nowMs) || nowMs <= 0 || !Number.isFinite(date.getTime())) return "unknown date";
+  return `${date.toISOString().slice(0, 10)} (UTC)`;
 }
 
 /** Formats an instant as full `YYYY-MM-DDTHH:mm:ssZ`. */
 export function formatUtcDateTime(nowMs: number): string {
-  if (!Number.isFinite(nowMs) || nowMs <= 0) return "unknown datetime";
-  return new Date(nowMs).toISOString().slice(0, 19) + "Z";
+  const date = new Date(nowMs);
+  if (!Number.isFinite(nowMs) || nowMs <= 0 || !Number.isFinite(date.getTime())) return "unknown datetime";
+  return date.toISOString().slice(0, 19) + "Z";
 }
 
 /** Parses `YYYY-MM-DD` into epoch ms (NaN when malformed or impossible). */

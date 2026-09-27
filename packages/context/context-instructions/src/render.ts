@@ -67,7 +67,14 @@ export function renderInstructions(
   let text = `[Agent instructions]\n${sections.join("\n\n")}`;
   if (text.length > budget) {
     const marker = `\n…[instructions capped: ${text.length} chars > ${budget} budget]…`;
-    text = text.slice(0, Math.max(0, budget - marker.length)) + marker;
+    // A marker longer than the budget would overshoot it; fall back to a plain head
+    // cut and record the cap so callers can see the block was truncated.
+    if (marker.length >= budget) {
+      truncated.push({ name: "(block budget)", kept: Math.max(0, budget), total: text.length });
+      text = text.slice(0, Math.max(0, budget));
+    } else {
+      text = text.slice(0, Math.max(0, budget - marker.length)) + marker;
+    }
   }
   return { text, layers: included, truncated };
 }

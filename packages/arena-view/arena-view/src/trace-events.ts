@@ -253,7 +253,15 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
     } else if (ev.type === "observation") {
       if (openActionIdx !== null) {
         const action = segs[openActionIdx]!;
-        action.result = (action.result ?? "") + (ev.result || "");
+        const streamed = action.result ?? "";
+        const observation = ev.result || "";
+        // Finalize, not append: bash tool_progress replays the whole output as chunks,
+        // so appending the observation verbatim would render the same text twice. The
+        // observation only supplies text when the call streamed nothing (or streamed
+        // strictly less than the observation carries).
+        if (streamed === "" || (observation !== "" && !streamed.includes(observation))) {
+          action.result = streamed + observation;
+        }
         action.resultDone = true;
         if (ts !== undefined) action.tsEnd = ts;
         // One observation completes the call; a later observation is a stray and must stay standalone

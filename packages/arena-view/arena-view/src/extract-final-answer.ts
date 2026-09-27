@@ -19,10 +19,15 @@ import { isPipelineConfigBanner } from "@agentprism/contracts";
  * drift alike — isPipelineConfigBanner covers every registered prefix).
  */
 export function extractFinalAnswer(events: ArenaEvent[], turn?: number): string {
-  const target =
-    turn != null
-      ? turn
-      : Math.max(0, ...events.map((e) => ("turn" in e ? (e.turn ?? 0) : 0)));
+  // A loop, not `Math.max(...map)`: a long run produces enough events to exceed the
+  // engine's argument limit (RangeError) on the spread.
+  let target = turn ?? 0;
+  if (turn == null) {
+    for (const event of events) {
+      const eventTurn = "turn" in event ? (event.turn ?? 0) : 0;
+      if (eventTurn > target) target = eventTurn;
+    }
+  }
 
   let lastThought = "";
   let streamingThought = "";

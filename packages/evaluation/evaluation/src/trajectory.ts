@@ -442,7 +442,10 @@ export async function evaluateTrajectoryAsync(
     const overallRaw = parsed.overall;
     if (typeof overallRaw === "number" && Number.isFinite(overallRaw)) {
       const overall = Number(Math.max(0, Math.min(1, overallRaw)).toFixed(2));
-      const passed = typeof parsed.passed === "boolean" ? parsed.passed : overall >= (options.passThreshold ?? DEFAULT_PASS_THRESHOLD);
+      // Same gate as the synchronous path: a model verdict can only confirm a
+      // deterministic success, never overrule a deterministic failure.
+      const llmPassed = typeof parsed.passed === "boolean" ? parsed.passed : overall >= (options.passThreshold ?? DEFAULT_PASS_THRESHOLD);
+      const passed = deterministicScore.passed && llmPassed;
       const summary = typeof parsed.summary === "string" && parsed.summary !== ""
         ? parsed.summary
         : deterministicScore.summary;

@@ -23,7 +23,8 @@ export class TokenTracker {
   private inputTokens = 0;
   private outputTokens = 0;
   private estimatedInputTokens = 0;
-  private usageFromApi = false;
+  private inputFromApi = false;
+  private outputFromApi = false;
 
   constructor(config: { contextWindow?: number; maxInputTokens?: number; maxOutputTokens?: number } = {}) {
     this.contextWindow = config.contextWindow ?? 128_000;
@@ -41,15 +42,19 @@ export class TokenTracker {
     // untrusted input, so non-finite or negative values are ignored instead of poisoning totals.
     if (Number.isFinite(usage.inputTokens) && usage.inputTokens > 0) {
       this.inputTokens += usage.inputTokens;
+      // Per-direction flags: an all-zero or one-sided report must not flip the other
+      // direction away from its seed estimate (providers that never report usage would
+      // otherwise collapse a parent column's input tokens to 0 after one nested call).
+      this.inputFromApi = true;
     }
     if (Number.isFinite(usage.outputTokens) && usage.outputTokens > 0) {
       this.outputTokens += usage.outputTokens;
+      this.outputFromApi = true;
     }
-    this.usageFromApi = true;
   }
 
   get effectiveInputTokens(): number {
-    return this.usageFromApi ? this.inputTokens : this.estimatedInputTokens;
+    return this.inputFromApi ? this.inputTokens : this.estimatedInputTokens;
   }
 
   get totalTokens(): number {
@@ -66,7 +71,9 @@ export class TokenTracker {
 
   asDict(): TokenStats {
     return {
-      input_tokens: this.inputTokens,
+      // Effective, not raw: with no provider usage the input side is the seed estimate,
+      // and reporting raw 0 here contradicted the non-zero total beside it.
+      input_tokens: this.effectiveInputTokens,
       output_tokens: this.outputTokens,
       total_tokens: this.totalTokens,
       context_window: this.contextWindow,

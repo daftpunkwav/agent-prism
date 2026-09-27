@@ -66,9 +66,18 @@ export class MemoryStore<T extends { id: string }> {
   /** Loads persisted items from disk into memory and builds the inverted search index. */
   private load(): void {
     if (!this.file) return;
+    let persisted: T[];
     try {
-      const persisted = this.file.read<T[]>() ?? [];
-      for (const item of persisted) {
+      persisted = this.file.read<T[]>() ?? [];
+    } catch (error) {
+      console.warn(`[memory-store] Failed to read persisted items: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    let skipped = 0;
+    for (const item of persisted) {
+      // Per-record isolation: one unreadable entry must not truncate the rest of the
+      // store, because the next save would then persist that truncated array.
+      try {
         if (item && typeof item.id === "string") {
           const rawText = this.extractSearchText(item);
           this.items.set(item.id, {
@@ -77,9 +86,12 @@ export class MemoryStore<T extends { id: string }> {
             searchTokens: tokenizeText(rawText),
           });
         }
+      } catch {
+        skipped += 1;
       }
-    } catch (error) {
-      console.warn(`[memory-store] Failed to load persisted items: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (skipped > 0) {
+      console.warn(`[memory-store] Skipped ${skipped} unreadable item(s) while loading persisted items.`);
     }
   }
 
