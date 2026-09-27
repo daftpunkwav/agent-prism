@@ -11,7 +11,7 @@ capability families and dependency rules.
 
 | Concept | Meaning | Lives in |
 |---|---|---|
-| **Run** | One comparison execution: a question plus per-column selections | `@agentprism/arena` (`arena-runner`) |
+| **Run** | One comparison execution: a question plus per-column selections | `@agentprism/arena-runner` |
 | **Column / pipeline** | One side-by-side variant inside a run; the SSE `pipeline` field is its display label and aggregation key | `contracts/events.ts` (`ArenaEventBase`) |
 | **Dimension** | One variable axis of comparison, with 16 ids: framework, prompt, reasoning, context, harness, temperature, model, thinking, thinking_budget, max_steps, toolset, mcp, skill, orchestration, memory, history_mode | `contracts/enums.ts`, `@agentprism/dimensions` |
 | **Driver** | A loop-architecture backend implementing the `AgentDriver` port: native, langchain, langgraph, deepagents, openai_agents, claude_agent_sdk, plan_execute, self_critique, autogen, crewai | `@agentprism/driver-*` |
@@ -19,7 +19,7 @@ capability families and dependency rules.
 | **Toolset** | A named tool table scope: `full` with 22 tools, `edit_run` with 19, `read_only` with 10 | `contracts/enums.ts` (`TOOL_NAMES_BY_TOOLSET`) |
 | **Workspace** | A per-run or per-column scratch directory on disk under `data/runs/<runId>/<workspace>/` | `@agentprism/runtime` (`WorkspaceRegistry`) |
 | **Session ledger** | The durable execution-session record, with kinds `arena`, `agent`, and `builder` and statuses `active`, `completed`, `failed`, and `cancelled` | `contracts/session.ts`, `@agentprism/session` |
-| **Builder** | The conversational assembly service that composes a column from blocks and chats with it turn by turn | `@agentprism/builder` |
+| **Builder** | The conversational assembly service that composes a column from blocks and chats with it turn by turn | `@agentprism/builder-service` |
 | **Template** | A task with a judge spec, 15 scored and 11 quick, used for one-click comparison matrices | `@agentprism/arena-dimensions` (`task-templates.ts`) |
 | **Matrix** | 1 to 32 template cells executed sequentially through ArenaService with SSE progress | `@agentprism/application` (`MatrixService`) |
 

@@ -12,7 +12,7 @@ prompt、reasoning mode、model 与 tool policy 下并排运行，对产生的�
 
 | 概念 | 含义 | 所在位置 |
 |---|---|---|
-| **Run** | 一次对比执行：一个问题加每列选择 | `@agentprism/arena` `arena-runner` |
+| **Run** | 一次对比执行：一个问题加每列选择 | `@agentprism/arena-runner` |
 | **Column / pipeline** | 一次 run 内的一条并排变体；SSE `pipeline` 字段是其显示 label 与聚合键 | `contracts/events.ts` `ArenaEventBase` |
 | **Dimension** | 一条对比变量轴，共 16 个 id：framework、prompt、reasoning、context、harness、temperature、model、thinking、thinking_budget、max_steps、toolset、mcp、skill、orchestration、memory、history_mode | `contracts/enums.ts`、`@agentprism/dimensions` |
 | **Driver** | 实现 `AgentDriver` port 的 loop-architecture backend：native、langchain、langgraph、deepagents、openai_agents、claude_agent_sdk、plan_execute、self_critique、autogen、crewai | `@agentprism/driver-*` |
@@ -20,7 +20,7 @@ prompt、reasoning mode、model 与 tool policy 下并排运行，对产生的�
 | **Toolset** | 具名 tool 表范围：`full` 含 22 个 tool，`edit_run` 含 19 个，`read_only` 含 10 个 | `contracts/enums.ts` `TOOL_NAMES_BY_TOOLSET` |
 | **Workspace** | 磁盘上 per-run 或 per-column 的临时目录，位于 `data/runs/<runId>/<workspace>/` | `@agentprism/runtime` `WorkspaceRegistry` |
 | **Session ledger** | 持久执行 session 记录，kinds 为 `arena`、`agent`、`builder`，statuses 为 `active`、`completed`、`failed`、`cancelled` | `contracts/session.ts`、`@agentprism/session` |
-| **Builder** | 对话式装配服务，用 block 组合出一列并逐 turn 对话 | `@agentprism/builder` |
+| **Builder** | 对话式装配服务，用 block 组合出一列并逐 turn 对话 | `@agentprism/builder-service` |
 | **Template** | 带 judge spec 的任务，15 个 scored 与 11 个 quick，用于一键对比矩阵 | `@agentprism/arena-dimensions` `task-templates.ts` |
 | **Matrix** | 1 至 32 个 template cell，经 ArenaService 顺序执行并带 SSE 进度 | `@agentprism/application` `MatrixService` |
 

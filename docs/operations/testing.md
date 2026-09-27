@@ -49,11 +49,11 @@ mount points rather than behavior this project owns; every other file under
 Files no test reaches are still counted, so a new module cannot enter the tree without
 its share of tests. Reports land in `cov-report/` as text plus a JSON summary.
 
-Coverage thresholds fail the run when any metric falls roughly four points under
-the baseline at introduction: the enforced floors are statements 84, branches 71,
-functions 85, and lines 86 (about four points under the 87/75/88/89 baseline).
-The margin absorbs run-to-run noise and the platform-gated code the Windows
-reference platform cannot reach, while turning a broad regression red instead of
+Coverage thresholds fail the run when any metric falls under its floor: statements
+89, branches 78, functions 90, and lines 91 (about one and a half points under the
+90.35/79.73/91.69/92.44 baseline). CI runs on the Windows reference platform, so the
+numbers come from the same run that gates the merge, and the margin absorbs
+run-to-run noise and spawn jitter while turning a broad regression red instead of
 letting coverage slide. Raise the bar as coverage improves; a red gate means
 restoring the tests, not lowering the numbers.
 

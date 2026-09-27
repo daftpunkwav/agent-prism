@@ -3,7 +3,7 @@
 In-memory search index with atomic file persistence for memory items.
 
 - `MemoryStore` loads and atomically persists typed collections through `AtomicJsonFile`.
-- `tokenizeText` segments Latin words and CJK uni/bi-grams for robust partial matching.
+- `tokenizeText` segments Latin words and CJK uni/bi-grams, so partial matching works in both scripts.
 - Term-frequency ranking over text representations; crash-safe across restarts.
 
 ## Dependencies
