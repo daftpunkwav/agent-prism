@@ -16,8 +16,9 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
    backend 位于独立的 leaf。
 2. 后端注册。每个 backend leaf 独立打包和声明，在组合时注册。
    driver backend 注册到 `DriverLookup`：`native` 在进程内运行，
-   `langchain` 与 `langgraph` 桥接外部框架，`plan_execute` 与
-   `self_critique` 是 native 系列循环。tool 实现注册到
+   `langchain`/`langgraph`/`deepagents` 驱动 LangChain 栈
+   （`openai_agents`/`claude_agent_sdk`/`autogen`/`crewai` 则驱动各自框架），
+   `plan_execute` 与 `self_critique` 是 native 系列循环。tool 实现注册到
    `ToolRegistry`：`tool-builtins` 与 `tool-mcp`。
 3. 显式组合。`apps/server/src/assemble.ts` 装配唯一交付物。
    每个能力族目录在其 `README.md` 中维护 `Package | Role | Wired at` 表；

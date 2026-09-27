@@ -15,7 +15,8 @@ The `packages/<capability-family>/<leaf>` two-level structure rests on three mec
    live in separate leaves.
 2. Backend registration. Each backend leaf is packaged and declared independently and
    registers at composition time. Driver backends register on `DriverLookup`: `native`
-   runs in process, `langchain` and `langgraph` bridge external frameworks, and
+   runs in process, `langchain`/`langgraph`/`deepagents` drive the LangChain stack (and
+   `openai_agents`/`claude_agent_sdk`/`autogen`/`crewai` their own frameworks), and
    `plan_execute` and `self_critique` are native-family loops. Tool implementations
    register on `ToolRegistry`: `tool-builtins` and `tool-mcp`.
 3. Explicit composition. `apps/server/src/assemble.ts` assembles the single deliverable.
