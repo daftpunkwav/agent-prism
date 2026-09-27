@@ -324,10 +324,12 @@ export class ScopedFileSystem {
         text: buffer.subarray(0, end).toString("utf8"),
         // "More content follows" counts from the window's start, so a caller reading
         // successive windows can stop exactly at the last one. `bytesRead` is the
-        // distance to the next window (it can exceed the text's byte length when a
-        // character was cut).
+        // distance to the next window: it stops at the last complete character, so a
+        // character the window cut is re-read whole by the next window instead of
+        // coming back as a replacement character (end === 0 means not even one
+        // character fit — advance by `read` so the caller cannot spin in place).
         truncated: from + read < size,
-        bytesRead: read,
+        bytesRead: end === 0 ? read : end,
       };
     } catch {
       throw new WorkspaceError(`Error: file not found: ${filePath}`);

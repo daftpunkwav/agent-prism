@@ -131,6 +131,28 @@ THIRD-LINE
     }
   });
 
+  it("keeps multi-byte characters whole across concatenated scan windows", async () => {
+    const ws = workspace();
+    try {
+      // Every line is CJK and the limit exceeds what one 256 KiB window holds, so the
+      // walker must concatenate windows and some window boundary will land inside a
+      // 3-byte character. A window that advances past the cut character's bytes would
+      // lose it and surface a replacement character in the next window's head.
+      const line = `${"中文注释测试".repeat(30)}\n`;
+      writeFileSync(join(ws.root, "cn.log"), line.repeat(2000));
+      const result = await readTool.execute(ws as never, { path: "cn.log", offset: 2, limit: 1000 });
+      expect(result.ok).toBe(true);
+      const expected = "中文注释测试".repeat(30);
+      for (const text of result.result.split("\n")) {
+        if (text === "" || text.startsWith("…")) continue;
+        expect(text).not.toContain("\uFFFD");
+        expect(text).toBe(expected);
+      }
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("returns exactly limit lines when the offset lands inside the first window", async () => {
     const ws = workspace();
     try {

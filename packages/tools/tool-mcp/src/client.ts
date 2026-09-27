@@ -313,5 +313,12 @@ export class McpClient {
         this.pump = null;
       }
     })();
+    // Nobody awaits the pump: an exception that escapes the loop above (a write
+    // into a just-died server's pipe, say) would surface as an unhandled
+    // rejection and crash the host. The finally block already rejected every
+    // pending call, so logging is all that is left to do here.
+    this.pump = this.pump.catch((error: unknown) => {
+      console.warn(`[mcp] message pump failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
   }
 }

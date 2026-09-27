@@ -101,6 +101,13 @@ export class NodeMcpTransport implements McpTransport {
     const wake = (): void => {
       while (waiters.length > 0) (waiters.shift() as () => void)();
     };
+    // A dying server takes its pipe with it: writing to the dead child's stdin
+    // (or a stdout decode fault) emits EPIPE/error asynchronously, and with no
+    // listener that crashes the host. The exit is already reported through
+    // `ended`/`exited`, so the error itself carries no information a caller
+    // could act on.
+    child.stdin?.on("error", () => {});
+    child.stdout?.on("error", () => {});
     child.stdout?.on("data", (chunk: Buffer) => {
       for (const message of decoder.push(textDecoder.write(chunk))) {
         queue.push(message);

@@ -183,6 +183,75 @@ describe("McpClient", () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     await expect(client.listTools()).rejects.toThrow(/server stream ended/);
   });
+
+  /**
+   * A server-initiated request answered while the child's pipe is already broken
+   * makes the pump's own write throw. The pump promise is never awaited, so that
+   * exception must be caught (and logged) instead of escaping as an unhandled
+   * rejection that crashes the host.
+   */
+  it("catches a pump-side write failure instead of leaking an unhandled rejection", async () => {
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown): void => {
+      rejections.push(reason);
+    };
+    process.on("unhandledRejection", onRejection);
+    let writes = 0;
+    const queue: string[] = [];
+    const waiters: Array<() => void> = [];
+    const wake = (): void => {
+      while (queue.length > 0 && waiters.length > 0) (waiters.shift() as () => void)();
+    };
+    const transport: McpTransport = {
+      spawn: () => ({
+        write(message: string): void {
+          writes += 1;
+          const request = JSON.parse(message) as { id?: number };
+          if (writes === 1) {
+            // Handshake reply.
+            queue.unshift(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: request.id,
+                result: { protocolVersion: "2024-11-05", capabilities: {}, serverInfo: { name: "fake", version: "0" } },
+              }),
+            );
+            wake();
+            return;
+          }
+          if (writes === 2) {
+            // With the handshake notification the server sends a request of its
+            // own; the client answers through a pipe that is already broken.
+            queue.push(JSON.stringify({ jsonrpc: "2.0", id: 77, method: "roots/list", params: {} }));
+            wake();
+            return;
+          }
+          throw new Error("EPIPE: pipe broken");
+        },
+        async *messages(): AsyncGenerator<string> {
+          for (;;) {
+            const next = queue.shift();
+            if (next !== undefined) {
+              yield next;
+              continue;
+            }
+            await new Promise<void>((resolve) => waiters.push(resolve));
+          }
+        },
+        kill(): void {},
+        exited: async () => ({ code: 0, signal: null }),
+      }),
+    };
+    const client = await McpClient.connect(transport, { command: "fake", timeoutMs: 1000 });
+    try {
+      // Let the pump reach the server-initiated request and hit the throwing write.
+      await new Promise<void>((resolve) => setTimeout(resolve, 20));
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onRejection);
+      client.close();
+    }
+  });
 });
 
 describe("mcpContentToText", () => {
