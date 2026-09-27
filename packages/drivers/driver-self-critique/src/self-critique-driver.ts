@@ -20,10 +20,8 @@ import type {
   ArenaEvent,
   LlmAssistantMessage,
   LlmMessage,
-  LlmToolMessage,
 } from "@agentprism/contracts";
 import {
-  OBSERVATION_MAX_CHARS,
   PIPELINE_BANNER_PREFIX,
   arenaErrorEvent,
   completeEvent,
@@ -32,7 +30,6 @@ import {
 } from "@agentprism/contracts";
 import {
   applyContextPipeline,
-  blockedToolMessageContent,
   buildInitialMessages,
   buildSystemUser,
   createColumnSnippetRetriever,
@@ -40,7 +37,7 @@ import {
   type AgentExecutionContext,
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
-import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, stepBudgetFor } from "@agentprism/driver-run-support";
+import { collectPriorToolNames, executeToolCalls, isToolBatchMessage, eventOf, formatCapabilityPluginIds, stepBudgetFor } from "@agentprism/driver-run-support";
 import { CRITIC_INSTRUCTION, criticRedirect } from "./prompts.js";
 
 /** Critic verdict: numeric progress score plus a one-line next action. */
@@ -225,6 +222,8 @@ export class SelfCritiqueDriver implements AgentDriver {
       }
       yield eventOf({ type: "thought_end", pipeline: label, step: streamStep, content: "", workspace: workspaceName });
       const response: LlmAssistantMessage = { role: "assistant", content: text, toolCalls: toolCalls.length > 0 ? toolCalls : undefined };
+      // Collect the drift-guard history BEFORE pushing this response (see tool-batch).
+      const priorToolNames = collectPriorToolNames(messages);
       messages.push(response);
 
       if ((response.toolCalls ?? []).length === 0) {
@@ -246,43 +245,11 @@ export class SelfCritiqueDriver implements AgentDriver {
         continue;
       }
 
-      // Tool batch with the shared drift guard.
-      const prior: string[] = [];
-      for (const message of messages.slice(0, -1)) {
-        if (message.role !== "assistant" || message.toolCalls === undefined) continue;
-        for (const call of message.toolCalls) prior.push(call.name);
-      }
-      for (const rawCall of response.toolCalls ?? []) {
-        const call = { ...rawCall, name: canonicalToolName(context.tools.names, rawCall.name) };
-        if (!context.tools.names.has(call.name)) {
-          messages.push({ role: "tool", content: `Error: tool ${call.name} is not authorized`, toolCallId: call.id, name: call.name });
-          continue;
-        }
-        const blocked = blockedToolMessageContent(question, call.name, call.args, prior, context.config.harness);
-        if (blocked !== null) {
-          messages.push({ role: "tool", content: blocked, toolCallId: call.id, name: call.name });
-          continue;
-        }
-        stats.toolCalls += 1;
-        stats.step += 1;
-        yield eventOf({ type: "action", pipeline: label, step: stats.step, tool: call.name, args: normalizeActionArgs(call.name, call.args), workspace: workspaceName });
-        let result: string;
-        let fileDiff: string | null = null;
-        try {
-          const outcome = await context.tools.execute(call.name, call.args, { signal: context.signal });
-          result = outcome.result;
-          fileDiff = outcome.fileDiff;
-        } catch (error) {
-          if ((error as Error)?.name === "AbortError") throw error;
-          result = `Error: tool ${call.name} failed: ${sanitizeErrorMessage(error)}`;
-        }
-        for (const event of emitToolOutcomeEvents(label, workspaceName, stats.step, call.name, { result, fileDiff })) {
-          yield event;
-        }
-        stats.step += 1;
-        yield eventOf({ type: "observation", pipeline: label, step: stats.step, result: result.slice(0, OBSERVATION_MAX_CHARS), workspace: workspaceName });
-        const toolMessage: LlmToolMessage = { role: "tool", content: result, toolCallId: call.id, name: call.name };
-        messages.push(toolMessage);
+      // Shared batch executor (same authorization, drift guard, outcome events, and
+      // error convergence as every other backend).
+      for await (const item of executeToolCalls(context, response, question, priorToolNames, stats)) {
+        if (isToolBatchMessage(item)) messages.push(item);
+        else yield item;
       }
 
       // Per-batch critic: score the batch, redirect only on low scores with budget left.

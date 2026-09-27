@@ -8,4 +8,4 @@
  * The executor is backend-neutral; see driver-run-support/tool-batch.
  */
 
-export { collectPriorToolNames, executeToolCalls } from "@agentprism/driver-run-support";
+export { collectPriorToolNames, executeToolCalls, isToolBatchMessage } from "@agentprism/driver-run-support";

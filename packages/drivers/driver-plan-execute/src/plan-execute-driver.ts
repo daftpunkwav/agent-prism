@@ -17,10 +17,8 @@ import type {
   ArenaEvent,
   LlmAssistantMessage,
   LlmMessage,
-  LlmToolMessage,
 } from "@agentprism/contracts";
 import {
-  OBSERVATION_MAX_CHARS,
   PIPELINE_BANNER_PREFIX,
   arenaErrorEvent,
   completeEvent,
@@ -29,7 +27,6 @@ import {
 } from "@agentprism/contracts";
 import {
   applyContextPipeline,
-  blockedToolMessageContent,
   buildInitialMessages,
   buildSystemUser,
   createColumnSnippetRetriever,
@@ -37,7 +34,7 @@ import {
   type AgentExecutionContext,
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
-import { collectPriorToolNames, emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, parseScoreVerdict, stepBudgetFor, totWidth } from "@agentprism/driver-run-support";
+import { collectPriorToolNames, executeToolCalls, isToolBatchMessage, eventOf, formatCapabilityPluginIds, parseScoreVerdict, stepBudgetFor, totWidth } from "@agentprism/driver-run-support";
 import {
   COT_PLAN_SUFFIX,
   DIRECT_PLAN_SUFFIX,
@@ -160,54 +157,6 @@ async function* streamExecutorTurn(
   }
   yield eventOf({ type: "thought_end", pipeline: label, step: streamStep, content: "", workspace: workspaceName });
   yield { role: "assistant", content: text, toolCalls: toolCalls.length > 0 ? toolCalls : undefined };
-}
-
-/** Executes one assistant tool batch with drift guard and outcome events. */
-async function* executeBatch(
-  context: AgentExecutionContext,
-  question: string,
-  response: LlmAssistantMessage,
-  prior: readonly string[],
-  messages: LlmMessage[],
-  stats: { step: number; turns: number; toolCalls: number },
-): AsyncGenerator<ArenaEvent> {
-  const { config, workspace } = context;
-  const label = config.label;
-  const workspaceName = workspace.name;
-  for (const rawCall of response.toolCalls ?? []) {
-    const call = { ...rawCall, name: canonicalToolName(context.tools.names, rawCall.name) };
-    if (!context.tools.names.has(call.name)) {
-      messages.push({ role: "tool", content: `Error: tool ${call.name} is not authorized`, toolCallId: call.id, name: call.name });
-      continue;
-    }
-    const blocked = blockedToolMessageContent(question, call.name, call.args, prior, context.config.harness);
-    if (blocked !== null) {
-      messages.push({ role: "tool", content: blocked, toolCallId: call.id, name: call.name });
-      continue;
-    }
-    stats.toolCalls += 1;
-    stats.step += 1;
-    yield eventOf({ type: "action", pipeline: label, step: stats.step, tool: call.name, args: normalizeActionArgs(call.name, call.args), workspace: workspaceName });
-    let result: string;
-    let fileDiff: string | null = null;
-    let ok = false;
-    try {
-      const outcome = await context.tools.execute(call.name, call.args, { signal: context.signal });
-      result = outcome.result;
-      fileDiff = outcome.fileDiff;
-      ok = outcome.ok;
-    } catch (error) {
-      if ((error as Error)?.name === "AbortError") throw error;
-      result = `Error: tool ${call.name} failed: ${sanitizeErrorMessage(error)}`;
-    }
-    for (const event of emitToolOutcomeEvents(label, workspaceName, stats.step, call.name, { result, fileDiff })) {
-      yield event;
-    }
-    stats.step += 1;
-    yield eventOf({ type: "observation", pipeline: label, step: stats.step, result: result.slice(0, OBSERVATION_MAX_CHARS), ok, workspace: workspaceName });
-    const toolMessage: LlmToolMessage = { role: "tool", content: result, toolCallId: call.id, name: call.name };
-    messages.push(toolMessage);
-  }
 }
 
 function isAssistantMessage(item: ArenaEvent | LlmAssistantMessage): item is LlmAssistantMessage {
@@ -349,7 +298,12 @@ export class PlanExecuteDriver implements AgentDriver {
         continue;
       }
       state.quietTurns = 0;
-      yield* executeBatch(context, question, response, priorToolNames, messages, stats);
+      // Shared batch executor (same authorization, drift guard, outcome events, and
+      // error convergence as every other backend).
+      for await (const item of executeToolCalls(context, response, question, priorToolNames, stats)) {
+        if (isToolBatchMessage(item)) messages.push(item);
+        else yield item;
+      }
     }
 
     yield completeEvent({

@@ -27,17 +27,11 @@ import {
 import { afterLlm, createReasoningState, isFinished } from "./reasoning-state.js";
 import { runSelfConsistencyLoop } from "./self-consistency.js";
 import { eventOf, formatCapabilityPluginIds, stepBudgetFor, totWidth } from "@agentprism/driver-run-support";
-import { executeToolCalls, collectPriorToolNames } from "./tool-batch.js";
+import { collectPriorToolNames, executeToolCalls, isToolBatchMessage } from "./tool-batch.js";
 import { streamLlmTurn } from "./stream-turn.js";
 
 function isAssistantMessage(item: ArenaEvent | LlmAssistantMessage): item is LlmAssistantMessage {
   return "role" in item && item.role === "assistant";
-}
-
-function isToolMessage(
-  item: ArenaEvent | { role: string },
-): item is { role: "tool"; content: string; toolCallId: string; name?: string } {
-  return "role" in item && item.role === "tool";
 }
 
 /** Native Driver: in-house agent main loop on LlmAdapter. */
@@ -162,7 +156,7 @@ export class NativeDriver implements AgentDriver {
           continue;
         }
         for await (const item of executeToolCalls(context, response, question, priorToolNames, stats)) {
-          if (isToolMessage(item)) {
+          if (isToolBatchMessage(item)) {
             messages.push(item);
           } else {
             yield item;

@@ -16,6 +16,14 @@ import { blockedToolMessageContent, type AgentExecutionContext } from "@agentpri
 import { eventOf, emitToolOutcomeEvents, normalizeActionArgs, canonicalToolName } from "./event-translation.js";
 
 /**
+ * Type guard for the tool-message half of `executeToolCalls`' output, so every
+ * caller splits the yielded union the same way.
+ */
+export function isToolBatchMessage(item: ArenaEvent | LlmToolMessage): item is LlmToolMessage {
+  return "role" in item && item.role === "tool";
+}
+
+/**
  * Collects tool names already used in the message history. Call BEFORE pushing
  * the current response onto the list so its own tool names stay out of the result.
  */
