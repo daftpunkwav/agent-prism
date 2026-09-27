@@ -38,6 +38,7 @@ const mockTemplates: TaskTemplate[] = [
       operator: "==",
       value: 0,
       tolerance: 0,
+      numeric_match: "any",
       patterns: [],
       pattern: "",
       rubric: "",

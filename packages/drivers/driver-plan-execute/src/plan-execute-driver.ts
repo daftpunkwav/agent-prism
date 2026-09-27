@@ -190,10 +190,12 @@ async function* executeBatch(
     yield eventOf({ type: "action", pipeline: label, step: stats.step, tool: call.name, args: normalizeActionArgs(call.name, call.args), workspace: workspaceName });
     let result: string;
     let fileDiff: string | null = null;
+    let ok = false;
     try {
       const outcome = await context.tools.execute(call.name, call.args, { signal: context.signal });
       result = outcome.result;
       fileDiff = outcome.fileDiff;
+      ok = outcome.ok;
     } catch (error) {
       if ((error as Error)?.name === "AbortError") throw error;
       result = `Error: tool ${call.name} failed: ${sanitizeErrorMessage(error)}`;
@@ -202,7 +204,7 @@ async function* executeBatch(
       yield event;
     }
     stats.step += 1;
-    yield eventOf({ type: "observation", pipeline: label, step: stats.step, result: result.slice(0, OBSERVATION_MAX_CHARS), workspace: workspaceName });
+    yield eventOf({ type: "observation", pipeline: label, step: stats.step, result: result.slice(0, OBSERVATION_MAX_CHARS), ok, workspace: workspaceName });
     const toolMessage: LlmToolMessage = { role: "tool", content: result, toolCallId: call.id, name: call.name };
     messages.push(toolMessage);
   }

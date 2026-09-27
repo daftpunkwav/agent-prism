@@ -19,6 +19,7 @@ function llmSpec(partial: Partial<JudgeSpec> = {}): JudgeSpec {
     operator: "==",
     value: 0,
     tolerance: 0,
+    numeric_match: "any",
     patterns: [],
     pattern: "",
     rubric: "correctness",

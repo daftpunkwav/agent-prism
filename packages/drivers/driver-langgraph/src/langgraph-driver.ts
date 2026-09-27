@@ -181,6 +181,7 @@ export class LangGraphDriver implements AgentDriver {
             pipeline: label,
             step: state.step,
             result: outcome.result.slice(0, OBSERVATION_MAX_CHARS),
+            ok: outcome.ok,
             workspace: state.workspaceName,
           }),
         );

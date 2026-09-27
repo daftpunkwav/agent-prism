@@ -23,7 +23,13 @@ import type {
 import { sanitizeForJson, sanitizeErrorMessage } from "@agentprism/contracts";
 
 const DEFAULT_PASS_THRESHOLD = 0.6;
-const ERROR_INDICATOR_PATTERN = /(?:error|failed|exception|traceback|invalid|errno|not found|command not found)/i;
+/**
+ * Text fallback for observations that carry no structured verdict. Line-anchored:
+ * a successful output that merely mentions one of these words (a file containing
+ * `except ValueError`, a log line quoting "invalid") is not a failure, while real
+ * failures start their line with the keyword.
+ */
+const ERROR_INDICATOR_PATTERN = /^\s*(?:error|failed|exception|traceback|invalid|errno|not found|command not found)\b/i;
 
 interface ExtractedSignals {
   totalEvents: number;
@@ -45,7 +51,7 @@ interface ExtractedSignals {
 function extractSignals(events: readonly ArenaEvent[]): ExtractedSignals {
   const thoughts: ArenaEvent[] = [];
   const actions: ArenaEvent[] = [];
-  const observations: ArenaEvent[] = [];
+  const observations: Array<Extract<ArenaEvent, { type: "observation" }>> = [];
   const reflects: ArenaEvent[] = [];
   const errors: ArenaEvent[] = [];
 
@@ -127,6 +133,12 @@ function extractSignals(events: readonly ArenaEvent[]): ExtractedSignals {
   for (let i = 0; i < observations.length; i += 1) {
     const obs = observations[i];
     if (obs === undefined) continue;
+    // Structured verdict first: the producer knows whether the tool call failed.
+    if (obs.ok === true) continue;
+    if (obs.ok === false) {
+      failedObservationIndices.push(i);
+      continue;
+    }
     if (typeof obs.result === "string" && ERROR_INDICATOR_PATTERN.test(obs.result.slice(0, 300))) {
       failedObservationIndices.push(i);
     }

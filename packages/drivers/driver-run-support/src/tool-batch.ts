@@ -90,6 +90,9 @@ export async function* executeToolCalls(
       pipeline: label,
       step: stats.step,
       result: result.slice(0, OBSERVATION_MAX_CHARS),
+      // The structured verdict travels with the result so scoring does not have to
+      // guess from the text.
+      ok: execution.ok,
       workspace: workspaceName,
     });
 

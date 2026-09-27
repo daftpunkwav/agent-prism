@@ -419,6 +419,14 @@ export const JudgeSpecSchema = z.object({
   operator: z.enum(["==", ">=", "<=", ">", "<"]).default("=="),
   value: z.number().default(0.0),
   tolerance: z.number().min(0).default(0.0),
+  /**
+   * Which extracted number the numeric judge compares (type "numeric"): "any"
+   * accepts a value anywhere in the answer, "last" requires the concluding number.
+   * The default is deliberately value-oriented — the templates ask for the number
+   * only, and a column that shows its work should be scored on the value it
+   * reached (verbosity is measured by token metrics, not by the judge).
+   */
+  numeric_match: z.enum(["any", "last"]).default("any"),
   patterns: z.array(z.string()).default([]),
   pattern: z.string().default(""),
   /** LLM judge rubric (used only when type is llm; empty = generic accuracy/completeness). */

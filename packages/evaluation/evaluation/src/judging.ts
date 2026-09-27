@@ -38,22 +38,34 @@ function result(passed: boolean, reason: string, details: string[] = []): JudgeR
 
 function checkNumeric(answer: string, spec: JudgeSpec): JudgeResult {
   const numbers = extractNumbers(answer);
-  const got = numbers[0];
-  if (got === undefined) {
+  if (numbers.length === 0) {
     return result(false, "No number extracted from answer", [`Expected ${spec.operator} ${spec.value}`]);
   }
   const target = spec.value;
-  let ok: boolean;
-  if (spec.operator === "==") ok = Math.abs(got - target) <= spec.tolerance;
-  else if (spec.operator === ">=") ok = got >= target;
-  else if (spec.operator === "<=") ok = got <= target;
-  else if (spec.operator === ">") ok = got > target;
-  else ok = got < target;
-  return result(
-    ok,
-    ok ? "Numeric comparison passed" : `Numeric comparison failed: ${got} ${spec.operator} ${target}`,
-    [`Extracted number: ${got}`, `Expected: ${spec.operator} ${target}`],
-  );
+  const matches = (got: number): boolean => {
+    if (spec.operator === "==") return Math.abs(got - target) <= spec.tolerance;
+    if (spec.operator === ">=") return got >= target;
+    if (spec.operator === "<=") return got <= target;
+    if (spec.operator === ">") return got > target;
+    return got < target;
+  };
+  // "last" reads the concluding number; "any" accepts the value wherever it appears
+  // (a column that shows its work still reached it). Details always list both so a
+  // failing verdict explains what was actually seen.
+  const candidates = spec.numeric_match === "last" ? [numbers[numbers.length - 1] as number] : numbers;
+  const matched = candidates.find((candidate) => matches(candidate));
+  const shown = numbers.map((value) => (candidates.includes(value) ? String(value) : `${value}(ignored)`)).join(", ");
+  if (matched !== undefined) {
+    return result(true, "Numeric comparison passed", [
+      `Matched number: ${matched}`,
+      `Extracted: ${shown}`,
+      `Expected: ${spec.operator} ${target}`,
+    ]);
+  }
+  return result(false, `Numeric comparison failed: no extracted number satisfies ${spec.operator} ${target}`, [
+    `Extracted: ${shown}`,
+    `Expected: ${spec.operator} ${target}`,
+  ]);
 }
 
 function checkJson(answer: string, spec: JudgeSpec): JudgeResult {

@@ -310,6 +310,8 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
                   pipeline: label,
                   step: state.step,
                   result: text.slice(0, OBSERVATION_MAX_CHARS),
+                  // MCP results carry the flag explicitly; absent means unknown.
+                  ok: typeof block.is_error === "boolean" ? !block.is_error : undefined,
                   workspace: state.workspaceName,
                 });
               }

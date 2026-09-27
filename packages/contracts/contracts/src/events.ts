@@ -95,6 +95,14 @@ function variant<T extends "thought" | "thought_delta" | "thought_end" | "step_s
   return ArenaEventBase.extend({ type: z.literal(type) });
 }
 
+/**
+ * observation carries one tool result. `ok` is the producer's structured verdict
+ * when it has one (ToolExecutionResult.ok, an MCP isError flag); consumers must
+ * treat a missing value as "unknown" and fall back to text heuristics — never as
+ * success.
+ */
+const ObservationVariant = variant("observation").extend({ ok: z.boolean().nullish() });
+
 /** token_update always carries the full token stats. */
 const TokenUpdateVariant = variant("token_update").extend({ token_stats: TokenStatsSchema });
 
@@ -107,7 +115,7 @@ export const ArenaEventSchema = z.discriminatedUnion("type", [
   // the column visibly alive while a buffering provider stays silent
   variant("step_start"),
   variant("action"),
-  variant("observation"),
+  ObservationVariant,
   variant("tool_progress"),
   // file_diff is emitted after write/edit tools succeed (all drivers; Native, LangChain, LangGraph)
   variant("file_diff"),
