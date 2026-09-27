@@ -60,6 +60,7 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 | `transport/http-runtime` | HTTP 外壳：middleware、health checks、error mapping | `createHttpApplication`、`HttpApplicationDeps`、`HttpApp` |
 | `transport/route-*`，8 个 route leaf | 领域路由注册器，含 session 读取/删除、durable threads 与 settings knobs | `register*Routes(app, deps)`，由组合根挂载 |
 | `dimensions` | 实验 dimension 目录与选项 | `DimensionCatalog` |
+| `custom/{summary-budget, memory-top-n, tool-replay}` | 自定义对比维度：一条轴一个包，声明取值以及让取值生效的钩子 | 无 registration key；仅允许依赖 `contracts`（门禁强制），由组合根注册 |
 | `agent` | 单列执行生命周期；默认装配 sandbox 拒绝策略 | 无 registration key；消费 `harness`、`tool-registry`、`tool-builtins`、`sandbox` |
 | `arena/arena-dimensions` | Dimension 路由与 baselines | `DimensionRouter`、`ProviderDimensionSync`、`buildCapabilityOptionProjection`、baselines 与 templates |
 | `arena/arena-runner` | 并行多列执行 | `ArenaRunner`、column-factory port `contracts.ColumnRuntimeFactory` |

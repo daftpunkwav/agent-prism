@@ -132,6 +132,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 |---|---|---|
 | `MCP_SERVERS` | `apps/server/src/assemble.ts` 到 `tool-mcp/src/config.ts` | stdio MCP server 的 JSON 数组 `{command, args?, env?, timeoutMs?, tools?, name?, enabled?}`；`timeoutMs` 默认 `MCP_REQUEST_TIMEOUT_MS`；仅在 `data/mcp_servers.json` 尚不存在时播种托管 store——运维经 settings API 保存后以文件为准；格式错误的 env JSON 告警一次并被忽略，启动继续 |
 | `DRIVERS` | `apps/server/src/load-drivers.ts` | 可选逗号分隔的 driver allowlist，大小写不敏感，如 `native,plan_execute,self_critique`；未设或空白表示全部内置；未知名称告警并忽略 |
+| `ARENA_CUSTOM_DIMENSIONS` | `apps/server/src/assemble.ts` 与 `arena-dimensions/src/capability-options.ts` | 恰为 `off` 时不注册任何 `packages/custom/*` 维度，因此不会出现自定义 Arena 轴、Builder 积木块或基线字段；其他任意值（含未设）保持启用 |
 | `SEARCH_PROVIDER` | `tool-builtins/src/definitions/web-search.ts` | `exa` 或 `tavily`；其他任何值失败关闭并给出设置提示 |
 | `SEARCH_API_KEY` | 同上 | provider key；缺失则失败关闭 |
 | `SEARCH_API_URL` | 同上 | 测试用 endpoint 覆盖，默认 Exa 为 `https://api.exa.ai/search`，Tavily 为 `https://api.tavily.com/search` |

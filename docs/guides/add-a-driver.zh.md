@@ -46,7 +46,7 @@ prompt 或 skeleton。
 loader 加入 `apps/server/src/load-drivers.ts` 中的 `builtinDriverLoaders`。注册是
 尽力而为，失败的后端只告警，组合冒烟测试
 `apps/server/tests/load-drivers.test.ts` 固定 loader 表内容。`framework` dimension
-选项经 `DimensionCatalog.syncCapabilityOptions` 从 driver registry 运行时同步，web
+选项经 router 的 `syncFrameworkOptions` 从 driver registry 运行时同步，web
 从 `/api/arena/meta` 读取它们，因此无需硬编码前端列表。
 
 ## 约束

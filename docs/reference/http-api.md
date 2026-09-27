@@ -57,7 +57,7 @@ each section.
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | GET | `/api/arena/meta` | dimensions, options, and templates metadata | `min_select` is 1; the UI may sit at zero selections with the run disabled |
-| POST | `/api/arena/run` | start one comparison run | SSE with event name `"arena"`. Body: `question` of 1 to 4000 characters, `dimension` defaulting to `framework`, `selections` of at most 16 and at least 1, or omitted for all, optional `column_sessions`, and `attachments` of at most 5 with 64 KiB text each. `onAbort` cancels the run, and abort books `cancelled`. In-stream failures are emitted as `error` events, never a silent close |
+| POST | `/api/arena/run` | start one comparison run | SSE with event name `"arena"`. Body: `question` of 1 to 4000 characters, `dimension` defaulting to `framework` and accepting any registered custom dimension id (an unknown axis is rejected with 422 before the stream opens), `selections` of at most 16 and at least 1, or omitted for all, optional `column_sessions`, and `attachments` of at most 5 with 64 KiB text each. `onAbort` cancels the run, and abort books `cancelled`. In-stream failures are emitted as `error` events, never a silent close |
 | POST | `/api/arena/answer` | answer one pending ask_user question | body of `agent_id`, `question_id`, and `answer`; 404 when no live column waits |
 | GET | `/api/arena/pending-asks` | columns waiting on the human | returns `{pending}`, one `{agentId, questions}` entry per column with its full pending ask_user questions |
 | POST | `/api/arena/stop-column` | stop one live column only | body `agent_id` from column events; other columns keep running; the stopped column settles with a `Column stopped by user` error and a failed complete; 404 when already settled |
@@ -65,7 +65,7 @@ each section.
 | GET | `/api/arena/templates` | task templates | `{templates: […]}` with 15 scored and 11 quick |
 | POST | `/api/arena/judge` | judge answers | `template_id` and an `answers` record of at most 16 |
 | POST | `/api/arena/judge-async` | judge answers through the async port | same body as `/api/arena/judge`; `llm` templates use the bound async judge when wired, otherwise the sync fail-closed verdict explains the missing wiring |
-| POST | `/api/arena/matrix` | 1 to 8 template cells | SSE with event name `"matrix"`; `matrix_progress` and a final `matrix_report`; per-cell failures isolated; same abort semantics |
+| POST | `/api/arena/matrix` | 1 to 32 template cells | SSE with event name `"matrix"`; `matrix_progress` and a final `matrix_report`; per-cell failures isolated; same abort semantics |
 
 ## Workspace files in `route-workspace/src/workspace.ts`
 

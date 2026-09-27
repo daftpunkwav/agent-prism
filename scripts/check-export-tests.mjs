@@ -46,7 +46,7 @@ const PENDING = [
   // packages/providers/provider-langchain
   "createColumnRuntime", "llmMessagesToLc", "serializeWireResponse",
   // packages/tools/tool-mcp
-  "NodeMcpTransport", "buildMcpChildEnv", "mcpServerTools",
+  "NodeMcpTransport", "buildMcpChildEnv",
   // two-symbol packages
   "eventTurn", "phaseCategoryOfTool",
   "buildCorsOriginList", "toLlmEnvSeed",
@@ -57,7 +57,7 @@ const PENDING = [
   "ProviderLookupAdapter", "defaultEnvLookup",
   "readRawBodyText", "settingsOf",
   // single-symbol packages
-  "firstIssueMessage", "buildBuilderCatalog", "frameTokens", "replanBudgetFor",
+  "firstIssueMessage", "frameTokens", "replanBudgetFor",
   "criticBudgetFor", "episodicSearchText", "semanticSearchText", "Workspace",
   "shellCommandFromArgs", "SessionMigrationError",
 ];

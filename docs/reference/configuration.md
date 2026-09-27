@@ -137,6 +137,7 @@ These are deliberately not env-tunable.
 |---|---|---|
 | `MCP_SERVERS` | `apps/server/src/assemble.ts` to `tool-mcp/src/config.ts` | JSON array of stdio MCP servers `{command, args?, env?, timeoutMs?, tools?, name?, enabled?}`; `timeoutMs` defaults to `MCP_REQUEST_TIMEOUT_MS`; it seeds the managed store (`data/mcp_servers.json`) only while that file does not exist yet — once an operator saves through the settings API the file wins; malformed env JSON warns once and is ignored, and startup continues |
 | `DRIVERS` | `apps/server/src/load-drivers.ts` | optional comma-separated driver allowlist, case-insensitive, such as `native,plan_execute,self_critique`; unset or blank means all builtins; unknown names warn and are ignored |
+| `ARENA_CUSTOM_DIMENSIONS` | `apps/server/src/assemble.ts` and `arena-dimensions/src/capability-options.ts` | exactly `off` skips registering every `packages/custom/*` dimension, so no custom Arena axis, Builder block, or baseline field appears; any other value, unset included, keeps them on |
 | `SEARCH_PROVIDER` | `tool-builtins/src/definitions/web-search.ts` | `exa` or `tavily`; anything else fails closed with a setup hint |
 | `SEARCH_API_KEY` | same | provider key; missing fails closed |
 | `SEARCH_API_URL` | same | endpoint override for tests, defaulting to Exa at `https://api.exa.ai/search` and Tavily at `https://api.tavily.com/search` |

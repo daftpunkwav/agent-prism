@@ -155,6 +155,15 @@
       "@agentprism/dimensions": [
         "./packages/dimensions/dimensions/src/index.ts"
       ],
+      "@agentprism/memory-top-n": [
+        "./packages/custom/memory-top-n/src/index.ts"
+      ],
+      "@agentprism/summary-budget": [
+        "./packages/custom/summary-budget/src/index.ts"
+      ],
+      "@agentprism/tool-replay": [
+        "./packages/custom/tool-replay/src/index.ts"
+      ],
       "@agentprism/environment": [
         "./packages/environment/environment/src/index.ts"
       ],

@@ -59,6 +59,7 @@ package exposes and that can be replaced by another implementation.
 | `transport/http-runtime` | HTTP shell: middleware, health checks, error mapping | `createHttpApplication`, `HttpApplicationDeps`, `HttpApp` |
 | `transport/route-*` (8 route leaves) | Domain route registrars, including session read/delete, durable threads, and settings knobs | `register*Routes(app, deps)`, mounted by the composition root |
 | `dimensions` | Experiment dimension catalog and options | `DimensionCatalog` |
+| `custom/{summary-budget, memory-top-n, tool-replay}` | Custom comparison dimensions: one package per axis, declaring values plus the hook that applies a value | no registration key; depends only on `contracts` (gate-enforced), registered by the composition root |
 | `agent` | Single-column execution lifecycle; assembles the sandbox deny policy by default | no registration key; consumes `harness`, `tool-registry`, `tool-builtins`, `sandbox` |
 | `arena/arena-dimensions` | Dimension routing and baselines | `DimensionRouter`, `ProviderDimensionSync`, `buildCapabilityOptionProjection`, baselines and templates |
 | `arena/arena-runner` | Parallel multi-column execution | `ArenaRunner`, column-factory port `contracts.ColumnRuntimeFactory` |

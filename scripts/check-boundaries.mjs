@@ -12,6 +12,10 @@
  * - application: no @agentprism/providers, no @agentprism/evaluation, no @agentprism/harness
  * - evaluation: only contracts / runtime (SDK-free judging and reports)
  * - dimensions: only contracts
+ * - custom dimensions (packages/custom/*): only contracts — a dimension package
+ *   declares values and pure hooks over framework-neutral types, so it must not
+ *   reach the registry, the arena, the builder, or any driver
+ *   (roots may use a `*` segment: it covers packages added later)
  * - tool-registry: only contracts (seam stays below every composer)
  * - tool-builtins: only contracts / environment / tool-registry
  * - driver-run-support: only contracts / environment / runtime / telemetry / harness
@@ -90,6 +94,11 @@ const RULES = [
   {
     name: "dimensions → only contracts",
     roots: ["packages/dimensions/dimensions/src"],
+    forbid: /from\s+["']@agentprism\/(?!contracts)[^"']+["']/,
+  },
+  {
+    name: "custom dimensions → only contracts",
+    roots: ["packages/custom/*/src"],
     forbid: /from\s+["']@agentprism\/(?!contracts)[^"']+["']/,
   },
   {
@@ -312,18 +321,49 @@ function walk(dir) {
   return files;
 }
 
+/**
+ * Expands one root spec into directories: a `*` segment matches every directory
+ * at that level, so a rule over a package family covers packages added later
+ * without editing this file (a new custom dimension must not require a rule
+ * change, or the guard silently stops covering the family).
+ */
+function expandRoot(root) {
+  if (!root.includes("*")) return [root];
+  /** @type {string[]} */
+  let dirs = [""];
+  for (const segment of root.split("/")) {
+    /** @type {string[]} */
+    const next = [];
+    for (const base of dirs) {
+      if (segment !== "*") {
+        next.push(path.join(base, segment));
+        continue;
+      }
+      const parent = path.join(ROOT, base);
+      if (!fs.existsSync(parent)) continue;
+      for (const entry of fs.readdirSync(parent, { withFileTypes: true })) {
+        if (entry.isDirectory()) next.push(path.join(base, entry.name));
+      }
+    }
+    dirs = next;
+  }
+  return dirs;
+}
+
 let failed = false;
 for (const rule of RULES) {
   for (const root of rule.roots) {
-    for (const file of walk(path.join(ROOT, root))) {
-      const text = fs.readFileSync(file, "utf8");
-      const lines = text.split(/\r?\n/);
-      lines.forEach((line, index) => {
-        if (rule.forbid.test(line)) {
-          failed = true;
-          console.error(`[boundaries] ${rule.name}\n  ${path.relative(ROOT, file)}:${index + 1}: ${line.trim()}`);
-        }
-      });
+    for (const dir of expandRoot(root)) {
+      for (const file of walk(path.join(ROOT, dir))) {
+        const text = fs.readFileSync(file, "utf8");
+        const lines = text.split(/\r?\n/);
+        lines.forEach((line, index) => {
+          if (rule.forbid.test(line)) {
+            failed = true;
+            console.error(`[boundaries] ${rule.name}\n  ${path.relative(ROOT, file)}:${index + 1}: ${line.trim()}`);
+          }
+        });
+      }
     }
   }
 }

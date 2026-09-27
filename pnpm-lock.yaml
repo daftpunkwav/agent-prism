@@ -47,9 +47,6 @@ importers:
       '@agentprism/config':
         specifier: workspace:*
         version: link:../../packages/config/config
-      '@agentprism/context-assembly':
-        specifier: workspace:*
-        version: link:../../packages/context/context-assembly
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts/contracts
@@ -92,9 +89,6 @@ importers:
       '@agentprism/evaluation':
         specifier: workspace:*
         version: link:../../packages/evaluation/evaluation
-      '@agentprism/harness':
-        specifier: workspace:*
-        version: link:../../packages/harness/harness
       '@agentprism/http-runtime':
         specifier: workspace:*
         version: link:../../packages/transport/http-runtime
@@ -107,6 +101,9 @@ importers:
       '@agentprism/memory-service':
         specifier: workspace:*
         version: link:../../packages/memory/memory-service
+      '@agentprism/memory-top-n':
+        specifier: workspace:*
+        version: link:../../packages/custom/memory-top-n
       '@agentprism/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence/persistence
@@ -146,12 +143,18 @@ importers:
       '@agentprism/session-persistence':
         specifier: workspace:*
         version: link:../../packages/session/session-persistence
+      '@agentprism/summary-budget':
+        specifier: workspace:*
+        version: link:../../packages/custom/summary-budget
       '@agentprism/tool-builtins':
         specifier: workspace:*
         version: link:../../packages/tools/tool-builtins
       '@agentprism/tool-mcp':
         specifier: workspace:*
         version: link:../../packages/tools/tool-mcp
+      '@agentprism/tool-replay':
+        specifier: workspace:*
+        version: link:../../packages/custom/tool-replay
       '@hono/node-server':
         specifier: ^1.13.0
         version: 1.19.17(hono@4.13.7)
@@ -344,9 +347,6 @@ importers:
       '@agentprism/contracts':
         specifier: workspace:*
         version: link:../../contracts/contracts
-      '@agentprism/harness':
-        specifier: workspace:*
-        version: link:../../harness/harness
       '@agentprism/runtime':
         specifier: workspace:*
         version: link:../../runtime/runtime
@@ -443,12 +443,6 @@ importers:
         specifier: ^24
         version: 24.13.4
 
-  packages/context/context-assembly:
-    dependencies:
-      '@agentprism/contracts':
-        specifier: workspace:*
-        version: link:../../contracts/contracts
-
   packages/context/context-budget:
     devDependencies:
       '@types/node':
@@ -496,6 +490,36 @@ importers:
       zod:
         specifier: ^4.1.5
         version: 4.6.1
+
+  packages/custom/memory-top-n:
+    dependencies:
+      '@agentprism/contracts':
+        specifier: workspace:*
+        version: link:../../contracts/contracts
+    devDependencies:
+      '@types/node':
+        specifier: ^24
+        version: 24.13.4
+
+  packages/custom/summary-budget:
+    dependencies:
+      '@agentprism/contracts':
+        specifier: workspace:*
+        version: link:../../contracts/contracts
+    devDependencies:
+      '@types/node':
+        specifier: ^24
+        version: 24.13.4
+
+  packages/custom/tool-replay:
+    dependencies:
+      '@agentprism/contracts':
+        specifier: workspace:*
+        version: link:../../contracts/contracts
+    devDependencies:
+      '@types/node':
+        specifier: ^24
+        version: 24.13.4
 
   packages/dimensions/dimensions:
     dependencies:
@@ -641,9 +665,6 @@ importers:
       langchain:
         specifier: ^1.0.0
         version: 1.5.11(@langchain/core@1.2.10(openai@7.14.0(undici@8.10.2)(ws@8.21.3)(zod@4.6.1))(ws@8.21.3))(openai@7.14.0(undici@8.10.2)(ws@8.21.3)(zod@4.6.1))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(ws@8.21.3)
-      zod:
-        specifier: ^4.1.5
-        version: 4.6.1
     devDependencies:
       '@agentprism/runtime':
         specifier: workspace:*

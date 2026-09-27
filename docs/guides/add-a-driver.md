@@ -46,9 +46,9 @@ each driver as structural, budget, prompt, or skeleton per reasoning mode.
 The loader is added to `builtinDriverLoaders` in `apps/server/src/load-drivers.ts`.
 Registration is best-effort, so a failing backend only warns, and the composition smoke
 test `apps/server/tests/load-drivers.test.ts` pins the loader table contents. The
-`framework` dimension options are runtime-synced from the driver registry through
-`DimensionCatalog.syncCapabilityOptions`, and the web reads them from `/api/arena/meta`,
-so no hardcoded frontend list is needed.
+`framework` dimension options are runtime-synced from the driver registry through the
+router's `syncFrameworkOptions`, and the web reads them from `/api/arena/meta`, so no
+hardcoded frontend list is needed.
 
 ## Constraints
 
