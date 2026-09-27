@@ -166,7 +166,10 @@ export const mcpFetchTool: ToolDefinition = createMcpFetchTool({ fetchUrl: failC
 export function mcpServerTools(deps?: Partial<McpFetchDeps>): Record<"fs" | "fetch", readonly ToolDefinition[]> {
   return {
     fs: [mcpFsListTool, mcpFsReadTool],
-    fetch: [createMcpFetchTool({ fetchUrl: deps?.fetchUrl ?? failClosedFetch })],
+    // timeoutMs rides through: it is both the fetch budget and the declared budget
+    // the registry arms its deadline from, so dropping it would cap every fetch at
+    // the module default and ignore the operator's MCP_FETCH_TIMEOUT_MS.
+    fetch: [createMcpFetchTool({ fetchUrl: deps?.fetchUrl ?? failClosedFetch, timeoutMs: deps?.timeoutMs })],
   };
 }
 

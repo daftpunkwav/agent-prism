@@ -11,7 +11,6 @@
 
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";
 import { UrlValidationError } from "@agentprism/contracts";
-import { WorkspaceError } from "@agentprism/environment";
 import { MAX_OUTPUT, readInt } from "./caps.js";
 import { toolTuningValue } from "../tuning.js";
 import { safeFetchText } from "./safe-fetch.js";
@@ -124,7 +123,10 @@ async function executeWebFetch(
       const title = extractHtmlTitle(raw);
       if (title !== "") text = `Title: ${title}\n\n${text}`;
     }
-    const maxLength = readInt(args, "max_length", toolTuningValue("maxOutputChars", MAX_OUTPUT));
+    // The arg may only lower the inline budget: honoring a larger one would return
+    // the full body (up to the 512 KB read cap) into the model context.
+    const maxOutput = toolTuningValue("maxOutputChars", MAX_OUTPUT);
+    const maxLength = Math.min(maxOutput, Math.max(1, readInt(args, "max_length", maxOutput)));
     return { result: boundText(workspace, "web_fetch", text, maxLength), fileDiff: null, ok: true };
   } catch (error) {
     if (error instanceof UrlValidationError) {

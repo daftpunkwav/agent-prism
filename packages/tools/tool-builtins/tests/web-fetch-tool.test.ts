@@ -143,6 +143,17 @@ describe("webFetchTool fetch outcomes", () => {
     expect(outcome.result.length).toBeLessThan(200);
   });
 
+  it("ignores a max_length above the inline budget", async () => {
+    setToolTuning({ maxOutputChars: 200 });
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response("y".repeat(4000), { status: 200, headers: { "content-type": "text/plain" } }),
+    );
+    const outcome = await webFetchTool.execute(EMPTY_WS, { url: "https://93.184.216.34/", max_length: 1_000_000 });
+    expect(outcome.ok).toBe(true);
+    // The model may only lower the budget: the tuned cap (200 chars) stays authoritative.
+    expect(outcome.result.length).toBeLessThan(400);
+  });
+
   it("maps an AbortError without a caller signal to the tuned timeout message", async () => {
     setToolTuning({ webFetchTimeoutMs: 1234 });
     vi.mocked(globalThis.fetch).mockRejectedValue(abortError());

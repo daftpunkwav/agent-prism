@@ -12,7 +12,7 @@ import type { McpChildProcess, McpTransport } from "../src/transport.js";
 /** In-memory duplex: scripted replies per method, observable writes. */
 function fakeTransport(
   handlers: Record<string, (params: Record<string, unknown>) => unknown>,
-  options: { malformed?: boolean; neverReply?: boolean } = {},
+  options: { malformed?: boolean; neverReply?: boolean; silentMethods?: readonly string[] } = {},
 ): McpTransport & { writes: string[] } {
   const writes: string[] = [];
   return {
@@ -30,6 +30,9 @@ function fakeTransport(
           if (options.neverReply) return;
           const request = JSON.parse(message) as { id?: number; method?: string; params?: Record<string, unknown> };
           if (request.id === undefined || request.method === undefined) return;
+          // Method-level silence: models a remote call that never answers while
+          // the rest of the server keeps working (cancel-latency cases).
+          if (options.silentMethods?.includes(request.method) === true) return;
           const respond = (payload: unknown): void => {
             const body = JSON.stringify({ jsonrpc: "2.0", id: request.id, ...(payload as Record<string, unknown>) });
             pending.push(options.malformed === true ? body.slice(0, 10) : body);
@@ -229,6 +232,48 @@ describe("registerRemoteMcpTools", () => {  it("bridges remote tools with namesp
       const out = await registry.execute(ws, names[0] as string, { path: "a" }, {});
       expect(out.ok).toBe(true);
       expect(out.result).toContain("a");
+    } finally {
+      client.close();
+    }
+  });
+
+  it("stops waiting on a remote call when the caller aborts", async () => {
+    // The call itself never answers: without the abort race the bridged tool
+    // would sit on the per-request timeout (30s by default) before the cancelled
+    // column could tear down, and would report a timeout instead of a cancel.
+    const transport = fakeTransport(serverHandlers(), { silentMethods: ["tools/call"] });
+    const client = await McpClient.connect(transport, { command: "fake", timeoutMs: 1500 });
+    try {
+      const registry = new MapToolRegistry();
+      const names = await registerRemoteMcpTools(registry, client, "ext1", ["read_file"]);
+      const ws = { name: "ws", root: "", cwd: () => "", fs: null };
+      const controller = new AbortController();
+      const started = Date.now();
+      const call = registry.execute(ws, names[0] as string, { path: "a" }, { signal: controller.signal });
+      setTimeout(() => controller.abort(), 10);
+      await expect(call).rejects.toMatchObject({ name: "AbortError" });
+      expect(Date.now() - started).toBeLessThan(1000);
+    } finally {
+      client.close();
+    }
+  });
+
+  it("sanitizes provider-invalid remote names and skips unresolvable conflicts", async () => {
+    const tools = [
+      { name: "issues.create", description: "dotted", inputSchema: { type: "object" } },
+      { name: "issues/create", description: "slashed", inputSchema: { type: "object" } },
+      { name: "x".repeat(80), description: "too long", inputSchema: { type: "object" } },
+    ];
+    const transport = fakeTransport({ ...serverHandlers(), "tools/list": () => ({ tools }) });
+    const client = await McpClient.connect(transport, { command: "fake", timeoutMs: 1000 });
+    try {
+      const registry = new MapToolRegistry();
+      const names = await registerRemoteMcpTools(registry, client, "ext1");
+      // Both dotted and slashed names sanitize to one bridged name: the first wins
+      // (registering the second would point the name at the wrong tool), and the
+      // 80-char name is skipped because providers reject names over 64 chars.
+      expect(names).toEqual(["mcp__ext1__issues_create"]);
+      expect(names[0]?.length).toBeLessThanOrEqual(64);
     } finally {
       client.close();
     }

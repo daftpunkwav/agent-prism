@@ -297,7 +297,14 @@ export function buildToolAccess(
     });
     if (wanted.length > 0) {
       const fetchTimeoutMs = tuning.mcpFetchTimeoutMs ?? MCP_FETCH_TIMEOUT_MS;
-      for (const name of registerMcpTools(registry, mcpPolicy, { fetchUrl: (url, signal) => safeFetchUrl(url, signal, fetchTimeoutMs) })) {
+      // timeoutMs is the fetch tool's declared budget as well as the host fetch
+      // budget: the registry arms its deadline from the declaration, so the
+      // operator's MCP_FETCH_TIMEOUT_MS must reach both (otherwise fetches are
+      // silently clamped to the module default).
+      for (const name of registerMcpTools(registry, mcpPolicy, {
+        fetchUrl: (url, signal) => safeFetchUrl(url, signal, fetchTimeoutMs),
+        timeoutMs: fetchTimeoutMs,
+      })) {
         if (wanted.includes(name)) names.add(name);
       }
     }

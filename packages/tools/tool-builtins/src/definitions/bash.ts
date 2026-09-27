@@ -29,15 +29,18 @@ export const BASH_JSON_SCHEMA: Record<string, unknown> = {
 };
 
 /** Windows command interpreter: PowerShell 5.1 ships with every supported Windows version. */
-const WIN32_SHELL = "powershell.exe";
-const WIN32_SHELL_ARGS = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
+export const WIN32_SHELL = "powershell.exe";
+export const WIN32_SHELL_ARGS = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
 /**
  * Forces UTF-8 output on Chinese Windows: PowerShell 5.1 otherwise emits GBK,
  * which Node decodes as mojibake (U+FFFD runs in Chinese error text).
  * No-BOM: a BOM would leak into captured stdout. Python/Node already emit
  * UTF-8 here (PYTHONIOENCODING is pinned, Node defaults to UTF-8 on pipes).
+ *
+ * Exported (with the two constants above) for run_job, which must spawn the very
+ * same interpreter and preamble; duplicating them let the two drift apart.
  */
-const WIN32_UTF8_PREAMBLE = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); ";
+export const WIN32_UTF8_PREAMBLE = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); ";
 
 async function executeBash(
   workspace: ToolWorkspace,

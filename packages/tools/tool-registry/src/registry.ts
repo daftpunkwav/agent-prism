@@ -161,7 +161,7 @@ export class MapToolRegistry implements ToolRegistry {
           ok: false,
           code: "timeout",
         };
-        options.afterExecute?.(name, args, timeoutOutcome);
+        options.afterExecute?.(canonical, args, timeoutOutcome);
         return timeoutOutcome;
       }
       throw error;

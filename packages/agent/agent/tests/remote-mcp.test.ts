@@ -76,6 +76,26 @@ describe("attachRemoteMcpServers", () => {
       console.warn = consoleWarn;
     }
   });
+
+  it("never spawns disabled servers", async () => {
+    let spawned = 0;
+    const transport: McpTransport = {
+      spawn: () => {
+        spawned += 1;
+        return handshakeChild(() => {});
+      },
+    };
+    const registry = new MapToolRegistry();
+    const clients = await attachRemoteMcpServers(
+      registry,
+      [{ command: "stub", enabled: false }, { command: "stub", enabled: true }],
+      transport,
+    );
+    // The disabled entry must not spawn a process; the enabled one still attaches.
+    expect(spawned).toBe(1);
+    expect(clients).toHaveLength(1);
+    clients.forEach((client) => client.close());
+  });
 });
 
 describe("runAgentExecution remote MCP toolset gate", () => {
@@ -147,5 +167,56 @@ describe("runAgentExecution remote MCP wiring", () => {
     const deps = testDeps();
     await collect(deps, testSpec(driver, { mcpServers: [{ command: "stub" }], mcpTransport: transport }));
     expect(killed).toBe(1);
+  });
+
+  it("closes attached server processes when the run is cancelled", async () => {
+    let killed = 0;
+    const transport: McpTransport = {
+      spawn: () => handshakeChild(() => { killed += 1; }),
+    };
+    const controller = new AbortController();
+    const driver = {
+      frameworkId: "stub",
+      displayName: "Stub",
+      async *run(): AsyncGenerator<ArenaEvent> {
+        controller.abort();
+        const aborted = new Error("Aborted");
+        aborted.name = "AbortError";
+        throw aborted;
+      },
+    };
+    const deps = testDeps();
+    let thrown: unknown = null;
+    try {
+      await collect(
+        deps,
+        testSpec(driver, { mcpServers: [{ command: "stub" }], mcpTransport: transport, signal: controller.signal }),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    // Cancellation propagates (the caller owns the cancelled terminal) and the
+    // spawned server process is still killed by the finally.
+    expect((thrown as Error | null)?.name).toBe("AbortError");
+    expect(killed).toBe(1);
+  });
+
+  it("never attaches a disabled server during a run", async () => {
+    let killed = 0;
+    const transport: McpTransport = {
+      spawn: () => handshakeChild(() => { killed += 1; }),
+    };
+    const driver = {
+      frameworkId: "stub",
+      displayName: "Stub",
+      async *run(): AsyncGenerator<ArenaEvent> {},
+    };
+    const deps = testDeps();
+    await collect(
+      deps,
+      testSpec(driver, { mcpServers: [{ command: "stub", enabled: false }], mcpTransport: transport }),
+    );
+    // Nothing spawned, so nothing to kill: the operator's disable toggle holds.
+    expect(killed).toBe(0);
   });
 });

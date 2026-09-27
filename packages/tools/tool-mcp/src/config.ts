@@ -6,7 +6,7 @@
  * - Parse the `MCP_SERVERS` env JSON into validated server configs
  * - Fail loudly on malformed entries (never half-configure a process spawn)
  *
- * Expected shape: a JSON array of `{command, args?, env?, timeoutMs?, tools?}`.
+ * Expected shape: a JSON array of `{command, args?, env?, timeoutMs?, tools?, name?, enabled?}`.
  * An unset or blank variable means no external servers (in-process servers and
  * the mcp dimension are unaffected). Spawning happens in the agent layer, not
  * here: this module only validates.

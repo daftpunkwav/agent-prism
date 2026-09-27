@@ -18,6 +18,8 @@
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";
 import { WorkspaceError, spawnBackground, splitShellCommand, type BackgroundJob } from "@agentprism/environment";
 import { truncate } from "./caps.js";
+import { SPILL_DIR } from "./spill.js";
+import { WIN32_SHELL, WIN32_SHELL_ARGS, WIN32_UTF8_PREAMBLE } from "./bash.js";
 import { asWorkspaceView } from "./workspace-view.js";
 
 export const RUN_JOB_JSON_SCHEMA: Record<string, unknown> = {
@@ -30,12 +32,6 @@ export const RUN_JOB_JSON_SCHEMA: Record<string, unknown> = {
   required: ["action"],
   additionalProperties: false,
 };
-
-/** Windows command interpreter (mirrors the bash tool: PowerShell 5.1 is always present). */
-const WIN32_SHELL = "powershell.exe";
-const WIN32_SHELL_ARGS = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
-/** Same UTF-8 forcing as the bash tool: without it Chinese Windows output arrives as GBK mojibake. */
-const WIN32_UTF8_PREAMBLE = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); ";
 
 /** Per-workspace live-job ceiling: the registry stays small and reaps exited jobs on start. */
 const MAX_JOBS_PER_WORKSPACE = 8;
@@ -55,7 +51,6 @@ interface JobRecord {
 }
 
 /** Oversized poll deltas spill to workspace files instead of vanishing. */
-const SPILL_DIR = ".spills";
 const SPILL_THRESHOLD_CHARS = 32 * 1024;
 const MAX_SPILL_BYTES = 256 * 1024;
 const MAX_SPILL_FILES = 20;

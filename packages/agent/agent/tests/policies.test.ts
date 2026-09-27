@@ -33,6 +33,22 @@ describe("mcp policy wiring", () => {
     const names = [...(seen as unknown as AgentExecutionContext).tools.names].filter((n) => n.startsWith("mcp__")).sort();
     expect(names).toEqual(["mcp__fetch_url", "mcp__fs_list", "mcp__fs_read"]);
   });
+
+  it("carries the tuned fetch timeout into the bridged tool's declared budget", async () => {
+    const deps = testDeps();
+    let seen: AgentExecutionContext | null = null;
+    const spec = testSpec(captureDriver((ctx) => { seen = ctx; }), {
+      config: PipelineConfigSchema.parse({ label: "col", harness: "bare", mcp_policy: "full", toolset: "full" }),
+      toolTuning: { mcpFetchTimeoutMs: 45_000 },
+    });
+    await collect(deps, spec);
+    const fetchTool = (seen as unknown as AgentExecutionContext).tools.registry
+      .listDefinitions()
+      .find((definition) => definition.name === "mcp__fetch_url");
+    // The registry arms its deadline from the declaration, so the operator knob
+    // (MCP_FETCH_TIMEOUT_MS) must reach it instead of the module default.
+    expect(fetchTool?.timeoutMs).toBe(45_000);
+  });
 });
 
 describe("skill policy wiring", () => {

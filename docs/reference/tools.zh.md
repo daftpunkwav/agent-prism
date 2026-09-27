@@ -31,7 +31,7 @@
 | `apply_patch` | V4A 多文件 patch，含 `*** Begin Patch` 与 Add、Update、Delete、Move-to 指令；非原子，早先的 hunk 会持久 | full, edit_run |
 | `glob` | glob 搜索，支持 `**`、`*`、`?`、`[abc]`、`{a,b}` | all |
 | `grep` | regex 内容搜索，返回 `path:line: text`；最多 200 匹配行；每行窗口 20 000 字符 | all |
-| `web_fetch` | http 或 https 转可读文本；15 秒超时；HTML 剥离前 body 上限 512 KB | full |
+| `web_fetch` | http 或 https 转可读文本；15 秒超时；HTML 剥离前 body 上限 512 KB；`max_length` 只能下调返回文本预算 | full |
 | `todo_write` | 整表替换的计划列表；50 项、每项 500 字符；持久化 `.agent-todos.json` | full, edit_run |
 | `ask_user` | 把问题记录到 `.agent-questions.json`，每次调用至多 5 条、共存 50 条；headless 运行绝不阻塞并指示模型继续，interactive 运行把问题内联交给人工回答（有界等待，超时后同样降级）；问题可带选项与 `multiSelect` 多选 | full, edit_run |
 | `web_search` | 经 `SEARCH_PROVIDER` 与 `SEARCH_API_KEY` 使用 Exa 或 Tavily；未配置则失败关闭并给出设置提示；15 秒超时；1 至 10 条结果，默认 5 | full |
@@ -74,8 +74,10 @@
   https，默认 8 000 字符、上限 16 000。
 - 策略到 tool：`off` 不挂载；`fs` 挂载 `fs_list` 与 `fs_read`；`full` 增加
   `fetch_url`，后者与 web_fetch、web_search 一样仅属 `full` toolset。
-- 远程 stdio server 来自 `MCP_SERVERS` env var，即
-  `{command, args?, env?, timeoutMs?, tools?}` 的 JSON 数组，其中每 server 的
-  `timeoutMs` 默认 30 000 ms。tool 命名空间为 `mcp__<server>__<tool>`，仅在 arena
-  顶层列上尽力挂载。宕机 server 告警并跳过，嵌套 turn 绝不继承进程，`read_only`
-  列绝不挂载远程。
+- 远程 stdio server 来自 `MCP_SERVERS` env var（仅在 `data/mcp_servers.json` 不存在时
+  为其播种），即 `{command, args?, env?, timeoutMs?, tools?, name?, enabled?}` 的 JSON
+  数组，其中每 server 的 `timeoutMs` 默认 30 000 ms。tool 命名空间为
+  `mcp__<server>__<tool>`，并按 provider 的 tool name 文法净化；净化后总长超过 64 字符、
+  或与已注册名冲突者会被跳过，而不会被截断。
+  仅在 arena 顶层列上尽力挂载：`enabled: false` 的条目照常持久化但绝不挂载，宕机
+  server 告警并跳过，嵌套 turn 绝不继承进程，`read_only` 列绝不挂载远程。

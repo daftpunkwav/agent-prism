@@ -202,4 +202,31 @@ describe("ToolRegistry declarative timeout (timeout-policy parity)", () => {
       workspace.cleanup();
     }
   });
+
+  it("reports the canonical tool name to afterExecute on the timeout path", async () => {
+    const workspace = tempWorkspace();
+    try {
+      const registry = new MapToolRegistry();
+      registry.register({
+        name: "slow",
+        description: "x",
+        jsonSchema: {},
+        mutatesWorkspace: true,
+        timeoutMs: 20,
+        execute: (_w, _a, signal) =>
+          new Promise((resolve) => {
+            signal?.addEventListener("abort", () => resolve({ result: "stopped", fileDiff: null, ok: true }));
+          }),
+      });
+      const after = vi.fn();
+      // A model-cased call must reach the hook under the registered name: consumers
+      // (RAG invalidation) resolve the definition by name.
+      const outcome = await registry.execute(workspace, "SLOW", {}, { afterExecute: after });
+      expect(outcome.code).toBe("timeout");
+      expect(after).toHaveBeenCalledOnce();
+      expect(after.mock.calls[0]?.[0]).toBe("slow");
+    } finally {
+      workspace.cleanup();
+    }
+  });
 });

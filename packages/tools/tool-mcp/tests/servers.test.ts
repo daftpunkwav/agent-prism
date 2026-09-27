@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import type { ToolWorkspace } from "@agentprism/contracts";
 import { UrlValidationError } from "@agentprism/contracts";
-import { createMcpFetchTool, mcpFetchTool, mcpFsListTool, mcpFsReadTool } from "../src/servers.js";
+import { createMcpFetchTool, mcpFetchTool, mcpFsListTool, mcpFsReadTool, mcpServerTools } from "../src/servers.js";
 
 function workspace(files: Record<string, string>): ToolWorkspace {
   return {
@@ -72,5 +72,12 @@ describe("mcp fetch server", () => {
 
   it("declares a timeout so the registry arms a derived deadline signal", () => {
     expect(mcpFetchTool.timeoutMs).toBeGreaterThan(0);
+  });
+
+  it("forwards the tuned timeout to the bridged fetch tool's declared budget", () => {
+    const { fetch } = mcpServerTools({ fetchUrl: () => Promise.resolve("ok"), timeoutMs: 42_000 });
+    // The declaration is what the registry arms its deadline from: dropping the
+    // tuned value here would silently clamp every fetch to the module default.
+    expect(fetch[0]?.timeoutMs).toBe(42_000);
   });
 });

@@ -29,7 +29,7 @@ to `edit_run` and `calc_time` or `workspace_read` to `read_only`.
 | `apply_patch` | V4A multi-file patch with `*** Begin Patch` and Add, Update, Delete, and Move-to directives; not atomic, so earlier hunks persist | full, edit_run |
 | `glob` | glob search with `**`, `*`, `?`, `[abc]`, and `{a,b}` | all |
 | `grep` | regex content search returning `path:line: text`; at most 200 match lines; per-line window of 20 000 characters | all |
-| `web_fetch` | http or https to readable text; 15-second timeout; body capped at 512 KB before HTML stripping | full |
+| `web_fetch` | http or https to readable text; 15-second timeout; body capped at 512 KB before HTML stripping; `max_length` may only lower the returned-text budget | full |
 | `todo_write` | whole-list replace plan list; 50 items of 500 characters; persists `.agent-todos.json` | full, edit_run |
 | `ask_user` | records questions to `.agent-questions.json`, at most 5 per call and 50 stored; headless runs never block and tell the model to continue, interactive runs hand the batch to the human inline (bounded wait, then the same defer); questions may carry options and `multiSelect` for ticking several | full, edit_run |
 | `web_search` | Exa or Tavily through `SEARCH_PROVIDER` and `SEARCH_API_KEY`; unconfigured fails closed with a setup hint; 15-second timeout; 1 to 10 results with a default of 5 | full |
@@ -75,8 +75,12 @@ overrides by name at execution, or bind an injected port such as `SessionQueryPo
   16 000.
 - Policy to tools: `off` mounts none; `fs` mounts `fs_list` and `fs_read`; `full` adds
   `fetch_url`, which is `full`-toolset only like web_fetch and web_search.
-- Remote stdio servers come from the `MCP_SERVERS` env var, a JSON array of
-  `{command, args?, env?, timeoutMs?, tools?}` where per-server `timeoutMs` defaults to
-  30 000 ms. Tools are namespaced `mcp__<server>__<tool>` and mounted best-effort on arena
-  top-level columns only. Dead servers warn and are skipped, nested turns never inherit
-  processes, and `read_only` columns never mount remote.
+- Remote stdio servers come from the `MCP_SERVERS` env var (which seeds the managed
+  `data/mcp_servers.json` list), a JSON array of
+  `{command, args?, env?, timeoutMs?, tools?, name?, enabled?}` where per-server `timeoutMs`
+  defaults to 30 000 ms. Tools are namespaced `mcp__<server>__<tool>` and sanitized to the
+  provider tool-name grammar; a name longer than 64 characters — or one that sanitizing
+  collapses onto an already-registered name — is skipped, never truncated. Attachment is
+  best-effort on arena top-level columns only: entries with `enabled: false` persist but
+  never attach, dead servers warn and are skipped, nested turns never inherit processes, and
+  `read_only` columns never mount remote.

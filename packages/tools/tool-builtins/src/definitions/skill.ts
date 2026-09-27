@@ -16,12 +16,7 @@ import { WorkspaceError } from "@agentprism/environment";
 
 import { boundText } from "./spill.js";
 import { asWorkspaceView } from "./workspace-view.js";
-import {
-  SKILL_FILE,
-  SKILL_NAME_RE,
-  parseSkillFile,
-  type Skill,
-} from "./skills.js";
+import { SKILL_NAME_RE, type Skill } from "./skills.js";
 import { effectiveSkills } from "./user-skills.js";
 
 export const SKILL_JSON_SCHEMA: Record<string, unknown> = {
