@@ -3,7 +3,7 @@
  * @description i18n consistency gate run before shipping copy changes.
  *
  * Responsibilities:
- * - Delegate catalog key-parity checks to apps/web/tests (catalog-parity)
+ * - Run the catalog-parity suite (and only it: the whole web suite belongs to `pnpm test`)
  * - Sweep app/components source for inline user-visible CJK copy
  *
  * Comments and console calls are stripped before scanning. Usage:
@@ -65,16 +65,19 @@ function scanCjk() {
   return hits;
 }
 
-// 1. Catalog contract via the shared vitest suite (exit code propagates).
+// 1. Catalog contract: the parity suite only. Running the whole apps/web tree here
+// duplicated `pnpm test` (and inherited its load-sensitive flakiness) for a gate whose
+// contract is exactly one file's assertions.
+const CATALOG_CONTRACT = "apps/web/tests/catalog-parity.test.ts";
 try {
-  execFileSync("pnpm", ["vitest", "run", "apps/web/tests"], {
+  execFileSync("pnpm", ["vitest", "run", CATALOG_CONTRACT], {
     cwd: REPO_ROOT,
     stdio: "inherit",
     // Windows resolves pnpm via the shell (pnpm.cmd); POSIX shells are unaffected.
     shell: true,
   });
 } catch {
-  fail("catalog contract suite failed (see vitest output above)");
+  fail(`catalog contract suite failed (${CATALOG_CONTRACT}; see vitest output above)`);
   process.exit(process.exitCode ?? 1);
 }
 
