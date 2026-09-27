@@ -208,6 +208,9 @@ async function* runManagerCall(
     );
     const result = await context.llm.invoke(prepared, { signal: context.signal });
     text = result.text;
+    // The header contract: every model call lands in the token ledger, the
+    // manager delegation call included (it consumes a step slot and real tokens).
+    recordAdapterUsage(result.usage, context.tracker);
   } catch (error) {
     if ((error as Error)?.name === "AbortError") throw error;
     text = "";

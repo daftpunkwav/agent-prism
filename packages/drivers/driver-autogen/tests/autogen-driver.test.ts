@@ -20,7 +20,8 @@ function stubLlm(invokes: string[], streams: Array<{ text?: string; toolCalls?: 
   return {
     async invoke(): Promise<LlmInvokeResult> {
       const text = invokes[Math.min(invokeAt++, invokes.length - 1)] ?? "";
-      return { text, toolCalls: [] };
+      // Selection calls report vendor usage like a real provider response does.
+      return { text, toolCalls: [], usage: { input_tokens: 111, output_tokens: 22 } };
     },
     async *stream(): AsyncGenerator<LlmStreamPart> {
       const reply = streams[Math.min(streamAt++, streams.length - 1)] ?? {};
@@ -99,6 +100,10 @@ describe("AutogenDriver", () => {
     expect(complete?.metrics?.tool_calls).toBe(1);
     // Two rounds of selection + speaker: 8 LLM calls, then termination.
     expect(complete?.metrics?.steps).toBe(8);
+    // All four selection calls land in the ledger (111/22 each), so the token
+    // stats cover the group chat's real spend, not just the speaker turns.
+    expect(complete?.metrics?.input_tokens).toBe(444);
+    expect(complete?.metrics?.output_tokens).toBe(88);
   });
 
   it("stops immediately when the first reviewer speech terminates the chat", async () => {

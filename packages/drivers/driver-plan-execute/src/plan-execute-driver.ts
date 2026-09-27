@@ -69,6 +69,9 @@ async function invokePlanner(context: AgentExecutionContext, system: string, use
     { analytics: context.contextAnalytics, ...context.contextTuning },
   );
   const result = await context.llm.invoke(prepared, { signal: context.signal });
+  // Every planner call (1 direct, or width×2 under tot) is a real model call and
+  // lands in the token ledger, exactly like the streamed executor turns.
+  recordAdapterUsage(result.usage, context.tracker);
   return result.text.trim();
 }
 
@@ -277,14 +280,16 @@ export class PlanExecuteDriver implements AgentDriver {
           state.replansLeft -= 1;
           let revised = "";
           try {
-            revised = await context.llm.invoke(
+            const replanned = await context.llm.invoke(
               applyContextPipeline(
                 [...messages, { role: "user", content: REPLAN_INSTRUCTION }],
                 config.context,
                 { retrieveSnippets, ...context.contextTuning },
               ),
               { signal: context.signal },
-            ).then((r) => r.text.trim());
+            );
+            recordAdapterUsage(replanned.usage, context.tracker);
+            revised = replanned.text.trim();
           } catch (error) {
             if ((error as Error)?.name === "AbortError") throw error;
             revised = "";

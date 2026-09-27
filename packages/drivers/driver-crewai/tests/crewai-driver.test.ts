@@ -16,7 +16,7 @@ import { CREW_COMPLETE_KEYWORD, crewProcess, parseManagerAssignment } from "../s
 /**
  * Scripted LLM: queued invoke replies (manager) and stream replies (worker turns),
  * plus optional provider usage reported once — the way the adapter emits it on the
- * stream's final part.
+ * stream's final part. Manager invokes report their own usage on every call.
  */
 function stubLlm(
   invokes: string[],
@@ -28,7 +28,9 @@ function stubLlm(
   return {
     async invoke(): Promise<LlmInvokeResult> {
       const text = invokes[Math.min(invokeAt++, invokes.length - 1)] ?? "";
-      return { text, toolCalls: [] };
+      // Deliberately the prompt_tokens/completion_tokens naming: the ledger must
+      // read both vendor namings, and every manager call must land in it.
+      return { text, toolCalls: [], usage: { prompt_tokens: 111, completion_tokens: 22 } };
     },
     async *stream(): AsyncGenerator<LlmStreamPart> {
       const call = streamAt++;
@@ -187,6 +189,10 @@ describe("CrewAIDriver hierarchical process", () => {
       expect(extractAnswerFromEvents(events)).toBe("final answer: crew done");
       const complete = events.find((event) => event.type === "complete");
       expect(complete?.metrics?.success).toBe(true);
+      // Two manager calls (delegate + CREW_COMPLETE) each report 111/22 and must
+      // land in the ledger: they are real model calls the run paid for.
+      expect(complete?.metrics?.input_tokens).toBe(222);
+      expect(complete?.metrics?.output_tokens).toBe(44);
     } finally {
       vi.unstubAllEnvs();
     }

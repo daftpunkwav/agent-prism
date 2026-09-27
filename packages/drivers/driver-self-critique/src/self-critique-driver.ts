@@ -109,6 +109,9 @@ async function criticPass(
   );
   try {
     const result = await context.llm.invoke(prepared, { signal: context.signal });
+    // The header contract: every critic call lands in the token ledger like the
+    // streamed executor turns (it consumes a step slot and real tokens).
+    recordAdapterUsage(result.usage, context.tracker);
     return parseCriticVerdict(result.text);
   } catch (error) {
     if ((error as Error)?.name === "AbortError") throw error;

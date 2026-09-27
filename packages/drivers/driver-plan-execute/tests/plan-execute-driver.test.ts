@@ -19,7 +19,8 @@ function stubLlm(invokes: string[], streams: Array<{ text?: string; toolCalls?: 
   return {
     async invoke(): Promise<LlmInvokeResult> {
       const text = invokes[Math.min(invokeAt++, invokes.length - 1)] ?? "";
-      return { text, toolCalls: [] };
+      // Planner/replan calls report vendor usage like a real provider response does.
+      return { text, toolCalls: [], usage: { input_tokens: 111, output_tokens: 22 } };
     },
     async *stream(): AsyncGenerator<LlmStreamPart> {
       const reply = streams[Math.min(streamAt++, streams.length - 1)] ?? {};
@@ -89,6 +90,10 @@ describe("PlanExecuteDriver", () => {
     const complete = events.find((e) => e.type === "complete");
     expect(complete?.metrics?.tool_calls).toBe(1);
     expect(complete?.metrics?.success).toBe(true);
+    // Invoke-based calls are real model calls and land in the ledger: the planner
+    // plus the stall replan the looping tail provokes (111/22 each).
+    expect(complete?.metrics?.input_tokens).toBe(222);
+    expect(complete?.metrics?.output_tokens).toBe(44);
   });
 
   it("repl meanwhile on stalled quiet turns exactly once", async () => {
@@ -97,7 +102,11 @@ describe("PlanExecuteDriver", () => {
     const reflects = events.filter((e) => e.type === "reflect").map((e) => e.content);
     expect(reflects.some((c) => c.includes("[Plan-Execute plan]"))).toBe(true);
     expect(reflects.some((c) => c.includes("[Plan-Execute replan]"))).toBe(true);
-    expect(events.some((e) => e.type === "complete")).toBe(true);
+    const complete = events.find((e) => e.type === "complete");
+    expect(complete?.type).toBe("complete");
+    // Planner plus replan: both invoke calls are billed, so both are counted.
+    expect(complete?.metrics?.input_tokens).toBe(222);
+    expect(complete?.metrics?.output_tokens).toBe(44);
   });
 
   it("runs without a plan when the planner fails", async () => {

@@ -18,7 +18,8 @@ function stubLlm(invokes: string[], streams: Array<{ text?: string; toolCalls?: 
   return {
     async invoke(): Promise<LlmInvokeResult> {
       const text = invokes[Math.min(invokeAt++, invokes.length - 1)] ?? "";
-      return { text, toolCalls: [] };
+      // Critic calls report vendor usage like a real provider response does.
+      return { text, toolCalls: [], usage: { prompt_tokens: 11, completion_tokens: 7 } };
     },
     async *stream(): AsyncGenerator<LlmStreamPart> {
       const reply = streams[Math.min(streamAt++, streams.length - 1)] ?? {};
@@ -142,6 +143,19 @@ describe("SelfCritiqueDriver", () => {
     expect(banner?.content).toContain("temp=0");
     expect(banner?.content).toContain("model=");
     expect(banner?.content).toContain("max_steps=6");
+  });
+
+  it("records every critic call in the token ledger", async () => {
+    // Tool batch (critic #1) then a tool-free turn (critic #2): both are real
+    // model calls, so both must land in the run's token stats.
+    const llm = stubLlm(["SCORE: 9\nNEXT: DONE", "SCORE: 9\nNEXT: DONE"], [
+      { text: "work", toolCalls: [{ id: "c1", name: "read", args: {} }] },
+      { text: "final answer" },
+    ]);
+    const events = await collect(contextWith(llm));
+    const complete = events.find((e) => e.type === "complete");
+    expect(complete?.token_stats?.input_tokens).toBe(22);
+    expect(complete?.token_stats?.output_tokens).toBe(14);
   });
 });
 
