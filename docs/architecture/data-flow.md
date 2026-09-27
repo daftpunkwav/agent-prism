@@ -106,7 +106,8 @@ completes.
 
 | Path | Content | Owner |
 |---|---|---|
-| `data/sessions.json` and `.bak` | session ledger document `{version:1, sessions:[…]}` | `FileSessionStore` |
+| `data/sessions.json` and `.bak` | session snapshot document `{version:1, sessions:[…]}` (compacted from the log) | `JsonlSessionStore` |
+| `data/sessions.jsonl` | append-only mutation log replayed on boot | `JsonlSessionStore` |
 | `data/sessions.json.blobs/` | oversized ledger entry texts named `<sessionId>.<seq>.blob.txt` | `FileBlobStore` |
 | `data/provider_config.json` and `.bak` | provider endpoints; keys may be `${env:NAME}` references | `ProviderConfigStore` |
 | `data/builder_sessions.json` and `.bak` | builder session store | `BuilderSessionStore` |

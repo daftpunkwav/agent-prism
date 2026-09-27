@@ -107,7 +107,8 @@ extraction 读取最后一条 thought，否则最后一条 observation。`apps/w
 
 | 路径 | 内容 | 归属 |
 |---|---|---|
-| `data/sessions.json` 与 `.bak` | session 账本文档 `{version:1, sessions:[…]}` | `FileSessionStore` |
+| `data/sessions.json` 与 `.bak` | session 快照文档 `{version:1, sessions:[…]}`（由日志压缩而来） | `JsonlSessionStore` |
+| `data/sessions.jsonl` | 启动时重放的追加式变更日志 | `JsonlSessionStore` |
 | `data/sessions.json.blobs/` | 超大账本条目文本，命名为 `<sessionId>.<seq>.blob.txt` | `FileBlobStore` |
 | `data/provider_config.json` 与 `.bak` | provider endpoints；key 可为 `${env:NAME}` 引用 | `ProviderConfigStore` |
 | `data/builder_sessions.json` 与 `.bak` | builder session store | `BuilderSessionStore` |

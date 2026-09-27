@@ -48,6 +48,14 @@ const OUTLINE_TEXT_CAP = 1000;
  * whole stream cannot accumulate full tool outputs. Previews cap at 240 chars,
  * so the folded outline is identical to folding the originals.
  */
+/**
+ * How many events the outline fold keeps per run. The outline only needs the
+ * per-turn draft (head + newest tail) and the verdicts, so a long run must not
+ * hold its whole stream in memory for a digest. Retention matches the runner's
+ * per-pipeline bucket default so both ends of the run agree on what survives.
+ */
+const OUTLINE_EVENT_RETENTION = 5_000;
+
 function boundedForOutline(event: ArenaEvent): ArenaEvent {
   if (event.type !== "thought" && event.type !== "thought_delta" && event.type !== "observation" && event.type !== "error") {
     return event;
@@ -205,6 +213,11 @@ export class ArenaService {
         for await (const event of runner.streamParallel(request, options)) {
           eventsYielded += 1;
           collected.push(boundedForOutline(event));
+          // Tail retention (same policy as the runner's buckets): drop the oldest
+          // outline material once the cap is reached instead of growing forever.
+          if (collected.length > OUTLINE_EVENT_RETENTION) {
+            collected.splice(0, collected.length - OUTLINE_EVENT_RETENTION);
+          }
           yield event;
         }
       } finally {

@@ -104,6 +104,8 @@ export class ArenaRunner {
   /** Terminal message for a user-initiated per-column stop (frontend matches this to render a paused badge, not an error). */
   static readonly COLUMN_STOPPED_MESSAGE = "Column stopped by user";
   private static readonly BREAKER_THRESHOLD = 3;
+  /** Buffered-event ceiling for the merge channel (slow-consumer backstop). */
+  private static readonly CHANNEL_BACKSTOP = 50_000;
   private static readonly BREAKER_COOLDOWN_MS = 30_000;
 
   private readonly eventRetention: number;
@@ -188,7 +190,11 @@ export class ArenaRunner {
     }
 
     const runId = this.deps.idGenerator.next();
-    const channel = new EventChannel<ArenaEvent | null>();
+    // Catastrophic backstop, NOT the retention window: a consumer that stalls (slow
+    // SSE client) must not let column pushes grow this buffer forever, while normal
+    // runs stay far below the bound so the per-pipeline retention decides what the
+    // report sees. Drops are reported once at the end of the drain.
+    const channel = new EventChannel<ArenaEvent | null>({ capacity: ArenaRunner.CHANNEL_BACKSTOP });
     const internalAbort = new AbortController();
     const signal = options.signal;
     const forwardAbort = () => internalAbort.abort();
@@ -248,6 +254,15 @@ export class ArenaRunner {
           metricsByPipeline[event.pipeline] = event.metrics;
         }
         yield event;
+      }
+
+      const dropped = channel.droppedCount();
+      if (dropped > 0) {
+        // Loud, not silent: the tail of the run is incomplete for this consumer.
+        yield systemErrorEvent(
+          `${dropped} event(s) were dropped: the run produced them faster than this consumer read them`,
+          this.deps.clock.now(),
+        );
       }
 
       // Comparison report (SSE tail): published through the port so orchestration does not depend on the evaluation implementation

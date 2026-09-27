@@ -41,9 +41,10 @@ registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf �
 9. Builder runtime：带 LLM wire-trace handler 的 model factory，从活 provider
    config 投影 endpoint，以及基于 `AtomicJsonFile(data/builder_sessions.json)` 的
    `BuilderSessionStore`。
-10. Session 账本：`FileSessionStore` 基于 `AtomicJsonFile(data/sessions.json)`，
-    以 `FileBlobStore(data/sessions.json.blobs)` 作为超大条目 sidecar，然后是
-    `SessionService` 与 `BuilderService`。
+10. Session store：`JsonlSessionStore` 把每次变更追加到 `data/sessions.jsonl`，
+    并保留 `AtomicJsonFile(data/sessions.json)` 作为快照（旧账本可原样加载，周期性
+    checkpoint 把日志压回快照），以 `FileBlobStore(data/sessions.json.blobs)` 作为
+    超大条目 sidecar，然后是 `SessionService` 与 `BuilderService`。
 11. 能力 seam 检查：`prompt`、`reasoning`、`context`、`harness`、`toolset` 各自必须
     暴露至少一个选项，否则启动抛错。
 12. MCP server 解析：`MCP_SERVERS` 经 `parseMcpServersEnv` 解析并播种托管的

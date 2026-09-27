@@ -82,20 +82,10 @@ export async function querySessions(store: SessionStore, query: SessionQuery = {
   const offset = Math.max(0, Math.floor(query.offset ?? 0));
   const sort: SessionSort = query.sort === "oldest" || query.sort === "title" ? query.sort : "newest";
 
-  // The store list already filters kind/status singly; the engine applies set
-  // semantics plus the remaining predicates over the union.
+  // One unfiltered read, then set semantics in memory: fanning out over kind × status
+  // re-listed the store up to twelve times for a single page.
   const candidates = new Map<string, SessionRecord>();
-  if (kinds.length === 0 && statuses.length === 0) {
-    for (const record of await store.list()) candidates.set(record.id, record);
-  } else {
-    const kindList = kinds.length === 0 ? [...KNOWN_KINDS] : kinds;
-    const statusList = statuses.length === 0 ? [...KNOWN_STATUSES] : statuses;
-    for (const kind of kindList) {
-      for (const status of statusList) {
-        for (const record of await store.list({ kind, status })) candidates.set(record.id, record);
-      }
-    }
-  }
+  for (const record of await store.list()) candidates.set(record.id, record);
   let rows = [...candidates.values()].filter((record) => {
     if (kindSet.size > 0 && !kindSet.has(record.kind)) return false;
     if (statusSet.size > 0 && !statusSet.has(record.status)) return false;

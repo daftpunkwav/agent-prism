@@ -24,6 +24,8 @@ export const PROJECTS_PATH = path.join(DATA_DIR, "projects.json");
 export const BUILDER_SESSIONS_PATH = path.join(DATA_DIR, "builder_sessions.json");
 export const BUILDER_TRACES_DIR = path.join(DATA_DIR, "builder_traces");
 export const SESSIONS_PATH = path.join(DATA_DIR, "sessions.json");
+/** Append-only mutation log for the session store; compacted into SESSIONS_PATH. */
+export const SESSIONS_LOG_PATH = path.join(DATA_DIR, "sessions.jsonl");
 export const THREADS_PATH = path.join(DATA_DIR, "threads.json");
 export const MEMORY_EPISODIC_PATH = path.join(DATA_DIR, "memory_episodic.json");
 export const MEMORY_SEMANTIC_PATH = path.join(DATA_DIR, "memory_semantic.json");

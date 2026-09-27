@@ -11,6 +11,9 @@ import { assemble } from "./assemble.js";
 import { installSignalHandlers } from "./lifecycle.js";
 import { startServer } from "./server.js";
 
+/** How often the append-only session log is compacted into its snapshot. */
+const SESSION_CHECKPOINT_INTERVAL_MS = 30 * 60 * 1000;
+
 /** Executable host entry: assemble → listen → wait for signals. */
 async function main(): Promise<void> {
   let stop: (() => Promise<void>) | null = null;
@@ -23,6 +26,15 @@ async function main(): Promise<void> {
     process.exit(1);
     return;
   }
+  // Periodic session-log compaction: the append-only log stays small without a
+  // debounce cost per mutation. unref keeps the timer from holding the process
+  // open; the shutdown path flushes and checkpoints explicitly.
+  const checkpoint = setInterval(() => {
+    void components?.checkpointStores().catch((error: unknown) => {
+      console.warn(`[server] Session checkpoint failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }, SESSION_CHECKPOINT_INTERVAL_MS);
+  checkpoint.unref?.();
   installSignalHandlers(
     async () => {
       // Flush before and after draining: a turn that commits while stop() waits
@@ -33,6 +45,9 @@ async function main(): Promise<void> {
       try {
         await stop?.();
       } finally {
+        // Compact before the last flush: the log tail lands in the snapshot, so the
+        // next boot replays a bounded log.
+        await components?.checkpointStores().catch(() => undefined);
         await components?.flushDurableStores();
       }
     },

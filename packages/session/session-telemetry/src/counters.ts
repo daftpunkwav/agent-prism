@@ -17,6 +17,13 @@ import type { SessionKind, SessionStatus } from "@agentprism/contracts";
 /** Terminal statuses (transitions counted once per session). */
 const TERMINAL: SessionStatus[] = ["completed", "failed", "cancelled"];
 
+/**
+ * How many settled ids stay remembered for duplicate-transition suppression. The
+ * ledger id space grows for the life of the process, so an unbounded set would leak;
+ * past this window a duplicate settle counts again (best effort, one extra count).
+ */
+const SETTLED_HISTORY_CAP = 20_000;
+
 /** Per-kind counters. */
 export interface KindCounters {
   started: number;
@@ -40,7 +47,10 @@ function zeroKind(): KindCounters {
 /** In-memory session telemetry sink. */
 export class SessionTelemetry {
   private readonly kinds = new Map<SessionKind, KindCounters>();
-  private readonly settled = new Set<string>();
+  /** Settled ids with their kind (bounded FIFO: see SETTLED_HISTORY_CAP). */
+  private readonly settled = new Map<string, SessionKind>();
+  private readonly settledOrder: string[] = [];
+  /** Open sessions only: their entries leave on settle, so this map cannot grow with history. */
   private readonly starts = new Map<string, { kind: SessionKind; at: number }>();
 
   private counters(kind: SessionKind): KindCounters {
@@ -66,10 +76,11 @@ export class SessionTelemetry {
   settledTransition(id: string, status: SessionStatus, at: number): void {
     if (!TERMINAL.includes(status) || this.settled.has(id)) return;
     const start = this.starts.get(id);
-    const kind = start?.kind ?? "agent";
-    // Only sessions this sink saw start may close it, or openSessions() would go
-    // negative for a settle whose start happened before telemetry attached.
-    if (start !== undefined) this.settled.add(id);
+    const kind = start?.kind ?? this.settled.get(id) ?? "agent";
+    // Remember the id (for duplicate suppression and later kind lookups) and close the
+    // open gauge by dropping the start entry the duration came from.
+    this.rememberSettled(id, kind);
+    if (start !== undefined) this.starts.delete(id);
     const counters = this.counters(kind);
     counters[status === "completed" ? "completed" : status === "failed" ? "failed" : "cancelled"] += 1;
     if (status === "completed" && start !== undefined && Number.isFinite(at) && at >= start.at) {
@@ -83,7 +94,8 @@ export class SessionTelemetry {
   /** Records milestone entries for a session (count only, kinds merge). */
   entries(id: string, count: number): void {
     if (!Number.isFinite(count) || count <= 0) return;
-    const kind = this.starts.get(id)?.kind ?? "agent";
+    // Settled ids still know their kind, so late milestones stay attributed.
+    const kind = this.starts.get(id)?.kind ?? this.settled.get(id) ?? "agent";
     this.counters(kind).entries += Math.floor(count);
   }
 
@@ -105,6 +117,18 @@ export class SessionTelemetry {
 
   /** Currently open (started but unsettled) session count. */
   openSessions(): number {
-    return this.starts.size - this.settled.size;
+    // `starts` holds open sessions only (settles remove their entry), so the gauge
+    // cannot go negative for a settle whose start this sink never observed.
+    return this.starts.size;
+  }
+
+  /** Remembers one settled id, evicting the oldest beyond the dedupe window. */
+  private rememberSettled(id: string, kind: SessionKind): void {
+    this.settled.set(id, kind);
+    this.settledOrder.push(id);
+    while (this.settledOrder.length > SETTLED_HISTORY_CAP) {
+      const oldest = this.settledOrder.shift();
+      if (oldest !== undefined && oldest !== id) this.settled.delete(oldest);
+    }
   }
 }

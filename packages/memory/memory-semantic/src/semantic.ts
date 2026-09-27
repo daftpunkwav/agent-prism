@@ -14,11 +14,20 @@
 import type { MemoryRecallOptions, SemanticFact } from "@agentprism/contracts";
 import { MemoryStore } from "@agentprism/memory-store";
 
+/** Default fact ceiling: past this, the store drops the least valuable facts. */
+export const DEFAULT_MAX_SEMANTIC_FACTS = 5_000;
+
 export interface SemanticMemoryOptions {
   /** Optional file path for atomic JSON persistence (omitted = in-memory only). */
   filePath?: string;
   /** Time source in ms epoch (injected; defaults to Date.now). */
   now?: () => number;
+  /**
+   * Maximum facts held. Expired facts go first, then the least confident, then the
+   * oldest: an unbounded fact store grows for the life of the deployment, and the
+   * per-write cost with it.
+   */
+  maxFacts?: number;
 }
 
 /** Search text combining the fact triple, source, and confidence. */
@@ -44,11 +53,14 @@ function normalizePart(part: string): string {
 export class SemanticMemory {
   private readonly store: MemoryStore<SemanticFact>;
   private readonly now: () => number;
+  private readonly maxFacts: number;
   private idCounter = 0;
 
   constructor(options: SemanticMemoryOptions = {}) {
     this.store = new MemoryStore<SemanticFact>(semanticSearchText, { filePath: options.filePath });
     this.now = options.now ?? Date.now;
+    const maxFacts = options.maxFacts ?? DEFAULT_MAX_SEMANTIC_FACTS;
+    this.maxFacts = Number.isFinite(maxFacts) ? Math.max(1, Math.trunc(maxFacts)) : DEFAULT_MAX_SEMANTIC_FACTS;
   }
 
   get size(): number {
@@ -62,6 +74,8 @@ export class SemanticMemory {
    */
   async recordFact(fact: Omit<SemanticFact, "id">): Promise<SemanticFact> {
     await this.pruneExpired();
+    // Room for the fact about to be written, so the cap holds once this call returns.
+    await this.enforceCapacity(1);
     const key = [normalizePart(fact.subject), normalizePart(fact.predicate), normalizePart(fact.object)].join("|");
     for (const existing of this.store.list()) {
       const existingKey = [normalizePart(existing.subject), normalizePart(existing.predicate), normalizePart(existing.object)].join("|");
@@ -108,17 +122,27 @@ export class SemanticMemory {
     }
   }
 
-  /** Removes expired facts; returns the number pruned. */
+  /** Removes expired facts; returns the number pruned (one persist for the batch). */
   async pruneExpired(now?: number): Promise<number> {
     const at = now ?? this.now();
-    let pruned = 0;
-    for (const fact of this.store.list()) {
-      if (!isFactEffective(fact, at)) {
-        await this.store.delete(fact.id);
-        pruned += 1;
-      }
-    }
-    return pruned;
+    const expired = this.store.list().filter((fact) => !isFactEffective(fact, at)).map((fact) => fact.id);
+    return expired.length === 0 ? 0 : this.store.deleteMany(expired);
+  }
+
+  /**
+   * Trims the store down to `maxFacts`, dropping the least valuable facts first:
+   * lowest confidence, then oldest, with the id as a stable tie-break. Facts that
+   * are referenced again get refreshed (see recordFact), so the cap costs the
+   * weakest long-tail knowledge rather than whatever was written last.
+   */
+  private async enforceCapacity(pending: number = 0): Promise<number> {
+    const overflow = this.store.size + pending - this.maxFacts;
+    if (overflow <= 0) return 0;
+    const weakest = [...this.store.list()]
+      .sort((a, b) => a.confidence - b.confidence || a.validFrom - b.validFrom || a.id.localeCompare(b.id))
+      .slice(0, overflow)
+      .map((fact) => fact.id);
+    return this.store.deleteMany(weakest);
   }
 
   /** Lists all facts including expired ones (use recallFacts for effective-only). */

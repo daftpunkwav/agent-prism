@@ -36,6 +36,22 @@ export interface TurnOutlineEntry {
   events: number;
 }
 
+/**
+ * Longest draft the outline keeps per turn. Only the preview tail is ever shown, but
+ * the accumulator used to hold the whole transcript (twice, with the event array).
+ * Head + rolling tail keeps the beginning and the latest wording.
+ */
+const RESPONSE_DRAFT_LIMIT = 8_000;
+
+/** Appends text, keeping the head and the newest tail inside the draft budget. */
+function appendBounded(current: string, addition: string): string {
+  const next = current === "" ? addition : `${current} ${addition}`;
+  if (next.length <= RESPONSE_DRAFT_LIMIT) return next;
+  const tail = Math.floor(RESPONSE_DRAFT_LIMIT / 4);
+  const head = RESPONSE_DRAFT_LIMIT - tail;
+  return `${next.slice(0, head)}…${next.slice(next.length - tail)}`;
+}
+
 /** Collapses whitespace and caps at limit with a trailing ellipsis. */
 function preview(text: string, limit: number): string {
   const flat = text.replace(/\s+/g, " ").trim();
@@ -71,7 +87,7 @@ export function outlineTurns(events: readonly ArenaEvent[], prompts: Record<numb
     state.events += 1;
     if (event.type === "thought" || event.type === "thought_delta") {
       const text = eventText(event);
-      if (text !== "") state.response = state.response === "" ? text : `${state.response} ${text}`;
+      if (text !== "") state.response = appendBounded(state.response, text);
     } else if (event.type === "observation") {
       const text = eventText(event);
       if (text !== "" && state.response === "") state.response = text;

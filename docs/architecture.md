@@ -74,7 +74,7 @@ package exposes and that can be replaced by another implementation.
 | `arena-view` | Pure view projections: column state, trace events, final-answer extraction | no registration key; depends only on `contracts` |
 | `ui` | Presentation components, React peer | no registration key; depends only on `contracts` |
 | `session/session` | In-memory session store implementation, port in `contracts` | `InMemorySessionStore` |
-| `session/session-persistence` | Session file backend | `FileSessionStore` |
+| `session/session-persistence` | Session backends (append-only JSONL + ledger) | `JsonlSessionStore`, `FileSessionStore` |
 | `sandbox/sandbox` | Shell safety policy and hook adapters | `DenyListSandboxPolicy`, `toBeforeExecute` |
 | `apps/server` | The only composition root: registers drivers, mounts routes, assembles services, owns port listening | `assemble()` |
 | `apps/web` | Next.js frontend | may depend only on `client`, `ui`, and `arena-view`; gate-enforced |

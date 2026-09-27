@@ -134,6 +134,19 @@ export class MemoryStore<T extends { id: string }> {
     return removed;
   }
 
+  /**
+   * Removes many items with a single persist. A prune loop that deleted one by one
+   * rewrote the whole collection (and its backup) per item.
+   */
+  async deleteMany(ids: readonly string[]): Promise<number> {
+    let removed = 0;
+    for (const id of ids) {
+      if (this.items.delete(id)) removed += 1;
+    }
+    if (removed > 0) await this.persist();
+    return removed;
+  }
+
   /** Clears all items. */
   async clear(): Promise<void> {
     this.items.clear();

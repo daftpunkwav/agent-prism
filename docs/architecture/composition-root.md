@@ -39,9 +39,11 @@ Abbreviated walk of `apps/server/src/assemble.ts`:
 9. Builder runtime: a model factory with an LLM wire-trace handler, endpoint projection
    from the live provider config, and `BuilderSessionStore` over
    `AtomicJsonFile(data/builder_sessions.json)`.
-10. Session ledger: `FileSessionStore` over `AtomicJsonFile(data/sessions.json)` with
-    `FileBlobStore(data/sessions.json.blobs)` as the oversized-entry sidecar, then
-    `SessionService` and `BuilderService`.
+10. Session store: `JsonlSessionStore` appends each mutation to
+    `data/sessions.jsonl` and keeps `AtomicJsonFile(data/sessions.json)` as its
+    snapshot (the legacy ledger loads unchanged; a periodic checkpoint compacts the
+    log back into it), with `FileBlobStore(data/sessions.json.blobs)` as the
+    oversized-entry sidecar, then `SessionService` and `BuilderService`.
 11. Capability-seam check: `prompt`, `reasoning`, `context`, `harness`, and `toolset` must
     each expose at least one option or startup throws.
 12. MCP server resolution: `MCP_SERVERS` parses through `parseMcpServersEnv` and

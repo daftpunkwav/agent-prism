@@ -60,10 +60,11 @@ export interface JsonlSessionStoreDeps {
 /**
  * Append-only JSONL SessionStore with snapshot compaction.
  *
- * Crash posture: every mutation appends exactly one line after applying
- * in-memory state, so a torn tail loses at most the in-flight mutation;
- * corrupt log lines are skipped loudly (see `corruptLines`). Snapshots bound
- * replay cost; `checkpoint()` rewrites both files from live state.
+ * Every mutation appends one line instead of rewriting the whole ledger, so an
+ * append costs the entry, not the store. Crash posture: a torn tail loses at most
+ * the in-flight mutation and corrupt lines are skipped loudly (`corruptLines`).
+ * `checkpoint()` rewrites snapshot + log from live state and bounds replay cost;
+ * the host calls it on a cadence and on shutdown (see `checkpointStores`).
  */
 export class JsonlSessionStore implements SessionStore {
   private readonly log: AppendFile;

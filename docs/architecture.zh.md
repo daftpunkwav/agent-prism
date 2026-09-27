@@ -74,7 +74,7 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 | `arena-view` | 纯视图投影：column state、trace events、final-answer extraction | 无 registration key；仅依赖 `contracts` |
 | `ui` | 展示组件，React peer | 无 registration key；仅依赖 `contracts` |
 | `session/session` | 内存 session store 实现，port 在 `contracts` | `InMemorySessionStore` |
-| `session/session-persistence` | Session 文件后端 | `FileSessionStore` |
+| `session/session-persistence` | Session 后端（追加式 JSONL 与账本两种） | `JsonlSessionStore`、`FileSessionStore` |
 | `sandbox/sandbox` | Shell 安全策略与 hook 适配器 | `DenyListSandboxPolicy`、`toBeforeExecute` |
 | `apps/server` | 唯一组合根：注册 drivers、挂载 routes、装配 services、负责端口监听 | `assemble()` |
 | `apps/web` | Next.js 前端 | 只能依赖 `client`、`ui`、`arena-view`；门禁强制 |

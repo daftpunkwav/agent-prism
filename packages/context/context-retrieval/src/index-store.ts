@@ -46,17 +46,20 @@ export interface ScoredHit {
 /** In-memory retrieval index over workspace chunks. */
 export class ChunkIndex {
   private readonly chunks: IndexedChunk[] = [];
+  /**
+   * Built on demand, not per mutation: an ingest loop adds one file at a time, and
+   * rebuilding the scorer (which tokenizes the whole corpus) on every add was
+   * O(files²). Mutations only mark it stale; the next query pays once.
+   */
   private scorer: Bm25 | null = null;
+  private scorerStale = true;
 
   /** Chunk count currently held. */
   get size(): number {
     return this.chunks.length;
   }
 
-  /**
-   * Adds chunks, enforcing per-file then total caps (oldest additions evict).
-   * Rebuilds the BM25 scorer whenever content changes.
-   */
+  /** Adds chunks, enforcing per-file then total caps (oldest additions evict). */
   add(chunks: ReadonlyArray<Omit<IndexedChunk, "id" | "tokens">>): void {
     const perFile = new Map<string, number>();
     for (const chunk of this.chunks) perFile.set(chunk.path, (perFile.get(chunk.path) ?? 0) + 1);
@@ -71,7 +74,7 @@ export class ChunkIndex {
       });
     }
     while (this.chunks.length > INDEX_TOTAL_CAP) this.chunks.shift();
-    this.rebuildScorer();
+    this.scorerStale = true;
   }
 
   /**
@@ -85,7 +88,7 @@ export class ChunkIndex {
       if (this.chunks[i]?.path === path) this.chunks.splice(i, 1);
     }
     if (this.chunks.length === before) return false;
-    this.rebuildScorer();
+    this.scorerStale = true;
     return true;
   }
 
@@ -93,10 +96,16 @@ export class ChunkIndex {
   clear(): void {
     this.chunks.length = 0;
     this.scorer = null;
+    this.scorerStale = true;
   }
 
-  private rebuildScorer(): void {
-    this.scorer = this.chunks.length === 0 ? null : new Bm25(this.chunks.map((chunk) => ({ id: chunk.id, text: chunk.content })));
+  /** Rebuilds the scorer when a mutation happened since the last build. */
+  private ensureScorer(): Bm25 | null {
+    if (this.scorerStale) {
+      this.scorer = this.chunks.length === 0 ? null : new Bm25(this.chunks.map((chunk) => ({ id: chunk.id, text: chunk.content })));
+      this.scorerStale = false;
+    }
+    return this.scorer;
   }
 
   private recencyMultiplier(ageRank: number): number {
@@ -110,8 +119,9 @@ export class ChunkIndex {
    * Zero-score chunks never return; ties break by fresher file, then id.
    */
   query(query: string, topK = 5): ScoredHit[] {
-    if (this.scorer === null || this.chunks.length === 0 || query.trim() === "") return [];
-    const scores = this.scorer.score(query);
+    const scorer = this.ensureScorer();
+    if (scorer === null || this.chunks.length === 0 || query.trim() === "") return [];
+    const scores = scorer.score(query);
     return this.chunks
       .map((chunk, index) => ({
         id: chunk.id,

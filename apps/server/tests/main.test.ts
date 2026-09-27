@@ -73,7 +73,11 @@ describe("main() entry", () => {
    * waits on signals (installSignalHandlers last, no exit).
    */
   it("assembles, starts serving, then waits on signals", async () => {
-    const components = { flushDurableStores: vi.fn().mockResolvedValue(undefined), settings: { serverShutdownGraceMs: 5_000 } };
+    const components = {
+      flushDurableStores: vi.fn().mockResolvedValue(undefined),
+      checkpointStores: vi.fn().mockResolvedValue(undefined),
+      settings: { serverShutdownGraceMs: 5_000 },
+    };
     const stop = vi.fn().mockResolvedValue(undefined);
     mockAssemble.mockResolvedValue(components);
     mockStartServer.mockResolvedValue(stop);
@@ -92,8 +96,9 @@ describe("main() entry", () => {
    */
   it("flushes threads around stop() on shutdown, in order", async () => {
     const flushDurableStores = vi.fn().mockResolvedValue(undefined);
+    const checkpointStores = vi.fn().mockResolvedValue(undefined);
     const stop = vi.fn().mockResolvedValue(undefined);
-    mockAssemble.mockResolvedValue({ flushDurableStores, settings: { serverShutdownGraceMs: 5_000 } });
+    mockAssemble.mockResolvedValue({ flushDurableStores, checkpointStores, settings: { serverShutdownGraceMs: 5_000 } });
     mockStartServer.mockResolvedValue(stop);
 
     await importMain();
@@ -106,6 +111,12 @@ describe("main() entry", () => {
     const [stopCall = 0] = stop.mock.invocationCallOrder;
     expect(firstFlush).toBeLessThan(stopCall);
     expect(stopCall).toBeLessThan(secondFlush);
+    // The session log is compacted before the last flush, so the next boot replays a
+    // bounded log.
+    expect(checkpointStores).toHaveBeenCalledOnce();
+    const [checkpointCall = 0] = checkpointStores.mock.invocationCallOrder;
+    expect(stopCall).toBeLessThan(checkpointCall);
+    expect(checkpointCall).toBeLessThan(secondFlush);
   });
 
   /**
@@ -114,8 +125,9 @@ describe("main() entry", () => {
    */
   it("still runs the second flush when stop() throws", async () => {
     const flushDurableStores = vi.fn().mockResolvedValue(undefined);
+    const checkpointStores = vi.fn().mockResolvedValue(undefined);
     const stop = vi.fn().mockRejectedValue(new Error("drain failed"));
-    mockAssemble.mockResolvedValue({ flushDurableStores, settings: { serverShutdownGraceMs: 5_000 } });
+    mockAssemble.mockResolvedValue({ flushDurableStores, checkpointStores, settings: { serverShutdownGraceMs: 5_000 } });
     mockStartServer.mockResolvedValue(stop);
 
     await importMain();

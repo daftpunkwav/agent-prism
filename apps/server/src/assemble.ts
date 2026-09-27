@@ -71,7 +71,7 @@ import { SemanticMemory } from "@agentprism/memory-semantic";
 import { MemoryServiceAdapter } from "@agentprism/memory-service";
 import { AtomicJsonFile, NodeAppendFile, atomicWriteJson, readJsonFile } from "@agentprism/persistence";
 import { SessionService } from "@agentprism/application";
-import { FileBlobStore, FileSessionStore } from "@agentprism/session-persistence";
+import { FileBlobStore, JsonlSessionStore } from "@agentprism/session-persistence";
 import { RandomIdGenerator, SystemClock, WorkspaceRegistry } from "@agentprism/runtime";
 import {
   BUILDER_SESSIONS_PATH,
@@ -81,6 +81,7 @@ import {
   MEMORY_EPISODIC_PATH,
   MEMORY_SEMANTIC_PATH,
   RUNTIME_KNOBS_PATH,
+  SESSIONS_LOG_PATH,
   SESSIONS_PATH,
   SKILL_SETTINGS_PATH,
   THREADS_PATH,
@@ -129,6 +130,8 @@ export interface RuntimeComponents {
   app: HttpApp;
   /** Debounced durable-store flush (threads, builder sessions, trace journals): awaited on shutdown so the last committed turn survives. */
   flushDurableStores: () => Promise<void>;
+  /** Compacts the append-only session log into its snapshot (periodic + shutdown). */
+  checkpointStores: () => Promise<void>;
 }
 
 const REQUIRED_CAPABILITY_DIMS = ["prompt", "reasoning", "context", "harness", "toolset"] as const;
@@ -313,8 +316,13 @@ export async function assemble(): Promise<RuntimeComponents> {
     open: (sessionId) => new NodeAppendFile(path.join(BUILDER_TRACES_DIR, `${sessionId}.jsonl`)),
     flushDebounceMs: settings.fileFlushDebounceMs,
   });
-  const sessionStore = new FileSessionStore({
-    file: new AtomicJsonFile(SESSIONS_PATH),
+  // Append-only backend: each mutation appends a line instead of rewriting the whole
+  // ledger (which was O(sessions × entries) per milestone). The snapshot stays the
+  // legacy path, so an existing sessions.json loads unchanged; the periodic
+  // checkpoint compacts the log back into it.
+  const sessionStore = new JsonlSessionStore({
+    log: new NodeAppendFile(SESSIONS_LOG_PATH),
+    snapshot: new AtomicJsonFile(SESSIONS_PATH),
     // Ledger blobs beside sessions.json: oversized entry texts stay retrievable
     // after restarts instead of dangling as memory-only locators.
     blobs: new FileBlobStore(`${SESSIONS_PATH}.blobs`),
@@ -636,6 +644,10 @@ export async function assemble(): Promise<RuntimeComponents> {
     // post-debounce tail (builder sessions share the thread store's durability bar).
     flushDurableStores: async () => {
       await Promise.all([threads.flush(), builderStore.flushNow(), builderTraceStore.flushAll()]);
+    },
+    /** Compacts the session log into its snapshot (bounded replay cost). */
+    checkpointStores: async () => {
+      await sessionStore.checkpoint();
     },
   };
 }
