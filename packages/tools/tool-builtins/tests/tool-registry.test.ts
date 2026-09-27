@@ -203,6 +203,22 @@ describe("ToolRegistry declarative timeout (timeout-policy parity)", () => {
     }
   });
 
+  it("reports the canonical tool name to afterExecute on the unauthorized path", async () => {
+    const workspace = tempWorkspace();
+    try {
+      const registry = new MapToolRegistry();
+      registry.register({ name: "write", description: "x", jsonSchema: {}, mutatesWorkspace: true, execute: async () => ({ result: "", fileDiff: null, ok: true }) });
+      const after = vi.fn();
+      // Cased call with an empty allowlist: consumers key on the registered name, so the
+      // hook must not see the model's spelling.
+      const outcome = await registry.execute(workspace, "WRITE", { path: "a.txt" }, { authorizedNames: new Set(), afterExecute: after });
+      expect(outcome.code).toBe("unauthorized_tool");
+      expect(after.mock.calls[0]?.[0]).toBe("write");
+    } finally {
+      workspace.cleanup();
+    }
+  });
+
   it("reports the canonical tool name to afterExecute on the timeout path", async () => {
     const workspace = tempWorkspace();
     try {

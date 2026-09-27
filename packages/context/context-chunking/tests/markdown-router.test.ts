@@ -14,6 +14,20 @@ describe("chunkMarkdown", () => {
     expect(chunks[1]).toMatchObject({ section: "Guide > Context" });
   });
 
+  it("reports a line start for every chunk of a multi-chunk document", () => {
+    const lines = ["# T", ...Array.from({ length: 40 }, (_v, i) => `line ${i} with some words`)];
+    const doc = `${lines.join("\n")}\n`;
+    const chunks = chunkMarkdown(doc, { maxChars: 120 });
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      // A character offset would point into the middle of a line; the citation the
+      // model receives must name a real line.
+      expect(chunk.startLine).toBeGreaterThanOrEqual(1);
+      expect(lines[chunk.startLine - 1]).toBeDefined();
+      expect(chunk.content.length).toBeGreaterThan(0);
+    }
+  });
+
   it("never splits fenced code blocks", () => {
     const doc = `# A\n${"x".repeat(900)}\n\`\`\`python\n${"y = 1\n".repeat(200)}\n\`\`\`\n`;
     const chunks = chunkMarkdown(doc, { maxChars: 500 });
