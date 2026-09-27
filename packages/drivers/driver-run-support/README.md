@@ -1,6 +1,6 @@
 # `@agentprism/driver-run-support`
 
-Driver seam: `FrameworkDriverRegistry` (implements `contracts.DriverLookup`; unknown frameworks throw `DriverNotFoundError`, reserved ones throw `DriverReservedError`), the injectable-loader `registerDriversBestEffort` registration helper, and run support shared by all backends (`event-translation`, `tool-batch`, `reasoning-constants`, `recursion-limit`, `step-budget`, `tool-schema`) plus the NDJSON framework-bridge transport (`bridge-protocol`, `child-bridge`) and the runtime probe (`python-probe`).
+Driver seam: `FrameworkDriverRegistry` (implements `contracts.DriverLookup`; unknown frameworks throw `DriverNotFoundError`, reserved ones throw `DriverReservedError`), the injectable-loader `registerDriversBestEffort` registration helper, and run support shared by all backends (`event-translation`, `tool-batch`, `reasoning-constants`, `recursion-limit`, `step-budget`, `tool-schema`, `self-consistency`, `capability-banner`) plus the NDJSON framework-bridge transport (`bridge-protocol`, `bridge-prompt`, `child-bridge`) and the runtime probe (`python-probe`).
 
 `tool-schema` is the single JSON-Schema → zod derivation shared by every backend that binds registry tools (LangChain StructuredTools, the MCP tool server).
 

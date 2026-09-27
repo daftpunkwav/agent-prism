@@ -64,13 +64,14 @@ export function renderMemoryBlock(
 }
 
 /**
- * Builds the initial LlmMessage list: system + rendered history + this turn's user.
- * History arrives already rendered per the column's history mode (full mode expands
- * tool rounds into structured assistant/tool turns), so tool entries pass through
- * verbatim; empty-text turns are skipped unless they carry tool calls (the shell).
+ * Renders the prior-turn history as neutral messages (no system, no user).
+ * The single source of the history rules: tool entries pass through verbatim
+ * (full mode expands tool rounds into structured turns), and empty-text turns
+ * are skipped unless they carry tool calls (the shell). Callers that seed a
+ * transcript built elsewhere (the framework bridges) mount exactly these turns.
  */
-export function buildInitialMessages(system: string, user: string, history?: ChatTurnMessage[]): LlmMessage[] {
-  const messages: LlmMessage[] = [{ role: "system", content: system }];
+export function buildHistoryMessages(history?: ChatTurnMessage[]): LlmMessage[] {
+  const messages: LlmMessage[] = [];
   for (const message of history ?? []) {
     if (message.role === "tool") {
       messages.push({ role: "tool", content: message.content, toolCallId: message.toolCallId, name: message.name });
@@ -85,8 +86,17 @@ export function buildInitialMessages(system: string, user: string, history?: Cha
         : { role: "user", content: text },
     );
   }
-  messages.push({ role: "user", content: user });
   return messages;
+}
+
+/**
+ * Builds the initial LlmMessage list: system + rendered history + this turn's user.
+ * History arrives already rendered per the column's history mode (full mode expands
+ * tool rounds into structured assistant/tool turns), so tool entries pass through
+ * verbatim; empty-text turns are skipped unless they carry tool calls (the shell).
+ */
+export function buildInitialMessages(system: string, user: string, history?: ChatTurnMessage[]): LlmMessage[] {
+  return [{ role: "system", content: system }, ...buildHistoryMessages(history), { role: "user", content: user }];
 }
 
 /**

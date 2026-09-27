@@ -1,11 +1,14 @@
 """AutoGen framework bootstrap for the driver-autogen Python bridge.
 
-Reads one NDJSON handshake from stdin (question, tool catalog, budget), runs
+Reads one NDJSON handshake from stdin (task prompt, tool catalog, budget), runs
 a real autogen-agentchat RoundRobinGroupChat coder/reviewer conversation, and
 streams NDJSON lines back:
 
 - llm_request lines ask the host for one model completion (the arena model
-  stays on the host side; this process never sees provider credentials)
+  stays on the host side; this process never sees provider credentials; the
+  host prepares every completion with the arena system prompt, context pipeline
+  and prior history, so this process only supplies the framework's own roles
+  and transcript)
 - tool_request lines ask the host to execute one arena tool
 - event lines report coder/reviewer speech as the conversation progresses
 - final carries the last coder answer; error ends the session
@@ -295,7 +298,8 @@ async def main() -> None:
     if not start_raw:
         return
     start = json.loads(start_raw)
-    question = str(start.get("question", ""))
+    # The handshake carries the column's assembled task prompt, not the bare question.
+    task_prompt = str(start.get("question", ""))
 
     loop = asyncio.get_running_loop()
     reader = threading.Thread(target=session.pump_thread, args=(loop,), daemon=True)
@@ -336,7 +340,7 @@ async def main() -> None:
     last_reviewer = ""
     try:
         # No cancellation token: abort is a host-side process kill.
-        async for message in team.run_stream(task=question):
+        async for message in team.run_stream(task=task_prompt):
             source = getattr(message, "source", "")
             content = getattr(message, "content", "")
             if source in (CODER_NAME, REVIEWER_NAME) and isinstance(content, str) and content:

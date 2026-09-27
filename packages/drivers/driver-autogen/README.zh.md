@@ -23,7 +23,10 @@ AutoGen 模式 framework driver：带 LLM speaker 选择的可对话 group chat�
   为默认。`python/bootstrap.py` 运行真实的 `RoundRobinGroupChat`（coder + reviewer，
   `TERMINATE` 终止），经 NDJSON 与宿主通信：每次模型补全都回环到 arena 模型端口，每次
   tool 调用都经 arena tool 注册表执行，因此凭据不会离开宿主进程，tool 策略/日志/预算
-  原样生效。安装：将 `pip install -r python/requirements.txt` 装进 `ARENA_PYTHON` 指向的
+  原样生效。宿主按进程内列同样的方式准备每次补全——arena system prompt 合并到
+  coder/reviewer 角色说明之前、套用该列的上下文管线、首次请求拼接历史轮次——并把
+  装配好的任务提示（问题 + @提及 + 检索 + profile 后缀）作为 group chat 的 task。
+  安装：将 `pip install -r python/requirements.txt` 装进 `ARENA_PYTHON` 指向的
   解释器（默认 `python`，其次 `python3`）。探测结果在 server 进程生命周期内缓存——
   安装框架后需重启运行时。
 - **TypeScript 模式回退**——探测失败时使用。中性 transcript 的 group-chat 循环带 LLM

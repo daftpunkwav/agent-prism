@@ -1,14 +1,15 @@
 /**
  * @file initial messages tests
- * @description Locks buildInitialMessages history passthrough semantics.
+ * @description Locks buildInitialMessages / buildHistoryMessages history semantics.
  *
  * Responsibilities:
  * - Pin bare Q/A passthrough and empty-text skipping (legacy behavior)
  * - Pin tool-turn passthrough and the tool-calls shell (full-mode expansion input)
+ * - Pin that the history-only renderer is the same source the initial list uses
  */
 
 import { describe, expect, it } from "vitest";
-import { buildInitialMessages } from "../src/prompt/assembly.js";
+import { buildHistoryMessages, buildInitialMessages } from "../src/prompt/assembly.js";
 import type { ChatTurnMessage } from "@agentprism/contracts";
 
 describe("buildInitialMessages", () => {
@@ -54,5 +55,22 @@ describe("buildInitialMessages", () => {
       content: "",
       toolCalls: [{ id: "c1", name: "ls", args: {} }],
     });
+  });
+});
+
+describe("buildHistoryMessages", () => {
+  it("renders exactly the history slice buildInitialMessages mounts", () => {
+    const history: ChatTurnMessage[] = [
+      { role: "user", content: "q1" },
+      { role: "assistant", content: "" },
+      { role: "assistant", content: "a1" },
+      { role: "tool", content: "out", toolCallId: "c1", name: "read" },
+    ];
+    // The framework bridges splice these turns into a transcript the child built,
+    // so the slice must stay byte-identical to the in-process list's middle.
+    expect(buildHistoryMessages(history)).toEqual(
+      buildInitialMessages("sys", "q2", history).slice(1, -1),
+    );
+    expect(buildHistoryMessages(undefined)).toEqual([]);
   });
 });

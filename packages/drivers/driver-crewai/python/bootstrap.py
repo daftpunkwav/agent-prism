@@ -1,10 +1,13 @@
 """CrewAI framework bootstrap for the driver-crewai Python bridge.
 
-Reads one NDJSON handshake from stdin (question, tool catalog), runs a real
+Reads one NDJSON handshake from stdin (task prompt, tool catalog), runs a real
 crewai Crew over the arena model, and streams NDJSON lines back:
 
 - llm_request lines ask the host for one model completion (the arena model
-  stays on the host side; this process never sees provider credentials)
+  stays on the host side; this process never sees provider credentials; the
+  host prepares every completion with the arena system prompt, context pipeline
+  and prior history, so this process only supplies the crew's own roles and
+  transcript)
 - tool_request lines ask the host to execute one arena tool
 - event lines report role speech as the crew progresses
 - final carries the crew output; error ends the session
@@ -190,7 +193,8 @@ def main() -> None:
     if not start_raw:
         return
     start = json.loads(start_raw)
-    question = str(start.get("question", ""))
+    # The handshake carries the column's assembled task prompt, not the bare question.
+    task_prompt = str(start.get("question", ""))
 
     reader = threading.Thread(target=session.pump_thread, daemon=True)
     reader.start()
@@ -253,7 +257,7 @@ def main() -> None:
             callback=report(RESEARCHER_NAME),
         ),
         Task(
-            description=f"Implement the task end to end. Task: {question}",
+            description=f"Implement the task end to end. Task: {task_prompt}",
             expected_output="Working artifacts for the task.",
             agent=coder,
             callback=report(CODER_NAME),

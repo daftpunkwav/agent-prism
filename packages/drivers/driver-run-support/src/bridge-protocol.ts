@@ -19,6 +19,11 @@ import type { LlmMessage } from "@agentprism/contracts";
 /** Host -> child: the startup handshake (first line the host writes). */
 export interface BridgeStart {
   type: "start";
+  /**
+   * The column's task text: the assembled Arena user part (question + profile
+   * suffix + cwd/time grounding + retrieval), which is what the in-process
+   * columns send as their user message. The child mounts it as its opening task.
+   */
   question: string;
   /** Tools the child may request, with the schema the framework advertises to its agents. */
   tools: Array<{ name: string; description: string; parameters: Record<string, unknown> }>;
@@ -125,4 +130,18 @@ export function toLlmMessage(message: BridgeLlmRequest["messages"][number]): Llm
     return { role: "system", content: message.content };
   }
   return { role: "user", content: message.content };
+}
+
+/**
+ * Tool names a transcript already carries — the "prior calls" list the drift
+ * guard compares against, identical in meaning to the in-process loops'
+ * collectPriorToolNames. The completing request was produced *after* the batch
+ * under execution, so the batch's own calls are never in it.
+ */
+export function priorToolNamesFromWire(messages: BridgeLlmRequest["messages"]): string[] {
+  const names: string[] = [];
+  for (const message of messages) {
+    for (const call of message.toolCalls ?? []) names.push(call.name);
+  }
+  return names;
 }

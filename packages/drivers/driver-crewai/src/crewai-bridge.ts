@@ -4,7 +4,7 @@
  *              model and tool ports into the bootstrap process over NDJSON.
  *
  * Responsibilities:
- * - Build the startup handshake (question, tool catalog, budget)
+ * - Build the startup handshake (task prompt, tool catalog, budget)
  * - Answer llm_request lines through the harness LlmAdapter (usage lands in the tracker)
  *   and enforce the step budget against it (the crewai bootstrap has no
  *   internal budget, unlike the autogen MaxMessageTermination bound)
@@ -15,7 +15,11 @@
  *
  * The framework keeps the orchestration (role crew, sequential/hierarchical
  * process, delegation); the arena keeps the model, the tools, the budget, and
- * the logs.
+ * the logs. Every completion the child asks for is prepared like an in-process
+ * column's model call: the Arena system prompt rides the child's leading system
+ * turn, the context pipeline (trim/retrieve) applies, and this turn's prior
+ * history is spliced in on the first request — the crew's own role copy stays
+ * behind the Arena prompt.
  *
  * Intentionally isomorphic with driver-autogen/src/autogen-bridge.ts: the event
  * pump, the tool handler, and the outcome tail are mirrored and structural
@@ -26,16 +30,19 @@
 
 import { fileURLToPath } from "node:url";
 import type { ArenaEvent, LlmAssistantMessage, LlmMessage } from "@agentprism/contracts";
-import { arenaErrorEvent, completeEvent, sanitizeErrorMessage } from "@agentprism/contracts";
+import { arenaErrorEvent, completeEvent, sanitizeErrorMessage, tokenUpdateEvent } from "@agentprism/contracts";
 import { buildMetrics } from "@agentprism/telemetry";
 import type { AgentExecutionContext } from "@agentprism/harness";
-import { recordAdapterUsage } from "@agentprism/harness";
+import { applyContextPipeline, buildSystemUser, createColumnSnippetRetriever, recordAdapterUsage } from "@agentprism/harness";
 import {
   eventOf,
   runChildBridge,
   executeToolCalls,
   stepBudgetFor,
+  priorToolNamesFromWire,
   toLlmMessage,
+  withArenaSystem,
+  withHistory,
   type ChildBridgeHandlers,
 } from "@agentprism/driver-run-support";
 
@@ -64,12 +71,20 @@ export interface CrewaiBridgeOptions {
  */
 export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): AsyncGenerator<ArenaEvent> {
   const { context, interpreter, bootstrapPath } = options;
-  const { config, question, tracker, workspace } = context;
+  const { config, tracker, workspace } = context;
   const label = config.label;
   const workspaceName = workspace.name;
   const started = context.clock.now();
   const stats = { step: 0, turns: 0, toolCalls: 0 };
   const maxSteps = stepBudgetFor(config.max_steps);
+
+  // Same prompt assembly every in-process column runs on (system + rendered
+  // history + this turn's user part). The user part becomes the crew's task;
+  // the system part is merged into the crew's role copy per completion.
+  const { system, user } = buildSystemUser(context);
+  const retrieveSnippets = createColumnSnippetRetriever(context.rag, workspace);
+  tracker.seedPrompt(system, user);
+  yield tokenUpdateEvent({ pipeline: label, token_stats: tracker.asDict(), workspace: workspaceName });
 
   // Event pump: bridge handlers and translated child events interleave in one
   // queue; the generator body drains it in arrival order until the run settles.
@@ -81,6 +96,14 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
     notify?.();
     notify = null;
   };
+
+  // History belongs to the conversation's first completion: the crew's own
+  // transcript carries every later turn (see withHistory).
+  let firstCompletion = true;
+  // Tool names the last transcript already carried. At tool_request time the
+  // current batch is not in it yet, so this is exactly the "prior calls" list the
+  // drift guard compares against on every other backend.
+  let priorToolNames: string[] = [];
 
   const toolDefinitions = context.tools.registry
     .listDefinitions()
@@ -96,7 +119,17 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
         // paying for completions and push the crew to wrap up.
         return BRIDGE_BUDGET_EXHAUSTED_NOTE;
       }
-      const messages: LlmMessage[] = request.messages.map(toLlmMessage);
+      priorToolNames = priorToolNamesFromWire(request.messages);
+      let messages: LlmMessage[] = request.messages.map(toLlmMessage);
+      if (firstCompletion) {
+        messages = withHistory(messages, context.history);
+        firstCompletion = false;
+      }
+      messages = applyContextPipeline(withArenaSystem(messages, system), config.context, {
+        retrieveSnippets,
+        analytics: context.contextAnalytics,
+        ...context.contextTuning,
+      });
       const result = await context.llm.invoke(messages, { signal: context.signal });
       // The header contract: bridge completions land in the token tracker like
       // every other model call (the bootstrap LLM reports zero usage).
@@ -122,10 +155,10 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
         content: "",
         toolCalls: [{ id: request.id, name: request.name, args: parsed }],
       };
-      // No neutral transcript rides the bridge, so the drift guard sees an
-      // empty prior-tool list (first-batch visibility, same as autogen).
+      // Drift guard inputs: the prior calls of the transcript that produced this
+      // batch (see priorToolNames). Same set the in-process loops pass.
       let lastResult = "";
-      for await (const item of executeToolCalls(context, response, question, [], stats)) {
+      for await (const item of executeToolCalls(context, response, context.question, priorToolNames, stats)) {
         if ("role" in item) {
           lastResult = item.content;
           continue;
@@ -143,7 +176,10 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
     signal: context.signal,
     start: {
       type: "start",
-      question,
+      // The assembled Arena user part (question + mentions + retrieval + profile
+      // suffix), not the bare question: the crew's task text must carry the same
+      // text every in-process column sends as its user message.
+      question: user,
       tools: toolDefinitions.map((definition) => ({
         name: definition.name,
         description: definition.description,
