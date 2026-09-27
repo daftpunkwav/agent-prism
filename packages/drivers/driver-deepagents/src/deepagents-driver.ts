@@ -25,7 +25,6 @@ import {
   PIPELINE_BANNER_PREFIX,
   arenaErrorEvent,
   sanitizeErrorMessage,
-  textFromContent,
   tokenUpdateEvent,
 } from "@agentprism/contracts";
 import {
@@ -41,6 +40,7 @@ import {
   eventOf,
   finishEvent,
   formatCapabilityPluginIds,
+  modelOutputText,
   recursionLimitFor,
 } from "@agentprism/driver-run-support";
 import {
@@ -58,8 +58,33 @@ import { FilesystemBackend, createDeepAgent, createFilesystemMiddleware } from "
  * the check is unconditional — a custom FilesystemMiddleware allowlist does not
  * lift it. The registry tools behind them are dropped for this column, and the
  * framework's own versions take over (see READ_ONLY_FILESYSTEM_TOOLS).
+ *
+ * The set mirrors the framework's internal BUILTIN_TOOL_NAMES (filesystem +
+ * async-subagent tools + "task"), which the package does not export; it must be
+ * re-checked whenever the `deepagents` dependency is bumped. Dropping too little
+ * fails the whole column at construction, so the list is deliberately complete:
+ * a collision with any unlisted reserved name would abort the run instead of
+ * dropping that one tool.
  */
-export const DEEPAGENTS_RESERVED_TOOL_NAMES: readonly string[] = ["glob", "grep", "ls"];
+export const DEEPAGENTS_RESERVED_TOOL_NAMES: readonly string[] = [
+  // FilesystemMiddleware (FILESYSTEM_TOOL_NAMES)
+  "ls",
+  "read_file",
+  "write_file",
+  "edit_file",
+  "delete",
+  "glob",
+  "grep",
+  "execute",
+  // Async subagent middleware (ASYNC_TASK_TOOL_NAMES)
+  "start_async_task",
+  "check_async_task",
+  "update_async_task",
+  "cancel_async_task",
+  "list_async_tasks",
+  // Subagent middleware
+  "task",
+];
 
 /**
  * Framework filesystem tools this column keeps, rooted at the Arena workspace:
@@ -83,15 +108,6 @@ function bindableToolAccess(tools: ToolAccess): ToolAccess {
     names: tools.names,
     execute: (name, args, options) => tools.execute(name, args, options),
   };
-}
-
-/** Visible text of a completed model call in the raw LangGraph event stream. */
-function modelOutputText(raw: unknown): string {
-  if (raw === null || typeof raw !== "object") return "";
-  const event = raw as { event?: unknown; data?: { output?: unknown } | undefined };
-  if (event.event !== "on_chat_model_end") return "";
-  const output = event.data?.output as { content?: unknown } | undefined;
-  return textFromContent(output?.content).trim();
 }
 
 /** Deep Agents Driver: createDeepAgent (planning + filesystem + subagents) + shared context middleware. */

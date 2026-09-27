@@ -19,12 +19,14 @@ import type { BaseMessage } from "@langchain/core/messages";
 import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { ChatGenerationChunk, type ChatResult } from "@langchain/core/outputs";
 import type { Runnable } from "@langchain/core/runnables";
+import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { ArenaEvent, PipelineConfig } from "@agentprism/contracts";
 import { PipelineConfigSchema } from "@agentprism/contracts";
 import type { AgentExecutionContext } from "@agentprism/harness";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import { TokenTracker } from "@agentprism/telemetry";
 import { createBuiltinToolRegistry } from "@agentprism/tool-builtins";
+import { FilesystemBackend, createDeepAgent, createFilesystemMiddleware } from "deepagents";
 import {
   DEEPAGENTS_RESERVED_TOOL_NAMES,
   READ_ONLY_FILESYSTEM_TOOLS,
@@ -200,8 +202,6 @@ describe("reserved tool names and read-only filesystem scope", () => {
     const bound = bindableDefinitions(tools).map((definition) => definition.name);
     for (const reserved of DEEPAGENTS_RESERVED_TOOL_NAMES) {
       expect(bound).not.toContain(reserved);
-      // The framework's own read-only version covers the dropped operation.
-      expect(READ_ONLY_FILESYSTEM_TOOLS).toContain(reserved === "ls" ? "ls" : reserved);
     }
     expect(bound).toContain("read");
     expect(bound).toContain("write");
@@ -211,5 +211,31 @@ describe("reserved tool names and read-only filesystem scope", () => {
     // No write/edit tool is handed to the framework's own filesystem layer.
     expect(READ_ONLY_FILESYSTEM_TOOLS).not.toContain("write_file");
     expect(READ_ONLY_FILESYSTEM_TOOLS).not.toContain("edit_file");
+  });
+
+  it("reserves no name the framework would accept, and mounts a set the middleware accepts", () => {
+    // The framework is the oracle for over-inclusion: every dropped name must
+    // really trip its collision check — dropping a name it accepts would
+    // silently remove a registry tool from this column. Under-inclusion (a
+    // reserved name missing from the list) aborts a run at construction, which
+    // is why the list is re-checked on every `deepagents` bump.
+    const model = new ScriptedChatModel([new AIMessage("unused")]);
+    // The collision check reads the tool's name only; the probe never runs.
+    const probe = (name: string): StructuredToolInterface => ({ name, description: "probe" }) as StructuredToolInterface;
+    for (const reserved of DEEPAGENTS_RESERVED_TOOL_NAMES) {
+      expect(() => createDeepAgent({ model, tools: [probe(reserved)] })).toThrowError(/conflict with built-in tools/);
+    }
+    // The mounted read-only filesystem set is exactly what the middleware takes.
+    expect(() =>
+      createDeepAgent({
+        model,
+        middleware: [
+          createFilesystemMiddleware({
+            backend: new FilesystemBackend({ rootDir: tmpdir(), virtualMode: true }),
+            tools: [...READ_ONLY_FILESYSTEM_TOOLS],
+          }),
+        ],
+      }),
+    ).not.toThrow();
   });
 });
