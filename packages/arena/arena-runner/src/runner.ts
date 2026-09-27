@@ -445,20 +445,23 @@ export class ArenaRunner {
         const turn = Math.floor(history.length / 2) + 1;
         // Wire tracer rides on the column model (both the LlmAdapter and the vendor
         // instance share one BaseChatModel), so native, the LangChain family and the
-        // OpenAI Agents bridge are all observed; the Claude Agent SDK column is the
-        // exception because its CLI subprocess makes the model calls itself.
+        // OpenAI Agents bridge are all observed.
         //
-        // Endpoint health arrives through the same handler: it is the one place that
-        // sees every call of the shared model, so the breaker reflects the dependency
-        // instead of whichever column finished last. A column that is stopping is
-        // filtered here — its cancelled calls are not endpoint faults.
+        // Endpoint health arrives through TWO observers feeding one sink: the wire-trace
+        // handler attached here (it sees every call of the shared chat model, and the
+        // column's own signal filters out cancelled ones) and the execution context
+        // below, which is how a driver that owns its model transport reports — today the
+        // Claude Agent SDK column, whose CLI subprocess makes the calls itself. Either
+        // way the breaker reflects the shared dependency, not whichever column finished
+        // last, and a column that is stopping reports nothing.
+        const reportModelCall = (outcome: { ok: boolean; error?: unknown }): void => {
+          if (linked.signal.aborted) return;
+          if (outcome.ok) breaker.recordSuccess();
+          else breaker.recordFailure();
+        };
         const runtime = this.deps.modelFactory.create(config, {
           wireSink: (record) => logs?.appendWire(config.label, turn, record),
-          onModelCall: (outcome) => {
-            if (linked.signal.aborted) return;
-            if (outcome.ok) breaker.recordSuccess();
-            else breaker.recordFailure();
-          },
+          onModelCall: reportModelCall,
         });
         agentId = this.deps.idGenerator.next();
         this.columnAborts.set(agentId, columnAbort);
@@ -489,6 +492,9 @@ export class ArenaRunner {
             askUser: interactive
               ? (questions, askSignal) => this.awaitUserAnswers(agentId, questions, askSignal)
               : undefined,
+            // Same sink the model callbacks report to: a driver with its own transport
+            // (Claude Agent SDK CLI) is otherwise invisible to the breaker.
+            onModelCall: reportModelCall,
             signal: linked.signal,
           },
         )) {
@@ -497,7 +503,7 @@ export class ArenaRunner {
           channel.push(event);
         }
         // No breaker accounting here: endpoint health arrives per model call (the
-        // adapter's onModelCall), so a driver that fails on its own cannot trip the
+        // callback handler and the driver's own reports), so a driver that fails on its own cannot trip the
         // shared endpoint, and breaker state no longer depends on finish order.
       } catch (error) {
         const columnStopped = columnAbort.signal.aborted && !signal.aborted;

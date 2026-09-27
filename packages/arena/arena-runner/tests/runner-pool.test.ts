@@ -169,6 +169,24 @@ describe("ArenaRunner.streamParallel", () => {
     expect(runner.breakerCount()).toBe(1);
   });
 
+  it("counts a driver-reported model-call failure toward the endpoint", async () => {
+    // The Claude Agent SDK column has no chat-model callbacks: its driver reports through
+    // the execution context. This locks that second path into the same breaker.
+    const runner = makeRunner({ breakerThreshold: 1 });
+    runMock.mockImplementation((async function* (_deps: unknown, spec: { onModelCall?: (outcome: { ok: boolean }) => void }) {
+      expect(spec.onModelCall).toBeDefined();
+      spec.onModelCall?.({ ok: false });
+      yield { type: "error", pipeline: "col-a", message: "claude run failed", turn: 1 };
+      yield { type: "complete", pipeline: "col-a", metrics: { ...METRICS, success: false }, turn: 1 };
+    }) as never);
+
+    await drain(runner, request());
+    // Threshold 1 and a reported failure: the next run never reaches the agent layer.
+    const second = await drain(runner, request());
+    expect(runMock).toHaveBeenCalledTimes(1);
+    expect(second.some((event) => event.type === "error" && /circuit-broken/.test(event.message))).toBe(true);
+  });
+
   it("does not count a driver-level column failure toward the endpoint", async () => {
     const runner = makeRunner({ breakerThreshold: 1 });
     runMock.mockImplementation(async function* () {

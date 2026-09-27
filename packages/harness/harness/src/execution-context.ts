@@ -16,6 +16,7 @@ import type {
   ContextTuning,
   LlmAdapter,
   MemoryRecallResult,
+  ModelCallOutcome,
   PipelineConfig,
   ToolAccess,
   ToolExecuteOptions,
@@ -111,5 +112,16 @@ export interface AgentExecutionContext {
    * prompt tags; the context pipeline applies their `messages` hooks.
    */
   customDimensions?: readonly ActiveCustomDimension[];
+  /**
+   * Endpoint-health hook for drivers that own their model transport. A driver whose
+   * calls go through the column's chat model does NOT report here (the model callbacks
+   * observe those); a driver that runs its own loop — today the Claude Agent SDK CLI
+   * subprocess — reports what it observes, so the endpoint it shares with the other
+   * columns is not the one column the arena breaker cannot see.
+   *
+   * Granularity is per driver: report one outcome per call you can observe, or your
+   * terminal outcome when the calls are opaque. Cancellation is never a fault.
+   */
+  onModelCall?: (outcome: ModelCallOutcome) => void;
   signal?: AbortSignal;
 }

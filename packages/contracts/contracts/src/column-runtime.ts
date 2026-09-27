@@ -30,11 +30,11 @@ export type LlmWireSink = (record: LlmWireRecord) => void;
  * indistinguishable, and a column that fails for its own reasons must not count
  * against the shared endpoint.
  *
- * Coverage is per COLUMN SHAPE, not per backend: the host reports from the callback
- * handler attached to the column's chat model, so columns whose calls go through
- * that model (the neutral drivers via the LlmAdapter, the LangChain family via
- * `llmVendor`) are observed, while a backend that runs its own model loop in a
- * subprocess (Claude Agent SDK) is not.
+ * Coverage is per COLUMN SHAPE, and every shape is covered by one of two observers:
+ * the callback handler attached to the column's chat model (the neutral drivers via
+ * the LlmAdapter, the LangChain family via `llmVendor`) and the driver itself through
+ * this run's execution context (a backend that owns its model loop, i.e. the Claude
+ * Agent SDK CLI subprocess). Both feed the same sink.
  */
 export interface ModelCallOutcome {
   ok: boolean;

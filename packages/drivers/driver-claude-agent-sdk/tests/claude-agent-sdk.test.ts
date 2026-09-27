@@ -353,6 +353,42 @@ describe("ClaudeAgentSdkDriver", () => {
       }
     });
 
+    it("reports endpoint health for a provider failure and for a successful run", { timeout: 60_000 }, async () => {
+      queryMock.mockImplementation(() =>
+        scriptedSession([
+          // The CLI retried a failed API request (status null = connection error), then
+          // the run completed: one failed call, then a healthy terminal.
+          { type: "system", subtype: "api_retry", error_status: null },
+          { type: "assistant", message: { content: [{ type: "text", text: "done" }] } },
+          { type: "result", subtype: "success", result: "done", usage: { input_tokens: 1, output_tokens: 1 } },
+        ]),
+      );
+      const outcomes: Array<{ ok: boolean }> = [];
+      const context = executionContext(anthropicVendor(), { onModelCall: (outcome) => outcomes.push(outcome) });
+      try {
+        await collect(context);
+        expect(outcomes).toMatchObject([{ ok: false }, { ok: true }]);
+      } finally {
+        context.cleanup();
+      }
+    });
+
+    it("does not report the CLI's own turn cap as an endpoint failure", { timeout: 60_000 }, async () => {
+      queryMock.mockImplementation(() =>
+        scriptedSession([{ type: "result", subtype: "error_max_turns", isError: true }]),
+      );
+      const outcomes: Array<{ ok: boolean }> = [];
+      const context = executionContext(anthropicVendor(), { onModelCall: (outcome) => outcomes.push(outcome) });
+      try {
+        await collect(context);
+        // The column still fails (the driver throws on a non-success result), but the
+        // endpoint did nothing wrong, so the breaker must not hear about it.
+        expect(outcomes).toEqual([]);
+      } finally {
+        context.cleanup();
+      }
+    });
+
     it("falls back to the result summary when no text reached the thought channel", { timeout: 60_000 }, async () => {
       queryMock.mockImplementation(() =>
         scriptedSession([

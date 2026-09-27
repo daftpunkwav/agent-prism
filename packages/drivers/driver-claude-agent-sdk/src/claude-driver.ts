@@ -14,6 +14,10 @@
  * the shared guarded path through MCP, which is what makes the column comparable
  * on the tool dimension. Verification retries are owned by runVerificationLoop
  * outside drivers.
+ *
+ * Because the calls are the CLI's, the callbacks the other columns attach to their
+ * chat model never fire here: endpoint health for this column is reported from the
+ * CLI's own stream through `context.onModelCall` (see health.ts).
  */
 
 import type { ArenaEvent, AgentDriver, ChatTurnMessage } from "@agentprism/contracts";
@@ -36,6 +40,7 @@ import {
   type RunState,
 } from "@agentprism/driver-run-support";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { classifyClaudeHealth } from "./health.js";
 import { resolveClaudeCodePath } from "./cli-path.js";
 import { claudeSubprocessEnv, resolveClaudeTransport } from "./endpoint.js";
 import { arenaAllowedToolIds, createArenaMcpServer } from "./mcp-tools.js";
@@ -61,6 +66,10 @@ interface MessageLike {
   usage?: unknown;
   errors?: unknown;
   isError?: unknown;
+  /** HTTP status of a failed request (api_retry system messages; null = no response). */
+  error_status?: unknown;
+  /** Rate-limit state for the subscription endpoints (rate_limit_event messages). */
+  rate_limit_info?: { status?: unknown } | undefined;
 }
 
 /** Reads the content block array of a message (string content counts as one text block). */
@@ -135,6 +144,27 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
     const { system, user } = buildSystemUser(context);
     tracker.seedPrompt(system, user);
     yield tokenUpdateEvent({ pipeline: label, token_stats: tracker.asDict(), workspace: state.workspaceName });
+
+    // Endpoint health: the CLI makes this column's model calls itself, so it is the only
+    // place that can observe them. Declared outside the try so the catch can tell whether
+    // the terminal result already classified the outcome.
+    let terminalReported = false;
+    const reportHealth = (message: MessageLike): void => {
+      // The CLI's terminal result is "accounted for" even when it classifies to nothing
+      // (its own turn/budget caps): the catch below must not then report that as an
+      // endpoint failure.
+      if (message.type === "result") terminalReported = true;
+      if (context.onModelCall === undefined) return;
+      const outcome = classifyClaudeHealth({
+        type: message.type,
+        subtype: message.subtype,
+        errorStatus: message.error_status,
+        isError: message.isError,
+        rateLimitStatus: message.rate_limit_info?.status,
+      });
+      if (outcome === null) return;
+      context.onModelCall(outcome);
+    };
 
     try {
       const transport = resolveClaudeTransport(context.llmVendor, config.model_id);
@@ -213,6 +243,7 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
         for await (const raw of session) {
           for (const queued of extra.splice(0)) yield queued;
           const message = raw as MessageLike;
+          reportHealth(message);
           switch (message.type) {
             case "stream_event": {
               const event = message.event;
@@ -360,6 +391,9 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
       // exactly like every other backend's abort path (agent-execution owns the
       // cancelled terminal).
       if ((error as Error)?.name === "AbortError") throw error;
+      // A driver-level throw without a classified result (spawn failure, stream error)
+      // is a failed model transport for this column, so report it once.
+      if (!terminalReported) context.onModelCall?.({ ok: false, error });
       // Server-side detail log; the client-facing event stays sanitized.
       console.error(`[claude-agent-sdk-driver] column "${label}" failed:`, error);
       yield arenaErrorEvent({

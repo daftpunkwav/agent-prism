@@ -28,6 +28,7 @@ import {
   type HarnessLevel,
   type MemoryRecallResult,
   type MemoryServicePort,
+  type ModelCallOutcome,
   type PipelineConfig,
   type SessionQueryPort,
 } from "@agentprism/contracts";
@@ -140,6 +141,12 @@ export interface AgentRunSpec {
   maxDelegationDepth?: number;
   /** Cross-session memory service override (falls back to deps.memory; absent = stateless). */
   memory?: MemoryServicePort;
+  /**
+   * Endpoint-health hook for drivers that own their model transport (see
+   * AgentExecutionContext.onModelCall). Model-based columns report through the
+   * callbacks attached to their chat model instead.
+   */
+  onModelCall?: (outcome: ModelCallOutcome) => void;
   signal?: AbortSignal;
 }
 
@@ -566,6 +573,7 @@ export async function* runAgentExecution(
       customDimensions,
       notices: spec.notices,
       systemPromptOverride: spec.systemPromptOverride,
+      onModelCall: spec.onModelCall,
       signal: spec.signal,
       get verificationFeedback() {
         return feedback.text;
