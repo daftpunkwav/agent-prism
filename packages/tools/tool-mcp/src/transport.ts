@@ -9,11 +9,13 @@
  *
  * The port keeps protocol code (client) independent of process mechanics:
  * tests inject an in-memory duplex while production spawns real MCP servers.
- * Framing follows MCP stdio: `Content-Length` headers with JSON-RPC bodies.
+ * Framing follows MCP stdio: one JSON-RPC message per line (newline-delimited,
+ * `JSON.stringify` never emits a raw newline inside a body).
  * Stderr inherits (server diagnostics stay visible); stdin/stdout are piped.
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
+import { StringDecoder } from "node:string_decoder";
 
 /** One spawned MCP server process (duplex byte streams as text lines). */
 export interface McpChildProcess {
@@ -32,7 +34,7 @@ export interface McpTransport {
   spawn(command: string, args?: readonly string[], env?: Record<string, string>): McpChildProcess;
 }
 
-/** Parses `Content-Length` framed bodies out of a byte chunk buffer. */
+/** Parses newline-delimited JSON-RPC bodies out of a text chunk buffer. */
 export class FrameDecoder {
   private buffer = "";
 
@@ -41,27 +43,20 @@ export class FrameDecoder {
     this.buffer += chunk;
     const out: string[] = [];
     for (;;) {
-      const headerEnd = this.buffer.indexOf("\r\n\r\n");
-      if (headerEnd === -1) return out;
-      const header = this.buffer.slice(0, headerEnd);
-      const lengthMatch = /Content-Length:\s*(\d+)/i.exec(header);
-      if (lengthMatch?.[1] === undefined) {
-        // Loud skip: a malformed header must not wedge the stream forever.
-        this.buffer = this.buffer.slice(headerEnd + 4);
-        continue;
-      }
-      const length = Number.parseInt(lengthMatch[1], 10);
-      const bodyStart = headerEnd + 4;
-      if (this.buffer.length < bodyStart + length) return out;
-      out.push(this.buffer.slice(bodyStart, bodyStart + length));
-      this.buffer = this.buffer.slice(bodyStart + length);
+      const lineEnd = this.buffer.indexOf("\n");
+      if (lineEnd === -1) return out;
+      // Tolerate CRLF writers and blank keep-alive lines: neither is a message.
+      const line = this.buffer.slice(0, lineEnd).replace(/\r$/, "");
+      this.buffer = this.buffer.slice(lineEnd + 1);
+      if (line.trim() === "") continue;
+      out.push(line);
     }
   }
 }
 
-/** Frames one JSON-RPC body with headers. */
+/** Frames one JSON-RPC body as a newline-delimited line. */
 export function frameMessage(body: string): string {
-  return `Content-Length: ${Buffer.byteLength(body, "utf-8")}\r\n\r\n${body}`;
+  return `${body}\n`;
 }
 
 /**
@@ -95,6 +90,9 @@ export class NodeMcpTransport implements McpTransport {
       stdio: ["pipe", "pipe", "inherit"],
     });
     const decoder = new FrameDecoder();
+    // Incremental UTF-8 decoding: a multi-byte character split across two chunks
+    // must survive, so decode through StringDecoder instead of per-chunk toString.
+    const textDecoder = new StringDecoder("utf-8");
     const queue: string[] = [];
     const waiters: Array<() => void> = [];
     let ended = false;
@@ -104,12 +102,15 @@ export class NodeMcpTransport implements McpTransport {
       while (waiters.length > 0) (waiters.shift() as () => void)();
     };
     child.stdout?.on("data", (chunk: Buffer) => {
-      for (const message of decoder.push(chunk.toString("utf-8"))) {
+      for (const message of decoder.push(textDecoder.write(chunk))) {
         queue.push(message);
         wake();
       }
     });
     const finish = (): void => {
+      for (const message of decoder.push(textDecoder.end())) {
+        queue.push(message);
+      }
       ended = true;
       wake();
     };

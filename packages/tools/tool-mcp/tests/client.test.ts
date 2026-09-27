@@ -281,12 +281,13 @@ describe("registerRemoteMcpTools", () => {  it("bridges remote tools with namesp
 });
 
 describe("FrameDecoder", () => {
-  it("deframes split chunks and skips bad headers", () => {
+  it("deframes split chunks, tolerates CRLF, and skips blank lines", () => {
     const decoder = new FrameDecoder();
     const framed = frameMessage('{"a":1}');
     const half = Math.floor(framed.length / 2);
     expect(decoder.push(framed.slice(0, half))).toEqual([]);
     expect(decoder.push(framed.slice(half))).toEqual(['{"a":1}']);
-    expect(decoder.push("Content-Length: nope\r\n\r\nxyz")).toEqual([]);
+    // A CRLF writer and stray keep-alive newlines must not produce phantom bodies.
+    expect(decoder.push('{"b":2}\r\n\n{"c":3}\n')).toEqual(['{"b":2}', '{"c":3}']);
   });
 });
