@@ -375,7 +375,7 @@ describe("ClaudeAgentSdkDriver", () => {
 
     it("does not report the CLI's own turn cap as an endpoint failure", { timeout: 60_000 }, async () => {
       queryMock.mockImplementation(() =>
-        scriptedSession([{ type: "result", subtype: "error_max_turns", isError: true }]),
+        scriptedSession([{ type: "result", subtype: "error_max_turns", is_error: true }]),
       );
       const outcomes: Array<{ ok: boolean }> = [];
       const context = executionContext(anthropicVendor(), { onModelCall: (outcome) => outcomes.push(outcome) });
@@ -384,6 +384,25 @@ describe("ClaudeAgentSdkDriver", () => {
         // The column still fails (the driver throws on a non-success result), but the
         // endpoint did nothing wrong, so the breaker must not hear about it.
         expect(outcomes).toEqual([]);
+      } finally {
+        context.cleanup();
+      }
+    });
+
+    it("fails the run when a success-subtype result carries is_error", { timeout: 60_000 }, async () => {
+      queryMock.mockImplementation(() =>
+        scriptedSession([{ type: "result", subtype: "success", is_error: true, result: "", usage: {} }]),
+      );
+      const context = executionContext(anthropicVendor());
+      try {
+        const events = await collect(context);
+        // The CLI ended the turn on an API error while still labeling the result
+        // "success": the column must surface the failure, not a phantom success.
+        const error = events.find((event) => event.type === "error");
+        expect(error).toBeDefined();
+        const terminal = events.at(-1);
+        expect(terminal?.type).toBe("complete");
+        expect((terminal as ArenaEvent & { metrics: { success: boolean } }).metrics.success).toBe(false);
       } finally {
         context.cleanup();
       }

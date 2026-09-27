@@ -65,7 +65,8 @@ interface MessageLike {
   result?: unknown;
   usage?: unknown;
   errors?: unknown;
-  isError?: unknown;
+  /** The CLI's own result flag (snake_case in the stream). */
+  is_error?: unknown;
   /** HTTP status of a failed request (api_retry system messages; null = no response). */
   error_status?: unknown;
   /** Rate-limit state for the subscription endpoints (rate_limit_event messages). */
@@ -159,7 +160,9 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
         type: message.type,
         subtype: message.subtype,
         errorStatus: message.error_status,
-        isError: message.isError,
+        // The CLI's own result field is `is_error` (snake_case); MessageLike.isError is
+        // a legacy alias nothing in the stream sets, so read the real field here.
+        isError: message.is_error,
         rateLimitStatus: message.rate_limit_info?.status,
       });
       if (outcome === null) return;
@@ -356,7 +359,7 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
                 token_stats: tracker.asDict(),
                 workspace: state.workspaceName,
               });
-              if (message.subtype !== "success" || message.isError === true) {
+              if (message.subtype !== "success" || message.is_error === true) {
                 const errors = Array.isArray(message.errors) ? message.errors.join("; ") : "";
                 throw new Error(
                   `Claude Agent SDK run failed (${String(message.subtype)})${errors !== "" ? `: ${errors}` : ""}`,
