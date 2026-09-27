@@ -131,6 +131,24 @@ THIRD-LINE
     }
   });
 
+  it("returns exactly limit lines when the offset lands inside the first window", async () => {
+    const ws = workspace();
+    try {
+      // Fixed-width 1024-byte lines make the line-per-window count deterministic:
+      // one 256 KiB window holds 256 lines. Skipping 19 lines leaves 237 in the first
+      // window, so the scan must continue to serve a 240-line limit.
+      const lines = Array.from({ length: 600 }, (_v, i) => `${String(i).padStart(4, "0")}${"y".repeat(1019)}\n`);
+      writeFileSync(join(ws.root, "rep.log"), lines.join(""));
+      const result = await readTool.execute(ws as never, { path: "rep.log", offset: 20, limit: 240 });
+      expect(result.ok).toBe(true);
+      // Lines 20..259 (1-based): the last line is index 0258.
+      expect(result.result).toContain("0258");
+      expect(result.result).not.toContain("0259");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("says so when the offset lies beyond the scan budget", async () => {
     const ws = workspace();
     try {

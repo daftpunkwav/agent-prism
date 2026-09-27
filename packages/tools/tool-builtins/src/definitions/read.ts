@@ -67,19 +67,27 @@ function readFromOffset(
     position += window.bytesRead;
     moreContent = window.truncated;
     const lines = toLines(window.text);
+    // A window that stops mid-line ends with a fragment: it is not a line until the
+    // next window's head merges with it, so it must not be counted (the merge's own
+    // count covers the completed line exactly once).
+    const endsMidLine = window.truncated && !window.text.endsWith("\n");
     if (linesToSkip > 0) {
       if (lines.length - 1 < linesToSkip) {
         linesToSkip -= lines.length - 1;
       } else {
-        collected = lines.slice(linesToSkip).join("\n");
+        const skipped = linesToSkip;
+        collected = lines.slice(skipped).join("\n");
         linesToSkip = 0;
-        linesCollected = lines.length - linesToSkip;
+        // Count the kept complete lines: zeroing linesToSkip before this subtraction
+        // made the old expression dead and reported `skipped` phantom lines, which
+        // stopped the scan before `limit` lines were actually in hand.
+        linesCollected = lines.length - 1 - skipped - (endsMidLine ? 1 : 0);
       }
     } else {
       // Windows are concatenated verbatim: a line split across the boundary must stay
       // one line, so no separator may be inserted between them.
       collected = collected === "" ? window.text : collected + window.text;
-      linesCollected += lines.length - 1;
+      linesCollected += lines.length - 1 - (endsMidLine ? 1 : 0);
     }
     if (collected !== "" && (limit > 0 ? linesCollected >= limit : enough(collected))) break;
     if (!window.truncated || position >= READ_SCAN_BUDGET_BYTES) break;
