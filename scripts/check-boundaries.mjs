@@ -38,6 +38,8 @@
  *   (adapter leaf over the two stores)
  * - memory family: no @langchain/*, no providers (SDK-free, deterministic)
  * - apps/web: @agentprism/* only client / ui / arena-view
+ * - front-end leaves (client / ui / arena-view sources): contracts only, so the
+ *   "thin view over the contracts client" invariant holds in both directions
  *
  * Note: LC/LG conversion lives in packages/drivers (llm-message-bridge).
  *       Native and harness talk only LlmMessage / LlmAdapter.
@@ -368,11 +370,19 @@ function expandRoot(root) {
 /**
  * Every module specifier in a file: static imports, re-exports, bare imports, and
  * dynamic `import("...")` calls.
+ *
+ * Matching is textual, so a specifier quoted inside a comment or a string literal is
+ * reported too (the same was already true for `from "..."` before this scanner judged
+ * specifiers; dynamic-import text is the one new case). That trade is deliberate:
+ * seeing a forbidden import shape anywhere in the file is worth the rare false positive,
+ * and the report prints the line so the reader can judge.
  */
 function moduleSpecifiers(text) {
   const specs = [];
   const re = /\bfrom\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)|\bimport\s*["']([^"']+)["']/g;
-  for (const m of text.matchAll(re)) specs.push(m[1] ?? m[2] ?? m[3]);
+  for (const m of text.matchAll(re)) {
+    specs.push({ spec: m[1] ?? m[2] ?? m[3], index: m.index ?? 0 });
+  }
   return specs;
 }
 
@@ -399,12 +409,15 @@ for (const rule of COMPILED_RULES) {
     for (const dir of expandRoot(root)) {
       for (const file of walk(path.join(ROOT, dir))) {
         const text = fs.readFileSync(file, "utf8");
-        for (const spec of moduleSpecifiers(text)) {
+        for (const { spec, index } of moduleSpecifiers(text)) {
           // Canonical static form: one rule syntax covers every import syntax.
           const canonical = `import x from "${spec}"`;
           if (rule.forbid.test(canonical)) {
             failed = true;
-            console.error(`[boundaries] ${rule.name}\n  ${path.relative(ROOT, file)}: ${canonical}`);
+            // The line number is derived from the match offset: the canonical form is
+            // synthetic, so printing it alone would not tell the reader where to look.
+            const line = text.slice(0, index).split("\n").length;
+            console.error(`[boundaries] ${rule.name}\n  ${path.relative(ROOT, file)}:${line}: ${canonical}`);
           }
         }
       }

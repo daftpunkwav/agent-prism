@@ -13,7 +13,8 @@ import { UiSelect } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
 import { DEFAULT_SKIN, SKINS, SKIN_STORAGE_KEY, applySkin, normalizeSkin } from "@/theme";
 
-const GROUPS: ReadonlyArray<{ key: string; icon: typeof BookOpen }> = [
+/** Guide groups in render order; the section test asserts every one has copy. */
+export const GROUPS: ReadonlyArray<{ key: string; icon: typeof BookOpen }> = [
   { key: "connections", icon: BookOpen },
   { key: "thinking", icon: BookOpen },
   { key: "decode", icon: BookOpen },

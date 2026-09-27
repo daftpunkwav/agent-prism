@@ -1,5 +1,5 @@
 /**
- * @file middleware
+ * @file proxy
  * @description Per-request Content-Security-Policy carrying a script nonce.
  *
  * Responsibilities:
@@ -11,9 +11,14 @@
  * scripts and the app inlines the theme/skin/locale pre-paint scripts, so a nonce is
  * the only workable tightening (hashes cannot cover the per-page flight payload).
  * Next reads the nonce back out of the request's CSP header and stamps it onto every
- * script it injects; app-rendered scripts read `x-nonce`. Dev keeps the hot-reload
- * allowances. A direct cross-origin backend (`NEXT_PUBLIC_API_BASE`) must be added to
- * `connect-src`, or REST and SSE requests are silently blocked.
+ * script it injects; app-rendered scripts read `x-nonce`. Dev keeps the `unsafe-eval`
+ * allowance hot reload needs. A direct cross-origin backend (`NEXT_PUBLIC_API_BASE`)
+ * must be added to `connect-src`, or REST and SSE requests are silently blocked.
+ *
+ * Requests the matcher skips (/api and static assets) carry no CSP at all: a CSP only
+ * governs documents and workers, and the API proxy must stay untouched.
+ *
+ * The file convention is Next 16's `proxy` (the `middleware` name is deprecated).
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -24,9 +29,12 @@ const isProd = process.env.NODE_ENV === "production";
 export function contentSecurityPolicy(nonce: string): string {
   return [
     "default-src 'self'",
+    // Note: a nonce makes browsers IGNORE 'unsafe-inline' in the same directive, so
+    // listing it would be a promise the policy does not keep. Dev differs only by
+    // 'unsafe-eval' (what hot reload actually needs).
     isProd
       ? `script-src 'self' 'nonce-${nonce}'`
-      : `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'nonce-${nonce}'`,
+      : `script-src 'self' 'unsafe-eval' 'nonce-${nonce}'`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
@@ -37,7 +45,7 @@ export function contentSecurityPolicy(nonce: string): string {
   ].join("; ");
 }
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const nonce = crypto.randomUUID().replaceAll("-", "");
   const csp = contentSecurityPolicy(nonce);
   const headers = new Headers(request.headers);

@@ -39,51 +39,42 @@ function hasLogic(source: string): boolean {
   );
 }
 
-/** Every `src/index.ts` flagged by the coverage exclude patterns. */
-function barrelsUnder(root: string, out: string[] = []): string[] {
-  let entries: string[];
-  try {
-    entries = readdirSync(root);
-  } catch {
-    return out;
-  }
-  for (const entry of entries) {
-    if (entry === "node_modules" || entry === "dist" || entry === ".next") continue;
-    const full = join(root, entry);
-    if (statSync(full).isDirectory()) {
-      barrelsUnder(full, out);
-      continue;
-    }
-    if (entry === "index.ts" && relative(full, root).includes(`${sep}src${sep}`)) out.push(full);
-    if (entry === "index.ts" && relative(join(root, entry), root) === "index.ts" && root.includes(`${sep}src`)) out.push(full);
-  }
-  return out;
-}
-
-/** All src barrels in the workspace, as repo-relative POSIX paths. */
+/**
+ * Every file the coverage config's index-barrel exclude hits inside its include
+ * roots (each package's src tree and each app's src tree, recursively): the list
+ * must mirror what the gate actually skips, or the honesty check misses files.
+ */
 function allSrcBarrels(): string[] {
   const found: string[] = [];
+  const walk = (dir: string, depth = 0): void => {
+    if (depth > 6) return;
+    let entries: Array<import("node:fs").Dirent>;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (["node_modules", "dist", ".next", "tests"].includes(entry.name)) continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full, depth + 1);
+        continue;
+      }
+      if (entry.name === "index.ts") found.push(full);
+    }
+  };
   const packagesRoot = join(REPO_ROOT, "packages");
   for (const family of readdirSync(packagesRoot)) {
     const familyDir = join(packagesRoot, family);
     if (!statSync(familyDir).isDirectory()) continue;
     for (const leaf of readdirSync(familyDir)) {
-      const srcDir = join(familyDir, leaf, "src");
-      let entries: string[];
-      try {
-        entries = readdirSync(srcDir);
-      } catch {
-        continue;
-      }
-      if (entries.includes("index.ts")) found.push(join(srcDir, "index.ts"));
+      walk(join(familyDir, leaf, "src"));
     }
   }
-  const webIndexes = [
-    join(REPO_ROOT, "apps", "web", "src", "i18n", "catalogs", "index.ts"),
-    join(REPO_ROOT, "apps", "web", "src", "i18n", "content", "guide", "index.ts"),
-    join(REPO_ROOT, "apps", "web", "src", "i18n", "content", "learn", "index.ts"),
-  ];
-  found.push(...webIndexes);
+  for (const app of readdirSync(join(REPO_ROOT, "apps"))) {
+    walk(join(REPO_ROOT, "apps", app, "src"));
+  }
   return found.map((file) => relative(REPO_ROOT, file).split(sep).join("/"));
 }
 
@@ -146,10 +137,13 @@ describe("coverage exclusions", () => {
     };
     for (const file of LOGIC_BARRELS) {
       const owner = file.replace("/src/index.ts", "");
-      const afterSrc = file.split("/src/")[1]?.replace("/index.ts", "") ?? "";
-      // A package barrel is covered by its own tests; an app barrel (i18n catalogs,
-      // guide/learn content) by the suites that import its path.
-      const mentioned = ownTestsReference(owner) || (afterSrc !== "index" && joined.includes(afterSrc));
+      // A workspace package barrel must be exercised by that package's own tests (a
+      // bare filename match would be satisfied by any test file mentioning "index.ts",
+      // including this very file). An app barrel (i18n catalogs, guide/learn content)
+      // is covered by the suites that import its module path.
+      const mentioned = owner.startsWith("packages/")
+        ? ownTestsReference(owner)
+        : joined.includes(file.split("/src/")[1]?.replace("/index.ts", "") ?? "");
       expect(mentioned, `no test file references ${file}`).toBe(true);
     }
   });

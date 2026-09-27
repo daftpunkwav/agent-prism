@@ -74,15 +74,21 @@ function scanImports(srcDir) {
       if (!/\.(ts|tsx)$/.test(entry.name)) continue;
       const lines = fs.readFileSync(full, "utf8").split(/\r?\n/);
       // The `from "..."` clause of a multi-line import sits on the closing line, which
-      // does not start with `import`. Walk back to the statement's first line so a
-      // multi-line `import type` is still classified as type-only (it used to become a
-      // phantom value edge, which could report cycles that do not exist).
+      // does not start with `import`. Walk back to the statement that owns the clause: a
+      // multi-line `import type` used to be classified as a value import, i.e. a phantom
+      // value edge that could report dependency cycles which do not exist.
+      //
+      // Two details matter. The clause line's own `;` terminates THIS statement, so it
+      // cannot end the walk. And a line may hold the tail of a previous statement, so the
+      // LAST statement start on a line decides (the first one may be an earlier statement).
+      const STATEMENT_START = /(?:^|;)\s*(?:import|export)\s+(type\s+)?/g;
       const isTypeOnlyImportAt = (index) => {
         for (let back = index; back >= 0 && index - back < 40; back -= 1) {
           const candidate = lines[back];
-          if (/^\s*import\s+type\b/.test(candidate)) return true;
-          if (/^\s*(import|export)\b/.test(candidate)) return false;
-          if (/;\s*$/.test(candidate)) return false;
+          let last = null;
+          for (const m of candidate.matchAll(STATEMENT_START)) last = m;
+          if (last !== null) return last[1] !== undefined;
+          if (back !== index && /;\s*$/.test(candidate)) return false;
         }
         return false;
       };

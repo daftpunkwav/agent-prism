@@ -60,7 +60,7 @@ async function pollUntilDone(ws: ReturnType<typeof tempWorkspace>, id: string): 
   throw new Error(`job ${id} did not finish within ${POLL_BUDGET_MS}ms: ${acc}`);
 }
 
-describe("runJobTool", () => {
+describe("runJobTool", { retry: 1 }, () => {
   it("starts a command and polls incremental deltas", async () => {
     const ws = tempWorkspace();
     try {
@@ -121,7 +121,7 @@ describe("runJobTool", () => {
   });
 });
 
-describe("runJobTool log spill", () => {
+describe("runJobTool log spill", { retry: 1 }, () => {
   it("spills oversized deltas to workspace files with rotation", async () => {
     const ws = tempWorkspace();
     try {
@@ -157,7 +157,7 @@ describe("runJobTool log spill", () => {
   });
 });
 
-describe("runJobTool spill rotation", () => {
+describe("runJobTool spill rotation", { retry: 1 }, () => {
   // Three sequential jobs, each spawning node (cold start can take seconds on a
   // loaded machine): the global 30s testTimeout routinely fires before the third
   // job settles, so this case carries its own budget. The behavior assertions

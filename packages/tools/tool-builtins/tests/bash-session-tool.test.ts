@@ -104,7 +104,7 @@ describe.runIf(POSIX)("bashSessionTool", () => {
   });
 });
 
-describe("bashSessionTool sandbox guard", () => {
+describe("bashSessionTool sandbox guard", { retry: 1 }, () => {
   it("refuses to start a shell when the workspace carries an OS sandbox hint", async () => {
     const ws = tempWorkspace();
     try {

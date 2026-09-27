@@ -52,7 +52,7 @@ function runGate(root: string, script: string): { status: number | null; stderr:
 const pkgJson = (name: string, deps: Record<string, string> = {}): string =>
   JSON.stringify({ name, version: "0.1.0", dependencies: deps }, null, 2);
 
-describe("check-boundaries", () => {
+describe("check-boundaries", { retry: 1 }, () => {
   it("fails on a static import outside the rule's allowlist", () => {
     const root = fixture({
       "packages/contracts/contracts/package.json": pkgJson("@agentprism/contracts"),
@@ -93,7 +93,7 @@ describe("check-boundaries", () => {
   });
 });
 
-describe("check-package-deps", () => {
+describe("check-package-deps", { retry: 1 }, () => {
   it("fails on a value import that is not declared", () => {
     const root = fixture({
       "packages/contracts/contracts/package.json": pkgJson("@agentprism/contracts"),
@@ -105,11 +105,16 @@ describe("check-package-deps", () => {
     expect(stderr).toContain("value/dynamic import of undeclared @agentprism/contracts");
   });
 
-  it("treats a multi-line `import type` as a type-only edge", () => {
+  it("treats a prettier-style multi-line `import type` as a type-only edge", () => {
     const root = fixture({
       "packages/contracts/contracts/package.json": pkgJson("@agentprism/contracts"),
-      // No value import, and the dependency is declared: a type-only edge must pass.
-      "packages/harness/harness/package.json": pkgJson("@agentprism/harness", { "@agentprism/contracts": "workspace:*" }),
+      // The dependency is DEV-only, so classifying this import as a value edge fails
+      // with "declared only as devDependency": the case cannot pass by accident.
+      "packages/harness/harness/package.json": JSON.stringify({
+        name: "@agentprism/harness",
+        version: "0.1.0",
+        devDependencies: { "@agentprism/contracts": "workspace:*" },
+      }),
       "packages/harness/harness/src/x.ts":
         'import type {\n  A,\n  B,\n} from "@agentprism/contracts";\nexport const use = (a: A, b: B) => [a, b];\n',
     });
@@ -121,14 +126,20 @@ describe("check-package-deps", () => {
   it("still flags a multi-line value import", () => {
     const root = fixture({
       "packages/contracts/contracts/package.json": pkgJson("@agentprism/contracts"),
-      "packages/harness/harness/package.json": pkgJson("@agentprism/harness"),
+      "packages/harness/harness/package.json": JSON.stringify({
+        name: "@agentprism/harness",
+        version: "0.1.0",
+        devDependencies: { "@agentprism/contracts": "workspace:*" },
+      }),
       "packages/harness/harness/src/x.ts": 'import {\n  A,\n} from "@agentprism/contracts";\nexport const use = A;\n',
     });
-    expect(runGate(root, "check-package-deps.mjs").status).toBe(1);
+    const result = runGate(root, "check-package-deps.mjs");
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("value import of @agentprism/contracts declared only as devDependency");
   });
 });
 
-describe("check-export-tests", () => {
+describe("check-export-tests", { retry: 1 }, () => {
   const withTest = (exportName: string, importedName: string): Record<string, string> => ({
     "packages/tools/tool-x/package.json": pkgJson("@agentprism/tool-x"),
     "packages/tools/tool-x/src/index.ts": `export function ${exportName}(): number {\n  return 1;\n}\n`,

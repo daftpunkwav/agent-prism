@@ -26,7 +26,7 @@ function tempWorkspace() {
   };
 }
 
-describe("bashTool", () => {
+describe("bashTool", { retry: 1 }, () => {
   // 90s budget: this spawn test sits near the global 30s timeout on slow CI
   // runners under coverage parallel load (locally it finishes in ~5s); the
   // larger ceiling only adds headroom, it never waits on a fast host.

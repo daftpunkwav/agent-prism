@@ -5,7 +5,7 @@
  * Responsibilities:
  * - Resolve the backend port from the repo-root .env
  * - Proxy same-origin /api requests to the local runtime
- * - Apply site-wide security headers (CSP)
+ * - Apply site-wide security headers (the CSP rides in src/proxy.ts, see below)
  */
 
 import fs from "node:fs";
@@ -60,7 +60,7 @@ function resolveBackendPort(): number {
  * Security response headers — applied site-wide.
  *
  * The Content-Security-Policy is NOT here: it needs a per-request script nonce, so it
- * lives in `src/middleware.ts` (a second CSP header would be enforced in addition to
+ * lives in `src/proxy.ts` (a second CSP header would be enforced in addition to
  * that one, and the intersection would block the nonced inline scripts).
  */
 const SECURITY_HEADERS = [

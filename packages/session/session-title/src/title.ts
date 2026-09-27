@@ -18,8 +18,10 @@ import { firstUsableTitle, normalizeTitle, TITLE_FALLBACK } from "./normalize.js
 export type Titler = (input: { question: string; answer: string }) => Promise<string>;
 
 /**
- * Stopwords excluded from keyword titles. English only: the tokenizer emits whole CJK
- * runs, so single particles can never match here (CJK filtering needs segmentation).
+ * Stopwords excluded from keyword titles. Only entries longer than two characters can
+ * fire: `extractKeywords` drops shorter words before consulting this set, and the
+ * tokenizer emits whole CJK runs, so the single-particle entries below are dead until
+ * the length filter or the tokenizer changes.
  */
 const STOPWORDS = new Set([
   "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with", "is", "are",

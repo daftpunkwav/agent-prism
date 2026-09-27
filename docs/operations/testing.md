@@ -117,9 +117,11 @@ suites are Win32-only, so another runner would skip the security-relevant cases.
 - Test files live beside the code they own. A test that needs two packages' internals is
   a journey test and goes through public barrels only.
 - Time is deterministic through the injected `Clock`; IDs are deterministic through the
-  injected `IdGenerator`. Assertions never sleep to wait for state. A few suites do measure
-  wall clock or poll a real child process (the spawn suites and their retry opt-in); those
-  are the exception and stay listed here rather than growing silently.
+  injected `IdGenerator`. Assertions never sleep to wait for state. Three suites do assert
+  wall-clock budgets — `arena-view/tests/answer-compare.test.ts`,
+  `tool-mcp/tests/client.test.ts`, `arena-runner/tests/runner-pool.test.ts` (channel
+  polling) — and the suites that spawn real children take the per-suite `{ retry: 1 }`
+  opt-in for Windows file-lock jitter.
 - Behavioral deltas are pinned explicitly. The compaction strategies have unit tests that
   pin the delta against `sliding`.
 - The full gate set is `pnpm verify`: build, typecheck, coverage, web lint, i18n catalogs, import boundaries,

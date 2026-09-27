@@ -61,8 +61,9 @@ interface ContentBlockLike {
  * Visible text from arbitrary content (string or content-block array). Single source:
  * harness message-text, providers chat-model-text, and LC/anthropic chunk shapes all
  * funnel here. Any string .text counts regardless of block type (thinking/tool_use
- * blocks are filtered by their callers, not here); a nullish or non-string block is
- * stringified into the result (`String(null)` contributes "null").
+ * blocks are filtered by their callers, not here); a SCALAR block that is not a string
+ * is stringified into the result (`String(null)` contributes "null"), while an object
+ * block without a string `.text` contributes nothing.
  */
 export function textFromContent(content: unknown): string {
   if (content === null || content === undefined) return "";

@@ -22,8 +22,8 @@ For the role table and dependency constraints see
 `scripts/dev.mjs` does three things a bare `next dev` would not: it probes the
 port first (bind + connect double check) and exits with guidance on conflict; it
 accepts `-p/--port` to move the port; and it forces `NODE_ENV=development` so a
-shell-global production value cannot downgrade the CSP to the production one
-(which carries no hot-reload allowances) while developing.
+shell-global production value cannot put React into production mode (dev-only
+warnings and the hydration expectation both change with it).
 
 ## Ports and proxying
 
@@ -36,10 +36,12 @@ shell-global production value cannot downgrade the CSP to the production one
 - `compress: false` is deliberate: Next's gzip buffers the proxied SSE stream
   and flushes only at completion, which would render arena traces all at once
   instead of step by step.
-- CSP lives in `src/middleware.ts`, not in `next.config.ts`, because it carries a
-  per-request script nonce: production allows inline scripts only with that nonce
-  (Next's inlined flight payload and the theme/skin/locale bootstrap scripts),
-  and dev additionally allows `unsafe-inline`/`unsafe-eval` for hot reload.
+- CSP lives in `src/proxy.ts` (Next 16's `proxy` file convention, formerly
+  `middleware`), not in `next.config.ts`, because it carries a per-request script
+  nonce: production allows inline scripts only with that nonce (Next's inlined
+  flight payload and the theme/skin/locale bootstrap scripts), and dev adds
+  `unsafe-eval` for hot reload. `/api` and static assets are matched out and carry
+  no CSP — a policy governs documents, and the proxy must stream untouched.
   Switching to a direct cross-origin backend (`NEXT_PUBLIC_API_BASE`) requires
   adding that address to `connect-src` there, or REST and SSE requests are
   silently blocked.
@@ -51,7 +53,7 @@ shell-global production value cannot downgrade the CSP to the production one
 | `src/app/` | App Router pages: `arena`, `builder`, `sessions`, `projects`, `settings`, plus `guide` and `learn` |
 | `src/components/` | Presentation components shared across pages |
 | `src/i18n/` | Locale catalogs (`catalogs/en`, `catalogs/zh-CN`) and the guide/learn content; see [src/i18n/README.md](src/i18n/README.md) |
-| `src/middleware.ts` | Per-request CSP with the script nonce for inline scripts |
+| `src/proxy.ts` | Per-request CSP with the script nonce for inline scripts |
 | `scripts/` | `dev.mjs` launcher and `check-i18n.mjs` gate |
 
 ## Dependencies

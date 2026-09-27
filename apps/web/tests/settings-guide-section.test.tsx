@@ -15,10 +15,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
-import { GuideSection } from "../src/app/settings/GuideSection.js";
+import { GROUPS, GuideSection } from "../src/app/settings/GuideSection.js";
 
-/** Keys the section renders; kept in sync with GROUPS in the component. */
-const GROUP_KEYS = ["connections", "thinking", "decode", "runtime", "memory", "skills", "mcp"] as const;
+/** Group keys come from the component itself, so a new group cannot slip past. */
+const GROUP_KEYS = GROUPS.map((group) => group.key);
 
 /** Dot-key lookup mirroring resolveMessage, so the test reads keys like the app does. */
 function message(locale: "en" | "zh-CN", key: string): string | null {
@@ -49,11 +49,13 @@ describe("GuideSection", () => {
   });
 
   it("renders the intro, every group heading, and the skin picker", () => {
-    renderSection();
+    const { container } = renderSection();
     for (const key of GROUP_KEYS) {
       expect(screen.getByText(message("en", `settings.guide.${key}.title`) as string)).toBeTruthy();
     }
-    // The degraded fallback renders the raw key (prod) or a marker (dev); neither may appear.
+    // A key with no copy degrades to a marker (dev builds, which is what vitest runs as)
+    // or the raw key (production): both would ship a broken guide tab.
+    expect(container.textContent ?? "").not.toContain("⟦");
     expect(screen.queryByText(/^settings\.guide\./)).toBeNull();
     expect(screen.getByText(message("en", "settings.guide.intro") as string)).toBeTruthy();
     expect(screen.getByText(message("en", "settings.skin.label") as string)).toBeTruthy();
