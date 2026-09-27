@@ -258,10 +258,12 @@ export class ArenaRunner {
 
       const dropped = channel.droppedCount();
       if (dropped > 0) {
-        // Loud, not silent: the tail of the run is incomplete for this consumer.
-        yield systemErrorEvent(
-          `${dropped} event(s) were dropped: the run produced them faster than this consumer read them`,
-          this.deps.clock.now(),
+        // Loud, not silent — but through the server log, not the stream: a run-level
+        // error event is the frontend's signal to abort the turn and strip it, so
+        // reporting a slow-consumer degradation that way would destroy a run that is
+        // otherwise fine. Reaching this bound means a consumer stalled badly.
+        console.warn(
+          `[arena-runner] dropped ${dropped} event(s): the consumer read slower than the run produced`,
         );
       }
 
@@ -445,11 +447,15 @@ export class ArenaRunner {
         // instance share one BaseChatModel), so native, the LangChain family and the
         // OpenAI Agents bridge are all observed; the Claude Agent SDK column is the
         // exception because its CLI subprocess makes the model calls itself.
+        //
+        // Endpoint health arrives through the same handler: it is the one place that
+        // sees every call of the shared model, so the breaker reflects the dependency
+        // instead of whichever column finished last. A column that is stopping is
+        // filtered here — its cancelled calls are not endpoint faults.
         const runtime = this.deps.modelFactory.create(config, {
           wireSink: (record) => logs?.appendWire(config.label, turn, record),
-          // Endpoint health: one report per model call, so the breaker reflects the
-          // shared dependency instead of whichever column finished last.
           onModelCall: (outcome) => {
+            if (linked.signal.aborted) return;
             if (outcome.ok) breaker.recordSuccess();
             else breaker.recordFailure();
           },

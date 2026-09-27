@@ -12,7 +12,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic, type ChatAnthropicInput } from "@langchain/anthropic";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { Callbacks } from "@langchain/core/callbacks/manager";
-import type { LlmEndpoint, ModelCallOutcome, PipelineConfig, ProviderConfig } from "@agentprism/contracts";
+import type { LlmEndpoint, PipelineConfig, ProviderConfig } from "@agentprism/contracts";
 import { ConfigurationError, effectiveThinkingLevel, validateLlmBaseUrl } from "@agentprism/contracts";
 import { resolveCredentialReference, resolveDefaultEndpoint } from "@agentprism/provider-catalog";
 import { lookupEndpoint, type EndpointCatalog } from "@agentprism/provider-catalog";
@@ -179,8 +179,6 @@ export interface ColumnRuntimeOptions {
   timeoutMs?: number;
   /** SDK-level transient-failure retry count; defaults to LLM_MAX_RETRIES. */
   maxRetries?: number;
-  /** One report per model call (endpoint health for the host's breaker). */
-  onModelCall?: (outcome: ModelCallOutcome) => void;
 }
 
 /** Builds a model from column config (override priority matches single-column execution). */
@@ -230,7 +228,7 @@ export function createColumnRuntime(
 ): import("@agentprism/contracts").ColumnRuntime {
   const bundle = createColumnModel(deps, config, options);
   return {
-    llm: toLlmAdapter(bundle.model, options.onModelCall),
+    llm: toLlmAdapter(bundle.model),
     llmVendor: bundle.model,
     contextWindow: bundle.contextWindow,
     maxInputTokens: bundle.maxInputTokens,

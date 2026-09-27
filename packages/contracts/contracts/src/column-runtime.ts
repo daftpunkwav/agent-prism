@@ -25,10 +25,16 @@ export interface ColumnRuntime {
 export type LlmWireSink = (record: LlmWireRecord) => void;
 
 /**
- * One model call's outcome, reported at the call site (the adapter), not inferred
- * from a column's end state: driver bugs and downstream faults are otherwise
+ * One model call's outcome, reported where the call is observed, never inferred from
+ * a column's end state: driver bugs and downstream faults are otherwise
  * indistinguishable, and a column that fails for its own reasons must not count
  * against the shared endpoint.
+ *
+ * Coverage is per COLUMN SHAPE, not per backend: the host reports from the callback
+ * handler attached to the column's chat model, so columns whose calls go through
+ * that model (the neutral drivers via the LlmAdapter, the LangChain family via
+ * `llmVendor`) are observed, while a backend that runs its own model loop in a
+ * subprocess (Claude Agent SDK) is not.
  */
 export interface ModelCallOutcome {
   ok: boolean;

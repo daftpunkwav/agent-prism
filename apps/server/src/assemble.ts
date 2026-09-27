@@ -27,6 +27,7 @@ import { listCustomDimensionRows, registerCustomDimensions } from "@agentprism/a
 import { memoryTopNDimension } from "@agentprism/memory-top-n";
 import { summaryBudgetDimension } from "@agentprism/summary-budget";
 import { toolReplayDimension } from "@agentprism/tool-replay";
+import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import {
   configureUserSkills,
@@ -109,6 +110,7 @@ import {
 import type {
   AnswerJudge,
   BuilderEndpointBlock,
+  ColumnRuntimeCreateOptions,
   ColumnRuntimeFactory,
   ContextTuning,
   HarnessLevel,
@@ -135,6 +137,29 @@ export interface RuntimeComponents {
 }
 
 const REQUIRED_CAPABILITY_DIMS = ["prompt", "reasoning", "context", "harness", "toolset"] as const;
+
+/**
+ * Builds one column's chat-model callbacks: the wire tracer for run logs plus, when
+ * the host asks for it, the endpoint-health reports the arena breaker consumes.
+ *
+ * Exported (and covered by a test) because dropping `onModelCall` here is silent:
+ * the breaker would simply never receive a report, and nothing else would fail.
+ */
+export function buildColumnCallbacks(
+  options: ColumnRuntimeCreateOptions | undefined,
+  now: () => number,
+): [BaseCallbackHandler] | undefined {
+  const wireSink = options?.wireSink;
+  const onModelCall = options?.onModelCall;
+  if (wireSink === undefined && onModelCall === undefined) return undefined;
+  return [
+    createLlmWireTraceHandler({
+      sink: wireSink ?? (() => undefined),
+      now,
+      ...(onModelCall !== undefined ? { onModelCall } : {}),
+    }),
+  ];
+}
 
 /**
  * Assembles the full server host. Fail-fast when required capability seams have
@@ -225,10 +250,10 @@ export async function assemble(): Promise<RuntimeComponents> {
     create(config: PipelineConfig, options) {
       // Same wire tracer as builder sessions: arena run logs capture every column's
       // LLM request/response without driver changes (native included — the adapter
-      // and the vendor model share one BaseChatModel instance).
-      const callbacks = options?.wireSink
-        ? [createLlmWireTraceHandler({ sink: options.wireSink, now: () => clock.now() })]
-        : undefined;
+      // and the vendor model share one BaseChatModel instance). The same handler
+      // carries the endpoint-health reports: it is the one place that sees every
+      // call, whichever driver shape made it.
+      const callbacks = buildColumnCallbacks(options, () => clock.now());
       return createColumnRuntime({ provider: providerStore.load(), catalog: endpointCatalog }, config, {
         callbacks,
         timeoutMs: llmCallOptions().timeoutMs,

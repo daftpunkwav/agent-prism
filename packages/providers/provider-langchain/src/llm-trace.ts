@@ -20,7 +20,7 @@ import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import type { Serialized } from "@langchain/core/load/serializable";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
-import type { LlmWireMessage, LlmWireResponse, LlmWireSink, LlmWireToolCall } from "@agentprism/contracts";
+import type { LlmWireMessage, LlmWireResponse, LlmWireSink, LlmWireToolCall, ModelCallOutcome } from "@agentprism/contracts";
 
 /** Maximum concurrent runs tracked for latency bookkeeping (leak guard). */
 const MAX_TRACKED_RUNS = 256;
@@ -32,9 +32,14 @@ const MAX_TRACKED_RUNS = 256;
  */
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|secret|credential|password|^token$/i;
 
-/** URL userinfo plus the vendor key shapes that appear in free-form SDK messages. */
-const URL_CREDENTIALS_PATTERN = /\/\/[^/\s@]+:[^/\s@]+@/g;
-const SECRET_VALUE_PATTERN = /(sk-|api[_-]?key["'\s:=]+)[A-Za-z0-9_\-]{8,}/gi;
+/**
+ * URL userinfo (with or without a password part) plus the key shapes that appear in
+ * free-form SDK messages: `sk-…` (OpenAI/Anthropic), `AIza…` (Google), `AKIA…` (AWS),
+ * `ghp_…` (GitHub), `Bearer …`, and `api_key=<value>`.
+ */
+const URL_CREDENTIALS_PATTERN = /\/\/[^/\s@]*@/g;
+const SECRET_VALUE_PATTERN =
+  /(sk-[A-Za-z0-9_\-]{8,}|AIza[0-9A-Za-z_\-]{8,}|AKIA[0-9A-Z]{8,}|ghp_[A-Za-z0-9]{8,}|Bearer\s+[A-Za-z0-9._\-]{8,}|api[_-]?key["']?\s*[=:]\s*[A-Za-z0-9_\-]{8,})/gi;
 
 /**
  * Redacts credentials inside a free-form error message: SDK errors routinely echo the
@@ -44,7 +49,7 @@ const SECRET_VALUE_PATTERN = /(sk-|api[_-]?key["'\s:=]+)[A-Za-z0-9_\-]{8,}/gi;
 function redactSecrets(message: string): string {
   return message
     .replace(URL_CREDENTIALS_PATTERN, "//<redacted>@")
-    .replace(SECRET_VALUE_PATTERN, "$1<redacted>");
+    .replace(SECRET_VALUE_PATTERN, (match) => (match.toLowerCase().startsWith("bearer") ? "Bearer <redacted>" : "<redacted>"));
 }
 
 interface RunTiming {
@@ -233,13 +238,34 @@ export function serializeWireResponse(result: LLMResult, model: string): LlmWire
   };
 }
 
-/** Options for the wire tracer factory. */
+/**
+ * Options for the wire tracer factory.
+ *
+ * `onModelCall` is the host's endpoint-health hook. This handler is the single place
+ * that observes EVERY model call a column makes — the neutral drivers through the
+ * LlmAdapter and the LangChain-family loops through `llmVendor` both invoke the same
+ * BaseChatModel these callbacks are attached to. Reporting from a driver or from the
+ * adapter would only cover one of those paths (and the Claude Agent SDK column, whose
+ * CLI subprocess makes its own calls, is out of reach either way).
+ */
 export interface LlmWireTraceHandlerOptions {
   sink: LlmWireSink;
   /** Injected time source (ms epoch); the handler never reads system time directly. */
   now: () => number;
   /** Returns the tool names currently authorized for the session (attached to requests). */
   boundToolNames?: () => string[];
+  /** One outcome per completed or failed model call (endpoint health). */
+  onModelCall?: (outcome: ModelCallOutcome) => void;
+}
+
+/** Reports one call outcome, never letting a health sink break the model loop. */
+function reportCall(sink: ((outcome: ModelCallOutcome) => void) | undefined, ok: boolean, error?: unknown): void {
+  if (sink === undefined) return;
+  try {
+    sink(ok ? { ok } : { ok, error });
+  } catch {
+    // Health reporting is advisory; it must never fail a model call.
+  }
 }
 
 /**
@@ -334,6 +360,10 @@ export function createLlmWireTraceHandler(options: LlmWireTraceHandlerOptions): 
     }
 
     override handleLLMEnd(output: LLMResult, runId: string): void {
+      // A stream that ran to completion and a successful invoke both land here: one
+      // healthy call. SDK-level retries are invisible at this level, which matches
+      // "one outcome per model call as the column sees it".
+      reportCall(options.onModelCall, true);
       try {
         const finished = finishRun(runId);
         const model = finished?.timing.model ?? "";
@@ -354,6 +384,9 @@ export function createLlmWireTraceHandler(options: LlmWireTraceHandlerOptions): 
     }
 
     override handleLLMError(err: Error, runId: string): void {
+      // Cancellation is not an endpoint fault; the host's sink filters it by the
+      // column's own signal, and the name check covers a signal it could not see.
+      if (err.name !== "AbortError") reportCall(options.onModelCall, false, err);
       try {
         const finished = finishRun(runId);
         // SDK messages routinely echo the request URL, and a base URL may embed

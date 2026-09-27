@@ -76,7 +76,7 @@ describe("assemble() happy path", () => {
   });
 
   it(
-    "wires the builder endpoints, the arena runner factory, and log reads",
+    "wires the builder endpoints and the column-log reads",
     { timeout: COMPOSITION_TIMEOUT },
     async () => {
       const { assemble } = await import("../src/assemble.js");
@@ -89,10 +89,14 @@ describe("assemble() happy path", () => {
       const catalogBody = (await catalog.json()) as any;
       expect(Array.isArray(catalogBody.endpoints)).toBe(true);
 
-      // Runner factory: reached through the arena logs route, which resolves a run's
-      // traces; the factory itself must build a runner without throwing.
-      const logs = await app.request("/api/arena/logs?runId=missing-run");
-      expect([200, 404]).toContain(logs.status);
+      // Column logs: the read side of the per-run trace files, with its query
+      // validation and its "unknown workspace yields empty, never 404" contract.
+      const missingParams = await app.request("/api/arena/column-logs");
+      expect(missingParams.status).toBe(400);
+      const unknownWorkspace = await app.request("/api/arena/column-logs?workspace=ws-missing&label=Native");
+      expect(unknownWorkspace.status).toBe(200);
+      const logsBody = (await unknownWorkspace.json()) as any;
+      expect(logsBody).toMatchObject({ workspace: "ws-missing", label: "Native", events: [], wire: [] });
     },
   );
 });

@@ -164,42 +164,18 @@ function usageOf(response: BaseMessage): Record<string, unknown> | undefined {
   return usage !== null && typeof usage === "object" ? (usage as Record<string, unknown>) : undefined;
 }
 
-/**
- * Reports one call outcome to the host's health sink. Cancellation is not a fault
- * of the endpoint, so it is never reported as a failure.
- */
-function reportCall(sink: ((outcome: { ok: boolean; error?: unknown }) => void) | undefined, ok: boolean, error?: unknown): void {
-  if (sink === undefined) return;
-  if (!ok && (error as Error)?.name === "AbortError") return;
-  try {
-    sink(ok ? { ok } : { ok, error });
-  } catch {
-    // A health sink must never break a model call.
-  }
-}
-
 /** LlmAdapter backed by a LangChain chat model. */
 export class ChatModelLlmAdapter implements LlmAdapter {
-  constructor(
-    private readonly model: BaseChatModel,
-    private readonly onModelCall?: (outcome: { ok: boolean; error?: unknown }) => void,
-  ) {}
+  constructor(private readonly model: BaseChatModel) {}
 
   async invoke(messages: LlmMessage[], options?: LlmCallOptions): Promise<LlmInvokeResult> {
     const plan = planInvoke(this.model, options);
-    let response: BaseMessage;
-    try {
-      response = await plan.runnable.invoke(llmMessagesToLc(messages), {
-        ...plan.invokeKwargs,
-        // Per-call truth for the wire tracer: single-shot invokes are genuinely
-        // non-streaming (the SDK snapshot alone reads as stream:false for every path).
-        metadata: { wire_stream: false },
-      });
-    } catch (error) {
-      reportCall(this.onModelCall, false, error);
-      throw error;
-    }
-    reportCall(this.onModelCall, true);
+    const response = await plan.runnable.invoke(llmMessagesToLc(messages), {
+      ...plan.invokeKwargs,
+      // Per-call truth for the wire tracer: single-shot invokes are genuinely
+      // non-streaming (the SDK snapshot alone reads as stream:false for every path).
+      metadata: { wire_stream: false },
+    });
     const toolCalls = normalizeToolCalls((response as AIMessage).tool_calls);
     const forced = plan.forcedToolName !== null
       ? toolCalls.find((call) => call.name === plan.forcedToolName)
@@ -217,33 +193,19 @@ export class ChatModelLlmAdapter implements LlmAdapter {
 
   async *stream(messages: LlmMessage[], options?: LlmCallOptions): AsyncIterable<LlmStreamPart> {
     const runnable = bindToolsIfNeeded(this.model, options?.tools);
-    let stream: Awaited<ReturnType<typeof runnable.stream>>;
-    try {
-      stream = await runnable.stream(llmMessagesToLc(messages), {
-        signal: options?.signal,
-        // Runnable.stream drives the vendor's streaming transport (SSE, stream:true
-        // in the HTTP body); stamp the call so the wire tracer records it.
-        metadata: { wire_stream: true },
-      });
-    } catch (error) {
-      reportCall(this.onModelCall, false, error);
-      throw error;
-    }
+    const stream = await runnable.stream(llmMessagesToLc(messages), {
+      signal: options?.signal,
+      // Runnable.stream drives the vendor's streaming transport (SSE, stream:true
+      // in the HTTP body); stamp the call so the wire tracer records it.
+      metadata: { wire_stream: true },
+    });
     let gathered: AIMessageChunk | null = null;
-    try {
-      for await (const chunk of stream) {
-        gathered = gathered === null ? (chunk as AIMessageChunk) : gathered.concat(chunk as AIMessageChunk);
-        const { thinking, text } = extractChunkParts(chunk);
-        if (thinking !== "") yield { thinking };
-        if (text !== "") yield { text };
-      }
-    } catch (error) {
-      reportCall(this.onModelCall, false, error);
-      throw error;
+    for await (const chunk of stream) {
+      gathered = gathered === null ? (chunk as AIMessageChunk) : gathered.concat(chunk as AIMessageChunk);
+      const { thinking, text } = extractChunkParts(chunk);
+      if (thinking !== "") yield { thinking };
+      if (text !== "") yield { text };
     }
-    // A stream that ran to completion is one healthy call; an abandoned one (the
-    // consumer stopped early on abort) is not counted either way.
-    if (options?.signal?.aborted !== true) reportCall(this.onModelCall, true);
     if (gathered !== null) {
       const toolCalls = normalizeToolCalls(gathered.tool_calls);
       if (toolCalls.length > 0) yield { toolCalls };
@@ -256,7 +218,7 @@ export class ChatModelLlmAdapter implements LlmAdapter {
   }
 }
 
-/** Wraps a BaseChatModel as LlmAdapter (the health sink receives one report per call). */
-export function toLlmAdapter(model: BaseChatModel, onModelCall?: (outcome: { ok: boolean; error?: unknown }) => void): LlmAdapter {
-  return new ChatModelLlmAdapter(model, onModelCall);
+/** Wraps a BaseChatModel as LlmAdapter. */
+export function toLlmAdapter(model: BaseChatModel): LlmAdapter {
+  return new ChatModelLlmAdapter(model);
 }

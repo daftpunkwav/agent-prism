@@ -35,6 +35,7 @@ describe("server barrel", () => {
         "InvalidPortError",
         "PortInUseError",
         "assemble",
+        "buildColumnCallbacks",
         "builtinDriverLoaders",
         "disposeSignalHandlers",
         "ensurePortAvailable",
