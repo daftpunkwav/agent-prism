@@ -570,6 +570,9 @@ export async function assemble(): Promise<RuntimeComponents> {
       sessionsQuery: sessions,
       contextTuning,
       toolTuning,
+      // Same shared bag the builder turns consume (applyRuntimeKnobs mutates it in
+      // place), so the settings harness-retry knobs govern arena runs too.
+      harnessMaxRetries,
       maxDelegationDepth: runtimeKnobsStore.current().agentMaxDelegationDepth,
       eventRetention: settings.arenaEventRetention,
       disconnectGraceMs: settings.arenaDisconnectGraceMs,

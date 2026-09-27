@@ -491,6 +491,7 @@ export class ArenaRunner {
             sessions: this.deps.sessionsQuery,
             contextTuning: this.deps.contextTuning,
             toolTuning: this.deps.toolTuning,
+            harnessMaxRetries: this.deps.harnessMaxRetries,
             maxDelegationDepth: this.deps.maxDelegationDepth,
             askUser: interactive
               ? (questions, askSignal) => this.awaitUserAnswers(agentId, questions, askSignal)
