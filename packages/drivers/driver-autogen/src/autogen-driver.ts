@@ -308,6 +308,11 @@ export class AutogenDriver implements AgentDriver {
               else yield item;
             }
           }
+          // Termination stays reachable after the reviewer budget is spent: no
+          // critique or verdict can arrive any more, so a fresh coder answer (one
+          // with no pending tool result) is the chat's final word. Without this a
+          // run with max_steps = -1 (unlimited) could never end on its own.
+          if (coderAnswerFresh && reviewerRoundsLeft <= 0) break;
         }
       }
 
@@ -327,6 +332,10 @@ export class AutogenDriver implements AgentDriver {
         timestamp: context.clock.now(),
       });
     } catch (error) {
+      // Cancellation is not a column failure: the abort error leaves untouched,
+      // exactly like every other backend's abort path (agent-execution owns the
+      // cancelled terminal).
+      if ((error as Error)?.name === "AbortError") throw error;
       // Server-side detail log; the client-facing event stays sanitized.
       console.error(`[autogen-driver] column "${label}" failed:`, error);
       yield arenaErrorEvent({

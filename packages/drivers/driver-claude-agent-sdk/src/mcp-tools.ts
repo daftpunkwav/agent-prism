@@ -75,6 +75,9 @@ export async function callArenaTool(
     options.onOutcome?.(definition.name, outcome);
     return textResult(outcome.result);
   } catch (error) {
+    // Cancellation is not a tool failure: the abort error propagates so the column
+    // tears down, exactly like the other backends' tool paths.
+    if ((error as Error)?.name === "AbortError") throw error;
     return textResult(`Error: tool ${definition.name} failed: ${sanitizeErrorMessage(error)}`, true);
   }
 }

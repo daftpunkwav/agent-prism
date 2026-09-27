@@ -22,6 +22,7 @@ import type {
 import {
   OBSERVATION_MAX_CHARS,
   PIPELINE_BANNER_PREFIX,
+  arenaErrorEvent,
   completeEvent,
   sanitizeErrorMessage,
   tokenUpdateEvent,
@@ -36,7 +37,7 @@ import {
   type AgentExecutionContext,
 } from "@agentprism/harness";
 import { buildMetrics } from "@agentprism/telemetry";
-import { emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, parseScoreVerdict, stepBudgetFor, totWidth } from "@agentprism/driver-run-support";
+import { collectPriorToolNames, emitToolOutcomeEvents, eventOf, formatCapabilityPluginIds, normalizeActionArgs, canonicalToolName, parseScoreVerdict, stepBudgetFor, totWidth } from "@agentprism/driver-run-support";
 import {
   COT_PLAN_SUFFIX,
   DIRECT_PLAN_SUFFIX,
@@ -166,17 +167,13 @@ async function* executeBatch(
   context: AgentExecutionContext,
   question: string,
   response: LlmAssistantMessage,
+  prior: readonly string[],
   messages: LlmMessage[],
   stats: { step: number; turns: number; toolCalls: number },
 ): AsyncGenerator<ArenaEvent> {
   const { config, workspace } = context;
   const label = config.label;
   const workspaceName = workspace.name;
-  const prior: string[] = [];
-  for (const message of messages) {
-    if (message.role !== "assistant" || message.toolCalls === undefined) continue;
-    for (const call of message.toolCalls) prior.push(call.name);
-  }
   for (const rawCall of response.toolCalls ?? []) {
     const call = { ...rawCall, name: canonicalToolName(context.tools.names, rawCall.name) };
     if (!context.tools.names.has(call.name)) {
@@ -221,11 +218,52 @@ export class PlanExecuteDriver implements AgentDriver {
   readonly displayName = "Plan-Execute";
 
   async *run(context: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
-    const { config, question, history, tracker, workspace } = context;
+    const { config, tracker, workspace } = context;
     const label = config.label;
     const workspaceName = workspace.name;
     const started = context.clock.now();
     const stats = { step: 0, turns: 0, toolCalls: 0 };
+
+    try {
+      yield* this.runLoop(context, { label, workspaceName, started, stats });
+    } catch (error) {
+      // Server-side detail log; the client-facing event stays sanitized. Converging
+      // here (instead of letting the throw escape) keeps the harness retry loop alive:
+      // verification/loop.ts only retries after seeing error + complete(false).
+      console.error(`[plan-execute-driver] column "${label}" failed:`, error);
+      yield arenaErrorEvent({
+        pipeline: label,
+        workspace: workspaceName,
+        message: sanitizeErrorMessage(error),
+        turn: context.turn,
+        timestamp: context.clock.now(),
+        agentId: context.identity.agentId,
+      });
+      yield completeEvent({
+        pipeline: label,
+        workspace: workspaceName,
+        metrics: buildMetrics(tracker, {
+          success: false,
+          durationMs: context.clock.now() - started,
+          toolCalls: stats.toolCalls,
+          steps: stats.turns,
+        }),
+        token_stats: tracker.asDict(),
+        turn: context.turn,
+        runId: context.identity.runId,
+        agentId: context.identity.agentId,
+        timestamp: context.clock.now(),
+      });
+    }
+  }
+
+  /** The planner + executor body; any throw propagates to `run`'s catch above. */
+  private async *runLoop(
+    context: AgentExecutionContext,
+    progress: { label: string; workspaceName: string; started: number; stats: { step: number; turns: number; toolCalls: number } },
+  ): AsyncGenerator<ArenaEvent> {
+    const { config, question, history, tracker, workspace } = context;
+    const { label, workspaceName, started, stats } = progress;
     const retrieveSnippets = createColumnSnippetRetriever(context.rag, workspace);
     const { system, user } = buildSystemUser(context);
     tracker.seedPrompt(system, user);
@@ -272,6 +310,9 @@ export class PlanExecuteDriver implements AgentDriver {
         else yield item;
       }
       if (response === null) break;
+      // Collect the drift-guard history BEFORE pushing this response: the guard must
+      // not see the current batch's own tool names as prior history (see tool-batch.ts).
+      const priorToolNames = collectPriorToolNames(messages);
       messages.push(response);
       const hadTools = (response.toolCalls ?? []).length > 0;
       if (!hadTools) {
@@ -306,7 +347,7 @@ export class PlanExecuteDriver implements AgentDriver {
         continue;
       }
       state.quietTurns = 0;
-      yield* executeBatch(context, question, response, messages, stats);
+      yield* executeBatch(context, question, response, priorToolNames, messages, stats);
     }
 
     yield completeEvent({

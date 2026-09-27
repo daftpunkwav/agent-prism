@@ -11,7 +11,7 @@
  * parameters every other column binds.
  */
 
-import type { ToolExecutionResult } from "@agentprism/contracts";
+import { sanitizeErrorMessage, type ToolExecutionResult } from "@agentprism/contracts";
 import { normalizeToolCallArgs } from "@agentprism/driver-run-support";
 import { blockedToolMessageContent, injectToolResultReminder, type ToolAccess } from "@agentprism/harness";
 import { tool as agentTool } from "@openai/agents";
@@ -75,9 +75,18 @@ export function bindRegistryToolsForAgents(tools: ToolAccess, options: AgentTool
         );
         if (blocked !== null) return blocked;
         priorToolNames.push(definition.name);
-        const outcome = await tools.execute(definition.name, normalizeToolCallArgs(definition, args), {
-          signal: options.signal,
-        });
+        let outcome: ToolExecutionResult;
+        try {
+          outcome = await tools.execute(definition.name, normalizeToolCallArgs(definition, args), {
+            signal: options.signal,
+          });
+        } catch (error) {
+          // tool-registry's contract leaves handler failures to the driver, which
+          // converges them: abort rethrows, anything else becomes error text the
+          // model can recover from (same shape as the other columns).
+          if ((error as Error)?.name === "AbortError") throw error;
+          return `Error: tool ${definition.name} failed: ${sanitizeErrorMessage(error)}`;
+        }
         options.onOutcome?.(definition.name, outcome);
         return injectToolResultReminder(outcome.result, options.question);
       },

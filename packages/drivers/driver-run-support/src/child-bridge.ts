@@ -154,7 +154,9 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
         if (typeof message !== "object" || message === null || typeof message.type !== "string") {
           continue;
         }
-        void handleMessage(message);
+        // The handler is async (it awaits tool executes); an unawaited rejection
+        // here would surface as an unhandled rejection and take the process down.
+        void handleMessage(message).catch(() => {});
       }
     });
 
@@ -164,7 +166,15 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
       stderrTail = `${stderrTail}${chunk}`.slice(-2000);
     });
 
+    // The abort escape hatch's force-kill timer; cleared on the exit paths below so
+    // a completed session does not leave a pending handle behind.
+    let forceKillTimer: ReturnType<typeof setTimeout> | null = null;
+
     child.on("close", () => {
+      if (forceKillTimer !== null) {
+        clearTimeout(forceKillTimer);
+        forceKillTimer = null;
+      }
       if (finalAnswer !== null) {
         finish({ ok: true, answer: finalAnswer });
         return;
@@ -180,6 +190,10 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
     // take the server down. Record it as the failure — 'close' settles the
     // session on Node >= 20, and `settled` guards against a late duplicate.
     child.on("error", (error: Error) => {
+      if (forceKillTimer !== null) {
+        clearTimeout(forceKillTimer);
+        forceKillTimer = null;
+      }
       errorMessage = `failed to run bootstrap: ${error.message}`;
       finish({ ok: false, message: errorMessage });
     });
@@ -190,8 +204,8 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
         errorMessage = options.signal?.reason instanceof Error ? options.signal.reason.message : "aborted";
         child.kill();
         // Force-kill fallback; on Windows kill() is already terminal so this is a no-op there.
-        const timer = setTimeout(() => child.kill("SIGKILL"), 3000);
-        timer.unref?.();
+        forceKillTimer = setTimeout(() => child.kill("SIGKILL"), 3000);
+        forceKillTimer.unref?.();
       },
       { once: true },
     );

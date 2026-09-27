@@ -36,7 +36,6 @@ describe("bindRegistryTools schema derivation", () => {
     const registry = createBuiltinToolRegistry();
     const bound = bindRegistryTools({
       registry,
-      names: new Set(registry.listDefinitions().map((definition) => definition.name)),
       execute: async () => ({ result: "", fileDiff: null, ok: true }),
     });
     expect(bound.length).toBeGreaterThan(0);
@@ -59,7 +58,6 @@ describe("bindRegistryTools schema derivation", () => {
     let seen: Record<string, unknown> | null = null;
     const bound = bindRegistryTools({
       registry,
-      names: new Set(["ask_user"]),
       execute: async (_name, args) => {
         seen = { args };
         return { result: "ok", fileDiff: null, ok: true };
@@ -79,7 +77,6 @@ describe("bindRegistryTools schema derivation", () => {
     let seen: Record<string, unknown> | null = null;
     const bound = bindRegistryTools({
       registry,
-      names: new Set(["ask_user"]),
       execute: async (_name, args) => {
         seen = { args };
         return { result: "ok", fileDiff: null, ok: true };

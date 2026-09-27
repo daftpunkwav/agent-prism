@@ -47,6 +47,7 @@ import { bootstrapScriptPath, runCrewaiFrameworkBridge } from "./crewai-bridge.j
 import {
   MANAGER_INSTRUCTION,
   SEQUENTIAL_TASKS,
+  CREW_ROLES,
   crewProcess,
   parseManagerAssignment,
   roleByKey,
@@ -325,9 +326,13 @@ export class CrewAIDriver implements AgentDriver {
         }
       } else {
         // Hierarchical: the manager delegates one member per round; CREW_COMPLETE
-        // or the step budget ends the crew, then the reviewer wraps up.
+        // or the step budget ends the crew, then the reviewer wraps up. The round
+        // cap mirrors the sequential branch's bound (members × per-task turns), so
+        // an unlimited step budget still cannot loop forever on a manager that
+        // never declares completion.
+        const managerRoundCap = CREW_ROLES.length * taskTurnCap;
         let lastRole: CrewRole["key"] = "researcher";
-        while (stats.turns < maxSteps) {
+        for (let round = 0; round < managerRoundCap && stats.turns < maxSteps; round += 1) {
           const managerReply = yield* runManagerCall(context, messages, stats, retrieveSnippets);
           const assignment = parseManagerAssignment(managerReply);
           if (assignment === null) {
@@ -375,6 +380,10 @@ export class CrewAIDriver implements AgentDriver {
         timestamp: context.clock.now(),
       });
     } catch (error) {
+      // Cancellation is not a column failure: the abort error leaves untouched,
+      // exactly like every other backend's abort path (agent-execution owns the
+      // cancelled terminal).
+      if ((error as Error)?.name === "AbortError") throw error;
       // Server-side detail log; the client-facing event stays sanitized.
       console.error(`[crewai-driver] column "${label}" failed:`, error);
       yield arenaErrorEvent({

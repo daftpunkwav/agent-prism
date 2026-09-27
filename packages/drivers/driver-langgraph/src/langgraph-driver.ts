@@ -250,6 +250,10 @@ export class LangGraphDriver implements AgentDriver {
 
       yield finishEvent(state, true);
     } catch (error) {
+      // Cancellation is not a column failure: the abort error leaves untouched,
+      // exactly like every other backend's abort path (agent-execution owns the
+      // cancelled terminal).
+      if ((error as Error)?.name === "AbortError") throw error;
       yield arenaErrorEvent({
         pipeline: label,
         workspace: state.workspaceName,

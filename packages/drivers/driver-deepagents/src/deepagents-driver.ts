@@ -48,6 +48,7 @@ import {
   contextPolicyMiddleware,
   requireChatModel,
   toLcMessages,
+  type BindableToolAccess,
 } from "@agentprism/driver-langchain";
 import type { ToolAccess } from "@agentprism/harness";
 import { FilesystemBackend, createDeepAgent, createFilesystemMiddleware } from "deepagents";
@@ -101,11 +102,10 @@ export function bindableDefinitions(tools: ToolAccess): ReturnType<ToolAccess["r
   return tools.registry.listDefinitions().filter((definition) => !reserved.has(definition.name));
 }
 
-/** ToolAccess narrowed to the bindable definitions, so binding never trips the collision check. */
-function bindableToolAccess(tools: ToolAccess): ToolAccess {
+/** Tool access narrowed to the bindable definitions, so binding never trips the collision check. */
+function bindableToolAccess(tools: ToolAccess): BindableToolAccess {
   return {
-    registry: { listDefinitions: () => bindableDefinitions(tools) } as ToolAccess["registry"],
-    names: tools.names,
+    registry: { listDefinitions: () => bindableDefinitions(tools) },
     execute: (name, args, options) => tools.execute(name, args, options),
   };
 }

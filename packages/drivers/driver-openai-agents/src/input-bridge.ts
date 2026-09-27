@@ -92,19 +92,22 @@ export function fromLlmMessages(messages: readonly LlmMessage[]): AgentInputItem
       items.push({ role: "user", content: message.content } as AgentInputItem);
       continue;
     }
+    // Responses-API turn order: the assistant message (its text) comes first, its
+    // function_call items follow. Emitting the calls first would describe a turn the
+    // provider reads in the inverse order.
+    if (message.content !== "" || (message.toolCalls ?? []).length === 0) {
+      // Assistant content is an output_text block list, not a bare string.
+      items.push({
+        role: "assistant",
+        content: [{ type: "output_text", text: message.content }],
+      } as AgentInputItem);
+    }
     for (const call of message.toolCalls ?? []) {
       items.push({
         type: "function_call",
         callId: call.id,
         name: call.name,
         arguments: JSON.stringify(call.args ?? {}),
-      } as AgentInputItem);
-    }
-    if (message.content !== "" || (message.toolCalls ?? []).length === 0) {
-      // Assistant content is an output_text block list, not a bare string.
-      items.push({
-        role: "assistant",
-        content: [{ type: "output_text", text: message.content }],
       } as AgentInputItem);
     }
   }

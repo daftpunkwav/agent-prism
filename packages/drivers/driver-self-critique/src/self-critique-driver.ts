@@ -25,6 +25,7 @@ import type {
 import {
   OBSERVATION_MAX_CHARS,
   PIPELINE_BANNER_PREFIX,
+  arenaErrorEvent,
   completeEvent,
   sanitizeErrorMessage,
   tokenUpdateEvent,
@@ -110,7 +111,8 @@ async function criticPass(
   try {
     const result = await context.llm.invoke(prepared, { signal: context.signal });
     // The header contract: every critic call lands in the token ledger like the
-    // streamed executor turns (it consumes a step slot and real tokens).
+    // streamed executor turns (it spends real tokens; steps stay executor-only,
+    // matching the platform rule that critic passes do not consume the step budget).
     recordAdapterUsage(result.usage, context.tracker);
     return parseCriticVerdict(result.text);
   } catch (error) {
@@ -125,11 +127,52 @@ export class SelfCritiqueDriver implements AgentDriver {
   readonly displayName = "Self-Critique";
 
   async *run(context: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
-    const { config, question, history, tracker, workspace } = context;
+    const { config, tracker, workspace } = context;
     const label = config.label;
     const workspaceName = workspace.name;
     const started = context.clock.now();
     const stats = { step: 0, turns: 0, toolCalls: 0 };
+
+    try {
+      yield* this.runLoop(context, { label, workspaceName, started, stats });
+    } catch (error) {
+      // Server-side detail log; the client-facing event stays sanitized. Converging
+      // here (instead of letting the throw escape) keeps the harness retry loop alive:
+      // verification/loop.ts only retries after seeing error + complete(false).
+      console.error(`[self-critique-driver] column "${label}" failed:`, error);
+      yield arenaErrorEvent({
+        pipeline: label,
+        workspace: workspaceName,
+        message: sanitizeErrorMessage(error),
+        turn: context.turn,
+        timestamp: context.clock.now(),
+        agentId: context.identity.agentId,
+      });
+      yield completeEvent({
+        pipeline: label,
+        workspace: workspaceName,
+        metrics: buildMetrics(tracker, {
+          success: false,
+          durationMs: context.clock.now() - started,
+          toolCalls: stats.toolCalls,
+          steps: stats.turns,
+        }),
+        token_stats: tracker.asDict(),
+        turn: context.turn,
+        runId: context.identity.runId,
+        agentId: context.identity.agentId,
+        timestamp: context.clock.now(),
+      });
+    }
+  }
+
+  /** The executor + critic body; any throw propagates to `run`'s catch above. */
+  private async *runLoop(
+    context: AgentExecutionContext,
+    progress: { label: string; workspaceName: string; started: number; stats: { step: number; turns: number; toolCalls: number } },
+  ): AsyncGenerator<ArenaEvent> {
+    const { config, question, history, tracker, workspace } = context;
+    const { label, workspaceName, started, stats } = progress;
     const retrieveSnippets = createColumnSnippetRetriever(context.rag, workspace);
     const definitions = context.tools.registry.listDefinitions();
     const { system, user } = buildSystemUser(context);

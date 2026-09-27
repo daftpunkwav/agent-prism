@@ -93,7 +93,9 @@ export class MapToolRegistry implements ToolRegistry {
         ok: false,
         code: "unauthorized_tool",
       };
-      options.afterExecute?.(name, args, outcome);
+      // Canonical name, like every other afterExecute call: consumers (RAG
+      // invalidation) key on the registry name, not on the model's spelling.
+      options.afterExecute?.(canonical, args, outcome);
       return outcome;
     }
 
