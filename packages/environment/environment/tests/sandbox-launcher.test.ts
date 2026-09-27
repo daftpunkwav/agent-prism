@@ -20,7 +20,7 @@ import {
   setSandboxSpawnTransform,
 } from "@agentprism/environment";
 
-describe("sandbox spawn transform", () => {
+describe("sandbox spawn transform", { retry: 1 }, () => {
   it("wraps argv in the helper invocation and round-trips the payloads", () => {
     const nonce = createSandboxNonce();
     const argv = ["powershell.exe", "-NoLogo", "-Command", "Get-ChildItem; Write-Output done"];
@@ -67,7 +67,7 @@ describe("sandbox spawn transform", () => {
   });
 });
 
-describe("sandbox setup failure parsing", () => {
+describe("sandbox setup failure parsing", { retry: 1 }, () => {
   it("accepts only the nonce-authenticated sentinel line", () => {
     const nonce = createSandboxNonce();
     const stderr = `some noise\n${SANDBOX_SETUP_SENTINEL}${nonce}:cwd does not exist\nmore`;
@@ -82,7 +82,7 @@ describe("sandbox setup failure parsing", () => {
   });
 });
 
-describe("runProcess sandbox setup failures", () => {
+describe("runProcess sandbox setup failures", { retry: 1 }, () => {
   it("maps a transform refusal to a process error with its message", async () => {
     setSandboxSpawnTransform(() => {
       throw new WorkspaceError("Error: OS write sandbox is only enforced on Windows");

@@ -71,13 +71,32 @@ export class ChunkIndex {
       });
     }
     while (this.chunks.length > INDEX_TOTAL_CAP) this.chunks.shift();
-    this.scorer = new Bm25(this.chunks.map((chunk) => ({ id: chunk.id, text: chunk.content })));
+    this.rebuildScorer();
+  }
+
+  /**
+   * Drops every chunk of one path and reindexes. Callers that re-read a file must
+   * use this before `add`, or the superseded chunks keep scoring (and keep holding
+   * their share of INDEX_TOTAL_CAP).
+   */
+  remove(path: string): boolean {
+    const before = this.chunks.length;
+    for (let i = this.chunks.length - 1; i >= 0; i -= 1) {
+      if (this.chunks[i]?.path === path) this.chunks.splice(i, 1);
+    }
+    if (this.chunks.length === before) return false;
+    this.rebuildScorer();
+    return true;
   }
 
   /** Drops all chunks and the scorer. */
   clear(): void {
     this.chunks.length = 0;
     this.scorer = null;
+  }
+
+  private rebuildScorer(): void {
+    this.scorer = this.chunks.length === 0 ? null : new Bm25(this.chunks.map((chunk) => ({ id: chunk.id, text: chunk.content })));
   }
 
   private recencyMultiplier(ageRank: number): number {

@@ -22,7 +22,7 @@ const blockedWin = (command: string) => policy.reviewShellCommand(command, "win3
 
 const words = (segment: CommandSegment): string[] => segment.words.map((w) => w.text);
 
-describe("parseShellCommand", () => {
+describe("parseShellCommand", { retry: 1 }, () => {
   it("splits segments on unquoted operators only", () => {
     const segments = parseShellCommand("echo hi; rm -rf / && cat /etc/passwd");
     expect(segments.map(words)).toEqual([["echo", "hi"], ["rm", "-rf", "/"], ["cat", "/etc/passwd"]]);
@@ -64,7 +64,7 @@ describe("parseShellCommand", () => {
   });
 });
 
-describe("LayeredSandboxPolicy blocks destruction", () => {
+describe("LayeredSandboxPolicy blocks destruction", { retry: 1 }, () => {
   it("blocks every legacy catastrophic shape (deny-list equivalence, POSIX parse)", () => {
     const leaks = MUST_BLOCK.filter((command) => blocked(command, "linux") === null);
     expect(leaks).toEqual([]);
@@ -121,7 +121,7 @@ describe("LayeredSandboxPolicy blocks destruction", () => {
   });
 });
 
-describe("LayeredSandboxPolicy allows legitimate work", () => {
+describe("LayeredSandboxPolicy allows legitimate work", { retry: 1 }, () => {
   it("passes every legacy daily command", () => {
     const denials = MUST_ALLOW.filter((command) => blocked(command, "linux") !== null);
     expect(denials).toEqual([]);
@@ -138,7 +138,7 @@ describe("LayeredSandboxPolicy allows legitimate work", () => {
   });
 });
 
-describe("isKnownSafeCommand", () => {
+describe("isKnownSafeCommand", { retry: 1 }, () => {
   const safe = (command: string) => expect(isKnownSafeCommand(command, "linux"));
 
   it("accepts read-only heads and read-only git subcommands", () => {

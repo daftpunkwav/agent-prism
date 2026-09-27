@@ -14,6 +14,7 @@
 
 import { EffectivenessLog, UsageLedger, renderEffectivenessReport, renderUsageReport, type StrategyId, type StrategyObservation, type TurnUsage } from "@agentprism/context-analytics";
 import type { LlmMessage } from "@agentprism/contracts";
+import { estimateMessageTokens, messageText } from "./message-text.js";
 
 /** Analytics carriers for one run (both append-only, both optional to wire). */
 export interface ContextAnalytics {
@@ -36,17 +37,20 @@ function sourceOf(message: LlmMessage): "system" | "tools" | "history" {
 /**
  * Records one turn's per-source char-proxy token estimates over the prepared
  * messages (post-trim composition is what the model will actually receive).
+ * `charsPerToken` is the run's divisor, so these numbers stay comparable with the
+ * budget arithmetic that produced the composition.
  */
-export function recordPreparedUsage(analytics: ContextAnalytics, messages: readonly LlmMessage[]): void {
+export function recordPreparedUsage(
+  analytics: ContextAnalytics,
+  messages: readonly LlmMessage[],
+  charsPerToken?: number,
+): void {
   const tokens: TurnUsage["tokens"] = { system: 0, tools: 0, history: 0 };
   for (const message of messages) {
-    tokens[sourceOf(message)] = (tokens[sourceOf(message)] ?? 0) + Math.ceil(messageTextLength(message) / 4);
+    const source = sourceOf(message);
+    tokens[source] = (tokens[source] ?? 0) + estimateMessageTokens(message, charsPerToken);
   }
   analytics.usage.record({ turn: analytics.usage.size + 1, tokens });
-}
-
-function messageTextLength(message: LlmMessage): number {
-  return message.content.length;
 }
 
 /**
@@ -72,8 +76,8 @@ export function observeStrategy(
   output: readonly LlmMessage[],
   ledgerEmitted: boolean,
 ): void {
-  const inputChars = input.reduce((sum, m) => sum + messageTextLength(m), 0);
-  const outputChars = output.reduce((sum, m) => sum + messageTextLength(m), 0);
+  const inputChars = input.reduce((sum, m) => sum + messageText(m).length, 0);
+  const outputChars = output.reduce((sum, m) => sum + messageText(m).length, 0);
   const inputToolResults = input.filter((m) => m.role === "tool").length;
   const outputToolResults = output.filter((m) => m.role === "tool").length;
   const observation: StrategyObservation = {

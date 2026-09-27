@@ -46,7 +46,7 @@ function liveInterpreter(): string | null {
 
 const interpreter = liveInterpreter();
 
-describe("bootstrapScriptPath", () => {
+describe("bootstrapScriptPath", { retry: 1 }, () => {
   it("resolves to the package's bundled bootstrap that really exists", () => {
     const script = bootstrapScriptPath(import.meta.url);
     expect(existsSync(script)).toBe(true);
@@ -54,7 +54,7 @@ describe("bootstrapScriptPath", () => {
   });
 });
 
-describe.skipIf(interpreter === null)("runCrewaiFrameworkBridge against the real framework", () => {
+describe.skipIf(interpreter === null)("runCrewaiFrameworkBridge against the real framework", { retry: 1 }, () => {
   const cleanups: Array<() => void> = [];
   afterEach(() => {
     for (const cleanup of cleanups.splice(0)) cleanup();

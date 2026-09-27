@@ -91,29 +91,33 @@ function extractSignals(events: readonly ArenaEvent[]): ExtractedSignals {
   // Detect consecutive or high-frequency identical actions (tool + args).
   // The signature pairs tool and args; args text is stored alongside so
   // evidence never depends on re-splitting (tool names may contain colons).
-  const actionSignatureCounts = new Map<string, { tool: string; argsStr: string; count: number }>();
+  const actionSignatureCounts = new Map<
+    string,
+    { tool: string; argsStr: string; count: number; longestRun: number }
+  >();
   let lastSignature = "";
-  let consecutiveRepeats = 0;
+  let currentRun = 0;
 
   for (const action of actions) {
     const argsStr = JSON.stringify(action.args ?? {});
     const sig = `${action.tool}:${argsStr}`;
+    // Consecutive counts belong to the signature that repeated, not to the run: a
+    // single run-global counter marked every signature as repeated.
+    currentRun = sig === lastSignature ? currentRun + 1 : 1;
     const existing = actionSignatureCounts.get(sig);
     if (existing) {
       existing.count += 1;
+      existing.longestRun = Math.max(existing.longestRun, currentRun);
     } else {
-      actionSignatureCounts.set(sig, { tool: action.tool, argsStr, count: 1 });
-    }
-
-    if (sig === lastSignature) {
-      consecutiveRepeats += 1;
+      actionSignatureCounts.set(sig, { tool: action.tool, argsStr, count: 1, longestRun: 1 });
     }
     lastSignature = sig;
   }
 
   const repeatedActions: Array<{ tool: string; argsStr: string; count: number }> = [];
   for (const data of actionSignatureCounts.values()) {
-    if (data.count >= 3 || consecutiveRepeats > 0) {
+    // Frequent (3+) or immediately repeated (2 in a row) identical calls.
+    if (data.count >= 3 || data.longestRun >= 2) {
       repeatedActions.push({ tool: data.tool, argsStr: data.argsStr, count: data.count });
     }
   }

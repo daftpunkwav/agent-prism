@@ -51,4 +51,16 @@ describe("ChunkIndex", () => {
     expect(index.size).toBe(0);
     expect(index.query("hello")).toEqual([]);
   });
+
+  it("drops one path's chunks so a re-index cannot keep stale text", () => {
+    const index = new ChunkIndex();
+    index.add([
+      { path: "a.md", content: "retired wording about spiders", ageRank: 0 },
+      { path: "b.md", content: "current wording about spiders", ageRank: 0 },
+    ]);
+    expect(index.remove("a.md")).toBe(true);
+    expect(index.remove("a.md")).toBe(false);
+    expect(index.size).toBe(1);
+    expect(index.query("spiders").map((h) => h.path)).toEqual(["b.md"]);
+  });
 });

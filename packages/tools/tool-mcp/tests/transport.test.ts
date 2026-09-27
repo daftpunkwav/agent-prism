@@ -39,7 +39,7 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-describe("NodeMcpTransport", () => {
+describe("NodeMcpTransport", { retry: 1 }, () => {
   it("round-trips newline-framed JSON with a real child, multi-byte safe", async () => {
     const transport = new NodeMcpTransport();
     const child = transport.spawn(process.execPath, ["-e", SERVER_SCRIPT]);

@@ -10,11 +10,14 @@
  *   (constant/schema/enum). Only callable exports are gated: a constant or a
  *   schema declaration carries no behavior of its own.
  * - "Referenced" means imported by a file under a `tests/` directory, including
- *   support modules such as `mock-deps.ts` and `*fixtures.ts`.
+ *   support modules such as `mock-deps.ts` and `*fixtures.ts`. References are
+ *   attributed to the package they resolve to, so two packages that export the
+ *   same name can no longer satisfy each other's requirement.
  *
- * PENDING: entries below have no test yet. The list must only ever shrink; delete
- * a line when its symbol gains a test. Adding a symbol here to silence the gate is
- * the one thing this script exists to prevent.
+ * PENDING: entries below have no test yet, grouped by the package that exports
+ * them. The list must only ever shrink; delete a line when its symbol gains a
+ * test. Adding a symbol here to silence the gate is the one thing this script
+ * exists to prevent.
  */
 
 import fs from "node:fs";
@@ -22,45 +25,44 @@ import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
-const PENDING = [
-  // packages/contracts/contracts
-  "JudgeRequestSchema", "LlmEndpointUpdateSchema",
-  "bannerPrefixForFramework", "countActionEvents", "fillWorkspaceNames",
-  "isAssistantMessage", "isToolMessage", "isUnlimitedSteps",
-  "staticDefaultRuntimeKnobs", "systemErrorEvent", "systemReportEvent",
-  "tokenUpdateEvent",
-  // packages/harness/harness
-  "MapPromptSectionRegistry", "applyCheckpointCompaction",
-  "createBuiltinPromptSectionRegistry", "estimateMessageTokens", "extractOriginalQuestion",
-  "getBuiltinPromptSectionRegistry", "injectToolResultReminder",
-  "reinforceSystemWithQuestion", "withToolGrounding",
-  // packages/arena/arena-dimensions
-  "coerceFieldValue", "isFloatField", "isUnlimitedToken", "normalizeOptionToken",
-  "snapIntToOptions", "snapToOptions",
-  // packages/client/client
-  "exportSession", "getSessionStats", "isAbortError", "responseDetail",
-  // packages/tools/tool-builtins
-  "parseSkillFile", "setWebSearchEnvReader", "utf8Bytes",
-  // packages/drivers/driver-autogen
-  "isTerminationMessage", "parseSpeakerSelection", "speakerSelectionPrompt",
-  // packages/providers/provider-langchain
-  "createColumnRuntime", "llmMessagesToLc", "serializeWireResponse",
-  // packages/tools/tool-mcp
-  "buildMcpChildEnv",
-  // two-symbol packages
-  "eventTurn", "phaseCategoryOfTool",
-  "buildCorsOriginList", "toLlmEnvSeed",
-  "renderMentionBlock", "resolveMention",
-  "REASONING_OPTIONS", "currentEndpointLabel",
-  "roleByKey", "roleInstruction",
-  "formatCapabilityPluginIds", "selfConsistencyOutcomeEvents",
-  "ProviderLookupAdapter", "defaultEnvLookup",
-  "readRawBodyText", "settingsOf",
-  // single-symbol packages
-  "firstIssueMessage", "frameTokens", "replanBudgetFor",
-  "criticBudgetFor", "episodicSearchText", "semanticSearchText", "Workspace",
-  "shellCommandFromArgs", "SessionMigrationError",
-];
+const PENDING = {
+  "@agentprism/application": ["firstIssueMessage"],
+  "@agentprism/arena-dimensions": [
+    "coerceFieldValue", "isFloatField", "isUnlimitedToken", "normalizeOptionToken",
+    "snapIntToOptions", "snapToOptions",
+  ],
+  "@agentprism/arena-view": ["eventTurn", "phaseCategoryOfTool"],
+  "@agentprism/client": ["exportSession", "getSessionStats", "isAbortError", "responseDetail"],
+  "@agentprism/config": ["buildCorsOriginList", "toLlmEnvSeed"],
+  "@agentprism/context-compaction": ["frameTokens"],
+  "@agentprism/context-mentions": ["renderMentionBlock", "resolveMention"],
+  "@agentprism/contracts": [
+    "JudgeRequestSchema", "bannerPrefixForFramework", "countActionEvents", "fillWorkspaceNames",
+    "isAssistantMessage", "isToolMessage", "isUnlimitedSteps", "staticDefaultRuntimeKnobs",
+    "systemErrorEvent", "systemReportEvent", "tokenUpdateEvent",
+  ],
+  "@agentprism/dimensions": ["REASONING_OPTIONS", "currentEndpointLabel"],
+  "@agentprism/driver-autogen": ["isTerminationMessage", "parseSpeakerSelection"],
+  "@agentprism/driver-crewai": ["roleByKey", "roleInstruction"],
+  "@agentprism/driver-plan-execute": ["replanBudgetFor"],
+  "@agentprism/driver-run-support": ["formatCapabilityPluginIds", "selfConsistencyOutcomeEvents"],
+  "@agentprism/driver-self-critique": ["criticBudgetFor"],
+  "@agentprism/harness": [
+    "MapPromptSectionRegistry", "applyCheckpointCompaction", "createBuiltinPromptSectionRegistry",
+    "estimateMessageTokens", "extractOriginalQuestion", "getBuiltinPromptSectionRegistry",
+    "injectToolResultReminder", "reinforceSystemWithQuestion", "withToolGrounding",
+  ],
+  "@agentprism/http-runtime": ["readRawBodyText", "settingsOf"],
+  "@agentprism/memory-episodic": ["episodicSearchText"],
+  "@agentprism/memory-semantic": ["semanticSearchText"],
+  "@agentprism/provider-catalog": ["ProviderLookupAdapter", "defaultEnvLookup"],
+  "@agentprism/provider-langchain": ["createColumnRuntime", "llmMessagesToLc", "serializeWireResponse"],
+  "@agentprism/runtime": ["Workspace"],
+  "@agentprism/sandbox": ["shellCommandFromArgs"],
+  "@agentprism/session-format": ["SessionMigrationError"],
+  "@agentprism/tool-builtins": ["parseSkillFile", "setWebSearchEnvReader", "utf8Bytes"],
+  "@agentprism/tool-mcp": ["buildMcpChildEnv"],
+};
 
 function collectDecls(src, values) {
   for (const m of src.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)) values.set(m[1], "callable");
@@ -132,27 +134,46 @@ function walkHarnessFiles(dir, out) {
   return out;
 }
 
-function importedNames(src) {
-  const names = new Set();
-  const importRe = /import\s+(?:type\s+)?(?:([\w$]+)\s*,?\s*)?(?:\{([^}]*)\})?\s*from\s*["'][^"']+["']/g;
-  for (const m of src.matchAll(importRe)) {
-    if (m[1]) names.add(m[1]);
-    if (m[2]) {
-      for (const raw of m[2].split(",")) {
-        const parts = raw.trim().split(/\s+as\s+/);
-        const local = (parts[1] ?? parts[0] ?? "").trim();
-        if (local !== "") names.add(local);
-      }
-    }
-  }
-  for (const m of src.matchAll(/\{\s*([^}]*)\s*\}\s*=\s*await\s+import\(/g)) {
-    for (const raw of m[1].split(",")) {
-      const parts = raw.trim().split(":");
-      const local = (parts[1] ?? parts[0] ?? "").trim();
-      if (local !== "") names.add(local);
-    }
+const IMPORT_RE = /import\s+(?:type\s+)?(?:([\w$]+)\s*,?\s*)?(?:\{([^}]*)\})?\s*from\s*["']([^"']+)["']/g;
+
+function namesOf(clause) {
+  const names = [];
+  if (clause === undefined) return names;
+  for (const raw of clause.split(",")) {
+    const local = raw.trim().split(/\s+as\s+/).pop() ?? "";
+    if (local !== "") names.push(local);
   }
   return names;
+}
+
+/** Imported names grouped by the module specifier that provides them. */
+function importedModules(src) {
+  const out = [];
+  for (const m of src.matchAll(IMPORT_RE)) {
+    const names = [...namesOf(m[1]), ...namesOf(m[2])];
+    if (names.length > 0) out.push({ spec: m[3], names });
+  }
+  for (const m of src.matchAll(/\{\s*([^}]*)\s*\}\s*=\s*await\s+import\(\s*["']([^"']+)["']\s*\)/g)) {
+    const names = namesOf(m[1].replaceAll(":", ", "));
+    if (names.length > 0) out.push({ spec: m[2], names });
+  }
+  return out;
+}
+
+/**
+ * Package a specifier resolves to, or null when it leaves the workspace. Dynamic
+ * and relative imports are attributed like static ones, so a package cannot
+ * satisfy a requirement through an import the reader did not expect.
+ */
+function ownerPackage(fromFile, spec, byName, pkgs) {
+  if (spec.startsWith("@agentprism/")) {
+    const name = spec.split("/").slice(0, 2).join("/");
+    return byName.has(name) ? name : null;
+  }
+  if (!spec.startsWith(".")) return null;
+  const resolved = resolveSpec(fromFile, spec);
+  const hit = pkgs.find((pkg) => resolved.startsWith(pkg.dir + path.sep) || resolved === pkg.dir);
+  return hit ? hit.name : null;
 }
 
 const pkgs = listPackages();
@@ -165,10 +186,21 @@ const harnessRoots = [
 const harnessFiles = [];
 for (const root of harnessRoots) if (fs.existsSync(root)) walkHarnessFiles(root, harnessFiles);
 
-const referenced = new Set();
-for (const file of harnessFiles) for (const n of importedNames(fs.readFileSync(file, "utf8"))) referenced.add(n);
+const byName = new Map(pkgs.map((pkg) => [pkg.name, pkg]));
+/** referenced.get(pkgName) = names harness files import from that package. */
+const referenced = new Map();
+for (const file of harnessFiles) {
+  for (const { spec, names } of importedModules(fs.readFileSync(file, "utf8"))) {
+    const owner = ownerPackage(file, spec, byName, pkgs);
+    if (owner === null) continue;
+    const bucket = referenced.get(owner) ?? new Set();
+    for (const name of names) bucket.add(name);
+    referenced.set(owner, bucket);
+  }
+}
 
-const pending = new Set(PENDING);
+const pending = new Set(Object.entries(PENDING).flatMap(([pkg, names]) => names.map((n) => `${pkg}:${n}`)));
+const isReferenced = (pkg, name) => referenced.get(pkg.name)?.has(name) === true;
 const failures = [];
 let callableTotal = 0;
 for (const pkg of pkgs) {
@@ -177,7 +209,7 @@ for (const pkg of pkgs) {
   for (const [name, kind] of exportsOf(barrel, new Set())) {
     if (kind !== "callable") continue;
     callableTotal += 1;
-    if (referenced.has(name) || pending.has(name)) continue;
+    if (isReferenced(pkg, name) || pending.has(`${pkg.name}:${name}`)) continue;
     failures.push(`${pkg.rel}: ${name}`);
   }
 }
@@ -186,10 +218,12 @@ for (const pkg of pkgs) {
 // has gained its test, so its line has to be deleted. Comparing against `failures`
 // cannot see that -- pending names are skipped before they can reach `failures` --
 // so match the referenced set instead.
-const stale = PENDING.filter((name) => referenced.has(name));
+const stale = Object.entries(PENDING).flatMap(([pkgName, names]) =>
+  names.filter((name) => referenced.get(pkgName)?.has(name) === true).map((name) => `${pkgName}: ${name}`),
+);
 
 console.log(`[check-export-tests] packages=${pkgs.length} harness files=${harnessFiles.length} callable exports=${callableTotal}`);
-console.log(`[check-export-tests] pending (no test yet)=${PENDING.length}`);
+console.log(`[check-export-tests] pending (no test yet)=${pending.size}`);
 
 if (failures.length > 0) {
   console.error(`\n[check-export-tests] ${failures.length} callable export(s) have no test and are not listed as pending:`);

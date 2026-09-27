@@ -31,7 +31,7 @@ function tempWorkspace() {
   };
 }
 
-describe("boundText", () => {
+describe("boundText", { retry: 1 }, () => {
   it("passes small results through exactly like truncate", () => {
     const ws = tempWorkspace();
     try {
@@ -104,7 +104,7 @@ describe("boundText", () => {
   });
 });
 
-describe("bash tool spill wiring", () => {
+describe("bash tool spill wiring", { retry: 1 }, () => {
   it("spills huge command output instead of losing the middle", async () => {
     const ws = tempWorkspace();
     try {

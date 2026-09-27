@@ -76,6 +76,11 @@ export function NumberInput({
   const [text, setText] = useState(String(value));
   const [editing, setEditing] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest external value, readable from the debounce closure: the closure captures
+  // the value of the render that scheduled it, so a parent update inside the debounce
+  // window would otherwise be compared against (and overwritten with) a stale value.
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
   // External value changes (reset, saved reload) win whenever the user is not
   // mid-edit; during editing the free text stays untouched.
@@ -96,9 +101,10 @@ export function NumberInput({
       clearTimeout(timer.current);
       timer.current = null;
     }
-    const { committed, revert } = parseCommitted(raw, value, min, max, integer);
+    const current = valueRef.current;
+    const { committed, revert } = parseCommitted(raw, current, min, max, integer);
     setText(String(committed));
-    if (!revert && committed !== value) onChange(committed);
+    if (!revert && committed !== current) onChange(committed);
   };
 
   const schedule = (raw: string) => {

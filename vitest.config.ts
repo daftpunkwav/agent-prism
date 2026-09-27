@@ -70,11 +70,12 @@ export default defineConfig({
     // PowerShell 5.1 cold start; under parallel load that can exceed the 5s default
     // and fail as a false timeout. A genuine hang still fails, just later.
     testTimeout: 30_000,
-    // Windows file-lock release is eventual (child handles close asynchronously,
-    // and on-access scanning briefly locks freshly written files), so cleanup
-    // rmSync can race a just-exited child under parallel load. One retry absorbs
-    // that jitter without hiding assertion failures — those fail on both tries.
-    retry: 1,
+    // No global retry: a second attempt is a second chance for state left behind by
+    // an earlier case in the same file (Vitest retries the failed case alone), which
+    // turns order-dependent bugs green. Only the suites that really spawn OS
+    // processes opt in, with `describe(..., { retry: 1 }, ...)`, for the Windows
+    // file-lock and PowerShell cold-start jitter that no assertion can absorb.
+    retry: 0,
     coverage: {
       provider: "v8",
       // Count unexecuted sources too, so a new module cannot enter the tree

@@ -19,7 +19,7 @@ import { runProcess, spawnBackground } from "@agentprism/environment";
 
 const WIN32_PS_ARGS = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
 
-describe.skipIf(process.platform !== "win32")("windows restricted-token sandbox (real OS)", () => {
+describe.skipIf(process.platform !== "win32")("windows restricted-token sandbox (real OS)", { retry: 1 }, () => {
   const root = mkdtempSync(path.join(tmpdir(), "ap-sbx-"));
   const outsideFile = path.join(tmpdir(), `ap-sbx-deny-${process.pid}.txt`);
 

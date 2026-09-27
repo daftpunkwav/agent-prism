@@ -47,7 +47,15 @@ import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
-/** @typedef {{ name: string; roots: string[]; forbid: RegExp; allow?: RegExp }} Rule */
+/**
+ * @typedef {{ name: string; roots: string[]; forbid: RegExp; allow?: RegExp }} Rule
+ *
+ * `forbid` is matched against a canonical `import x from "<specifier>"` line, so a
+ * rule sees every import syntax (static, re-export, and dynamic `import("...")`) and
+ * cannot be bypassed by changing the form. Allowlists written as a negative lookahead
+ * (`(?!a|b)`) are rewritten to require a path boundary, so an entry admits the named
+ * package and its subpaths only -- never `a-extra`.
+ */
 
 /** @type {Rule[]} */
 const RULES = [
@@ -228,7 +236,7 @@ const RULES = [
   {
     name: "http-runtime → only application/builder/config/contracts",
     roots: ["packages/transport/http-runtime/src"],
-    forbid: /from\s+["']@agentprism\/(?!application|builder|config|contracts)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!application|builder-service|config|contracts)[^"']+["']/,
   },
   {
     name: "route-* → only domain deps + http-runtime",
@@ -242,7 +250,7 @@ const RULES = [
       "packages/transport/route-workspace/src",
       "packages/transport/route-sessions/src",
     ],
-    forbid: /from\s+["']@agentprism\/(?!application|builder|config|contracts|http-runtime)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!application|builder-service|config|contracts|http-runtime)[^"']+["']/,
   },
   {
     name: "builder-service → orchestrates turns, no agent",
@@ -357,19 +365,48 @@ function expandRoot(root) {
   return dirs;
 }
 
+/**
+ * Every module specifier in a file: static imports, re-exports, bare imports, and
+ * dynamic `import("...")` calls.
+ */
+function moduleSpecifiers(text) {
+  const specs = [];
+  const re = /\bfrom\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)|\bimport\s*["']([^"']+)["']/g;
+  for (const m of text.matchAll(re)) specs.push(m[1] ?? m[2] ?? m[3]);
+  return specs;
+}
+
+/** A rule's allowlist as written: a negative lookahead over bare package names. */
+const ALLOWLIST_RE = /\(\?!([\w-]+(?:\|[\w-]+)*)\)/g;
+
+/** Rewrites `(?!a|b)` into `(?!a(?:[/"'])|b(?:[/"']))` so prefixes stop matching. */
+function withSegmentBoundaries(rule) {
+  const source = rule.forbid.source.replace(ALLOWLIST_RE, (_whole, alternatives) => {
+    const bounded = alternatives
+      .split("|")
+      .map((name) => `${name}(?:[/"'])`)
+      .join("|");
+    return `(?!${bounded})`;
+  });
+  return { ...rule, forbid: new RegExp(source) };
+}
+
+const COMPILED_RULES = RULES.map(withSegmentBoundaries);
+
 let failed = false;
-for (const rule of RULES) {
+for (const rule of COMPILED_RULES) {
   for (const root of rule.roots) {
     for (const dir of expandRoot(root)) {
       for (const file of walk(path.join(ROOT, dir))) {
         const text = fs.readFileSync(file, "utf8");
-        const lines = text.split(/\r?\n/);
-        lines.forEach((line, index) => {
-          if (rule.forbid.test(line)) {
+        for (const spec of moduleSpecifiers(text)) {
+          // Canonical static form: one rule syntax covers every import syntax.
+          const canonical = `import x from "${spec}"`;
+          if (rule.forbid.test(canonical)) {
             failed = true;
-            console.error(`[boundaries] ${rule.name}\n  ${path.relative(ROOT, file)}:${index + 1}: ${line.trim()}`);
+            console.error(`[boundaries] ${rule.name}\n  ${path.relative(ROOT, file)}: ${canonical}`);
           }
-        });
+        }
       }
     }
   }

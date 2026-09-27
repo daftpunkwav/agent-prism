@@ -93,7 +93,7 @@ export function applyContextPipeline(
     );
   }
   if (analytics !== undefined) {
-    recordPreparedUsage(analytics, shaped);
+    recordPreparedUsage(analytics, shaped, options.charsPerToken);
     // Every strategy is observed, not just the lossy budget ones: kept/dropped
     // volume grounds ablation rows. Ledger detection covers each applier's
     // marker ([Context summary] / [Budget ledger] / [Context checkpoint]).

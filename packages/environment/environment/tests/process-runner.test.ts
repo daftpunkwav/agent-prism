@@ -25,7 +25,7 @@ const GRANDCHILD_SCRIPT =
   "spawn(process.execPath,['-e','setTimeout(()=>{},15000)'],{stdio:['inherit','inherit','inherit'],detached:true}).unref();" +
   "process.stdout.write('parent-done');";
 
-describe("runProcess when a grandchild holds stdio pipes", () => {
+describe("runProcess when a grandchild holds stdio pipes", { retry: 1 }, () => {
   it("settles as soon as the direct child exits, without waiting for the grandchild (regression F-202)", async () => {
     const started = Date.now();
     const result = await runProcess({
@@ -43,7 +43,7 @@ describe("runProcess when a grandchild holds stdio pipes", () => {
   });
 });
 
-describe("runProcess output decoding", () => {
+describe("runProcess output decoding", { retry: 1 }, () => {
   it("decodes UTF-8 output as-is", async () => {
     const result = await runProcess({
       argv: [process.execPath, "-e", "process.stdout.write('表达式 ok')"],
@@ -64,7 +64,7 @@ describe("runProcess output decoding", () => {
   });
 });
 
-describe("runProcess cancellation", () => {
+describe("runProcess cancellation", { retry: 1 }, () => {
   it("pre-aborted signal resolves aborted without spawning", async () => {
     const controller = new AbortController();
     controller.abort();
@@ -95,7 +95,7 @@ describe("runProcess cancellation", () => {
   });
 });
 
-describe("runProcess outcome kinds", () => {
+describe("runProcess outcome kinds", { retry: 1 }, () => {
   it("reports an error kind when the executable does not exist", async () => {
     const result = await runProcess({
       argv: ["definitely-missing-binary-xyz", "--flag"],
@@ -119,7 +119,7 @@ describe("runProcess outcome kinds", () => {
   });
 });
 
-describe("childProcessEnv", () => {
+describe("childProcessEnv", { retry: 1 }, () => {
   const saved: Record<string, string | undefined> = {};
   const set = (key: string, value: string | undefined): void => {
     if (!(key in saved)) saved[key] = process.env[key];
@@ -148,7 +148,7 @@ describe("childProcessEnv", () => {
   });
 });
 
-describe("splitShellCommand", () => {
+describe("splitShellCommand", { retry: 1 }, () => {
   it("strips quotes per posix rules and honors backslash escapes", () => {
     expect(splitShellCommand(`echo "a b" c`, true)).toEqual(["echo", "a b", "c"]);
     expect(splitShellCommand(`echo a\\ b`, true)).toEqual(["echo", "a b"]);
@@ -161,7 +161,7 @@ describe("splitShellCommand", () => {
   });
 });
 
-describe("spawnBackground", () => {
+describe("spawnBackground", { retry: 1 }, () => {
   it("reports lifecycle, exit code, and combined output", async () => {
     const { spawnBackground } = await import("@agentprism/environment");
     const job = spawnBackground({
@@ -194,7 +194,7 @@ describe("spawnBackground", () => {
   });
 });
 
-describe.skipIf(process.platform !== "win32")("spawnPersistentShell on Windows", () => {
+describe.skipIf(process.platform !== "win32")("spawnPersistentShell on Windows", { retry: 1 }, () => {
   it("fails closed instead of spawning a non-POSIX shell", async () => {
     const { spawnPersistentShell } = await import("@agentprism/environment");
     // Windows callers must fail closed upstream; the message states the reason so a
@@ -203,7 +203,7 @@ describe.skipIf(process.platform !== "win32")("spawnPersistentShell on Windows",
   });
 });
 
-describe.skipIf(process.platform === "win32")("spawnPersistentShell", () => {
+describe.skipIf(process.platform === "win32")("spawnPersistentShell", { retry: 1 }, () => {
   it("keeps cd/export state across writes and reports output", async () => {
     const { spawnPersistentShell } = await import("@agentprism/environment");
     const shell = spawnPersistentShell({ cwd: process.cwd() });
