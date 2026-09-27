@@ -21,7 +21,6 @@
     "@agentprism/agent": "workspace:*",
     "@agentprism/arena-dimensions": "workspace:*",
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/harness": "workspace:*",
     "@agentprism/runtime": "workspace:*",
     "@agentprism/tool-mcp": "workspace:*"
   },

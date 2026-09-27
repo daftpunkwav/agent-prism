@@ -33,13 +33,16 @@ import {
 } from "@agentprism/contracts";
 import { arenaErrorEvent, completeEvent, extractAnswerFromEvents, isPipelineConfigBanner, majorityVote, type RunAttachment } from "@agentprism/contracts";
 import {
+  applyCustomContextTuning,
   createContextAnalytics,
   RagStoreCache,
+  resolveCustomDimensions,
   runVerificationLoop,
   summarizeAnalytics,
   finalizeStructuredAnswer,
   type AgentExecutionContext,
   type ContextTuning,
+  type RunContextTuning,
 } from "@agentprism/harness";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import { buildMetrics, TokenTracker } from "@agentprism/telemetry";
@@ -128,6 +131,7 @@ export interface AgentRunSpec {
   systemPromptOverride?: string;
   /** Operator-tuned context strategy budgets; absent fields keep built-in defaults. */
   contextTuning?: ContextTuning;
+
   /** Operator-tuned harness retry caps per level; absent fields keep built-in defaults. */
   harnessMaxRetries?: Partial<Record<HarnessLevel, number>>;
   /** Operator-tuned delegation/fetch knobs; absent fields keep built-in defaults. */
@@ -207,8 +211,9 @@ export { majorityVote };
 
 /**
  * Attaches external MCP servers to a column registry (top-level runs only).
- * Each server connects best-effort: a dead server warns and skips, never fails
- * the run it was meant to serve. Returns live clients the caller must close.
+ * Disabled entries are skipped before any spawn. Each remaining server connects
+ * best-effort: a dead server warns and skips, never fails the run it was meant to
+ * serve. Returns live clients the caller must close.
  */
 export async function attachRemoteMcpServers(
   registry: import("@agentprism/contracts").ToolRegistry,
@@ -219,7 +224,12 @@ export async function attachRemoteMcpServers(
   const clients: McpClient[] = [];
   let index = 0;
   for (const server of servers) {
+    // Count every configured entry: the ext<N> tag (and the tool names derived
+    // from it) stays stable when an operator toggles another server off.
     index += 1;
+    // A disabled server persists in the settings store but must never attach:
+    // the toggle means "no spawned process, no bridged tools".
+    if (server.enabled === false) continue;
     try {
       const client = await McpClient.connect(transport, server, { roots: options.roots });
       clients.push(client);
@@ -522,6 +532,19 @@ export async function* runAgentExecution(
     // Per-run context analytics: usage estimates + strategy observations are
   // reported at run end so operators see what each context strategy cost.
     const contextAnalytics = createContextAnalytics();
+    // Custom dimensions of this run, resolved once at the single assembly point:
+    // the budget hook folds into the tuning bag every driver already spreads, and
+    // the resolved list rides the execution context to the prompt seams. Unknown
+    // ids throw here — a column must never silently run a different experiment.
+    const customDimensions = resolveCustomDimensions(spec.config.custom);
+    const customRun = { question: spec.question, custom: spec.config.custom };
+    // This bag is the one object every driver spreads into applyContextPipeline,
+    // so the active dimensions ride it to all of that function's call sites.
+    const contextTuning: RunContextTuning = {
+      ...applyCustomContextTuning(customDimensions, spec.contextTuning ?? {}, customRun),
+      customDimensions,
+      customRun,
+    };
     const context: AgentExecutionContext = {
       identity: { agentId: spec.agentId, runId: spec.runId },
       config: spec.config,
@@ -539,7 +562,8 @@ export async function* runAgentExecution(
       skillPreloadBlock,
       memoryRecall,
       contextAnalytics,
-      contextTuning: spec.contextTuning,
+      contextTuning,
+      customDimensions,
       notices: spec.notices,
       systemPromptOverride: spec.systemPromptOverride,
       signal: spec.signal,
@@ -632,6 +656,18 @@ export async function* runAgentExecution(
       yield stampEvent(event, label, spec.turn, spec.agentId, spec.runId, deps.clock.now());
     }
 
+    // Cancellation is never a success: frameworks surface it differently (some
+    // throw AbortError, some end their stream normally, e.g. LangGraph checks the
+    // signal between nodes only), so the terminal is validated here — one
+    // checkpoint for every backend — before the structured finalize spends
+    // another LLM call on a run nobody is waiting for and before the held-back
+    // complete would report a successful, partial answer.
+    if (spec.signal?.aborted === true) {
+      const aborted = new Error("Aborted");
+      aborted.name = "AbortError";
+      throw aborted;
+    }
+
     // Structured profile: normalize the final answer through one schema-constrained
     // invoke so every downstream consumer reads the same canonical JSON. Fail-open:
     // finalize returns null on any failure and the raw answer stands. The finalize
@@ -639,13 +675,13 @@ export async function* runAgentExecution(
     // one-step-start-per-LLM-call invariant the metrics rely on. It runs BEFORE
     // the held-back terminal complete: thread persistence extracts at the
     // complete event, so the normalized answer must precede it. Skipped for
-    // failed runs — a failed complete is terminal, no further calls happen.
+    // failed runs — a failed complete is terminal, no further calls happen —
+    // and for cancelled runs, which the checkpoint above already threw out.
     if (structuredAnswer === "") structuredAnswer = structuredLastObservation;
     if (
       spec.config.prompt_profile === "structured" &&
       structuredAnswer !== "" &&
-      heldComplete?.metrics?.success !== false &&
-      spec.signal?.aborted !== true
+      heldComplete?.metrics?.success !== false
     ) {
       const normalized = await finalizeStructuredAnswer(context, structuredAnswer);
       if (normalized !== null) {
@@ -755,6 +791,12 @@ export async function* runAgentExecution(
       });
     }
   } catch (error) {
+    // Cancellation is not a failure of this execution: the abort propagates so
+    // the owner of the cancel reports it itself (the arena runner turns it into
+    // the stopped-column marker, the builder turn into an aborted turn). Turning
+    // it into a failed run here made every user stop look like a column failure
+    // and left the runner's stopped path unreachable.
+    if (spec.signal?.aborted === true) throw error;
     console.error(`[agent-execution] run failed (${spec.config.framework}/${spec.config.model_id}):`, error);
     const failureMessage = sanitizeErrorMessage(error);
     if (subagentDepth === 0) {

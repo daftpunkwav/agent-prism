@@ -13,6 +13,7 @@ import type {
   DriverLookup,
   PipelineConfig,
   PipelineMetrics,
+  ReportPublisher,
 } from "@agentprism/contracts";
 import { PipelineConfigSchema } from "@agentprism/contracts";
 import { ArenaRunner } from "../src/runner.js";
@@ -43,7 +44,11 @@ function config(label: string): PipelineConfig {
   return PipelineConfigSchema.parse({ label, framework: "native" });
 }
 
-function makeRunner(overrides?: { breakerThreshold?: number }): ArenaRunner {
+function makeRunner(overrides?: {
+  breakerThreshold?: number;
+  eventRetention?: number;
+  reportPublisher?: ReportPublisher;
+}): ArenaRunner {
   return new ArenaRunner({
     registry: { get: () => ({}), names: new Set() } as unknown as DriverLookup,
     router: { route: () => [config("col-a")] },
@@ -52,7 +57,7 @@ function makeRunner(overrides?: { breakerThreshold?: number }): ArenaRunner {
         throw new Error("no fs in tests");
       },
     },
-    reportPublisher: { publish: async () => null },
+    reportPublisher: overrides?.reportPublisher ?? { publish: async () => null },
     modelFactory: { create: () => ({}) },
     idGenerator: (() => {
       let n = 0;
@@ -61,6 +66,7 @@ function makeRunner(overrides?: { breakerThreshold?: number }): ArenaRunner {
     clock: { now: () => 1_700_000_000_000 },
     maxConcurrentRuns: 2,
     breakerThreshold: overrides?.breakerThreshold ?? 1,
+    eventRetention: overrides?.eventRetention,
     askUserWaitMs: 60_000,
   } as never);
 }
@@ -100,6 +106,33 @@ describe("ArenaRunner.streamParallel", () => {
     const events = await drain(runner, request());
     expect(events.map((event) => event.type)).toEqual(["step_start", "complete"]);
     expect(runMock).toHaveBeenCalledOnce();
+  });
+
+  it("retains exactly the newest events per column for the comparison report", async () => {
+    // The cap evicts from the head after every push: the bucket handed to the report
+    // must hold the newest `eventRetention` events in arrival order. A first-N slice
+    // would keep the head and lose the terminal complete (the tail is what workspace
+    // resolution and the report read).
+    runMock.mockImplementation((async function* () {
+      for (let step = 1; step <= 10; step += 1) {
+        yield { type: "thought_delta", pipeline: "col-a", turn: 1, step, content: `delta-${step}` };
+      }
+      yield { type: "complete", pipeline: "col-a", metrics: METRICS, turn: 1 };
+    }) as never);
+    const captured: Array<Record<string, ArenaEvent[]>> = [];
+    const reportPublisher: ReportPublisher = {
+      publish: async (input) => {
+        captured.push(input.eventsByPipeline);
+        return null;
+      },
+    };
+    const runner = makeRunner({ eventRetention: 3, reportPublisher });
+    await drain(runner, request());
+    const retained = captured[0]?.["col-a"] ?? [];
+    expect(retained.map((event) => event.type)).toEqual(["thought_delta", "thought_delta", "complete"]);
+    expect(
+      retained.filter((event) => event.type === "thought_delta").map((event) => event.content),
+    ).toEqual(["delta-9", "delta-10"]);
   });
 
   it("normalizes empty labels and applies the temperature override outside the temperature dimension", () => {

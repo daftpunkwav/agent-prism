@@ -137,8 +137,16 @@ describe("runAgentExecution subagent abort parity", () => {
         }
       },
     };
-    await collect(deps, testSpec(driver, { signal: controller.signal }));
+    let thrown: unknown = null;
+    try {
+      await collect(deps, testSpec(driver, { signal: controller.signal }));
+    } catch (error) {
+      thrown = error;
+    }
     expect((failure as Error | null)?.name).toBe("AbortError");
+    // The cancelled parent run propagates too: a run whose signal fired never
+    // reports a failed (or successful) terminal — the cancel owner renders it.
+    expect((thrown as Error | null)?.name).toBe("AbortError");
   });
 });
 

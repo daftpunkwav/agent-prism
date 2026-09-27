@@ -23,9 +23,10 @@ import {
   WorkspaceFileService,
 } from "@agentprism/application";
 import { buildComparisonReport, extractNarrativeText, judgeAnswers, judgeAnswersAsync, type ReportDeps } from "@agentprism/evaluation";
-import { registerContextStrategyPlugins } from "@agentprism/harness";
-import { contextAssemblyPlugins } from "@agentprism/context-assembly";
-import type { ContextTuning } from "@agentprism/harness";
+import { listCustomDimensionRows, registerCustomDimensions } from "@agentprism/arena-dimensions";
+import { memoryTopNDimension } from "@agentprism/memory-top-n";
+import { summaryBudgetDimension } from "@agentprism/summary-budget";
+import { toolReplayDimension } from "@agentprism/tool-replay";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import {
   configureUserSkills,
@@ -107,16 +108,19 @@ import type {
   AnswerJudge,
   BuilderEndpointBlock,
   ColumnRuntimeFactory,
+  ContextTuning,
+  HarnessLevel,
   PipelineConfig,
   ProviderCommand,
   ReportPublisher,
 } from "@agentprism/contracts";
-import { isLoopbackHost } from "@agentprism/contracts";
+import { harnessRetryCaps, isLoopbackHost } from "@agentprism/contracts";
 
-// Custom-dimension subpackages: register at composition root so the context
-// dimension auto-surfaces them (ARENA_CUSTOM_DIMENSIONS=off disables).
+// Custom-dimension subpackages: each registered dimension becomes an Arena
+// comparison axis, a Builder block, and a pinnable baseline field.
+// ARENA_CUSTOM_DIMENSIONS=off disables every one of them.
 if (process.env.ARENA_CUSTOM_DIMENSIONS !== "off") {
-  registerContextStrategyPlugins(contextAssemblyPlugins);
+  registerCustomDimensions([summaryBudgetDimension, memoryTopNDimension, toolReplayDimension]);
 }
 
 export interface RuntimeComponents {
@@ -340,7 +344,10 @@ export async function assemble(): Promise<RuntimeComponents> {
     budgetTokens: settings.contextBudgetTokens,
     compactTargetTokens: settings.contextCheckpointTargetTokens,
   };
-  const harnessMaxRetries: { verify?: number; reflect?: number; selfEvolve?: number } = {};
+  // Keyed by harness level token, never by the knob's wire key: the verification
+  // loop looks the cap up as maxRetries[level], so "selfEvolve" here would be
+  // silently ignored (see harnessRetryCaps).
+  const harnessMaxRetries: Partial<Record<HarnessLevel, number>> = {};
   // Shared delegation/fetch tuning object: the knob store mutates it in place so
   // settings saves reach the next run without a restart.
   // Structural AgentToolTuning (agent package dep deliberately avoided here).
@@ -371,9 +378,9 @@ export async function assemble(): Promise<RuntimeComponents> {
     contextTuning.toolTailKeepChars = knobs.contextToolTailKeepChars;
     contextTuning.budgetTokens = knobs.contextBudgetTokens;
     contextTuning.compactTargetTokens = knobs.contextCheckpointTargetTokens;
-    harnessMaxRetries.verify = knobs.harnessRetries.verify;
-    harnessMaxRetries.reflect = knobs.harnessRetries.reflect;
-    harnessMaxRetries.selfEvolve = knobs.harnessRetries.selfEvolve;
+    // In-place so the runner/builder deps keep their shared-bag identity across
+    // hot-applies (harnessRetryCaps maps selfEvolve -> the self_evolve level token).
+    Object.assign(harnessMaxRetries, harnessRetryCaps(knobs.harnessRetries));
     toolTuning.subagentMaxSteps = knobs.subagentMaxSteps;
     toolTuning.ralphMaxRounds = knobs.ralphMaxRounds;
     toolTuning.mcpFetchTimeoutMs = knobs.mcpFetchTimeoutMs;
@@ -488,6 +495,18 @@ export async function assemble(): Promise<RuntimeComponents> {
     mcpServers,
     endpoints: builderEndpoints,
     toolDefinitions: () => builtinTools.listDefinitions(),
+    customDimensions: () =>
+      listCustomDimensionRows().map((row) => ({
+        id: row.id,
+        label: row.label,
+        subtitle: row.subtitle,
+        default: row.default,
+        options: row.options.map((option) => ({
+          value: option.value,
+          label: option.label,
+          description: option.description ?? "",
+        })),
+      })),
     resolveThinkingCapable: (endpointId: string) => {
       const provider = providerStore.load();
       const endpoint =
