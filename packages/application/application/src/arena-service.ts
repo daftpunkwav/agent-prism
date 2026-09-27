@@ -20,12 +20,11 @@ import {
   type ArenaMeta,
   type ArenaRunRequest,
   type BaselineOverrides,
-  type DimensionId,
   type AskUserQuestion,
   type JudgeResponse,
   type TaskTemplate,
 } from "@agentprism/contracts";
-import { getTemplate, listTemplates, type DimensionRouter } from "@agentprism/arena-dimensions";
+import { getTemplate, listCustomDimensionRows, listTemplates, type CustomDimensionRow, type DimensionRouter } from "@agentprism/arena-dimensions";
 import { outlineDigest, outlineTurns } from "@agentprism/session-outline";
 import type { ArenaRunner } from "@agentprism/arena-runner";
 import { AppError } from "./errors.js";
@@ -92,17 +91,26 @@ export class ArenaService {
       // Sync failure keeps the existing options, but must leave a trace
       console.warn(`[arena] Provider option sync failed: ${error instanceof Error ? error.message : String(error)}`);
     }
-    const dimensions = DIMENSION_IDS.map((id) => {
-      const options = this.deps.router.listDimensionOptions(id);
-      return {
-        id,
-        label: this.deps.router.dimensionCatalog.fieldLabel(id),
-        subtitle: this.deps.router.dimensionCatalog.fieldSubtitle(id),
-        options,
-        min_select: ARENA_MIN_SELECT,
-        max_select: options.length,
-      };
-    });
+    const dimensions = [
+      ...DIMENSION_IDS.map((id) => ({ id, custom: null as CustomDimensionRow | null })),
+      ...listCustomDimensionRows().map((row) => ({ id: row.id, custom: row })),
+    ]
+      .map(({ id, custom }) => {
+        const options = this.deps.router.listDimensionOptions(id);
+        return {
+          id,
+          // Custom dimensions carry their descriptor copy; builtins read the
+          // static catalog (translations overlay both through the web i18n).
+          label: custom?.label ?? this.deps.router.dimensionCatalog.fieldLabel(id),
+          subtitle: custom?.subtitle ?? this.deps.router.dimensionCatalog.fieldSubtitle(id),
+          options,
+          min_select: ARENA_MIN_SELECT,
+          max_select: options.length,
+        };
+      })
+      // A custom dimension whose options were never synced is not selectable yet;
+      // dropping the row keeps /meta honest instead of advertising an empty axis.
+      .filter((dimension) => dimension.options.length > 0);
     return {
       dimensions,
       frameworks: [...runner.registry.listAvailable(), ...runner.registry.listReserved()],
@@ -113,13 +121,29 @@ export class ArenaService {
   }
 
   /**
+   * Asserts a comparison axis exists before a run opens its event stream. The run
+   * request schema accepts any dimension token (registered custom dimensions are
+   * legal axes), so the registry check lives here — and it must happen before the
+   * SSE response starts, so an unknown id stays an HTTP 422 like any other
+   * invalid request instead of a mid-stream system error.
+   *
+   * @throws AppError 422 when the id is neither builtin nor a registered custom dimension.
+   */
+  assertKnownDimension(dimension: string): void {
+    if (this.deps.router.listDimensionOptions(dimension).length > 0) return;
+    throw AppError.unprocessable(
+      `Unknown dimension "${dimension}" (not a builtin dimension nor a registered custom dimension)`,
+    );
+  }
+
+  /**
    * Validates a pinned baseline with the same resolver the run path uses, so a
    * caller that stores config immutably (threads) fails at creation instead of
    * storing a config whose only failure mode is an in-stream run error.
    *
    * @throws AppError 422 when the baseline cannot be replayed.
    */
-  assertBaselineReplayable(dimension: DimensionId, selections: readonly string[], baseline: Record<string, unknown>): void {
+  assertBaselineReplayable(dimension: string, selections: readonly string[], baseline: Record<string, unknown>): void {
     try {
       // Pinned configs carry typed values (numbers for decode fields) exactly like the
       // run path passes them, while BaselineOverrides types the wire form as option

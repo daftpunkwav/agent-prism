@@ -13,28 +13,28 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchArenaMeta, fetchTemplates } from "@agentprism/client";
+import { customFieldDimension, dimensionFieldName, fetchArenaMeta, fetchTemplates } from "@agentprism/client";
 import type {
   ArenaMeta,
   BaselineOverrides,
   DimensionId,
   TaskTemplate,
 } from "@agentprism/client";
-import { DIMENSION_FIELD, DIMENSION_IDS } from "./arenaConstants";
+import { DIMENSION_IDS, type BaselineDraft } from "./arenaConstants";
 import { templateQuestion } from "./templateLabels";
 import { useT } from "@/i18n/useT";
 
 /** localStorage key for the user's last baseline (preference persistence). */
 const BASELINE_STORAGE_KEY = "agentprism.arena.baseline.v1";
 
-/** Reads the stored baseline overlay; null when absent or corrupted. */
-function loadStoredBaseline(): Partial<BaselineOverrides> | null {
+/** Reads the stored baseline overlay; null when absent or corrupted (values are re-guarded at use). */
+function loadStoredBaseline(): BaselineDraft | null {
   try {
     const raw = typeof window === "undefined" ? null : window.localStorage.getItem(BASELINE_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
-    return parsed as Partial<BaselineOverrides>;
+    return parsed as BaselineDraft;
   } catch {
     return null;
   }
@@ -58,7 +58,7 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
    * is what allows "zero selections allowed" without breaking the initial show-all UX.
    */
   const [selections, setSelections] = useState<string[] | null>(null);
-  const [baseline, setBaseline] = useState<BaselineOverrides>({});
+  const [baseline, setBaseline] = useState<BaselineDraft>({});
   const [metaLoading, setMetaLoading] = useState(true);
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   /** Template list has settled (success or failure): distinguishes "loading, must wait" from "loaded but empty, may degrade" */
@@ -71,7 +71,7 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
       .then((m) => {
         setMeta(m);
         if (m.baseline_defaults) {
-          setBaseline({ ...m.baseline_defaults, ...loadStoredBaseline() } as BaselineOverrides);
+          setBaseline({ ...m.baseline_defaults, ...loadStoredBaseline() });
         }
       })
       .catch((err: Error) => {
@@ -103,7 +103,7 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
     } catch {
       // Storage unavailable: the in-memory reset below still applies.
     }
-    setBaseline({ ...(meta?.baseline_defaults ?? {}) } as BaselineOverrides);
+    setBaseline({ ...(meta?.baseline_defaults ?? {}) });
   }, [meta]);
 
   useEffect(() => {
@@ -154,7 +154,11 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
     const q = searchParams.get("q");
     if (q) setQuestion(q);
     const dim = searchParams.get("dimension");
+    // Accept a shared link's axis whenever the server serves it: builtins plus
+    // registered custom dimensions. Unknown ids still fall back to the default.
     if (dim && (DIMENSION_IDS as readonly string[]).includes(dim)) {
+      setDimension(dim as DimensionId);
+    } else if (dim && meta?.dimensions.some((entry) => entry.id === dim)) {
       setDimension(dim as DimensionId);
     }
     const sel = searchParams.get("selections");
@@ -169,19 +173,33 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
   }, [searchParams, metaLoading, templates, templatesLoaded, applyTemplate]);
 
   const baselinePayload = useMemo(() => {
-    const locked = DIMENSION_FIELD[dimension];
+    // The compared dimension's own field is pinned by the axis, not the baseline:
+    // the server-served field when /meta lists the dimension, else the contracts
+    // mapping (builtin id → its config field, anything else → `custom.<id>`).
+    const activeField =
+      meta?.dimensions.find((entry) => entry.id === dimension)?.options[0]?.field ??
+      dimensionFieldName(dimension);
     const allowed = new Set(
       (meta?.baseline_fields ?? []).map((f) => f.field).filter(Boolean),
     );
     const out: BaselineOverrides = {};
-    (Object.keys(baseline) as Array<keyof BaselineOverrides>).forEach((key) => {
-      if (key === locked || key === "model_id") return;
+    const custom: Record<string, string> = {};
+    Object.keys(baseline).forEach((key) => {
+      if (key === activeField || key === "model_id") return;
       if (allowed.size > 0 && !allowed.has(key)) return;
-      const val = baseline[key];
-      if (typeof val === "string" && val) {
-        Object.assign(out, { [key]: val });
+      const val: unknown = baseline[key];
+      // Stored preferences are untrusted JSON: re-guard the value, not just its type.
+      if (typeof val !== "string" || val === "") return;
+      // Custom dimensions travel as one nested record (the wire shape); the panel
+      // keys them flat as `custom.<id>`.
+      const customId = customFieldDimension(key);
+      if (customId !== "") {
+        custom[customId] = val;
+        return;
       }
+      Object.assign(out, { [key]: val });
     });
+    if (Object.keys(custom).length > 0) out.custom = custom;
     return out;
   }, [baseline, dimension, meta]);
 

@@ -173,3 +173,34 @@ describe("ArenaService.run cancellation", () => {
     expect(release).toHaveBeenCalledOnce();
   });
 });
+
+describe("ArenaService.assertKnownDimension contract", () => {
+  it("accepts a registered custom axis and rejects an unknown one as 422", () => {
+    const router = mockRouter({
+      listDimensionOptions: vi.fn((id: string) =>
+        id === "summary_budget" ? [{ field: "custom.summary_budget", value: "2000", label: "2k" }] : [],
+      ),
+    });
+    const service = new ArenaService({
+      router: router as any,
+      runnerFactory: async () => mockRunner() as any,
+      answerJudge: mockAnswerJudge(),
+      sessions: new SessionService({ store: mockSessions() }),
+    });
+
+    // A registered custom axis is a legal comparison axis even though its id is
+    // not a builtin dimension id.
+    expect(() => service.assertKnownDimension("summary_budget")).not.toThrow();
+
+    let thrown: unknown = null;
+    try {
+      service.assertKnownDimension("ghost_axis");
+    } catch (error) {
+      thrown = error;
+    }
+    // The message names the offender; the status stays 422 so an unknown axis is
+    // a request error (mapped before the SSE stream opens), not a stream failure.
+    expect((thrown as Error | null)?.message).toContain("ghost_axis");
+    expect((thrown as { status?: number } | null)?.status).toBe(422);
+  });
+});

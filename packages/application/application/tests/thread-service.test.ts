@@ -178,6 +178,39 @@ describe("ThreadService.run (resume path)", () => {
     expect(validations[0]?.baseline).not.toHaveProperty("endpoint_id");
   });
 
+  it("pins the stored custom-dimension values into the run baseline", async () => {
+    const { arena, requests, validations } = fakeArena([
+      { ...baseEvent("complete"), metrics: { success: true } as ArenaEvent["metrics"] },
+    ]);
+    const { service } = makeService(arena);
+    const config: PipelineConfig = PipelineConfigSchema.parse({
+      label: "col",
+      custom: { summary_budget: "8000" },
+    });
+    const view = service.create({ title: "t", config });
+
+    await drain(service.run(view.id, { question: "q" }));
+
+    // A pinned value keeps every resumed turn on the same custom axis: the record
+    // travels in the wire baseline and passes the creation-time replay validation.
+    expect((requests[0]?.baseline as Record<string, unknown>).custom).toEqual({ summary_budget: "8000" });
+    expect(validations[0]?.baseline.custom).toEqual({ summary_budget: "8000" });
+  });
+
+  it("omits an empty custom record from the replayed baseline", async () => {
+    const { arena, requests } = fakeArena([
+      { ...baseEvent("complete"), metrics: { success: true } as ArenaEvent["metrics"] },
+    ]);
+    const { service } = makeService(arena);
+    const view = service.create({ title: "t", config: CONFIG });
+
+    await drain(service.run(view.id, { question: "q" }));
+    // An empty record is not a pin: sending it would make a default config look
+    // like it overrode a custom axis.
+    expect(CONFIG.custom).toEqual({});
+    expect(requests[0]?.baseline as Record<string, unknown>).not.toHaveProperty("custom");
+  });
+
   it("leaves the transcript untouched when the turn fails, and resets the running flag", async () => {
     const { arena } = fakeArena([{ ...baseEvent("complete"), metrics: { success: false } as ArenaEvent["metrics"] }]);
     const { service, store } = makeService(arena);

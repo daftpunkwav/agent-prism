@@ -13,7 +13,29 @@ import { BlockBoard } from "../src/app/builder/BlockBoard.js";
 
 const CATALOG = {
   capabilities: [
-    { block: "reasoning", options: [{ value: "react", label: "react", description: "ReAct loop" }, { value: "tot", label: "tot", description: "Tree of thoughts" }] },
+    {
+      block: "reasoning",
+      label: "",
+      default: "",
+      options: [
+        { value: "react", label: "react", description: "ReAct loop" },
+        { value: "tot", label: "tot", description: "Tree of thoughts" },
+        // No catalog key: a value the catalogs do not translate (the dynamic-option
+        // case) must fall back to the label the server sent.
+        { value: "probe_mode", label: "Probe mode", description: "Untranslated option" },
+      ],
+    },
+    // Custom-dimension blocks arrive from the server as `custom:<id>` with their
+    // own label/default/options; the board renders them generically.
+    {
+      block: "custom:summary_budget",
+      label: "Summary budget",
+      default: "5000",
+      options: [
+        { value: "2000", label: "2k tokens", description: "Small digest" },
+        { value: "5000", label: "5k tokens", description: "Medium digest" },
+      ],
+    },
   ],
   endpoints: [{ id: "ep-1", name: "Main endpoint" }],
   frameworks: [
@@ -130,6 +152,24 @@ describe("BlockBoard", () => {
     fireEvent.blur(temperature);
     // Blank input reverts silently: no extra commit, the value stays 1.5.
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the server label for an option no catalog key covers", () => {
+    renderBoard();
+    // The dynamic-option case: a chip whose value the catalogs do not translate
+    // renders the catalog payload's label, never the resolveMessage marker.
+    expect(screen.getByRole("button", { name: "Probe mode" })).toBeDefined();
+    expect(screen.queryByText(/⟦/)).toBeNull();
+  });
+
+  it("renders custom-dimension blocks, highlighting the server default and writing the choice into composition.custom", () => {
+    const { onChange } = renderBoard();
+    expect(screen.getByText("Summary budget")).toBeDefined();
+    // Unset shows the block's effective default, the same value the run applies.
+    expect(screen.getByRole("button", { name: "5k tokens" }).getAttribute("data-selected")).toBe("true");
+    expect(screen.getByRole("button", { name: "2k tokens" }).getAttribute("data-selected")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: "2k tokens" }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ custom: { summary_budget: "2000" } }));
   });
 
   it("reports restore-default clicks", () => {

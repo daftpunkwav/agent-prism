@@ -42,6 +42,9 @@ export function registerArenaRoutes(app: HttpApp, deps: HttpApplicationDeps): vo
 
   app.post("/api/arena/run", async (c) => {
     const request = await parseJsonBody(c, ArenaRunRequestSchema);
+    // The dimension axis is validated before the stream opens: an unknown id is a
+    // 422 like any other invalid request, never a mid-stream system error.
+    deps.arena.assertKnownDimension(request.dimension);
     const abortController = new AbortController();
     return streamSSE(c, async (stream) => {
       stream.onAbort(() => abortController.abort());

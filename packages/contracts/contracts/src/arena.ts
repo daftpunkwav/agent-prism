@@ -28,6 +28,7 @@ import {
   ToolsetIdSchema,
 } from "./enums.js";
 import { PipelineMetricsSchema, TokenStatsSchema } from "./events.js";
+import { CUSTOM_DIMENSION_ID_MAX, CUSTOM_DIMENSION_VALUE_MAX } from "./custom-dimension.js";
 import { ToolRoundSchema, type ToolRound } from "./history-mode.js";
 
 /** Total character budget over chat history plus the current question (one shared source for backend validation and frontend trimming). */
@@ -84,6 +85,14 @@ export const PipelineConfigSchema = z.object({
   prompt_version: z.string().default("v1.0.0"),
   /** Column display label; display plus per-turn aggregation key, not a stable cross-system identity (use agentId/runId). */
   label: z.string().default(""),
+  /**
+   * Custom-dimension values for this column (`{ [dimensionId]: optionValue }`).
+   * Written by the routing/baseline path and by Builder compositions; consumed by
+   * run assembly, which activates each registered dimension's hooks. An id with no
+   * registered dimension fails loud there — never a silently inert column. Bounds
+   * are the descriptor bounds, so a registered dimension's values always fit.
+   */
+  custom: z.record(z.string().max(CUSTOM_DIMENSION_ID_MAX), z.string().max(CUSTOM_DIMENSION_VALUE_MAX)).default({}),
 });
 export type PipelineConfig = z.infer<typeof PipelineConfigSchema>;
 
@@ -95,9 +104,9 @@ export type PipelineConfig = z.infer<typeof PipelineConfigSchema>;
 export const BaselineOverridesSchema = z.object({
   framework: z.string().nullish(),
   reasoning: ReasoningModeSchema.nullish(),
-  // Like framework, a dynamic-valued field: registered context-strategy plugin
-  // ids are legal alongside the builtin enum. resolveBaselineOverrides still
-  // rejects unknown ids against the synced option set (fail loud).
+  // Like framework, a dynamic-valued field: a bare string keeps the enum out of
+  // the baseline wire, and resolveBaselineOverrides rejects every id the synced
+  // option set does not offer (fail loud, never a silently ignored pin).
   context: z.string().nullish(),
   harness: HarnessLevelSchema.nullish(),
   prompt_profile: PromptProfileSchema.nullish(),
@@ -121,6 +130,13 @@ export const BaselineOverridesSchema = z.object({
   history_mode: HistoryModeSchema.nullish(),
   /** Column label override: pins the pipeline aggregation key for single-column callers (e.g. threads). */
   label: z.string().max(96).nullish(),
+  /**
+   * Custom-dimension values pinned for this baseline (`{ [dimensionId]: value }`).
+   * The baseline panel exposes each registered dimension as a `custom.<id>` field;
+   * resolveBaselineOverrides validates the ids/values against the live registry and
+   * rejects unknown ones loudly. Bounds are the descriptor bounds.
+   */
+  custom: z.record(z.string().max(CUSTOM_DIMENSION_ID_MAX), z.string().max(CUSTOM_DIMENSION_VALUE_MAX)).nullish(),
 });
 export type BaselineOverridesInput = z.input<typeof BaselineOverridesSchema>;
 export type BaselineOverrides = z.infer<typeof BaselineOverridesSchema>;
@@ -283,7 +299,10 @@ export type RunAttachment = z.infer<typeof RunAttachmentSchema>;
 export const ArenaRunRequestSchema = z
   .object({
     question: z.string().min(1).max(4000),
-    dimension: DimensionIdSchema.default("framework"),
+    // Open string, not the builtin enum: registered custom dimensions are legal
+    // comparison axes. Unknown ids still fail loudly, one layer down in the
+    // dimension router (422), which is the only place that knows the registry.
+    dimension: z.string().min(1).max(64).default("framework"),
     selections: z.array(z.string()).max(16).default([]),
     temperature: z.number().min(0).max(2).nullish(),
     baseline: BaselineOverridesSchema.nullish(),
@@ -337,7 +356,8 @@ export type DimensionOption = z.infer<typeof DimensionOptionSchema>;
 
 /** Dimension metadata (the option list /meta returns to the frontend). */
 export const DimensionMetaSchema = z.object({
-  id: DimensionIdSchema,
+  // Builtin id or a registered custom dimension id (the projection is the source).
+  id: z.string(),
   label: z.string(),
   subtitle: z.string(),
   options: z.array(DimensionOptionSchema),
@@ -351,7 +371,8 @@ export type BaselineFieldOption = z.infer<typeof BaselineFieldOptionSchema>;
 
 /** Baseline-configurable field (dimension === null means baseline-only, not a comparison dimension). */
 export const BaselineFieldSchema = z.object({
-  dimension: DimensionIdSchema.nullable(),
+  // Builtin dimension id, a registered custom dimension id, or null (baseline-only).
+  dimension: z.string().nullable(),
   field: z.string(),
   label: z.string(),
   group: z.string(),

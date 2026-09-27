@@ -39,6 +39,7 @@ Extension points and their constraints.
 | [reference/events.md](reference/events.md) | Arena event types, builder stream chunks, and folding |
 | [reference/tools.md](reference/tools.md) | Toolsets, built-in tools, MCP, and output-budget helpers |
 | [reference/dimensions.md](reference/dimensions.md) | Dimensions, templates, judging, and ablation |
+| [reference/add-a-custom-dimension.md](reference/add-a-custom-dimension.md) | One package per custom comparison dimension: descriptor, four hooks, Arena + Builder auto-wiring |
 | [reference/configuration.md](reference/configuration.md) | Environment variables, credential references, and the `data/` layout |
 | [reference/threads.md](reference/threads.md) | Durable fork and resume threads |
 

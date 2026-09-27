@@ -14,7 +14,9 @@
 
 import { RotateCcw } from "lucide-react";
 import { NumberInput, UiSelect, type UiSelectEntry } from "@agentprism/ui";
+import { BUILDER_CUSTOM_BLOCK_PREFIX, customBlockDimension } from "@agentprism/client";
 import type { BuilderCatalog, BuilderComposition } from "@agentprism/client";
+import { isMissingMessage } from "@/i18n/resolveMessage";
 import { useT } from "@/i18n/useT";
 
 export interface BlockBoardProps {
@@ -60,14 +62,26 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
   // key is safe; the cast keeps the single dynamic-key point explicit.
   // history_mode values (minimal/tool_summary/full) collide with other blocks'
   // flat keys, so its labels live under a `history_` prefix.
-  const opt = (value: string, prefix = "") => t(`builder.opts.${prefix}${value}` as Parameters<typeof t>[0]);
+  //
+  // Fallback matters: a value with no catalog key (a block whose keys drifted)
+  // must render the server-provided label rather than the resolveMessage marker.
+  const opt = (value: string, prefix = "", fallback?: string) => {
+    const key = `builder.opts.${prefix}${value}`;
+    const resolved = t(key as Parameters<typeof t>[0]);
+    return isMissingMessage(resolved, key) ? (fallback ?? value) : resolved;
+  };
 
+  // Builtin blocks only: a custom-dimension block renders its server-provided
+  // labels in its own slot below, and its option values live in a value space
+  // shared with the builtin keys ("high", "full"), where a flat-key lookup could
+  // relabel it with a builtin option's text.
   const capabilityOptions = new Map<string, Array<{ value: string; label: string; description: string }>>();
   for (const group of catalog.capabilities) {
+    if (group.block.startsWith(BUILDER_CUSTOM_BLOCK_PREFIX)) continue;
     const prefix = group.block === "history_mode" ? "history_" : "";
     capabilityOptions.set(
       group.block,
-      group.options.map((option) => ({ ...option, label: opt(option.value, prefix) })),
+      group.options.map((option) => ({ ...option, label: opt(option.value, prefix, option.label) })),
     );
   }
 
@@ -245,6 +259,37 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
       <Slot title={t("builder.slotHistoryMode")}>
         <div className="builder-chip-row">{renderChips("history_mode", composition.history_mode, (value) => set({ history_mode: value as BuilderComposition["history_mode"] }))}</div>
       </Slot>
+
+      {/* Custom-dimension blocks: the server catalog names them `custom:<id>` and
+          the selection lands in composition.custom[id], which the run carries into
+          the dimension's hooks. One generic slot renders every registered one. */}
+      {catalog.capabilities
+        .filter((group) => group.block.startsWith(BUILDER_CUSTOM_BLOCK_PREFIX))
+        .map((group) => {
+          const dimensionId = customBlockDimension(group.block);
+          // Unset shows the dimension's effective default (declared, else first
+          // option), which is also what the run applies (compositionToPipelineConfig
+          // fills it): display and execution must not disagree about the value in force.
+          const current = composition.custom?.[dimensionId] ?? group.default ?? "";
+          return (
+            <Slot key={group.block} title={group.label || dimensionId}>
+              <div className="builder-chip-row">
+                {group.options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="builder-chip"
+                    data-selected={current === option.value}
+                    title={option.description}
+                    onClick={() => set({ custom: { ...composition.custom, [dimensionId]: option.value } })}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </Slot>
+          );
+        })}
 
       <Slot title={t("builder.slotDecode")}>
         <div className="builder-decode">

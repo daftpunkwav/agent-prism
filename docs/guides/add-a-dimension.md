@@ -18,12 +18,15 @@ mapping is the common case. Precedents are `mcp` to `mcp_policy`, `skill` to
 `value` and label plus the default, following `mcp.ts`, `skill.ts`, or
 `orchestration.ts`. Two flavors exist:
 
-- Static options are listed directly: prompt, reasoning, context, harness, temperature,
-  thinking, thinking_budget, max_steps, toolset, mcp, skill, orchestration, memory, and
+- Static options are listed directly in the catalog and serve /meta as-is: temperature,
+  thinking, thinking_budget, max_steps, mcp, skill, orchestration, memory, and
   history_mode.
-- Runtime-synced options start empty and are filled by
-  `DimensionCatalog.syncCapabilityOptions` or provider sync at startup and on provider
-  changes: `framework` from the driver registry and `model` from provider endpoints.
+- Registry-gated options start empty in `STATIC_DIMENSION_OPTIONS` and are filled at
+  startup by the capability sync: `buildCapabilityOptionProjection` filters the static
+  tables down to the live registry, and the router's `syncCapabilityOptions` applies the
+  result — prompt, reasoning, context, harness, and toolset. `framework` (driver registry)
+  and `model` (provider endpoints) carry static seed rows that driver/provider sync
+  overwrites instead.
 
 A dimension with a default registers it in `STATIC_DEFAULT_BASE`.
 
@@ -38,6 +41,13 @@ The dimension changes one thing per column.
   `top_p`, `frequency_penalty`, `presence_penalty`, and `max_output_tokens`.
 
 A selection isolates exactly this dimension's effect.
+
+Why this is not the path for every comparison idea: a **custom dimension package**
+(`packages/custom/<name>`) declares a whole new axis — its values, its hook, its
+Builder block, and its baseline field — without touching the enum, the field table,
+or any driver. Use it whenever the variation can be expressed by a dimension hook;
+use this guide only when the axis must be a first-class builtin. See
+[../reference/add-a-custom-dimension.md](../reference/add-a-custom-dimension.md).
 
 ## Inherited surfaces
 

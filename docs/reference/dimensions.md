@@ -12,7 +12,7 @@ modules in `packages/dimensions/dimensions/src/dimensions/`, and the templates i
 | `framework` | `framework` | **native**, langchain, langgraph, deepagents, openai_agents, claude_agent_sdk, plan_execute, self_critique, autogen, crewai | runtime-synced from the driver registry |
 | `prompt` | `prompt_profile` | **zero_shot**, few_shot, cot_prompt, structured, terse | static |
 | `reasoning` | `reasoning` | **react**, cot_tool, tot, reflexion, self_consistency | derived from contracts `REASONING_MODE_META` |
-| `context` | `context` | **sliding**, summary, vector, hybrid, tool_tail, token_budget, budget, checkpoint | static |
+| `context` | `context` | **sliding**, summary, vector, hybrid, tool_tail, token_budget | static catalog filtered by the live policy registry |
 | `harness` | `harness` | **bare**, verify, reflect, self_evolve | static |
 | `temperature` | `temperature` | **0**, 0.3, 0.7, 1, plus any custom value from 0 to 2 | static |
 | `model` | `endpoint_id` | provider endpoints | runtime-synced from the provider catalog |
@@ -29,10 +29,21 @@ modules in `packages/dimensions/dimensions/src/dimensions/`, and the templates i
 Notes:
 
 - Capability dimensions, namely prompt, reasoning, context, harness, and toolset, start
-  empty in `STATIC_DIMENSION_OPTIONS` and are filled by
-  `DimensionCatalog.syncCapabilityOptions` from registered plugins. Framework and model
-  are overwritten by driver and provider sync. Startup fails fast if prompt, reasoning,
+  empty in `STATIC_DIMENSION_OPTIONS` and are filled at startup from the registered ids:
+  `buildCapabilityOptionProjection` filters the static tables down to the live registries
+  and the router's `syncCapabilityOptions` applies the result. Framework and model are
+  overwritten by driver and provider sync. Startup fails fast if prompt, reasoning,
   context, harness, or toolset ends up empty.
+- **Custom dimensions** (`packages/custom/*`, registered at the composition root) are
+  comparison axes of their own, not extra rows on a builtin dimension: each contributes a
+  `DimensionMeta` entry, a Builder block (`custom:<id>`), and a pinnable `custom.<id>`
+  baseline field. See `docs/reference/add-a-custom-dimension.md`.
+- The context dimension's six rows are the builtin strategies. The pipeline also implements
+  `budget` and `checkpoint` (tuned by `CONTEXT_BUDGET_TOKENS` and
+  `CONTEXT_CHECKPOINT_TARGET_TOKENS`): the Builder palette enumerates the context enum and
+  offers them as blocks, and API-pinned `PipelineConfig`s can carry them, but they are not
+  Arena dimension options — so they are neither selectable in the Arena lane picker nor
+  legal baseline values.
 - Baseline-only decode fields `top_p`, `frequency_penalty`, `presence_penalty`, and
   `max_output_tokens`, along with the safety control fields `approval_mode` and
   `sandbox_mode`, live in `BASELINE_ONLY_OPTIONS`.
@@ -51,7 +62,7 @@ Notes:
 - `question` is 1 to 4000 characters. `selections` is at most 16 with a minimum of 1
   column from `ARENA_MIN_SELECT`. The UI may sit at zero selections, showing an empty
   state with the run disabled. `attachments` is at most 5, each at most 64 KiB of text.
-- Matrix requests carry 1 to 8 cells, each `{template_id, dimension?, selections,
+- Matrix requests carry 1 to 32 cells, each `{template_id, dimension?, selections,
   baseline?}`.
 
 ## Task templates in `task-templates.ts`

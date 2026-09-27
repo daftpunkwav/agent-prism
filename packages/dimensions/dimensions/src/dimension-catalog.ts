@@ -10,7 +10,7 @@
  * option tables elsewhere are forbidden.
  */
 
-import { DECODE_FIELD_RANGES, type DimensionId } from "@agentprism/contracts";
+import { DECODE_FIELD_RANGES, dimensionFieldName, type DimensionId } from "@agentprism/contracts";
 import { BASELINE_ONLY_LABELS, BASELINE_ONLY_OPTIONS, DIMENSION_FIELD, FIELD_GROUP, FIELD_LABELS, FIELD_NAME_LABELS, FIELD_SUBTITLES, type DimensionOptionTriple } from "./fields.js";
 import { FRAMEWORK_OPTIONS } from "./dimensions/framework.js";
 import { MAX_STEPS_OPTIONS } from "./dimensions/max-steps.js";
@@ -25,7 +25,8 @@ import { HISTORY_MODE_OPTIONS } from "./dimensions/history-mode.js";
 
 /** Static fallback options per dimension.
  *  Capability dims (prompt/reasoning/context/harness/toolset) start empty and are
- *  filled by syncCapabilityOptions from registered plugin ids.
+ *  filled at startup by the capability sync (the arena option projection, applied
+ *  through setDimensionOptions) from the registered capability ids.
  *  Framework/model are overwritten by provider/driver sync; temperature/thinking/
  *  max_steps stay static (no runtime registry).
  */
@@ -71,24 +72,24 @@ const STATIC_DEFAULT_BASE: Record<string, string | number> = {
 /** Registry of experiment dimensions and their selectable options. */
 export class DimensionCatalog {
   private defaultBase: Record<string, string | number>;
-  private readonly options = new Map<DimensionId, DimensionOptionTriple[]>();
+  private readonly options = new Map<string, DimensionOptionTriple[]>();
   private baselineOptionValues = new Map<string, Set<string>>();
 
   constructor() {
     this.defaultBase = { ...STATIC_DEFAULT_BASE };
     for (const [dimension, triples] of Object.entries(STATIC_DIMENSION_OPTIONS)) {
-      this.options.set(dimension as DimensionId, triples.map((t) => ({ ...t })));
+      this.options.set(dimension, triples.map((t) => ({ ...t })));
     }
     this.refreshBaselineOptionValues();
   }
 
-  /** Snapshot of the options for one dimension. */
-  dimensionOptions(dimension: DimensionId): DimensionOptionTriple[] {
+  /** Snapshot of the options for one dimension (builtin id or registered custom id). */
+  dimensionOptions(dimension: string): DimensionOptionTriple[] {
     return (this.options.get(dimension) ?? []).map((t) => ({ ...t }));
   }
 
-  /** Overrides dimension options (the sync entry point for framework/model). */
-  setDimensionOptions(dimension: DimensionId, triples: DimensionOptionTriple[]): void {
+  /** Overrides dimension options (sync entry point for framework/model/custom dimensions). */
+  setDimensionOptions(dimension: string, triples: DimensionOptionTriple[]): void {
     this.options.set(dimension, triples.map((t) => ({ ...t })));
     this.refreshBaselineOptionValues();
   }
@@ -153,7 +154,7 @@ export class DimensionCatalog {
   refreshBaselineOptionValues(): void {
     const values = new Map<string, Set<string>>();
     for (const [dimension, triples] of this.options) {
-      values.set(DIMENSION_FIELD[dimension], new Set(triples.map((t) => t.value)));
+      values.set(dimensionFieldName(dimension), new Set(triples.map((t) => t.value)));
     }
     for (const [field, optionPairs] of Object.entries(BASELINE_ONLY_OPTIONS)) {
       values.set(field, new Set(optionPairs.map(([v]) => v)));
@@ -193,12 +194,10 @@ export class DimensionCatalog {
 
   /** Default value for a field: falls back to the first option of that field's dimension. */
   firstOptionValue(field: string): string {
-    for (const [dimension, fieldName] of Object.entries(DIMENSION_FIELD)) {
-      if (fieldName === field) {
-        const options = this.options.get(dimension as DimensionId) ?? [];
-        const first = options[0]?.value;
-        if (first !== undefined) return first;
-      }
+    for (const dimension of this.options.keys()) {
+      if (dimensionFieldName(dimension) !== field) continue;
+      const first = this.options.get(dimension)?.[0]?.value;
+      if (first !== undefined) return first;
     }
     return "";
   }

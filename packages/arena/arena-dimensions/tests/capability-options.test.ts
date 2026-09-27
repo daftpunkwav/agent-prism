@@ -1,12 +1,30 @@
 /**
  * @file capability options tests
- * @description Locks capability projection: live-registry gating and static toolsets.
+ * @description Locks capability projection: live-registry gating, static
+ * toolsets, and one comparison axis per registered custom dimension.
  */
 
 import { describe, expect, it } from "vitest";
 import { TOOL_NAMES_BY_TOOLSET } from "@agentprism/contracts";
+import { registerCustomDimensions } from "@agentprism/harness";
 import { TOOLSET_OPTIONS } from "@agentprism/dimensions";
 import { buildCapabilityOptionProjection } from "../src/capability-options.js";
+import { listCustomDimensionRows } from "../src/custom-dimension-rows.js";
+
+const CUSTOM_DIMENSION_ID = "capability_probe";
+
+registerCustomDimensions([
+  {
+    id: CUSTOM_DIMENSION_ID,
+    label: "Capability probe",
+    subtitle: "Probe axis",
+    options: [
+      { value: "low", label: "Low" },
+      { value: "high", label: "High" },
+    ],
+    default: "low",
+  },
+]);
 
 describe("buildCapabilityOptionProjection", () => {
   it("covers every static toolset", () => {
@@ -32,5 +50,45 @@ describe("buildCapabilityOptionProjection", () => {
       expect(first).not.toBe(catalogFirst);
       expect(first).toEqual(catalogFirst);
     }
+  });
+});
+
+describe("custom-dimension projection", () => {
+  it("gives each registered dimension its own axis, keyed by its id", () => {
+    const projection = buildCapabilityOptionProjection();
+    expect((projection[CUSTOM_DIMENSION_ID] ?? []).map((option) => option.value)).toEqual(["low", "high"]);
+    // The option rows carry the synthetic field the baseline/router read back.
+    expect((projection[CUSTOM_DIMENSION_ID] ?? [])[0]?.field).toBe(`custom.${CUSTOM_DIMENSION_ID}`);
+  });
+
+  it("keeps the builtin context rows free of custom entries", () => {
+    const values = (buildCapabilityOptionProjection().context ?? []).map((row) => row.value);
+    expect(values).not.toContain(CUSTOM_DIMENSION_ID);
+  });
+
+  it("drops every custom axis when ARENA_CUSTOM_DIMENSIONS=off", () => {
+    const previous = process.env.ARENA_CUSTOM_DIMENSIONS;
+    process.env.ARENA_CUSTOM_DIMENSIONS = "off";
+    try {
+      expect(buildCapabilityOptionProjection()[CUSTOM_DIMENSION_ID]).toBeUndefined();
+    } finally {
+      if (previous === undefined) delete process.env.ARENA_CUSTOM_DIMENSIONS;
+      else process.env.ARENA_CUSTOM_DIMENSIONS = previous;
+    }
+  });
+
+  it("shapes the arena row with label, subtitle, field, and default", () => {
+    const row = listCustomDimensionRows().find((entry) => entry.id === CUSTOM_DIMENSION_ID);
+    expect(row).toEqual({
+      id: CUSTOM_DIMENSION_ID,
+      label: "Capability probe",
+      subtitle: "Probe axis",
+      field: `custom.${CUSTOM_DIMENSION_ID}`,
+      default: "low",
+      options: [
+        { field: `custom.${CUSTOM_DIMENSION_ID}`, value: "low", label: "Low" },
+        { field: `custom.${CUSTOM_DIMENSION_ID}`, value: "high", label: "High" },
+      ],
+    });
   });
 });

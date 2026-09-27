@@ -5,11 +5,13 @@
  * Responsibilities:
  * - Build the initial LlmMessage list
  * - Compose system/user prompts including cwd and workspace retrieval
+ * - Apply the active custom dimensions' prompt tags and prompt/memory hooks
  */
 
-import type { ChatTurnMessage, LlmMessage, MemoryRecallResult } from "@agentprism/contracts";
+import type { ChatTurnMessage, LlmMessage, MemoryBlockLimits, MemoryRecallResult } from "@agentprism/contracts";
 import { agentReplyDirective } from "@agentprism/contracts";
 import { parseMentions, resolveMentionBlock, type MentionFileSystem } from "@agentprism/context-mentions";
+import { applyCustomMemory, applyCustomPrompt, customPromptHint } from "../dimensions/custom-dimension-hooks.js";
 import { formatRetrievedSnippets } from "../context/messages.js";
 import { queryWorkspaceSnippets } from "../memory/rag.js";
 import { buildPromptParts } from "./prompt-builder.js";
@@ -29,7 +31,7 @@ import type { AgentExecutionContext } from "../execution-context.js";
 export const MENTION_RESOLVE_LIMIT = 10;
 
 /** Max memory lines mounted into the system prompt (bounds context cost). */
-export const MEMORY_BLOCK_LIMITS = { episodic: 3, semantic: 5 } as const;
+export const MEMORY_BLOCK_LIMITS: MemoryBlockLimits = { episodic: 3, semantic: 5 };
 
 /** Truncates one memory line so a single verbose lesson cannot flood the prompt. */
 function truncateMemoryLine(line: string, maxChars = 300): string {
@@ -40,17 +42,21 @@ function truncateMemoryLine(line: string, maxChars = 300): string {
 /**
  * Renders recalled cross-session memories as a prompt block.
  * Returns "" when there is nothing to mount (fail-closed to stateless).
+ * `limits` caps mounted lines per layer (custom dimensions may raise them).
  */
-export function renderMemoryBlock(memory: MemoryRecallResult | undefined | null): string {
+export function renderMemoryBlock(
+  memory: MemoryRecallResult | undefined | null,
+  limits: MemoryBlockLimits = MEMORY_BLOCK_LIMITS,
+): string {
   if (memory === undefined || memory === null) return "";
   const lines: string[] = [];
-  for (const entry of (memory.episodic ?? []).slice(0, MEMORY_BLOCK_LIMITS.episodic)) {
+  for (const entry of (memory.episodic ?? []).slice(0, limits.episodic)) {
     const outcome = entry.success ? "succeeded" : "failed";
     const via = entry.keyActions.length > 0 ? ` (via ${entry.keyActions.slice(0, 6).join(", ")})` : "";
     const lesson = entry.lessons.trim() !== "" ? `: ${entry.lessons}` : "";
     lines.push(episodicMemoryLine(entry.task, outcome, via, lesson));
   }
-  for (const fact of (memory.semantic ?? []).slice(0, MEMORY_BLOCK_LIMITS.semantic)) {
+  for (const fact of (memory.semantic ?? []).slice(0, limits.semantic)) {
     lines.push(semanticMemoryLine(fact.subject, fact.predicate, fact.object));
   }
   if (lines.length === 0) return "";
@@ -124,8 +130,23 @@ export function buildSystemUser(context: AgentExecutionContext): { system: strin
   system += mcpPolicyNote(mcpPolicy);
   system += skillPolicyNote(skillPolicy);
   system += orchestrationNote(orchestration);
+  // The run's active dimensions; `config.custom` (read below as the hook context)
+  // is the value record they were resolved from.
+  const activeCustomDimensions = context.customDimensions ?? [];
+  // Custom-dimension prompt tags ride with the policy notes, so the column's
+  // prompt states which custom values are in force (same convention as the
+  // builtin context hints). The `prompt` hook below may reshape them.
+  if (activeCustomDimensions.length > 0) {
+    system += customPromptHint(activeCustomDimensions);
+  }
   if (memoryPolicy !== "none") {
-    system += renderMemoryBlock(context.memoryRecall);
+    // The memory hook adjusts the recall and the per-layer render caps together:
+    // "inject everything" needs the caps, "inject the top N" needs the recall.
+    const memory = applyCustomMemory(activeCustomDimensions, context.memoryRecall, MEMORY_BLOCK_LIMITS, {
+      question,
+      custom: config.custom,
+    });
+    system += renderMemoryBlock(memory.recall, memory.limits);
   }
   const preload = (context.skillPreloadBlock ?? "").trim();
   if (skillPolicy === "preloaded" && preload !== "") {
@@ -165,6 +186,12 @@ export function buildSystemUser(context: AgentExecutionContext): { system: strin
   const notices = (context.notices ?? []).map((notice) => notice.trim()).filter((notice) => notice !== "");
   if (notices.length > 0) {
     system += `\n\n${notices.map((notice) => sessionNoticeLine(notice)).join("\n\n")}`;
+  }
+  // Custom-dimension prompt hooks run last, on the fully composed halves: a
+  // dimension is trusted operator code (same trust level as a driver) and may
+  // therefore append, rewrite, or strip anything above — including the roster.
+  if (activeCustomDimensions.length > 0) {
+    return applyCustomPrompt(activeCustomDimensions, { system, user }, { question, custom: config.custom });
   }
   return { system, user };
 }

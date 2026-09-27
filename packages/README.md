@@ -27,6 +27,7 @@ Dependency directions between families are fixed by `pnpm boundaries` and
 | [`agent/`](agent/README.md) | agent | Single-column execution lifecycle |
 | [`drivers/`](drivers/README.md) | driver-run-support, driver-native, driver-langchain, driver-langgraph, driver-deepagents, driver-openai-agents, driver-claude-agent-sdk, driver-plan-execute, driver-self-critique, driver-autogen, driver-crewai | Shared driver run-support kit and ten loop-architecture backends |
 | [`dimensions/`](dimensions/README.md) | dimensions | Experiment dimension catalog and options |
+| [`custom/`](custom/README.md) | summary-budget, memory-top-n, tool-replay | One custom comparison dimension per leaf; each is only allowed to depend on contracts |
 | [`evaluation/`](evaluation/README.md) | evaluation | Judging, comparison reports, ablation rows, matrix aggregation |
 | [`providers/`](providers/README.md) | provider-catalog, provider-langchain | Provider seam (catalog/config/lookup) and LangChain SDK model construction |
 | [`arena/`](arena/README.md) | arena-dimensions, arena-runner | Dimension routing + baselines, parallel multi-column runner |

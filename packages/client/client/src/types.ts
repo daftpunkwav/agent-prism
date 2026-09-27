@@ -93,7 +93,7 @@ export type {
 } from "@agentprism/contracts";
 
 /** Dimension mapping constants: contract single source (contracts/dimension-field), consumed by the frontend through this outlet. */
-export { DIMENSION_FIELD, DIMENSION_IDS } from "@agentprism/contracts";
+export { BUILDER_CUSTOM_BLOCK_PREFIX, customBlockDimension, customFieldDimension, customFieldKey, DIMENSION_FIELD, DIMENSION_IDS, dimensionFieldName } from "@agentprism/contracts";
 
 /** Unified clamp ranges for decode-default editing controls: contract single source (contracts/decode-options), shared by both editors. */
 export { DECODE_FIELD_RANGES } from "@agentprism/contracts";

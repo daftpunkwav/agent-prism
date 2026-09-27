@@ -42,6 +42,7 @@ function context(language: string | undefined, override = ""): AgentExecutionCon
       history_mode: "minimal",
       prompt_version: "v1.0.0",
       label: "col",
+      custom: {},
     },
     question: "你好",
     history: [],

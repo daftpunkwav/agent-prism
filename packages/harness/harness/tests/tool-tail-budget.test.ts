@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { LlmMessage } from "@agentprism/contracts";
+import { ContextStrategySchema } from "@agentprism/contracts";
 import { applyContextPipeline } from "../src/context/pipeline.js";
 import { prepareMessagesForLlm } from "../src/context/messages.js";
 import { applyTokenBudget } from "../src/context/token-budget.js";
@@ -87,9 +88,14 @@ describe("pipeline routing", () => {
     expect(() => applyContextPipeline(messages, "bogus")).toThrow();
   });
 
-  it("registers all six policies", () => {
-    expect(createBuiltinContextPolicyRegistry().listIds()).toEqual([
-      "hybrid", "sliding", "summary", "token_budget", "tool_tail", "vector",
-    ]);
+  it("resolves the config-only strategies through the policy port", () => {
+    // budget/checkpoint are dispatchable by the pipeline and pinned through
+    // PipelineConfig, so the port must resolve them too (the Arena catalog
+    // still offers only the six dimension rows).
+    const registry = createBuiltinContextPolicyRegistry();
+    for (const id of ["budget", "checkpoint"] as const) {
+      expect(() => registry.get(id)).not.toThrow();
+    }
+    expect(registry.listIds()).toHaveLength(ContextStrategySchema.options.length);
   });
 });

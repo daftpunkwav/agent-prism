@@ -11,7 +11,8 @@
  */
 
 import type { ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, TEMPERATURE_OPTIONS, TOP_P_OPTIONS } from "@agentprism/contracts";
+import { customFieldKey, MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, TEMPERATURE_OPTIONS, TOP_P_OPTIONS } from "@agentprism/contracts";
+import { customDimension, customDimensionDefault } from "@agentprism/harness";
 import { currentEndpointLabel, DimensionCatalog, THINKING_BUDGET_OPTIONS, type DimensionOptionTriple } from "@agentprism/dimensions";
 import { snapIntToOptions, snapToOptions } from "./field-values.js";
 
@@ -71,13 +72,20 @@ export class ProviderDimensionSync {
   }
 
   /**
-   * Overwrites capability dimension options from registered plugin projections.
-   * Empty projections are skipped (not blanked): a partial sync must never wipe a dimension.
+   * Overwrites capability dimension options from the registered projection.
+   * Empty projections are skipped (not blanked): a partial sync must never wipe a
+   * dimension. Custom dimensions additionally seed their effective default
+   * (declared, else the first option), so the baseline panel and pin resolution
+   * see it exactly like a builtin default.
    */
   syncCapabilityOptions(options: Partial<Record<string, DimensionOptionTriple[]>>): void {
     for (const [dimension, triples] of Object.entries(options)) {
       if (triples === undefined || triples.length === 0) continue;
-      this.dimensionCatalog.setDimensionOptions(dimension as "prompt", triples);
+      this.dimensionCatalog.setDimensionOptions(dimension, triples);
+      const custom = customDimension(dimension);
+      if (custom !== undefined) {
+        this.dimensionCatalog.setDefaultBase(customFieldKey(dimension), customDimensionDefault(custom));
+      }
     }
   }
 

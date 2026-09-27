@@ -7,8 +7,9 @@
  * - Provide default tokens per field
  */
 
-import { DECODE_FIELD_RANGES, DEFAULT_MODEL_ID, DIMENSION_IDS, type DimensionId } from "@agentprism/contracts";
-import { DIMENSION_FIELD, type DimensionCatalog } from "@agentprism/dimensions";
+import { customFieldKey, DECODE_FIELD_RANGES, DEFAULT_MODEL_ID, DIMENSION_IDS, dimensionFieldName } from "@agentprism/contracts";
+import { DimensionCatalog } from "@agentprism/dimensions";
+import { listCustomDimensions } from "@agentprism/harness";
 import { isFloatField, normalizeOptionToken } from "./field-values.js";
 
 /**
@@ -47,7 +48,7 @@ export function baselineDefaultToken(catalog: DimensionCatalog, fieldName: strin
 
 /** Baseline panel field list (dimension fields + baseline-only fields). */
 export function listBaselineFields(deps: BaselineFieldsDeps): Array<{
-  dimension: DimensionId | null;
+  dimension: string | null;
   field: string;
   label: string;
   group: string;
@@ -81,7 +82,7 @@ export function listBaselineFields(deps: BaselineFieldsDeps): Array<{
     };
   };
   const fields: Array<{
-    dimension: DimensionId | null;
+    dimension: string | null;
     field: string;
     label: string;
     group: string;
@@ -95,11 +96,27 @@ export function listBaselineFields(deps: BaselineFieldsDeps): Array<{
   }> = [];
   for (const dimension of DIMENSION_IDS) {
     const options = catalog.dimensionOptions(dimension);
-    const fieldName = DIMENSION_FIELD[dimension];
+    const fieldName = dimensionFieldName(dimension);
     fields.push({
       dimension,
       field: fieldName,
       label: catalog.fieldLabel(dimension),
+      group: catalog.fieldGroup(fieldName),
+      default: baselineDefaultToken(catalog, fieldName),
+      options: options.map((option) => ({ value: option.value, label: option.label })),
+      ...numericMeta(fieldName),
+    });
+  }
+  // Custom dimensions: one pinnable field each, keyed by the synthetic
+  // `custom.<id>` name the baseline payload carries inside the `custom` record.
+  for (const dimension of listCustomDimensions()) {
+    const fieldName = customFieldKey(dimension.id);
+    const options = catalog.dimensionOptions(dimension.id);
+    if (options.length === 0) continue;
+    fields.push({
+      dimension: dimension.id,
+      field: fieldName,
+      label: dimension.label,
       group: catalog.fieldGroup(fieldName),
       default: baselineDefaultToken(catalog, fieldName),
       options: options.map((option) => ({ value: option.value, label: option.label })),

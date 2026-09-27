@@ -9,6 +9,7 @@
  */
 
 import type { BaselineOverrides, LlmEndpoint, PipelineConfig, ProviderConfig, ProviderLookup } from "@agentprism/contracts";
+import { dimensionFieldName, customFieldDimension } from "@agentprism/contracts";
 import {
   effectiveThinkingLevel,
   MAX_OUTPUT_TOKENS_OPTIONS,
@@ -16,8 +17,7 @@ import {
   TEMPERATURE_OPTIONS,
   TOP_P_OPTIONS,
 } from "@agentprism/contracts";
-import type { DimensionId } from "@agentprism/contracts";
-import { DIMENSION_FIELD, type DimensionCatalog } from "@agentprism/dimensions";
+import type { DimensionCatalog } from "@agentprism/dimensions";
 import { coerceFieldValue, normalizeOptionToken, snapIntToOptions, snapToOptions } from "./field-values.js";
 
 export interface BaselineResolverDeps {
@@ -32,7 +32,7 @@ export interface BaselineResolverDeps {
  * (throws when no match) → throws on unknown fields / illegal values.
  */
 export function resolveBaselineOverrides(
-  dimension: DimensionId,
+  dimension: string,
   baseline: BaselineOverrides | null | undefined,
   deps: BaselineResolverDeps,
 ): Record<string, unknown> {
@@ -67,9 +67,27 @@ export function resolveBaselineOverrides(
     }
   }
 
-  const lockedField = DIMENSION_FIELD[dimension];
+  const lockedField = dimensionFieldName(dimension);
   const resolved: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
+    // Custom-dimension pins arrive as one nested record; each entry becomes a
+    // synthetic `custom.<id>` field so it is validated exactly like a builtin
+    // baseline field (unknown id or illegal value fails loud, never silently).
+    if (key === "custom") {
+      for (const [customId, customValue] of Object.entries(value as Record<string, unknown>)) {
+        const customField = dimensionFieldName(customId);
+        if (customField === lockedField) continue;
+        if (!deps.dimensionCatalog.isKnownField(customField)) {
+          throw new Error(`Baseline does not support custom dimension: ${customId}`);
+        }
+        const customToken = normalizeOptionToken(customField, customValue);
+        if (!deps.dimensionCatalog.isLegalFieldValue(customField, customToken)) {
+          throw new Error(`Baseline custom dimension "${customId}" has unsupported value: ${String(customValue)}`);
+        }
+        resolved[customField] = customToken;
+      }
+      continue;
+    }
     if (key === lockedField) continue;
     // Column label is an identity pin (threads), not a comparison variable: pass through
     // without dimension-catalog validation; buildPipelineBase applies it verbatim.
@@ -142,6 +160,8 @@ export function buildPipelineBase(
       Number(base.max_output_tokens ?? snapIntToOptions(provider.max_output_tokens, MAX_OUTPUT_TOKENS_OPTIONS)),
     ),
     label: "",
+    // Custom-dimension values collect here from the `custom.<id>` override keys.
+    custom: {} as Record<string, string>,
   };
 
   for (const [key, value] of Object.entries(overrides)) {
@@ -163,6 +183,12 @@ export function buildPipelineBase(
       continue;
     }
     if (key === "thinking_level") {
+      continue;
+    }
+    // Synthetic custom fields collect into the nested record PipelineConfig carries.
+    const customId = customFieldDimension(key);
+    if (customId !== "") {
+      (data.custom as Record<string, string>)[customId] = String(value);
       continue;
     }
     data[key] = coerceFieldValue(key, value);
@@ -209,5 +235,6 @@ function toPipelineConfig(data: Record<string, unknown>): PipelineConfig {
     history_mode: data.history_mode as PipelineConfig["history_mode"],
     prompt_version: data.prompt_version as PipelineConfig["prompt_version"],
     label: data.label as PipelineConfig["label"],
+    custom: (data.custom ?? {}) as PipelineConfig["custom"],
   };
 }

@@ -30,6 +30,18 @@ export const DimensionIdSchema = z.enum([
 ]);
 export type DimensionId = z.infer<typeof DimensionIdSchema>;
 
+/**
+ * True only for a builtin dimension id. Custom dimensions (registered
+ * subpackages) own ids outside this set: they surface as their own comparison
+ * axis and Builder block, so a descriptor reusing a builtin id would be
+ * shadowed by the builtin and is rejected at registration instead.
+ */
+export function isBuiltinDimensionId(id: string): boolean {
+  return DIMENSION_ID_SET.has(id);
+}
+
+const DIMENSION_ID_SET: ReadonlySet<string> = new Set<string>(DimensionIdSchema.options);
+
 /** Model thinking effort levels. */
 export const ThinkingLevelSchema = z.enum(["off", "low", "medium", "high"]);
 export type ThinkingLevel = z.infer<typeof ThinkingLevelSchema>;
@@ -45,6 +57,23 @@ export type ReasoningMode = z.infer<typeof ReasoningModeSchema>;
 /** Context assembly strategies. */
 export const ContextStrategySchema = z.enum(["sliding", "summary", "vector", "hybrid", "tool_tail", "token_budget", "budget", "checkpoint"]);
 export type ContextStrategy = z.infer<typeof ContextStrategySchema>;
+
+/**
+ * Builtin context-strategy ids as a lookup set, derived from the schema above so
+ * the pipeline dispatch, the analytics observation gate and the builtin policy
+ * registry share one list.
+ */
+export const CONTEXT_STRATEGY_IDS: ReadonlySet<string> = new Set<string>(ContextStrategySchema.options);
+
+/**
+ * True only for a builtin strategy: the pipeline dispatches exactly these ids,
+ * and every observation lands in the effectiveness report under its id. A
+ * custom-dimension id inside this set would merge its rows with the builtin
+ * strategy's, so dimension registration rejects those ids.
+ */
+export function isBuiltinContextStrategy(id: string): boolean {
+  return CONTEXT_STRATEGY_IDS.has(id);
+}
 
 /** Harness capability levels (verification / reflection / self-evolution loops). */
 export const HarnessLevelSchema = z.enum(["bare", "verify", "reflect", "self_evolve"]);

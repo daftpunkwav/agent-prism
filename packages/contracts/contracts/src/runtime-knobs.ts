@@ -11,11 +11,24 @@
  * live in config (defaultRuntimeKnobs over the Settings reads).
  */
 
+import type { HarnessLevel } from "./enums.js";
+
 /** Retry caps per harness level (overrides HARNESS_MAX_RETRIES when present). */
 export interface HarnessRetriesKnobs {
   verify: number;
   reflect: number;
   selfEvolve: number;
+}
+
+/**
+ * Maps the operator's harness retry knobs onto the run-level override bag keyed
+ * by harness level token. The knob keeps the wire's camelCase `selfEvolve` while
+ * runVerificationLoop reads `maxRetries[level]` (level token `self_evolve`), so a
+ * hand-written camelCase key typechecks and is silently ignored at runtime — that
+ * cap would never apply. This is the single mapping seam between the two shapes.
+ */
+export function harnessRetryCaps(knobs: HarnessRetriesKnobs): Partial<Record<HarnessLevel, number>> {
+  return { verify: knobs.verify, reflect: knobs.reflect, self_evolve: knobs.selfEvolve };
 }
 
 /** Operator-tunable runtime values applied live (no restart). */

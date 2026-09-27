@@ -37,7 +37,9 @@ const warnedKeys = new Set<string>();
 /**
  * Resolves a message with the full fallback chain. In development a missing key
  * renders as ⟦key⟧ with a console warning; in production it degrades to the raw
- * key string instead of crashing or hiding the slot.
+ * key string instead of crashing or hiding the slot. Both degraded shapes are
+ * recognized by `isMissingMessage`, the single check for callers that carry
+ * their own fallback text.
  */
 export function resolveMessage(
   locale: AppLocale,
@@ -58,4 +60,14 @@ export function resolveMessage(
     return `⟦${key}⟧`;
   }
   return key;
+}
+
+/**
+ * Whether a resolved message is a missing-key fallback rather than catalog text
+ * (the dev marker or the production raw key). Callers holding their own display
+ * fallback — server-provided labels for dynamic options — must test with this,
+ * never by matching the marker themselves: the degraded shapes are owned here.
+ */
+export function isMissingMessage(resolved: string, key: string): boolean {
+  return resolved.startsWith("⟦") || resolved === key;
 }

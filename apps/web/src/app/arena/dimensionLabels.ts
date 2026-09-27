@@ -9,6 +9,7 @@
 
 import type { MessageKey } from "@/i18n/catalogs/types";
 import type { useT } from "@/i18n/useT";
+import { isMissingMessage } from "@/i18n/resolveMessage";
 
 type TFn = ReturnType<typeof useT>;
 
@@ -38,11 +39,10 @@ const BASELINE_ONLY_OPTION_FIELDS = new Set(["approval_mode", "sandbox_mode"]);
 /** English canonical suffix emitted by packages/dimensions currentEndpointLabel. */
 export const CANONICAL_CURRENT_SUFFIX = " (current)";
 
-/** Resolves a catalog key; falls back when the entry is missing (⟦ marker) or untranslated. */
+/** Resolves a catalog key; falls back when the entry is missing or untranslated. */
 export function catalogOrFallback(t: TFn, key: MessageKey, fallback: string): string {
   const resolved = t(key);
-  if (resolved.startsWith("⟦") || resolved === key) return fallback;
-  return resolved;
+  return isMissingMessage(resolved, key) ? fallback : resolved;
 }
 
 /** Dimension card / select label. */

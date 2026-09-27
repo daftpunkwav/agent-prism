@@ -93,6 +93,19 @@ describe("resolveBaselineOverrides endpoint/model resolution", () => {
     ).toThrow('Baseline endpoint_id "ghost" has no matching endpoint');
   });
 
+  it("applies a requested endpoint's own model and capability to the column config", () => {
+    const { provider, lookup, catalog } = makeDeps();
+    // Threads pin endpoint_id, so a resumed turn must run the pinned endpoint's
+    // model: dropping this branch would silently run the default endpoint instead.
+    const config = buildPipelineBase(
+      { provider, providerLookup: lookup, dimensionCatalog: catalog },
+      { endpoint_id: "ep-2" },
+    );
+    expect(config.endpoint_id).toBe("ep-2");
+    expect(config.model_id).toBe("other-model");
+    expect(config.thinking_capable).toBe(false);
+  });
+
   it("accepts approval_mode as a baseline-only control field", () => {
     const { provider, lookup, catalog } = makeDeps();
     const resolved = resolveBaselineOverrides("prompt", { approval_mode: "unless_trusted" }, { provider, providerLookup: lookup, dimensionCatalog: catalog });

@@ -12,19 +12,17 @@
  * ablation rows consume these counters to ground "did the strategy matter".
  */
 
-export type StrategyName =
-  | "sliding"
-  | "summary"
-  | "vector"
-  | "hybrid"
-  | "tool_tail"
-  | "token_budget"
-  | "checkpoint"
-  | "budget";
+/**
+ * Any applied strategy id: a builtin pipeline strategy (the `ContextStrategy`
+ * ids in contracts) or a registered custom dimension id. Observations are
+ * id-agnostic on purpose, so a custom-dimension column reports kept/dropped
+ * volume exactly like its builtin siblings.
+ */
+export type StrategyId = string;
 
 /** One observed strategy application. */
 export interface StrategyObservation {
-  strategy: StrategyName;
+  strategy: StrategyId;
   /** Input message count. */
   inputMessages: number;
   /** Output message count. */
@@ -41,7 +39,7 @@ export interface StrategyObservation {
 
 /** Aggregated effectiveness for one strategy. */
 export interface StrategyEffectiveness {
-  strategy: StrategyName;
+  strategy: StrategyId;
   applications: number;
   /** Mean output/input char ratio (compression achieved). */
   meanKeepRate: number;
@@ -76,7 +74,7 @@ export class EffectivenessLog {
 
   /** Effectiveness per strategy, in first-seen order. */
   effectiveness(): StrategyEffectiveness[] {
-    const groups = new Map<StrategyName, StrategyObservation[]>();
+    const groups = new Map<StrategyId, StrategyObservation[]>();
     for (const observation of this.observations) {
       const group = groups.get(observation.strategy) ?? [];
       group.push(observation);

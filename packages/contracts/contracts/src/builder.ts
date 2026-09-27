@@ -28,6 +28,7 @@ import {
 } from "./enums.js";
 import { ArenaEventSchema, PipelineMetricsSchema } from "./events.js";
 import { RunAttachmentSchema } from "./arena.js";
+import { CUSTOM_DIMENSION_ID_MAX, CUSTOM_DIMENSION_ID_RE, CUSTOM_DIMENSION_VALUE_MAX } from "./custom-dimension.js";
 import { ToolRoundSchema } from "./history-mode.js";
 
 /** Per-message content cap of the builder chat history (server-side store enforces the same value). */
@@ -111,6 +112,14 @@ export const BuilderCompositionSchema = z.object({
   history_mode: HistoryModeSchema.default("minimal"),
   approval_mode: ApprovalModeSchema.default("auto"),
   sandbox_mode: SandboxModeSchema.default("off"),
+  /**
+   * Custom-dimension values (`{ [dimensionId]: optionValue }`), one block per
+   * registered dimension. Persisted with the session and carried into the run's
+   * PipelineConfig; validation against the live registry happens at configure
+   * time (builder service) and again at run assembly. Bounds are the descriptor
+   * bounds, so a registered dimension's values always fit.
+   */
+  custom: z.record(z.string().max(CUSTOM_DIMENSION_ID_MAX), z.string().max(CUSTOM_DIMENSION_VALUE_MAX)).default({}),
 });
 export type BuilderComposition = z.infer<typeof BuilderCompositionSchema>;
 export type BuilderCompositionInput = z.input<typeof BuilderCompositionSchema>;
@@ -305,6 +314,31 @@ export const BuilderCapabilityBlockIdSchema = z.enum([
 ]);
 export type BuilderCapabilityBlockId = z.infer<typeof BuilderCapabilityBlockIdSchema>;
 
+/** Prefix of a capability block contributed by a custom dimension (`custom:<dimensionId>`). */
+export const BUILDER_CUSTOM_BLOCK_PREFIX = "custom:";
+
+/**
+ * Capability block id as it appears in the catalog: a builtin slot id, or a
+ * custom dimension's `custom:<id>` block. Builtin slots stay exactly enumerated
+ * (a typo in a catalog row must not render a dead block); custom blocks are
+ * gated by the id grammar and validated against the live registry on apply.
+ */
+export const BuilderCapabilityBlockRefSchema = z.union([
+  BuilderCapabilityBlockIdSchema,
+  z
+    .string()
+    .startsWith(BUILDER_CUSTOM_BLOCK_PREFIX)
+    .refine((value) => CUSTOM_DIMENSION_ID_RE.test(value.slice(BUILDER_CUSTOM_BLOCK_PREFIX.length)), {
+      message: "Custom block id must be custom:<lower_snake_case_dimension_id>",
+    }),
+]);
+export type BuilderCapabilityBlockRef = z.infer<typeof BuilderCapabilityBlockRefSchema>;
+
+/** Dimension id of a custom block id ("" when the block is a builtin slot). */
+export function customBlockDimension(block: string): string {
+  return block.startsWith(BUILDER_CUSTOM_BLOCK_PREFIX) ? block.slice(BUILDER_CUSTOM_BLOCK_PREFIX.length) : "";
+}
+
 const BuilderCapabilityOptionSchema = z.object({
   value: z.string(),
   label: z.string(),
@@ -312,7 +346,20 @@ const BuilderCapabilityOptionSchema = z.object({
 });
 
 const BuilderCapabilityGroupSchema = z.object({
-  block: BuilderCapabilityBlockIdSchema,
+  block: BuilderCapabilityBlockRefSchema,
+  /**
+   * Display label of the block. Builtin slots are titled from the web i18n
+   * catalogs; a custom-dimension block has no catalog entry, so its registered
+   * label travels here (English canonical, localized in the UI when keys exist).
+   */
+  label: z.string().default(""),
+  /**
+   * The block's effective default value: a custom dimension's declared default,
+   * else its first option ("" for builtin slots, whose defaults live in the
+   * composition schema). The palette highlights it and the run applies it when the
+   * composition holds no explicit choice.
+   */
+  default: z.string().default(""),
   options: z.array(BuilderCapabilityOptionSchema),
 });
 

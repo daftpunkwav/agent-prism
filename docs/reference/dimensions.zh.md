@@ -14,7 +14,7 @@
 | `framework` | `framework` | **native**、langchain、langgraph、deepagents、openai_agents、claude_agent_sdk、plan_execute、self_critique、autogen、crewai | 从 driver registry 运行时同步 |
 | `prompt` | `prompt_profile` | **zero_shot**、few_shot、cot_prompt、structured、terse | static |
 | `reasoning` | `reasoning` | **react**、cot_tool、tot、reflexion、self_consistency | 从 contracts `REASONING_MODE_META` 派生 |
-| `context` | `context` | **sliding**、summary、vector、hybrid、tool_tail、token_budget、budget、checkpoint | static |
+| `context` | `context` | **sliding**、summary、vector、hybrid、tool_tail、token_budget | static catalog，经实时 policy registry 过滤 |
 | `harness` | `harness` | **bare**、verify、reflect、self_evolve | static |
 | `temperature` | `temperature` | **0**、0.3、0.7、1，以及 0 至 2 的任意自定义值 | static |
 | `model` | `endpoint_id` | provider endpoints | 从 provider catalog 运行时同步 |
@@ -31,9 +31,19 @@
 备注：
 
 - 能力类 dimension，即 prompt、reasoning、context、harness、toolset，在
-  `STATIC_DIMENSION_OPTIONS` 中起始为空，由 `DimensionCatalog.syncCapabilityOptions`
-  从已注册 plugin 填充。framework 与 model 由 driver 与 provider sync 覆盖写。若
-  prompt、reasoning、context、harness、toolset 最终为空，启动快速失败。
+  `STATIC_DIMENSION_OPTIONS` 中起始为空，启动时从已注册 id 填充：
+  `buildCapabilityOptionProjection` 把 static 表过滤到实时注册表，router 的
+  `syncCapabilityOptions` 应用结果。framework 与 model 由 driver 与 provider sync
+  覆盖写。若 prompt、reasoning、context、harness、toolset 最终为空，启动快速失败。
+- **自定义维度**（`packages/custom/*`，在组合根注册）是各自独立的对比轴，而不是挂在某个
+  内置维度下的额外行：每个维度贡献一个 `DimensionMeta`、一个 Builder 积木块
+  （`custom:<id>`）以及一个可钉的 `custom.<id>` 基线字段。见
+  `docs/reference/add-a-custom-dimension.zh.md`。
+- context dimension 的六行即内置策略。流水线另外实现了 `budget` 与 `checkpoint`
+  （由 `CONTEXT_BUDGET_TOKENS`、`CONTEXT_CHECKPOINT_TARGET_TOKENS` 调参）：Builder 面板
+  枚举 context 的 enum，因此把它们作为积木块提供，API 固定的 `PipelineConfig` 也能携带
+  它们；但它们不是 Arena 的 dimension 选项，因此在 Arena lane 选择器中不可选，也不是合法
+  baseline 值。
 - 仅 baseline 的 decode 字段 `top_p`、`frequency_penalty`、`presence_penalty`、
   `max_output_tokens`，以及安全控制字段 `approval_mode` 与 `sandbox_mode`，位于
   `BASELINE_ONLY_OPTIONS`。
@@ -51,7 +61,7 @@
 - `question` 为 1 至 4000 字符。`selections` 至多 16 个，最少 1 列，见
   `ARENA_MIN_SELECT`。UI 可以停在零选择，显示空状态并禁用 run。`attachments` 至多
   5 个，每个至多 64 KiB 文本。
-- Matrix 请求携带 1 至 8 个 cell，每个为
+- Matrix 请求携带 1 至 32 个 cell，每个为
   `{template_id, dimension?, selections, baseline?}`。
 
 ## `task-templates.ts` 中的任务模板

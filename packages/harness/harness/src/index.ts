@@ -24,6 +24,8 @@ export * from "./context/budget-strategy.js";
 export * from "./context/pair-safety.js";
 export * from "./context/checkpoint-strategy.js";
 export * from "./context/tuning.js";
+export * from "./dimensions/custom-dimensions.js";
+export * from "./dimensions/custom-dimension-hooks.js";
 export * from "./control/tool-guard.js";
 export * from "./control/repeat-reminder.js";
 export * from "./verification/harness-runner.js";

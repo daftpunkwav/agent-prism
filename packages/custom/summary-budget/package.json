@@ -1,6 +1,6 @@
 {
-  "name": "@agentprism/context-assembly",
-  "description": "Example context-strategy plugins: tool-call replay granularity strategies serving as the reference implementation.",
+  "name": "@agentprism/summary-budget",
+  "description": "Summary-budget custom dimension: how much room the summary context strategy keeps.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,12 +10,17 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24"
   }
 }

@@ -32,6 +32,8 @@ export * from "./workspace-name.js";
 export * from "./tool-registry.js";
 export * from "./prompt-section.js";
 export * from "./context-policy.js";
+export * from "./context-tuning.js";
+export * from "./custom-dimension.js";
 export * from "./verification-policy.js";
 export * from "./column-runtime.js";
 export * from "./run-logs.js";

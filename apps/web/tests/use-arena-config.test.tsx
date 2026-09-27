@@ -49,6 +49,32 @@ const META = {
   baseline_defaults: { temperature: "0.7", model_id: "ep-1" },
 } as unknown as ArenaMeta;
 
+/** Meta with a registered custom axis: its options carry the synthetic `custom.<id>` field. */
+const CUSTOM_META = {
+  dimensions: [
+    {
+      id: "summary_budget",
+      label: "Summary budget",
+      subtitle: "How much digested history the summary strategy keeps",
+      options: [
+        { field: "custom.summary_budget", value: "2000", label: "2k tokens" },
+        { field: "custom.summary_budget", value: "8000", label: "8k tokens" },
+      ],
+    },
+    {
+      id: "tool_replay",
+      label: "Tool-result replay",
+      options: [{ field: "custom.tool_replay", value: "writes_only", label: "Writes only" }],
+    },
+  ],
+  baseline_fields: [
+    { field: "custom.summary_budget", dimension: "summary_budget", label: "Summary budget" },
+    { field: "custom.tool_replay", dimension: "tool_replay", label: "Tool-result replay" },
+    { field: "temperature", dimension: "temperature", label: "Temperature" },
+  ],
+  baseline_defaults: { "custom.summary_budget": "2000", temperature: "0.7" },
+} as unknown as ArenaMeta;
+
 const TEMPLATES = [
   {
     id: "tpl-1",
@@ -148,6 +174,31 @@ describe("useArenaConfig", () => {
     act(() => result.current.setDimension("reasoning"));
     // The active dimension's own field locks out of the baseline.
     expect(result.current.baselinePayload).toEqual({ temperature: "0.8", toolset: "full" });
+  });
+
+  it("prefills a custom axis and pins its value as one nested record", async () => {
+    // A registered custom dimension arrives as its own /meta row whose options carry
+    // the synthetic `custom.<id>` field (the server projection) — the frontend must
+    // treat it like any other axis and nest its pinned value for the run request.
+    searchParams = new URLSearchParams("dimension=summary_budget");
+    metaMock.mockResolvedValue(CUSTOM_META);
+    templatesMock.mockResolvedValue([]);
+    const { result } = renderConfig();
+    await waitFor(() => expect(result.current.metaLoading).toBe(false));
+    await waitFor(() => expect(result.current.dimension).toBe("summary_budget"));
+    act(() =>
+      result.current.setBaseline({
+        "custom.summary_budget": "8000",
+        "custom.tool_replay": "writes_only",
+        temperature: "0.9",
+      }),
+    );
+    // Flat `custom.<id>` panel keys travel as the nested record the wire expects,
+    // and the compared axis's own value stays out of the baseline.
+    expect(result.current.baselinePayload).toEqual({
+      custom: { tool_replay: "writes_only" },
+      temperature: "0.9",
+    });
   });
 
   it("treats null selections as show-all and supports toggling into explicit sets", async () => {

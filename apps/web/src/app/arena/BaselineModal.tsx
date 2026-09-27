@@ -16,9 +16,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { HelpCircle, RotateCcw, X } from "lucide-react";
-import type { ArenaMeta, BaselineOverrides, DimensionId } from "@agentprism/client";
+import type { ArenaMeta, DimensionId } from "@agentprism/client";
 import { UiSelect } from "@agentprism/ui";
-import { BASELINE_GROUP_ORDER } from "./arenaConstants";
+import { BASELINE_GROUP_ORDER, type BaselineDraft } from "./arenaConstants";
 import { useT } from "@/i18n/useT";
 import { baselineFieldLabel, baselineOptionLabel } from "./dimensionLabels";
 
@@ -172,7 +172,7 @@ export interface BaselineModalProps {
   running: boolean;
   meta: ArenaMeta | null;
   dimension: DimensionId;
-  baseline: BaselineOverrides;
+  baseline: BaselineDraft;
   onBaselineFieldChange: (field: string, value: string) => void;
   /** Clears the stored baseline preference and restores server defaults. */
   onResetBaseline: () => void;
@@ -301,7 +301,7 @@ export function BaselineModal({
                         <div className="baseline-pick">
                           {items.map((field) => {
                             const locked = field.dimension === dimension;
-                            const value = (baseline[field.field as keyof BaselineOverrides] ?? field.default) as string;
+                            const value = baseline[field.field] ?? field.default;
                             const fieldLab = baselineFieldLabel(t, field.field, field.label);
                             // Numeric editor only for unlocked number-kind fields with a
                             // server-provided range (old backends omit input/min/max and

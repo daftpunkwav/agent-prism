@@ -3,7 +3,6 @@
  * @description Covers the per-run context analytics seam.
  *
  * Responsibilities:
- * - Pin strategy-name narrowing against the pipeline's strategy set
  * - Lock per-source usage recording and strategy observation bookkeeping
  * - Pin the report rendering entry
  */
@@ -12,20 +11,10 @@ import { describe, expect, it } from "vitest";
 import type { LlmMessage } from "@agentprism/contracts";
 import {
   createContextAnalytics,
-  isStrategyName,
   observeStrategy,
   recordPreparedUsage,
   summarizeAnalytics,
 } from "../../src/context/analytics.js";
-
-describe("isStrategyName", () => {
-  it("accepts exactly the pipeline strategy ids", () => {
-    for (const id of ["sliding", "summary", "vector", "hybrid", "tool_tail", "token_budget", "budget", "checkpoint"]) {
-      expect(isStrategyName(id)).toBe(true);
-    }
-    expect(isStrategyName("mystery")).toBe(false);
-  });
-});
 
 describe("context analytics bundle", () => {
   it("records per-source char-proxy usage over prepared messages", () => {
@@ -57,5 +46,15 @@ describe("context analytics bundle", () => {
     const report = summarizeAnalytics(analytics);
     expect(report.effectiveness).toContain("sliding");
     expect(report.usage).toContain("turn");
+  });
+
+  it("observes custom dimension ids on the same rows as builtins", () => {
+    const analytics = createContextAnalytics();
+    const input: LlmMessage[] = [{ role: "tool", content: "r1", toolCallId: "c1" }];
+    observeStrategy(analytics, "custom_axis", input, [], true);
+    const report = summarizeAnalytics(analytics).effectiveness;
+    expect(report).toContain("custom_axis: n=1");
+    expect(report).toContain("dropped_tools=1");
+    expect(report).toContain("ledger=1.00");
   });
 });

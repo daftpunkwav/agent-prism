@@ -1,11 +1,36 @@
 /**
  * @file arena service meta tests
- * @description Locks getMeta: dimensions, sync failures, lazy runner singleton.
+ * @description Locks getMeta: dimensions, custom axes, sync failures, lazy runner singleton.
  */
 
 import { describe, expect, it, vi } from "vitest";
 import { ArenaService, SessionService } from "@agentprism/application";
+import { registerCustomDimensions } from "@agentprism/arena-dimensions";
 import { mockAnswerJudge, mockRouter, mockRunner, mockSessions } from "./arena-service-fixtures.js";
+
+/** Registered custom axis: /meta must surface its own descriptor copy, not a catalog entry. */
+registerCustomDimensions([
+  {
+    id: "meta_probe",
+    label: "Meta probe",
+    subtitle: "Probe axis",
+    options: [
+      { value: "low", label: "Low" },
+      { value: "high", label: "High" },
+    ],
+    default: "low",
+  },
+]);
+
+function makeService(router: ReturnType<typeof mockRouter>): ArenaService {
+  const runner = mockRunner();
+  return new ArenaService({
+    router: router as any,
+    runnerFactory: async () => runner as any,
+    answerJudge: mockAnswerJudge(),
+    sessions: new SessionService({ store: mockSessions() }),
+  });
+}
 
 describe("ArenaService.getMeta contract", () => {
   it("returns metadata including all dimensions", async () => {
@@ -77,6 +102,29 @@ describe("ArenaService.getMeta contract", () => {
     await service.getMeta();
     await service.getMeta();
     expect(factory).toHaveBeenCalledOnce();
+  });
+
+  it("surfaces a registered custom axis with its descriptor label and subtitle", async () => {
+    const meta = await makeService(mockRouter()).getMeta();
+    const row = meta.dimensions.find((dimension) => dimension.id === "meta_probe");
+    // The static dimension catalog has no entry for a package-contributed axis;
+    // the descriptor copy travels on the row instead.
+    expect(row?.label).toBe("Meta probe");
+    expect(row?.subtitle).toBe("Probe axis");
+    expect(row?.options.length).toBeGreaterThan(0);
+  });
+
+  it("drops a custom axis whose options were never synced", async () => {
+    // An axis with no selectable values is not comparable: advertising it would
+    // hand the panel a dimension every run request then rejects.
+    const router = mockRouter({
+      listDimensionOptions: vi.fn((id: string) =>
+        id === "meta_probe" ? [] : [{ field: "reasoning", value: "react", label: "ReAct" }],
+      ),
+    });
+    const meta = await makeService(router).getMeta();
+    expect(meta.dimensions.some((dimension) => dimension.id === "meta_probe")).toBe(false);
+    expect(meta.dimensions.some((dimension) => dimension.id === "framework")).toBe(true);
   });
 });
 

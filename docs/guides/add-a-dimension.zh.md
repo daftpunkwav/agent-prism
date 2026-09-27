@@ -19,11 +19,13 @@ id 加入 `DimensionIdSchema`，并在
 `packages/dimensions/dimensions/src/dimensions/<name>.ts` 保存选项表，含 `value` 与
 label 以及默认值，参照 `mcp.ts`、`skill.ts` 或 `orchestration.ts`。存在两种形态：
 
-- static 选项直接列出：prompt、reasoning、context、harness、temperature、thinking、
-  thinking_budget、max_steps、toolset、mcp、skill、orchestration、memory、history_mode。
-- runtime-synced 选项起始为空，由 `DimensionCatalog.syncCapabilityOptions` 或
-  provider sync 在启动时与 provider 变化时填充：`framework` 来自 driver registry，
-  `model` 来自 provider endpoints。
+- static 选项直接列在 catalog 中并原样供给 /meta：temperature、thinking、
+  thinking_budget、max_steps、mcp、skill、orchestration、memory、history_mode。
+- 受注册表门控的选项在 `STATIC_DIMENSION_OPTIONS` 中起始为空，由启动期能力同步填充：
+  `buildCapabilityOptionProjection` 把 static 表过滤到实时注册表，router 的
+  `syncCapabilityOptions` 应用结果——即 prompt、reasoning、context、harness、toolset。
+  `framework`（driver registry）与 `model`（provider endpoints）则带有 static 种子行，
+  由 driver/provider sync 覆盖写。
 
 有默认值的 dimension 在 `STATIC_DEFAULT_BASE` 注册它。
 
@@ -37,6 +39,11 @@ dimension 改变每列的一件事。
   `top_p`、`frequency_penalty`、`presence_penalty`、`max_output_tokens`。
 
 一次选择恰好隔离该 dimension 的效应。
+
+为什么这不是所有对比想法的路径：**自定义维度包**（`packages/custom/<名字>`）可以声明一整
+条新轴——它的取值、钩子、Builder 积木块与基线字段——而无需改 enum、字段表或任何 driver。
+只要该变体能用一个维度钩子表达，就用它；只有必须成为一等内置维度时，才按本指南改动。见
+[../reference/add-a-custom-dimension.zh.md](../reference/add-a-custom-dimension.zh.md)。
 
 ## 继承的暴露面
 

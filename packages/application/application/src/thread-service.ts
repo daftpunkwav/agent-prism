@@ -310,6 +310,9 @@ export const THREAD_BASELINE_FIELDS = [
   "orchestration",
   "memory",
   "history_mode",
+  // Custom-dimension values are pinned like every other baseline field, so a
+  // thread whose package declared them keeps comparing under the same settings.
+  "custom",
 ] as const;
 
 /** Comparison dimension a thread run pins to (single column of the thread's framework). */
@@ -323,6 +326,13 @@ function baselineOverridesOf(config: PipelineConfig): Record<string, unknown> {
     // fail baseline legality instead of taking the default endpoint the run path
     // resolves for an absent value.
     if (value === "") continue;
+    // The custom record is passed by value: an empty one carries no pin and would
+    // only make the baseline look non-default.
+    if (field === "custom") {
+      if (typeof value !== "object" || value === null || Object.keys(value).length === 0) continue;
+      overrides.custom = { ...(value as Record<string, string>) };
+      continue;
+    }
     overrides[field] = value;
   }
   return overrides;

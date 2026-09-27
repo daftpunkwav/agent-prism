@@ -19,6 +19,11 @@ export interface DimensionOptionTriple {
   field: string;
   value: string;
   label: string;
+  /**
+   * Optional one-line explanation shown as the option's tooltip. Custom
+   * dimensions author one per option; builtin catalogs leave it out.
+   */
+  description?: string;
 }
 
 /** Decode control-variable options that are baseline-only, not comparison dimensions (value, label). Levels must match the contracts/decode-options.ts single source. */

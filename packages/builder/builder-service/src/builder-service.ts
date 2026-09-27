@@ -27,6 +27,7 @@ import type {
   BuilderSwapResult,
   Clock,
   DriverLookup,
+  HarnessLevel,
   IdGenerator,
   RunAttachment,
   MemoryServicePort,
@@ -43,7 +44,7 @@ import type {
   BuilderContextTuning,
   BuilderMcpServerConfig,
 } from "@agentprism/builder-turns";
-import { buildBuilderCatalog, type BuilderCatalogSources } from "@agentprism/builder-turns";
+import { buildBuilderCatalog, type BuilderCatalogSources, type BuilderCustomBlock } from "@agentprism/builder-turns";
 import {
   buildNoToolsNotice,
   buildSwapNotice,
@@ -95,6 +96,12 @@ export interface BuilderServiceDeps {
   endpoints: () => BuilderEndpointBlock[];
   /** Builtin tool definitions for the catalog (injected; builder-service owns no tool implementations). */
   toolDefinitions: () => readonly ToolDefinition[];
+  /**
+   * Registered custom-dimension blocks (injected at the composition root): one
+   * palette block per dimension plus the legal values used to validate a
+   * composition before it runs.
+   */
+  customDimensions: () => readonly BuilderCustomBlock[];
   /** Thinking capability of the effective endpoint (composition endpoint or provider default). */
   resolveThinkingCapable: (endpointId: string) => boolean;
   /** Human-channel wait in ms before ask_user degrades to headless defer (default 5min). */
@@ -102,7 +109,8 @@ export interface BuilderServiceDeps {
   /** Hot runtime knobs shared with the arena runner (absent = built-in defaults). */
   contextTuning?: BuilderContextTuning;
   toolTuning?: { subagentMaxSteps: number; ralphMaxRounds: number; mcpFetchTimeoutMs: number };
-  harnessMaxRetries?: { verify?: number; reflect?: number; selfEvolve?: number };
+  /** Harness retry caps keyed by level token (see contracts' harnessRetryCaps). */
+  harnessMaxRetries?: Partial<Record<HarnessLevel, number>>;
   /** Cross-session memory service backing the memory composition block (absent = stateless). */
   memory?: MemoryServicePort;
   /** Operator MCP servers attached when the composition enables mcp_policy. */
@@ -371,6 +379,7 @@ export class BuilderService {
         .slice(-60_000);
       const config = compositionToPipelineConfig(record.composition, BUILDER_PIPELINE_LABEL, {
         thinkingCapable: this.deps.resolveThinkingCapable(record.composition.endpoint_id),
+        customDimensionDefaults: this.customDimensionDefaults(),
       });
       const runtime = this.deps.modelRuntime.create(config, {
         sink: () => {},
@@ -506,7 +515,11 @@ export class BuilderService {
     yield { stream: "trace", entry: startEntry };
 
     let output: BuilderTurnOutput | null = null;
-    const turnEvents: ArenaEvent[] = [];
+    // Only pairing-relevant events are retained, the same rule the thread turn path
+    // applies: extractToolRounds reads actions and observations only, so holding the
+    // streamed deltas too would pin a live turn's whole transcript (~420 B per event;
+    // 20 k deltas ≈ 8 MB) in a list nothing ever reads.
+    const toolEvents: ArenaEvent[] = [];
     try {
       const iterator = runBuilderTurn(
         {
@@ -521,6 +534,7 @@ export class BuilderService {
           harnessMaxRetries: this.deps.harnessMaxRetries,
           memory: this.deps.memory,
           mcpServers: this.deps.mcpServers,
+          customDimensionDefaults: () => this.customDimensionDefaults(),
         },
         {
           appendTrace: (kind, title, data, appendOptions) =>
@@ -551,7 +565,9 @@ export class BuilderService {
         // Raw arena events land in the journal as they stream (full-fidelity trail).
         if (next.value.stream === "event") {
           this.deps.traceStore.append(id, { kind: "event", turn, event: next.value.event });
-          turnEvents.push(next.value.event);
+          if (next.value.event.type === "action" || next.value.event.type === "observation") {
+            toolEvents.push(next.value.event);
+          }
         }
         yield next.value;
       }
@@ -571,7 +587,7 @@ export class BuilderService {
         const answer = result.answer.slice(0, BUILDER_MESSAGE_MAX_CHARS) || "(no reply)";
         // Same clamp as the client capture path: a stored turn can never outgrow
         // the wire budget, whichever mode renders it later.
-        this.deps.store.appendTurn(id, message, answer, result.workspaceName, turn, clampToolRoundsForWire(extractToolRounds(turnEvents)));
+        this.deps.store.appendTurn(id, message, answer, result.workspaceName, turn, clampToolRoundsForWire(extractToolRounds(toolEvents)));
         trace.append("session", `Turn ${turn} completed · ${result.metrics?.total_tokens ?? 0} tokens`, {
           turn,
           runId: result.runId,
@@ -617,6 +633,17 @@ export class BuilderService {
     }
   }
 
+  /**
+   * Effective default per registered custom dimension (declared, else first
+   * option): the value a run applies when the composition holds no explicit
+   * choice, matching what the palette shows.
+   */
+  private customDimensionDefaults(): Readonly<Record<string, string>> {
+    return Object.fromEntries(
+      this.deps.customDimensions().map((dimension) => [dimension.id, dimension.default]),
+    );
+  }
+
   /** Availability sources against the live registries (never a static snapshot). */
   private catalogSources(): BuilderCatalogSources {
     return {
@@ -626,6 +653,7 @@ export class BuilderService {
       ],
       endpoints: () => this.deps.endpoints(),
       tools: () => this.deps.toolDefinitions(),
+      customDimensions: () => this.deps.customDimensions(),
     };
   }
 
@@ -657,6 +685,9 @@ export class BuilderService {
         .map((framework) => framework.id),
       knownTools: sources.tools().map((definition) => definition.name),
       knownEndpointIds: sources.endpoints().map((endpoint) => endpoint.id),
+      customDimensionValues: Object.fromEntries(
+        sources.customDimensions().map((dimension) => [dimension.id, dimension.options.map((option) => option.value)]),
+      ),
     });
   }
 }

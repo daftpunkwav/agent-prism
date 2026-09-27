@@ -11,6 +11,7 @@
 
 import { DimensionIdSchema } from "./enums.js";
 import type { DimensionId } from "./enums.js";
+import { customFieldKey } from "./custom-dimension.js";
 
 export const DIMENSION_FIELD: Record<DimensionId, string> = {
   framework: "framework",
@@ -33,3 +34,20 @@ export const DIMENSION_FIELD: Record<DimensionId, string> = {
 
 /** All dimension ids (derived from the zod schema, guaranteed same-source with the enum). */
 export const DIMENSION_IDS: readonly DimensionId[] = [...DimensionIdSchema.options];
+
+/**
+ * Field name of any comparison dimension. Builtin ids map to their PipelineConfig
+ * field; a registered custom dimension maps to the synthetic `custom.<id>` field
+ * carried inside the config's `custom` record (see custom-dimension.ts). Single
+ * source for the router, baseline resolution, the panel projection, and the web.
+ *
+ * Own-key lookup: the custom id grammar admits Object.prototype member names
+ * ("constructor", "toString"), and an inherited read would return that member — a
+ * function where a field name belongs — instead of the synthetic `custom.<id>`.
+ */
+export function dimensionFieldName(dimension: string): string {
+  const builtin: string | undefined = Object.hasOwn(DIMENSION_FIELD, dimension)
+    ? (DIMENSION_FIELD as Record<string, string | undefined>)[dimension]
+    : undefined;
+  return builtin ?? customFieldKey(dimension);
+}

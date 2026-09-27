@@ -1,16 +1,17 @@
 /**
  * @file capability-options
- * @description Projects registered capability plugins onto dimension option triples.
+ * @description Projects the registered capability ids onto dimension option triples.
  *
  * Responsibilities:
- * - Map plugin ids to option entries for GET /api/arena/meta
+ * - Map registered prompt/reasoning/context/harness ids to option entries for GET /api/arena/meta
+ * - Project each registered custom dimension onto a comparison axis of its own
  *
  * Labels come from the dimensions static catalogs. Membership is live-registry gated for
- * prompt/context/harness/reasoning; toolset lists every toolset the tools package supports
- * (toolset availability is static, not plugin-registered).
+ * prompt/context/harness/reasoning (prompt section registry, context policy registry);
+ * toolset lists every toolset the tools package supports (toolset availability is static,
+ * not registry-gated).
  */
 
-import type { DimensionId } from "@agentprism/contracts";
 import { REASONING_MODE_META, TOOL_NAMES_BY_TOOLSET } from "@agentprism/contracts";
 import {
   CONTEXT_OPTIONS,
@@ -19,11 +20,8 @@ import {
   TOOLSET_OPTIONS,
   type DimensionOptionTriple,
 } from "@agentprism/dimensions";
-import {
-  createBuiltinContextPolicyRegistry,
-  listContextStrategyPlugins,
-  getBuiltinPromptSectionRegistry,
-} from "@agentprism/harness";
+import { createBuiltinContextPolicyRegistry, getBuiltinPromptSectionRegistry } from "@agentprism/harness";
+import { listCustomDimensionRows } from "./custom-dimension-rows.js";
 
 function idsWithPrefix(allIds: string[], prefix: string): Set<string> {
   const out = new Set<string>();
@@ -37,8 +35,22 @@ function project(catalog: DimensionOptionTriple[], registered: Set<string>): Dim
   return catalog.filter((option) => registered.has(option.value)).map((option) => ({ ...option }));
 }
 
-/** Builds capability dimension options from currently registered plugins. */
-export function buildCapabilityOptionProjection(): Partial<Record<DimensionId, DimensionOptionTriple[]>> {
+/**
+ * Option rows of every registered custom dimension, keyed by its own dimension
+ * id. Built on the arena row projection, so the synthetic field name and the
+ * option triple shape stay single-sourced across /meta, the baseline panel and
+ * this capability projection.
+ */
+function customDimensionOptions(): Record<string, DimensionOptionTriple[]> {
+  return Object.fromEntries(listCustomDimensionRows().map((row) => [row.id, row.options]));
+}
+
+/**
+ * Builds capability dimension options from the currently registered sources.
+ * Keys are builtin dimension ids plus every registered custom dimension id, so
+ * the map is a plain string-keyed record over the live registry.
+ */
+export function buildCapabilityOptionProjection(): Partial<Record<string, DimensionOptionTriple[]>> {
   const sectionIds = getBuiltinPromptSectionRegistry().listIds();
   const contextRegistered = new Set(createBuiltinContextPolicyRegistry().listIds());
   const reasoningFromSections = idsWithPrefix(sectionIds, "reasoning:");
@@ -46,16 +58,13 @@ export function buildCapabilityOptionProjection(): Partial<Record<DimensionId, D
     REASONING_MODE_META.map((meta) => meta.mode).filter((mode) => reasoningFromSections.has(mode)),
   );
   const toolsetRegistered = new Set(Object.keys(TOOL_NAMES_BY_TOOLSET));
-  // Custom-dimension subpackages: registered plugins append their own labels
-  // after the builtin rows; ARENA_CUSTOM_DIMENSIONS=off turns them off.
+  // Custom-dimension subpackages each own a comparison axis; the env switch turns
+  // every one of them off at once.
   const customEnabled = process.env.ARENA_CUSTOM_DIMENSIONS !== "off";
-  const pluginRows = customEnabled
-    ? listContextStrategyPlugins().map((plugin) => ({ field: "context", value: plugin.id, label: plugin.label }))
-    : [];
 
   return {
     prompt: project(PROMPT_OPTIONS, idsWithPrefix(sectionIds, "profile:")),
-    context: [...project(CONTEXT_OPTIONS, contextRegistered), ...pluginRows],
+    context: project(CONTEXT_OPTIONS, contextRegistered),
     harness: project(HARNESS_OPTIONS, idsWithPrefix(sectionIds, "harness:")),
     reasoning: REASONING_MODE_META.filter((meta) => reasoningRegistered.has(meta.mode)).map(
       (meta): DimensionOptionTriple => ({
@@ -65,5 +74,6 @@ export function buildCapabilityOptionProjection(): Partial<Record<DimensionId, D
       }),
     ),
     toolset: project(TOOLSET_OPTIONS, toolsetRegistered),
+    ...(customEnabled ? customDimensionOptions() : {}),
   };
 }

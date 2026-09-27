@@ -25,6 +25,8 @@ function testDeps() {
       answerQuestion: vi.fn(async () => undefined),
       pendingAsks: vi.fn(async () => [{ agentId: "a1", questions: [] }]),
       stopColumn: vi.fn(async () => undefined),
+      // The run route validates the comparison axis before opening the stream.
+      assertKnownDimension: vi.fn(),
       listTemplates: vi.fn(() => [{ id: "t1", question: "q", suggested_dimension: null, suggested_selections: [], category: "open" }]),
       judge: vi.fn(() => ({ results: {} })),
       judgeAsync: vi.fn(async () => ({ results: {} })),

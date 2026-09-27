@@ -9,9 +9,10 @@
  * Config syncing is delegated; this class keeps routing and queries only.
  */
 
-import type { BaselineOverrides, DimensionId, PipelineConfig } from "@agentprism/contracts";
+import type { BaselineOverrides, PipelineConfig } from "@agentprism/contracts";
+import { dimensionFieldName } from "@agentprism/contracts";
 import { ARENA_MIN_SELECT } from "@agentprism/contracts";
-import { DIMENSION_FIELD, DimensionCatalog, type DimensionOptionTriple } from "@agentprism/dimensions";
+import { DimensionCatalog, type DimensionOptionTriple } from "@agentprism/dimensions";
 import { coerceFieldValue, normalizeOptionToken } from "./field-values.js";
 import { resolveBaselineOverrides, buildPipelineBase } from "./baseline.js";
 import { listBaselineFields } from "./baseline-fields.js";
@@ -43,7 +44,7 @@ export class DimensionRouter {
     this.sync.syncFrameworkOptions(available);
   }
 
-  /** Syncs prompt/reasoning/context/harness/toolset options from registered plugins. */
+  /** Syncs prompt/reasoning/context/harness/toolset options from the registered capability ids. */
   syncCapabilityOptions(options: Partial<Record<string, DimensionOptionTriple[]>>): void {
     this.sync.syncCapabilityOptions(options);
   }
@@ -67,7 +68,7 @@ export class DimensionRouter {
     return this.dimensionCatalog.modelCompareReady();
   }
 
-  listDimensionOptions(dimension: DimensionId): Array<{ field: string; value: string; label: string }> {
+  listDimensionOptions(dimension: string): Array<{ field: string; value: string; label: string }> {
     if (dimension === "model") this.sync.ensureModelSynced();
     return this.dimensionCatalog.dimensionOptions(dimension);
   }
@@ -80,7 +81,7 @@ export class DimensionRouter {
   }
 
   /** Core of the single-variable principle: each column differs only in the comparison dimension's field. */
-  route(dimension: DimensionId, selections: string[] | null | undefined, baseline?: BaselineOverrides | null): PipelineConfig[] {
+  route(dimension: string, selections: string[] | null | undefined, baseline?: BaselineOverrides | null): PipelineConfig[] {
     if (dimension === "model") this.sync.ensureModelSynced();
 
     const options = this.dimensionCatalog.dimensionOptions(dimension);
@@ -153,9 +154,9 @@ export class DimensionRouter {
   }
 
   /** Normalizes a raw selection token so numeric dimensions dedupe alternate spellings of one value. */
-  private normalizeSelectionToken(dimension: DimensionId, raw: string): string {
+  private normalizeSelectionToken(dimension: string, raw: string): string {
     if (dimension === "max_steps" || dimension === "temperature") {
-      return normalizeOptionToken(DIMENSION_FIELD[dimension], raw);
+      return normalizeOptionToken(dimensionFieldName(dimension), raw);
     }
     return raw;
   }
@@ -167,9 +168,9 @@ export class DimensionRouter {
    * out-of-range values so the caller keeps failing loudly (never silently
    * running a column the user did not ask for).
    */
-  private customNumericEntry(dimension: DimensionId, token: string): { field: string; token: string; label: string } | undefined {
+  private customNumericEntry(dimension: string, token: string): { field: string; token: string; label: string } | undefined {
     if (dimension !== "max_steps" && dimension !== "temperature") return undefined;
-    const field = DIMENSION_FIELD[dimension];
+    const field = dimensionFieldName(dimension);
     if (!this.dimensionCatalog.isLegalFieldValue(field, token)) return undefined;
     if (dimension === "max_steps") {
       return { field, token, label: token === "unlimited" ? "unlimited" : `${token} steps` };

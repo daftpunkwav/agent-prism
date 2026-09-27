@@ -3,7 +3,11 @@
  * @description Registry of ContextPolicy implementations keyed by strategy id.
  *
  * Responsibilities:
- * - Resolve strategies by id; unknown ids fail closed
+ * - Resolve builtin strategies by id; unknown ids fail closed
+ *
+ * Custom comparison dimensions are a separate axis (see ../dimensions): they do
+ * not become context strategies, so the strategy set here is exactly the
+ * contracts enum and every id the pipeline dispatches is resolvable.
  */
 
 import type {
@@ -11,11 +15,11 @@ import type {
   ContextPolicyInput,
   ContextPolicyRegistry,
   ContextStrategy,
-  ContextStrategyPlugin,
   LlmMessage,
 } from "@agentprism/contracts";
+import { ContextStrategySchema } from "@agentprism/contracts";
 import { UnknownPromptConfigError } from "../prompt/errors.js";
-import { applyContextPipeline, finishContextPipeline } from "./pipeline.js";
+import { applyContextPipeline } from "./pipeline.js";
 
 class StrategyPolicy implements ContextPolicy {
   constructor(readonly id: ContextStrategy) {}
@@ -60,36 +64,11 @@ export class MapContextPolicyRegistry implements ContextPolicyRegistry {
   }
 }
 
-class PluginPolicy implements ContextPolicy {
-  // Plugin ids live outside the ContextStrategy enum; the registry treats ids
-  // as opaque strings, so the cast only satisfies the port's nominal type.
-  readonly id: ContextStrategy;
-
-  constructor(readonly plugin: ContextStrategyPlugin) {
-    this.id = plugin.id as ContextStrategy;
-  }
-
-  // The plugin shapes replayed messages; sanitize + tool grounding still run
-  // through the shared pipeline tail so custom strategies stay comparable.
-  apply(input: ContextPolicyInput): LlmMessage[] {
-    return finishContextPipeline(this.plugin.apply(input.messages), {});
-  }
-}
-
-// Public API re-export: the plugin map lives in its own module so the live
-// pipeline (applyContextPipeline) can dispatch plugin ids without a cycle
-// back into this file.
-export { registerContextStrategyPlugins, listContextStrategyPlugins } from "./strategy-plugins.js";
-import { listContextStrategyPlugins as listPlugins } from "./strategy-plugins.js";
-
-/** Creates a registry with the builtin policies plus every registered plugin. */
+/** Creates a registry with every builtin policy (same set the pipeline dispatches on). */
 export function createBuiltinContextPolicyRegistry(): MapContextPolicyRegistry {
   const registry = new MapContextPolicyRegistry();
-  for (const id of ["sliding", "summary", "vector", "hybrid", "tool_tail", "token_budget"] as const) {
+  for (const id of ContextStrategySchema.options) {
     registry.register(new StrategyPolicy(id));
-  }
-  for (const plugin of listPlugins()) {
-    registry.register(new PluginPolicy(plugin));
   }
   return registry;
 }

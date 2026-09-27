@@ -38,3 +38,33 @@ describe("validateComposition", () => {
   });
 });
 
+describe("validateComposition custom dimensions", () => {
+  const index = {
+    availableFrameworks: ["native"],
+    knownTools: [...DEFAULT_BUILDER_TOOLS],
+    customDimensionValues: { summary_budget: ["2000", "8000"] },
+  };
+
+  it("accepts a registered dimension with one of its own values", () => {
+    expect(() => validateComposition(baseComposition({ custom: { summary_budget: "8000" } }), index)).not.toThrow();
+  });
+
+  it("rejects an unregistered block and an unsupported value as invalid input", () => {
+    expect(() => validateComposition(baseComposition({ custom: { ghost_axis: "x" } }), index)).toThrow(/ghost_axis/);
+    expect(() => validateComposition(baseComposition({ custom: { summary_budget: "9999" } }), index)).toThrow(
+      /unsupported value/,
+    );
+  });
+
+  it("treats a prototype-named key as an unknown block, never as a crash", () => {
+    // Keys are only length-bounded, so "toString" reaches this check: reading it
+    // off the index would find Object.prototype's member and throw a TypeError
+    // (an HTTP 500) instead of the 422 an unknown block deserves.
+    for (const key of ["toString", "constructor", "hasOwnProperty"]) {
+      expect(() => validateComposition(baseComposition({ custom: { [key]: "x" } }), index)).toThrow(
+        /Unknown custom dimension block/,
+      );
+    }
+  });
+});
+

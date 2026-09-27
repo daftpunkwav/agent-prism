@@ -147,6 +147,8 @@ export function mockDeps(overrides: Partial<HttpApplicationDeps> = {}): HttpAppl
     arena: {
       getMeta: vi.fn().mockResolvedValue({ dimensions: [], frameworks: [], baseline_defaults: {}, baseline_fields: [], model_compare_ready: false }),
       run: vi.fn(),
+      // Dimensions are validated before the stream opens (422 for unknown axes).
+      assertKnownDimension: vi.fn(),
       listTemplates: vi.fn().mockReturnValue([]),
       judge: vi.fn().mockReturnValue({ template_id: "t", template_name: "T", judge_type: "keyword", results: {} }),
     } as any,

@@ -12,7 +12,7 @@
  * the token tracker. Role → source mapping is message-granularity truth.
  */
 
-import { EffectivenessLog, UsageLedger, renderEffectivenessReport, renderUsageReport, type StrategyName, type StrategyObservation, type TurnUsage } from "@agentprism/context-analytics";
+import { EffectivenessLog, UsageLedger, renderEffectivenessReport, renderUsageReport, type StrategyId, type StrategyObservation, type TurnUsage } from "@agentprism/context-analytics";
 import type { LlmMessage } from "@agentprism/contracts";
 
 /** Analytics carriers for one run (both append-only, both optional to wire). */
@@ -24,15 +24,6 @@ export interface ContextAnalytics {
 /** Creates an empty analytics bundle for one run. */
 export function createContextAnalytics(): ContextAnalytics {
   return { usage: new UsageLedger(), effectiveness: new EffectivenessLog() };
-}
-
-const STRATEGY_NAMES = new Set<StrategyName>([
-  "sliding", "summary", "vector", "hybrid", "tool_tail", "token_budget", "budget", "checkpoint",
-]);
-
-/** Narrows a pipeline strategy id to the analytics union (same set as the pipeline). */
-export function isStrategyName(value: string): value is StrategyName {
-  return STRATEGY_NAMES.has(value as StrategyName);
 }
 
 /** Maps a prepared message role to its usage source (message-granularity truth). */
@@ -69,10 +60,14 @@ export function summarizeAnalytics(analytics: ContextAnalytics): { usage: string
   };
 }
 
-/** Observes one strategy application from its input/output message lists. */
+/**
+ * Observes one strategy application from its input/output message lists. The id
+ * is opaque: builtin strategies and registered custom dimensions are observed
+ * the same way, so both appear in the run's effectiveness rows.
+ */
 export function observeStrategy(
   analytics: ContextAnalytics,
-  strategy: StrategyName,
+  strategy: StrategyId,
   input: readonly LlmMessage[],
   output: readonly LlmMessage[],
   ledgerEmitted: boolean,

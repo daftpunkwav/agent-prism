@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { AppError } from "@agentprism/application";
 import { buildTestApp, mockDeps } from "./mock-deps.js";
 
 describe("http-app arena run streaming", () => {
@@ -60,6 +61,29 @@ describe("http-app arena run streaming", () => {
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(422);
+  });
+
+  it("POST /api/arena/run rejects an unknown comparison axis before the stream opens", async () => {
+    const deps = mockDeps();
+    (deps.arena as any).assertKnownDimension = vi.fn(() => {
+      throw AppError.unprocessable(
+        'Unknown dimension "ghost_axis" (not a builtin dimension nor a registered custom dimension)',
+      );
+    });
+    const app = buildTestApp(deps);
+    const res = await app.request("/api/arena/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: "test question", dimension: "ghost_axis", selections: ["x"] }),
+    });
+    // The axis check runs before streamSSE: a rejected axis is a plain 422 JSON
+    // response (with a client-visible detail naming it), never a 200 SSE stream
+    // that only fails once it is open, and the run itself never starts.
+    expect(res.status).toBe(422);
+    expect(res.headers.get("content-type") ?? "").not.toContain("text/event-stream");
+    expect(((await res.json()) as { detail: string }).detail).toContain("ghost_axis");
+    expect(deps.arena.assertKnownDimension).toHaveBeenCalledWith("ghost_axis");
+    expect(deps.arena.run).not.toHaveBeenCalled();
   });
 
 });

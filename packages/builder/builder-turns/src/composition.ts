@@ -46,6 +46,12 @@ export interface CompositionBlockIndex {
   knownTools: readonly string[];
   /** Known endpoint ids; when provided, a non-empty unknown endpoint_id rejects ("" always means the provider default). */
   knownEndpointIds?: readonly string[];
+  /**
+   * Legal values per registered custom dimension. When provided, an unknown
+   * dimension id or an illegal value rejects at configure time; a custom value
+   * with no entry here would only fail later, at run assembly.
+   */
+  customDimensionValues?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** Rejects unknown framework or tool blocks with a message naming the offender. */
@@ -69,6 +75,23 @@ export function validateComposition(composition: BuilderComposition, index: Comp
   ) {
     throw BuilderError.invalid(`Unknown endpoint block "${composition.endpoint_id}" (it may have been deleted or renamed)`);
   }
+  if (index.customDimensionValues !== undefined) {
+    for (const [dimensionId, value] of Object.entries(composition.custom)) {
+      // Own-key lookup: the record is caller input whose keys are only bounded by
+      // length, so "toString"/"constructor" reach here — an inherited
+      // Object.prototype member would make the includes() below throw a TypeError
+      // (a 500) for what is really an unknown block (422).
+      const legal = Object.hasOwn(index.customDimensionValues, dimensionId)
+        ? index.customDimensionValues[dimensionId]
+        : undefined;
+      if (legal === undefined) {
+        throw BuilderError.invalid(`Unknown custom dimension block "${dimensionId}" (no registered package provides it)`);
+      }
+      if (!legal.includes(value)) {
+        throw BuilderError.invalid(`Custom dimension "${dimensionId}" has unsupported value "${value}"`);
+      }
+    }
+  }
 }
 
 /**
@@ -76,11 +99,17 @@ export function validateComposition(composition: BuilderComposition, index: Comp
  * banners and prompt profiles: the authoritative tool authorization travels via
  * the run's explicit tool names, so a custom subset maps to "full" as the widest
  * description base and the actual bound set is always narrower (fail-closed).
+ *
+ * `customDimensionDefaults` are the registered dimensions' effective defaults
+ * (the declared one, else the first option): a dimension the author never touched
+ * still runs under its own default, exactly like every builtin block (whose unset
+ * value is the schema default). Without the fill, a block the palette shows as
+ * selected would run as "not selected at all".
  */
 export function compositionToPipelineConfig(
   composition: BuilderComposition,
   label: string,
-  options: { thinkingCapable: boolean },
+  options: { thinkingCapable: boolean; customDimensionDefaults?: Readonly<Record<string, string>> },
 ): PipelineConfig {
   return {
     framework: composition.framework,
@@ -112,6 +141,10 @@ export function compositionToPipelineConfig(
     memory: composition.memory,
     history_mode: composition.history_mode,
     prompt_version: "v1.0.0",
+    // Custom-dimension blocks ride straight into the run config; unknown ids are
+    // rejected at configure time (validateComposition) and again at run assembly,
+    // and an explicit choice always wins over the dimension's declared default.
+    custom: { ...options.customDimensionDefaults, ...composition.custom },
     label,
   };
 }
@@ -157,6 +190,7 @@ const COMPARABLE_FIELDS = [
   "history_mode",
   "approval_mode",
   "sandbox_mode",
+  "custom",
 ] as const;
 
 /**
@@ -174,6 +208,11 @@ export function diffComposition(before: BuilderComposition, after: BuilderCompos
       changedFields.push(field);
       continue;
     }
+    if (field === "custom") {
+      if (sameRecord(before.custom, after.custom)) continue;
+      changedFields.push(field);
+      continue;
+    }
     if (before[field] !== after[field]) changedFields.push(field);
   }
   return {
@@ -185,6 +224,12 @@ export function diffComposition(before: BuilderComposition, after: BuilderCompos
 
 function sameSet(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((name) => right.includes(name));
+}
+
+/** Key-order-insensitive equality for the custom-value record. */
+function sameRecord(left: Readonly<Record<string, string>>, right: Readonly<Record<string, string>>): boolean {
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
 }
 
 /** Builds the model-facing notice describing one hot-swap (English, injected into the system prompt). */

@@ -18,7 +18,7 @@ import type {
   PipelineMetrics,
   ToolExecutionResult,
 } from "@agentprism/contracts";
-import type { AgentExecutionContext } from "@agentprism/harness";
+import { registerCustomDimensions, type AgentExecutionContext } from "@agentprism/harness";
 import { BuilderCreateRequestSchema, BuilderPatchRequestSchema, completeEvent } from "@agentprism/contracts";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import { BuilderService } from "../src/builder-service.js";
@@ -27,6 +27,7 @@ import type { AppendFile } from "@agentprism/persistence";
 import { SessionService } from "@agentprism/application";
 import { InMemorySessionStore } from "@agentprism/session";
 import { BuilderError } from "@agentprism/builder-turns";
+import type { BuilderCustomBlock } from "@agentprism/builder-turns";
 import { createBuiltinToolRegistry } from "@agentprism/tool-builtins";
 import { BuilderSessionStore } from "../src/builder-session-store.js";
 import type { BuilderModelRuntimeFactory } from "@agentprism/builder-turns";
@@ -173,10 +174,43 @@ class MemoryAppendFile implements AppendFile {
   }
 }
 
+/** Registered custom-dimension blocks, as the composition root injects them. */
+function axisOne(): BuilderCustomBlock {
+  return {
+    id: "probe_axis",
+    label: "Probe axis",
+    subtitle: "Probe axis subtitle",
+    default: "high",
+    options: [
+      { value: "low", label: "Low", description: "" },
+      { value: "high", label: "High", description: "" },
+    ],
+  };
+}
+
+function axisTwo(): BuilderCustomBlock {
+  return {
+    id: "probe_second",
+    label: "Probe second",
+    subtitle: "",
+    default: "two",
+    options: [
+      { value: "one", label: "One", description: "" },
+      { value: "two", label: "Two", description: "" },
+    ],
+  };
+}
+
+// The composition root registers the packages once and injects the same rows into
+// the service: the run assembly resolves `config.custom` against this registry, so
+// the fixture must be registered here too (a deps-only stub would fail the turn).
+registerCustomDimensions([axisOne(), axisTwo()]);
+
 function makeService(
   harness: Pick<DriverHarness, "lookup">,
   sessions: SessionService = makeSessionLedger(),
   runtime: BuilderModelRuntimeFactory = modelRuntime,
+  customDimensions: readonly BuilderCustomBlock[] = [],
 ): BuilderService {
   const runsRoot = mkdtempSync(join(tmpdir(), "builder-service-test-"));
   const traceFiles = new Map<string, MemoryAppendFile>();
@@ -214,6 +248,8 @@ function makeService(
     endpoints: () => [{ id: "ep1", name: "MiniMax", model: "abab", api_format: "openai_chat", thinking_capable: true }],
     // Real builtin surface: composition validation must see ask_user & co.
     toolDefinitions: () => createBuiltinToolRegistry().listDefinitions(),
+    // Registered custom-dimension packages, injected at the composition root.
+    customDimensions: () => customDimensions,
     resolveThinkingCapable: () => true,
     sessions,
   });
@@ -315,6 +351,54 @@ describe("BuilderService.chatTurn", () => {
     expect(harness.contexts[0]?.systemPromptOverride).toBe("You are a pirate.");
   });
 
+  it("advertises each registered dimension as a palette block", () => {
+    const service = makeService(makeDriverHarness(["fake"]), makeSessionLedger(), modelRuntime, [
+      axisOne(),
+      axisTwo(),
+    ]);
+    const capabilities = service.catalog().capabilities;
+    const block = capabilities.find((entry) => entry.block === "custom:probe_axis");
+    // Display and execution agree: the block carries the descriptor copy and the
+    // effective default the run applies when the composition holds no choice.
+    expect(block?.label).toBe("Probe axis");
+    expect(block?.default).toBe("high");
+    expect(block?.options.map((option) => option.value)).toEqual(["low", "high"]);
+    // Builtin slots are untouched by the custom projection.
+    expect(capabilities.find((entry) => entry.block === "context")?.default).toBe("");
+    expect(capabilities.some((entry) => entry.block === "custom:probe_second")).toBe(true);
+  });
+
+  it("runs a custom block's explicit value and an unset block's declared default", async () => {
+    const harness = makeDriverHarness(["fake"], { block: false });
+    const service = makeService(harness, makeSessionLedger(), modelRuntime, [axisOne(), axisTwo()]);
+    const view = service.createSession(
+      BuilderCreateRequestSchema.parse({
+        name: "Custom",
+        composition: { framework: "fake", custom: { probe_axis: "low" } },
+      }),
+    );
+
+    await collect(service.chatTurn(view.id, "go"));
+
+    // The explicit choice stays; the unset block runs the default its chip shows.
+    expect(harness.contexts[0]?.config.custom).toEqual({ probe_axis: "low", probe_second: "two" });
+    // The choice is persisted, not only carried into this turn's run.
+    const detail = await service.getSessionDetail(view.id);
+    expect(detail.session.composition.custom).toEqual({ probe_axis: "low" });
+  });
+
+  it("rejects a custom block no registered dimension provides", () => {
+    const service = makeService(makeDriverHarness(["fake"]), makeSessionLedger(), modelRuntime, [axisOne()]);
+    expect(() =>
+      service.createSession(
+        BuilderCreateRequestSchema.parse({
+          name: "Ghost",
+          composition: { framework: "fake", custom: { ghost_axis: "x" } },
+        }),
+      ),
+    ).toThrow(/ghost_axis/);
+  });
+
   it("rejects a second concurrent turn with 409", async () => {
     const harness = makeDriverHarness(["fake"], { block: true });
     const service = makeService(harness);
@@ -379,6 +463,39 @@ describe("BuilderService.chatTurn", () => {
     const detail = await service.getSessionDetail(view.id);
     expect(detail.session.turn_count).toBe(1);
     expect(detail.session.history.at(-1)).toEqual({ role: "assistant", content: "Final answer here", turn: 1 });
+  });
+
+  it("persists the turn's tool rounds from its action/observation events", async () => {
+    // The turn collection retains only pairing-relevant events (the streamed deltas
+    // are dropped, the same rule the thread turn path applies): the extraction must
+    // still pair each action with the observation that follows it on its column.
+    const script: ArenaEvent[] = [
+      { ...thoughtEvent("x"), type: "thought_delta" as const },
+      {
+        ...thoughtEvent(""),
+        type: "action",
+        step: 1,
+        tool: "bash",
+        args: { cmd: "ls" },
+      },
+      {
+        ...thoughtEvent(""),
+        type: "observation",
+        step: 2,
+        result: "file.txt",
+      },
+      thoughtEvent("Answer with tools"),
+      completeEvent({ pipeline: "builder", metrics: METRICS, turn: 1, runId: "r1", agentId: "a1", timestamp: 0 }),
+    ];
+    const harness = makeDriverHarness(["fake"], { script });
+    const service = makeService(harness);
+    const view = service.createSession(BuilderCreateRequestSchema.parse({ name: "Tools", composition: { framework: "fake" } }));
+
+    await collect(service.chatTurn(view.id, "go"));
+    const detail = await service.getSessionDetail(view.id);
+    expect(detail.session.history.at(-1)?.tool_rounds).toEqual([
+      { tool: "bash", args: { cmd: "ls" }, result: "file.txt" },
+    ]);
   });
 
   it("abortTurn reports whether a turn was running", async () => {

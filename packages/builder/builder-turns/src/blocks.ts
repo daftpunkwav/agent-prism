@@ -14,6 +14,7 @@
 
 import type { ToolDefinition } from "@agentprism/contracts";
 import {
+  BUILDER_CUSTOM_BLOCK_PREFIX,
   ContextStrategySchema,
   HarnessLevelSchema,
   HistoryModeSchema,
@@ -137,11 +138,28 @@ export const CAPABILITY_GROUPS: ReadonlyArray<{
   },
 ];
 
+/** One custom-dimension block: the `custom:<id>` slot plus its selectable values. */
+export interface BuilderCustomBlock {
+  /** Dimension id (the block id is `custom:<id>`). */
+  id: string;
+  label: string;
+  subtitle: string;
+  /**
+   * Effective default value (the declared default, else the first option). The
+   * palette highlights it when the composition has no explicit choice, and the run
+   * applies it (see compositionToPipelineConfig), so display and execution agree.
+   */
+  default: string;
+  options: readonly CapabilityOptionSpec[];
+}
+
 /** Availability sources the catalog assembles from (injected at the composition root). */
 export interface BuilderCatalogSources {
   frameworks: () => Array<{ id: string; name: string; status: "available" | "reserved"; reason?: string }>;
   endpoints: () => BuilderEndpointBlock[];
   tools: () => readonly ToolDefinition[];
+  /** Registered custom dimensions; each becomes one block of the palette. */
+  customDimensions: () => readonly BuilderCustomBlock[];
 }
 
 /** Assembles the block palette from live registries. */
@@ -154,6 +172,15 @@ export function buildBuilderCatalog(sources: BuilderCatalogSources): BuilderCata
       mutates_workspace: definition.mutatesWorkspace,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+  // Custom-dimension blocks append after the builtin slots, one per registered
+  // dimension: the web renders any `custom:<id>` block generically and writes the
+  // selection into composition.custom[id].
+  const customBlocks = sources.customDimensions().map((dimension) => ({
+    block: `${BUILDER_CUSTOM_BLOCK_PREFIX}${dimension.id}`,
+    label: dimension.label,
+    default: dimension.default,
+    options: dimension.options.map((option) => ({ ...option })),
+  }));
   return {
     frameworks: sources.frameworks().map((framework) => ({
       id: framework.id,
@@ -163,9 +190,14 @@ export function buildBuilderCatalog(sources: BuilderCatalogSources): BuilderCata
     })),
     endpoints: sources.endpoints(),
     tools,
-    capabilities: CAPABILITY_GROUPS.map((group) => ({
-      block: group.block,
-      options: group.options.map((option) => ({ ...option })),
-    })),
+    capabilities: [
+      ...CAPABILITY_GROUPS.map((group) => ({
+        block: group.block,
+        label: "",
+        default: "",
+        options: group.options.map((option) => ({ ...option })),
+      })),
+      ...customBlocks,
+    ],
   };
 }

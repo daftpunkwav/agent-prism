@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { ContextStrategySchema } from "@agentprism/contracts";
 import { UnknownPromptConfigError } from "../../src/prompt/errors.js";
 import {
   MapContextPolicyRegistry,
@@ -11,15 +12,12 @@ import {
 } from "../../src/context/policy-registry.js";
 
 describe("createBuiltinContextPolicyRegistry", () => {
-  it("registers the six strategies with sorted ids", () => {
-    expect(createBuiltinContextPolicyRegistry().listIds()).toEqual([
-      "hybrid",
-      "sliding",
-      "summary",
-      "token_budget",
-      "tool_tail",
-      "vector",
-    ]);
+  it("registers every builtin strategy the pipeline can dispatch", () => {
+    // Same set as the pipeline's dispatch list: a strategy the pipeline runs must
+    // also resolve through the port (the Arena catalog decides which are exposed).
+    expect(createBuiltinContextPolicyRegistry().listIds()).toEqual(
+      [...ContextStrategySchema.options].sort(),
+    );
   });
 });
 

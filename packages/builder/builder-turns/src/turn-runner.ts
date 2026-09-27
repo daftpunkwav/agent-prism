@@ -20,7 +20,9 @@ import type {
   ChatMessage,
   Clock,
   ColumnRuntime,
+  ContextTuning,
   DriverLookup,
+  HarnessLevel,
   IdGenerator,
   MemoryServicePort,
   LlmWireRecord,
@@ -59,21 +61,12 @@ export interface BuilderModelRuntimeFactory {
 }
 
 /**
- * Structural ContextTuning (harness dep deliberately avoided here): mirrors the
- * harness tuning knobs field-for-field so the builder never imports execution
- * packages; every field is optional, so the mirror stays assignable both ways.
+ * Builder-facing name for the per-run context budgets. The field list is
+ * single-sourced in contracts (see ContextTuning), so the builder and the harness
+ * cannot drift apart; every field is optional, so the bag stays assignable to the
+ * tuning type the run path expects.
  */
-export interface BuilderContextTuning {
-  windowSize?: number;
-  charsPerToken?: number;
-  summaryMaxChars?: number;
-  tokenBudgetChars?: number;
-  tokenBudgetKeepTurns?: number;
-  toolTailBudgetChars?: number;
-  toolTailKeepChars?: number;
-  budgetTokens?: number;
-  compactTargetTokens?: number;
-}
+export type BuilderContextTuning = ContextTuning;
 
 /** Structural MCP server config (tool-mcp dep deliberately avoided here). */
 export interface BuilderMcpServerConfig {
@@ -95,11 +88,19 @@ export interface BuilderTurnDeps {
   /** Hot runtime knobs shared with the arena runner (absent = built-in defaults). */
   contextTuning?: BuilderContextTuning;
   toolTuning?: { subagentMaxSteps: number; ralphMaxRounds: number; mcpFetchTimeoutMs: number };
-  harnessMaxRetries?: { verify?: number; reflect?: number; selfEvolve?: number };
+  /** Harness retry caps keyed by level token (see contracts' harnessRetryCaps). */
+  harnessMaxRetries?: Partial<Record<HarnessLevel, number>>;
   /** Cross-session memory service backing the memory composition block (absent = stateless). */
   memory?: MemoryServicePort;
   /** Operator MCP servers attached when the composition enables mcp_policy. */
   mcpServers?: readonly BuilderMcpServerConfig[];
+  /**
+   * Effective defaults of the registered custom dimensions (`{ [id]: value }`:
+   * the declared default, else the first option). Filled into the run config for
+   * dimensions the composition does not set, so a palette block shown as selected
+   * always runs.
+   */
+  customDimensionDefaults?: () => Readonly<Record<string, string>>;
 }
 
 export interface BuilderTurnInput {
@@ -189,6 +190,7 @@ export async function* runBuilderTurn(
       const driver = deps.driverLookup.get(input.composition.framework);
       const config = compositionToPipelineConfig(input.composition, BUILDER_PIPELINE_LABEL, {
         thinkingCapable: input.thinkingCapable,
+        customDimensionDefaults: deps.customDimensionDefaults?.(),
       });
       const boundToolNames = [...input.composition.tools];
       const runtime = deps.modelRuntime.create(config, {
@@ -233,7 +235,14 @@ export async function* runBuilderTurn(
         // the head, never the tail. Keeping the first N instead would lose the terminal
         // complete on long turns (thought_delta streams per chunk), misreporting a finished
         // turn as failed and extracting a stale mid-run answer.
-        if (events.length > MAX_TURN_EVENTS) events.splice(0, events.length - MAX_TURN_EVENTS);
+        //
+        // shift(), not splice(0, overflow): one event arrives per iteration, and the cap
+        // must not cost a full tail memmove per streamed chunk — splice(0, 1) measures
+        // ~2.4 us/event at 800 retained vs ~0.2 us for shift(), which V8 left-trims. The
+        // splice branch keeps the cap exact should another push site appear.
+        const overflow = events.length - MAX_TURN_EVENTS;
+        if (overflow === 1) events.shift();
+        else if (overflow > 0) events.splice(0, overflow);
         channel.push({ stream: "event", event });
       }
 

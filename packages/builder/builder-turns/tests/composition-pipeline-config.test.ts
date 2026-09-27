@@ -43,3 +43,35 @@ describe("compositionToPipelineConfig", () => {
   });
 });
 
+
+describe("custom dimension defaults", () => {
+  it("applies a registered dimension's declared default when the composition is unset", () => {
+    // The palette highlights the declared default, so the run must use it: an
+    // unset block that shows as selected while running as "nothing" would be a
+    // silent no-op.
+    const config = compositionToPipelineConfig(baseComposition(), "builder", {
+      thinkingCapable: false,
+      customDimensionDefaults: { summary_budget: "5000", tool_replay: "all" },
+    });
+    expect(config.custom).toEqual({ summary_budget: "5000", tool_replay: "all" });
+  });
+
+  it("keeps an explicit choice over the declared default", () => {
+    const config = compositionToPipelineConfig(
+      baseComposition({ custom: { summary_budget: "8000" } }),
+      "builder",
+      { thinkingCapable: false, customDimensionDefaults: { summary_budget: "5000", tool_replay: "all" } },
+    );
+    expect(config.custom).toEqual({ summary_budget: "8000", tool_replay: "all" });
+  });
+
+  it("carries the composition's values untouched when no defaults are supplied", () => {
+    const config = compositionToPipelineConfig(
+      baseComposition({ custom: { summary_budget: "2000" } }),
+      "builder",
+      { thinkingCapable: false },
+    );
+    expect(config.custom).toEqual({ summary_budget: "2000" });
+    expect(compositionToPipelineConfig(baseComposition(), "builder", { thinkingCapable: false }).custom).toEqual({});
+  });
+});

@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { LlmMessage } from "@agentprism/contracts";
-import { applyContextPipeline } from "../../src/context/pipeline.js";
+import { applyContextPipeline, finishContextPipeline } from "../../src/context/pipeline.js";
 import { createContextAnalytics } from "../../src/context/analytics.js";
 
 describe("applyContextPipeline options", () => {
@@ -57,5 +57,28 @@ describe("applyContextPipeline options", () => {
       charsPerToken: 4,
     });
     expect(quiet).toHaveLength(1); // below threshold: no reminder
+  });
+});
+
+describe("finishContextPipeline tail", () => {
+  it("runs the pair-safety pass so a shed result cannot orphan its call", () => {
+    // A strategy (or custom hook) that deletes a tool result must not leave the
+    // requesting call unanswerable: providers reject that shape outright.
+    const trimmed: LlmMessage[] = [
+      { role: "user", content: "task" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read", args: {} }] },
+    ];
+    const out = finishContextPipeline(trimmed, { sanitizeAndGround: false });
+    expect(out.some((message) => message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0)).toBe(false);
+  });
+
+  it("keeps a paired transcript intact", () => {
+    const paired: LlmMessage[] = [
+      { role: "system", content: "s" },
+      { role: "user", content: "task" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read", args: {} }] },
+      { role: "tool", content: "body", toolCallId: "c1", name: "read" },
+    ];
+    expect(finishContextPipeline(paired, { sanitizeAndGround: false })).toEqual(paired);
   });
 });

@@ -13,6 +13,7 @@ import type {
   AgentIdentity,
   ChatTurnMessage,
   Clock,
+  ContextTuning,
   LlmAdapter,
   MemoryRecallResult,
   PipelineConfig,
@@ -22,7 +23,8 @@ import type {
   ToolRegistry,
 } from "@agentprism/contracts";
 import type { ContextAnalytics } from "./context/analytics.js";
-import type { ContextTuning } from "./context/tuning.js";
+import type { ActiveCustomDimension } from "./dimensions/custom-dimensions.js";
+import type { CustomDimensionRun } from "./dimensions/custom-dimension-hooks.js";
 import type { RagStoreCache } from "./memory/rag.js";
 import type { Workspace } from "@agentprism/runtime";
 import type { TokenTracker } from "@agentprism/telemetry";
@@ -30,6 +32,24 @@ import type { TokenTracker } from "@agentprism/telemetry";
 // Identity and tool-access shapes are single-sourced in contracts (agent-run-context):
 // re-exported here so existing harness importers keep working without rewiring.
 export type { AgentIdentity, ToolAccess } from "@agentprism/contracts";
+
+/**
+ * What `AgentExecutionContext.contextTuning` carries: the operator's per-run
+ * budgets (contracts' ContextTuning) plus the run's active custom dimensions,
+ * which every driver must forward into the context pipeline.
+ *
+ * Deliberately narrower than `ContextPipelineOptions`: the pipeline-only switches
+ * (`analytics`, `sanitizeAndGround`, `retrieveSnippets`) are injected by each
+ * driver itself, so they must not be settable through a field documented as
+ * budgets — a caller disabling the sanitize/grounding tail from a "tuning" bag
+ * would silently change what every column sends to the provider.
+ */
+export interface RunContextTuning extends ContextTuning {
+  /** Active custom dimensions (the pipeline runs their `messages` hooks). */
+  customDimensions?: readonly ActiveCustomDimension[];
+  /** Run facts custom-dimension hooks may consult (question + configured values). */
+  customRun?: CustomDimensionRun;
+}
 
 /**
  * Agent execution context: the composed result of dependency injection. Explicitly
@@ -78,10 +98,18 @@ export interface AgentExecutionContext {
   /** Per-run context analytics seam (usage ledger + effectiveness log); optional. */
   contextAnalytics?: ContextAnalytics;
   /**
-   * Operator-tuned context strategy budgets (window sizes, char/token budgets).
-   * Optional: absent fields keep each strategy's built-in default. Drivers
-   * spread this into applyContextPipeline so tuning reaches every LLM call.
+   * Operator-tuned context strategy budgets (window sizes, char/token budgets),
+   * already folded with the run's custom-dimension hooks. Optional: absent fields
+   * keep each strategy's built-in default. Drivers spread this into
+   * applyContextPipeline, which is also how the `messages` hooks reach every call
+   * site; prompt assembly reads `customDimensions` for the prompt/memory seams.
    */
-  contextTuning?: ContextTuning;
+  contextTuning?: RunContextTuning;
+  /**
+   * Active custom dimensions of this run (resolved from config.custom at the run
+   * assembly). Prompt assembly applies their `prompt`/`memory` hooks and their
+   * prompt tags; the context pipeline applies their `messages` hooks.
+   */
+  customDimensions?: readonly ActiveCustomDimension[];
   signal?: AbortSignal;
 }
