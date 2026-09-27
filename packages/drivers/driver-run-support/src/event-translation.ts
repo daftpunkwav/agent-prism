@@ -12,7 +12,7 @@
  */
 
 import type { ArenaEvent, Clock, ToolExecutionResult } from "@agentprism/contracts";
-import { OBSERVATION_MAX_CHARS, completeEvent, lowerAskUserKeys, normalizeAskUserBatchArgs, normalizeAskUserOptions, tokenUpdateEvent } from "@agentprism/contracts";
+import { OBSERVATION_MAX_CHARS, completeEvent, lowerAskUserKeys, normalizeAskUserBatchArgs, normalizeAskUserOptions, textFromContent, tokenUpdateEvent } from "@agentprism/contracts";
 import { buildMetrics, type TokenTracker } from "@agentprism/telemetry";
 import { extractLlmUsage } from "@agentprism/harness";
 import { extractChunkParts } from "@agentprism/contracts";
@@ -165,6 +165,19 @@ export function emitToolOutcomeEvents(
   return events;
 }
 
+/**
+ * Visible text of a completed model call in the raw event stream ("" for every
+ * other event). Providers that do not emit token chunks leave the thought channel
+ * empty, so drivers fall back to this whole output as the closing thought block.
+ */
+export function modelOutputText(raw: unknown): string {
+  if (raw === null || typeof raw !== "object") return "";
+  const event = raw as { event?: unknown; data?: { output?: unknown } | undefined };
+  if (event.event !== "on_chat_model_end") return "";
+  const output = event.data?.output as { content?: unknown } | undefined;
+  return textFromContent(output?.content).trim();
+}
+
 function thoughtEnd(state: RunState): ArenaEvent {
   const step = state.streamingStep ?? 0;
   state.streamingStep = null;
@@ -175,6 +188,11 @@ function thoughtEnd(state: RunState): ArenaEvent {
 
 export interface StreamEventOptions {
   nodeName?: string;
+  /**
+   * Opt-in phase hints: node names whose start must not emit a `[Phase: …]`
+   * thought. Passing the set (instead of leaving it undefined) is what enables
+   * the hints, so the LangChain and Deep Agents columns stay phase-free.
+   */
   nodeStartExcluded?: ReadonlySet<string>;
 }
 
@@ -195,8 +213,10 @@ export function emitStreamEvent(state: RunState, rawEvent: unknown, options: Str
       return onToolStart(state, data, event, options.nodeName ?? "");
     case "on_tool_end":
       return onToolEnd(state, data);
-    case "on_node_start":
-      return onNodeStart(state, options.nodeName ?? "", options.nodeStartExcluded ?? new Set());
+    // Node starts arrive as on_chain_start, the kind astream_events v2 emits for
+    // a graph node's own runnable (see onNodeStart).
+    case "on_chain_start":
+      return onNodeStart(state, event, options.nodeStartExcluded);
     default:
       return [];
   }
@@ -335,15 +355,45 @@ function onToolEnd(state: RunState, data: Record<string, unknown>): ArenaEvent[]
   ];
 }
 
-function onNodeStart(state: RunState, nodeName: string, excluded: ReadonlySet<string>): ArenaEvent[] {
-  if (nodeName === "" || excluded.has(nodeName)) return [];
+/**
+ * Emits the `[Phase: <node>]` narration for a started reasoning-graph node.
+ *
+ * A node start is an `on_chain_start` whose `metadata.langgraph_node` names the
+ * node; the name equals the event's own `name` only for the node's own runnable,
+ * so nested runnables inside a node (routers, prompts, the model wrapper) and the
+ * graph run itself never qualify. Callers opt in through `nodeStartExcluded`.
+ *
+ * The narration rides a `reflect` event — the same channel every other driver
+ * uses for its own notes: `thought` content is the answer channel, and answer
+ * extraction folds a `thought` event into the following deltas' buffer.
+ */
+function onNodeStart(
+  state: RunState,
+  event: Record<string, unknown>,
+  excluded: ReadonlySet<string> | undefined,
+): ArenaEvent[] {
+  if (excluded === undefined) return [];
+  const metadata = event.metadata;
+  const node =
+    metadata !== null && typeof metadata === "object"
+      ? (metadata as Record<string, unknown>)["langgraph_node"]
+      : undefined;
+  if (typeof node !== "string" || node === "" || node !== event.name || excluded.has(node)) return [];
   const events: ArenaEvent[] = [];
+  // A phase boundary closes an open streamed block, so the narration lands
+  // between thought blocks instead of inside one.
   if (state.streamingStep !== null) {
     events.push(thoughtEnd(state));
   }
-  state.thinkingStep = null;
-  state.pendingStep = null;
-  events.push(eventOf({ type: "thought", pipeline: state.label, step: state.step, content: `[Phase: ${nodeName}]` }));
+  events.push(
+    eventOf({
+      type: "reflect",
+      pipeline: state.label,
+      step: state.step,
+      content: `[Phase: ${node}]`,
+      workspace: state.workspaceName,
+    }),
+  );
   return events;
 }
 

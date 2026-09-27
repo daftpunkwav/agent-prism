@@ -12,6 +12,7 @@ import {
   emitToolOutcomeEvents,
   eventOf,
   finishEvent,
+  modelOutputText,
   normalizeActionArgs,
 } from "../src/event-translation.js";
 
@@ -146,23 +147,62 @@ describe("model-call arc (start → stream → end)", () => {
     expect(run.toolCalls).toBe(1);
   });
 
-  it("emits phase thoughts only for non-excluded nodes", () => {
+  it("emits phase narration for non-excluded graph nodes and nothing for nested runnables", () => {
     const run = state();
     const excluded = new Set(["agent"]);
+    // A node start is an on_chain_start whose langgraph_node metadata names the
+    // node itself (the shape astream_events v2 really emits).
     expect(
-      emitStreamEvent(run, { event: "on_node_start", data: {}, name: "agent" }, { nodeName: "agent", nodeStartExcluded: excluded }),
+      emitStreamEvent(run, { event: "on_chain_start", name: "agent", metadata: { langgraph_node: "agent" } }, { nodeStartExcluded: excluded }),
+    ).toEqual([]);
+    // Nested runnables inside a node carry the enclosing node's name but their own
+    // `name`, so they are not node starts.
+    expect(
+      emitStreamEvent(
+        run,
+        { event: "on_chain_start", name: "RunnableLambda", metadata: { langgraph_node: "agent" } },
+        { nodeStartExcluded: excluded },
+      ),
     ).toEqual([]);
     const phases = emitStreamEvent(
       run,
-      { event: "on_node_start", data: {}, name: "planner" },
-      { nodeName: "planner", nodeStartExcluded: excluded },
+      { event: "on_chain_start", name: "planner", metadata: { langgraph_node: "planner" } },
+      { nodeStartExcluded: excluded },
     );
-    expect(phases.map((e) => e.type)).toEqual(["thought"]);
+    // Narration rides reflect: the thought channel is the answer channel, and
+    // answer extraction folds a thought event into the following deltas.
+    expect(phases.map((e) => e.type)).toEqual(["reflect"]);
     expect(phases[0]?.content).toBe("[Phase: planner]");
+  });
+
+  it("keeps phase hints off unless the caller opts in", () => {
+    // LangChain and Deep Agents run on LangGraph too: without the opt-in set their
+    // node starts must not add phase thoughts to the answer channel.
+    const run = state();
+    expect(
+      emitStreamEvent(run, { event: "on_chain_start", name: "planner", metadata: { langgraph_node: "planner" } }),
+    ).toEqual([]);
   });
 
   it("ignores unrecognized raw event kinds", () => {
     expect(emitStreamEvent(state(), { event: "on_retriever_start", data: {} })).toEqual([]);
+  });
+
+  it("reads a completed model call's whole output text", () => {
+    // The closing-thought fallback needs the output of on_chat_model_end only;
+    // every other event (and a content-block list) must resolve to text or "".
+    expect(
+      modelOutputText({ event: "on_chat_model_end", data: { output: { content: "the answer" } } }),
+    ).toBe("the answer");
+    expect(
+      modelOutputText({
+        event: "on_chat_model_end",
+        data: { output: { content: [{ type: "text", text: "block one" }, { type: "text", text: " block two" }] } },
+      }),
+    ).toBe("block one block two");
+    expect(modelOutputText({ event: "on_chat_model_start", data: { output: { content: "x" } } })).toBe("");
+    expect(modelOutputText(null)).toBe("");
+    expect(modelOutputText("plain")).toBe("");
   });
 
   it("finishes with a complete event carrying observed workload metrics", () => {

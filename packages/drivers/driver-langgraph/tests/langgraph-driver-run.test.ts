@@ -22,7 +22,7 @@ import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { ChatGenerationChunk, type ChatResult } from "@langchain/core/outputs";
 import type { Runnable } from "@langchain/core/runnables";
 import type { ArenaEvent, PipelineConfig, ToolExecutionResult } from "@agentprism/contracts";
-import { PipelineConfigSchema } from "@agentprism/contracts";
+import { PipelineConfigSchema, extractAnswerFromEvents } from "@agentprism/contracts";
 import type { AgentExecutionContext, ToolAccess } from "@agentprism/harness";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import { LangGraphDriver } from "../src/langgraph-driver.js";
@@ -79,8 +79,12 @@ function toolCallMessage(name: string, args: Record<string, unknown>): AIMessage
 }
 
 /** Real workspace under a throwaway runs root + scripted tool access. */
-function executionContext(model: BaseChatModel, toolAccess?: Partial<ToolAccess>): AgentExecutionContext & { cleanup: () => void } {
-  const config: PipelineConfig = PipelineConfigSchema.parse({ label: "col", harness: "bare" });
+function executionContext(
+  model: BaseChatModel,
+  toolAccess?: Partial<ToolAccess>,
+  configOverrides: Partial<PipelineConfig> = {},
+): AgentExecutionContext & { cleanup: () => void } {
+  const config: PipelineConfig = PipelineConfigSchema.parse({ label: "col", harness: "bare", ...configOverrides });
   const runsRoot = mkdtempSync(join(tmpdir(), "lg-driver-"));
   const workspace = new WorkspaceRegistry({ runsRoot, clock: { now: () => 1_700_000_000_000 } }).create("ws");
   const context = {
@@ -150,6 +154,27 @@ describe("LangGraphDriver.run", () => {
       expect(action?.tool).toBe("grep");
       expect(events.some((event) => event.type === "observation" && event.result.includes("matched line 3"))).toBe(true);
       // The second model call ran (two turns) and the run completed successfully.
+      const terminal = events.at(-1);
+      expect(terminal?.type).toBe("complete");
+      expect(terminal?.passed).not.toBe(false);
+    } finally {
+      context.cleanup();
+    }
+  });
+
+  it("narrates the reasoning graph's structural nodes without touching the answer", { timeout: 60_000 }, async () => {
+    const driver = new LangGraphDriver();
+    const model = new ScriptedChatModel([new AIMessage("The plan, then the answer.")]);
+    const context = executionContext(model, undefined, { reasoning: "cot_tool" });
+    try {
+      const events = await collect(driver.run(context));
+      // think/act are the cot_tool graph's structural nodes; the tool node is
+      // excluded from narration.
+      const phases = events.filter((event) => event.type === "reflect" && event.content.startsWith("[Phase: "));
+      expect(phases.map((event) => event.content)).toEqual(["[Phase: think]", "[Phase: act]"]);
+      // The narration must not displace the answer: with a model that streams no
+      // token chunks, the closing whole-output block is what carries the text.
+      expect(extractAnswerFromEvents(events)).toBe("The plan, then the answer.");
       const terminal = events.at(-1);
       expect(terminal?.type).toBe("complete");
       expect(terminal?.passed).not.toBe(false);

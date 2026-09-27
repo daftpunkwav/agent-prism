@@ -18,13 +18,18 @@ import {
   buildSystemUser,
   type AgentExecutionContext,
 } from "@agentprism/harness";
-import { createRunState, emitStreamEvent, emitToolOutcomeEvents, eventOf, finishEvent, recursionLimitFor, formatCapabilityPluginIds, normalizeActionArgs, selfConsistencyAttempts } from "@agentprism/driver-run-support";
+import { createRunState, emitStreamEvent, emitToolOutcomeEvents, eventOf, finishEvent, modelOutputText, recursionLimitFor, formatCapabilityPluginIds, normalizeActionArgs, selfConsistencyAttempts } from "@agentprism/driver-run-support";
 import { bindRegistryTools, requireChatModel, toLcMessages } from "@agentprism/driver-langchain";
 import { buildReasoningGraph } from "./reasoning-graphs.js";
 import { runSelfConsistencyLoop } from "./self-consistency.js";
 
-/** Skeleton nodes excluded from on_node_start phase hints (agent/execute/tools are the main loop nodes). */
-const NODE_START_EXCLUDED = new Set(["agent", "execute", "tools"]);
+/**
+ * Nodes excluded from the `[Phase: …]` thought hints: the skeleton's own loop
+ * nodes (agent/execute/tools) and LangGraph's `__start__` pseudo-node. The
+ * remaining nodes are the mode's structural ones (think/act/reflect/branch_n/
+ * score_n/select), which is what makes the reasoning graph visible in the trace.
+ */
+const NODE_START_EXCLUDED = new Set(["agent", "execute", "tools", "__start__"]);
 
 /** Drains one compiled graph's streamEvents into ArenaEvents, racing short ticks so tool-side extras surface during interactive waits. */
 async function* drainGraphStream(
@@ -35,6 +40,12 @@ async function* drainGraphStream(
 ): AsyncGenerator<ArenaEvent> {
   let streamDone = false;
   let pending: Promise<IteratorResult<unknown, unknown>> | null = null;
+  // Token chunks are provider-driven: a provider (or a model call the framework
+  // routes through invoke) can complete without ever emitting on_chat_model_stream,
+  // and then the thought channel — which carries the column's answer — stays empty.
+  // Tracking both sides lets the tail below fall back to the whole model output.
+  let streamedText = "";
+  let lastModelText = "";
   const tick = () => new Promise<null>((resolve) => setTimeout(() => resolve(null), 100));
   while (!streamDone) {
     pending ??= stream.next();
@@ -52,14 +63,37 @@ async function* drainGraphStream(
     const raw = next.value;
     const rawNodeName =
       raw !== null && typeof raw === "object" ? String((raw as Record<string, unknown>).name ?? "") : "";
+    const modelText = modelOutputText(raw);
+    if (modelText !== "") lastModelText = modelText;
     for (const event of emitStreamEvent(state, raw, {
       nodeName: rawNodeName,
       nodeStartExcluded: NODE_START_EXCLUDED,
     })) {
+      if (event.type === "thought_delta" && typeof event.content === "string") streamedText += event.content;
       yield event;
     }
   }
   for (const queued of extra.splice(0)) yield queued;
+
+  // The closing thought block: when the last model output never reached the
+  // thought channel, that output is emitted here — otherwise the column would
+  // end without an answer at all (answer extraction reads the thought channel).
+  if (lastModelText !== "" && !streamedText.includes(lastModelText)) {
+    yield eventOf({
+      type: "thought_delta",
+      pipeline: state.label,
+      step: state.streamingStep ?? state.step,
+      content: lastModelText,
+      workspace: state.workspaceName,
+    });
+    yield eventOf({
+      type: "thought_end",
+      pipeline: state.label,
+      step: state.streamingStep ?? state.step,
+      content: "",
+      workspace: state.workspaceName,
+    });
+  }
 }
 
 /** LangGraph Driver: real reasoning-mode graph structures + live streamed output. */
