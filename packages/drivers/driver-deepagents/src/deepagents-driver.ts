@@ -5,16 +5,19 @@
  *
  * Responsibilities:
  * - Run the real createDeepAgent middleware stack over the Arena model port
- * - Drop registry tools whose names the framework reserves, and scope its own
-   filesystem tools to read-only access of the Arena workspace
+ * - Drop registry tools whose names the framework reserves, and keep the
+ *   framework's own filesystem tools read-only and confined to the workspace
  * - Keep the shared context pipeline and tool drift guard on every model call
  * - Translate the framework's LangGraph event stream into ArenaEvents
+ * - Translate a cancelled run (a normally-ended graph stream) into AbortError
  *
  * Uses the arena's ChatModel (llmVendor) and the registry tools, so the column
  * shares the model, tool surface and telemetry with every other backend. The
- * deep agent's own filesystem tools keep the framework default: they operate on
- * its in-memory StateBackend, never on the workspace, so real workspace
- * mutations stay on the guarded tool path.
+ * deep agent's own filesystem tools read the real workspace through a
+ * FilesystemBackend rooted at the column workspace in virtual mode, which is
+ * what confines both absolute and relative paths to that root; writes and shell
+ * execution stay off the tool allowlist so real workspace mutations remain on
+ * the guarded tools.execute path.
  */
 
 import type { ArenaEvent, AgentDriver } from "@agentprism/contracts";
@@ -157,7 +160,11 @@ export class DeepAgentsDriver implements AgentDriver {
             config.harness,
           ),
           createFilesystemMiddleware({
-            backend: new FilesystemBackend({ rootDir: context.workspace.cwd() }),
+            // virtualMode is what confines the backend to rootDir: without it the
+            // framework's own read tools accept absolute paths (and resolve relative
+            // ones against the host process cwd), reading files outside the Arena
+            // workspace and bypassing the scoped tool filesystem entirely.
+            backend: new FilesystemBackend({ rootDir: context.workspace.cwd(), virtualMode: true }),
             tools: [...READ_ONLY_FILESYSTEM_TOOLS],
           }),
         ],
@@ -181,6 +188,16 @@ export class DeepAgentsDriver implements AgentDriver {
         }
       }
       for (const queued of extra.splice(0)) yield queued;
+
+      // A cancelled run ends its graph stream normally once the in-flight node
+      // returns (LangGraph only checks the signal between nodes), so without this
+      // checkpoint the column would report a successful, partial-or-empty answer.
+      // Same abort checkpoint the harness uses for its nested runs.
+      if (context.signal?.aborted === true) {
+        const aborted = new Error("Aborted");
+        aborted.name = "AbortError";
+        throw aborted;
+      }
 
       // deepagents' graph node calls the model without token streaming (the raw
       // stream carries on_chat_model_end, never on_chat_model_stream), so the
@@ -206,6 +223,9 @@ export class DeepAgentsDriver implements AgentDriver {
 
       yield finishEvent(state, true);
     } catch (error) {
+      // Cancellation is not a column failure: the abort error leaves untouched,
+      // exactly like every other backend's abort path.
+      if ((error as Error)?.name === "AbortError") throw error;
       // Server-side detail log; the client-facing event stays sanitized.
       console.error(`[deepagents-driver] column "${label}" failed:`, error);
       yield arenaErrorEvent({

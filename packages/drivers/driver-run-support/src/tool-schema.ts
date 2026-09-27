@@ -17,7 +17,7 @@ import { lowerAskUserKeys, normalizeAskUserBatchArgs, normalizeAskUserOptions } 
 import { z } from "zod";
 
 /** Attaches the model-facing description when present. */
-function described(base: z.ZodType, property: Record<string, unknown>): z.ZodType {
+function withDescription(base: z.ZodType, property: Record<string, unknown>): z.ZodType {
   const description = property.description;
   return typeof description === "string" && description !== "" ? base.describe(description) : base;
 }
@@ -27,16 +27,16 @@ function described(base: z.ZodType, property: Record<string, unknown>): z.ZodTyp
  * (todo_write/ask_user lists need them); null when the shape is exotic.
  */
 function valueSchema(property: Record<string, unknown>): z.ZodType | null {
-  if (property.type === "string") return described(z.string(), property);
-  if (property.type === "integer") return described(z.number().int(), property);
-  if (property.type === "number") return described(z.number(), property);
-  if (property.type === "boolean") return described(z.boolean(), property);
+  if (property.type === "string") return withDescription(z.string(), property);
+  if (property.type === "integer") return withDescription(z.number().int(), property);
+  if (property.type === "number") return withDescription(z.number(), property);
+  if (property.type === "boolean") return withDescription(z.boolean(), property);
   if (property.type === "array") {
     const items = property.items;
     if (items === null || typeof items !== "object" || Array.isArray(items)) return null;
     const inner = valueSchema(items as Record<string, unknown>);
     if (inner === null) return null;
-    return described(z.array(inner), property);
+    return withDescription(z.array(inner), property);
   }
   if (property.type === "object") {
     const properties = property.properties;
@@ -51,7 +51,7 @@ function valueSchema(property: Record<string, unknown>): z.ZodType | null {
       if (inner === null) return null;
       shape[name] = required.has(name) ? inner : inner.optional();
     }
-    return described(z.object(shape), property);
+    return withDescription(z.object(shape), property);
   }
   return null;
 }

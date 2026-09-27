@@ -116,6 +116,11 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
       const abort = new AbortController();
       const forwardAbort = () => abort.abort();
       context.signal?.addEventListener("abort", forwardAbort, { once: true });
+      // A run cancelled while this column was still starting up (the driver is
+      // suspended at its first yield until the consumer pulls) has already
+      // dispatched its abort event: the listener above never fires, so the CLI
+      // would run the whole task for nobody. Same guard as the run helpers.
+      if (context.signal?.aborted === true) abort.abort();
 
       yield eventOf({
         type: "thought",
@@ -161,7 +166,13 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
       });
 
       try {
+        // `sawText` gates the whole-message fallback (assistant text blocks would
+        // duplicate deltas already delivered); `sawAnswerText` is the wider claim
+        // "answer text reached the thought channel", which the result summary must
+        // not duplicate either. A deployment that delivers whole assistant messages
+        // with no partial events needs the two tracked apart.
         let sawText = false;
+        let sawAnswerText = false;
         for await (const raw of session) {
           for (const queued of extra.splice(0)) yield queued;
           const message = raw as MessageLike;
@@ -186,6 +197,7 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
                 const delta = event.delta;
                 if (delta?.type === "text_delta" && typeof delta.text === "string" && delta.text !== "") {
                   sawText = true;
+                  sawAnswerText = true;
                   yield eventOf({
                     type: "thought_delta",
                     pipeline: label,
@@ -224,6 +236,7 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
               }
               for (const block of contentBlocks(message.message?.content)) {
                 if (block.type === "text" && !sawText && typeof block.text === "string" && block.text !== "") {
+                  sawAnswerText = true;
                   yield eventOf({
                     type: "thought_delta",
                     pipeline: label,
@@ -279,8 +292,10 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
                   `Claude Agent SDK run failed (${String(message.subtype)})${errors !== "" ? `: ${errors}` : ""}`,
                 );
               }
-              if (!sawText && typeof message.result === "string" && message.result.trim() !== "") {
-                // No streamed text at all: the run summary is the only answer text.
+              if (!sawAnswerText && typeof message.result === "string" && message.result.trim() !== "") {
+                // No text reached the thought channel at all: the run summary is the
+                // only answer text. When assistant messages already carried it, the
+                // summary would just repeat the answer in the transcript.
                 yield eventOf({
                   type: "thought",
                   pipeline: label,

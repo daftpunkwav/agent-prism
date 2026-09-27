@@ -11,4 +11,4 @@ message 的地方；`harness` 保持框架中立。
 ## 依赖
 
 - Runtime：`contracts / driver-run-support / harness`，加上 `@langchain/core`、
-  `langchain`、`zod`。
+  `langchain`。

@@ -10,7 +10,7 @@
  * - Pin the error arc for a column without an Anthropic endpoint
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, delimiter } from "node:path";
@@ -24,6 +24,21 @@ import { ClaudeAgentSdkDriver } from "../src/claude-driver.js";
 import { CLAUDE_CODE_PATH_ENV, resolveClaudeCodePath } from "../src/cli-path.js";
 import { claudeSubprocessEnv, resolveClaudeTransport } from "../src/endpoint.js";
 import { arenaAllowedToolIds, callArenaTool, createArenaMcpServer, mcpToolId } from "../src/mcp-tools.js";
+
+// Only query() is scripted (no CLI is spawned); the rest of the SDK stays real so
+// the MCP server the driver builds is the production one.
+const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
+vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@anthropic-ai/claude-agent-sdk")>()),
+  query: (...args: unknown[]) => queryMock(...args),
+}));
+
+/** One scripted SDK message stream for a run. */
+function scriptedSession(messages: readonly unknown[]): AsyncGenerator<unknown> {
+  return (async function* () {
+    for (const message of messages) yield message;
+  })();
+}
 
 /** Minimal Anthropic-shaped vendor instance (the fields ChatAnthropic exposes). */
 function anthropicVendor(overrides: Record<string, unknown> = {}) {
@@ -266,5 +281,120 @@ describe("ClaudeAgentSdkDriver", () => {
     } finally {
       context.cleanup();
     }
+  });
+
+  describe("run loop message translation", () => {
+    async function collect(context: AgentExecutionContext): Promise<ArenaEvent[]> {
+      const events: ArenaEvent[] = [];
+      for await (const event of new ClaudeAgentSdkDriver().run(context)) events.push(event);
+      return events;
+    }
+
+    it("delivers whole-message text once and records the SDK usage", { timeout: 60_000 }, async () => {
+      queryMock.mockImplementation(() =>
+        scriptedSession([
+          { type: "assistant", message: { content: [{ type: "text", text: "The answer is 4." }] } },
+          {
+            type: "result",
+            subtype: "success",
+            result: "The answer is 4.",
+            usage: { input_tokens: 10, output_tokens: 5 },
+          },
+        ]),
+      );
+      const context = executionContext(anthropicVendor());
+      try {
+        const events = await collect(context);
+        const streamed = events
+          .filter((event) => event.type === "thought_delta")
+          .map((event) => event.content)
+          .join("");
+        // The assistant turn carries the text; the result summary must not repeat it.
+        expect(streamed).toBe("The answer is 4.");
+        expect(events.filter((event) => event.type === "thought" && event.content === "The answer is 4.")).toHaveLength(0);
+        const lastTokens = events.filter((event) => event.type === "token_update").at(-1);
+        expect(lastTokens?.token_stats?.input_tokens).toBe(10);
+        expect(lastTokens?.token_stats?.output_tokens).toBe(5);
+        const terminal = events.at(-1);
+        expect(terminal?.type).toBe("complete");
+        expect((terminal as ArenaEvent & { metrics: { success: boolean } }).metrics.success).toBe(true);
+      } finally {
+        context.cleanup();
+      }
+    });
+
+    it("falls back to the result summary when no text reached the thought channel", { timeout: 60_000 }, async () => {
+      queryMock.mockImplementation(() =>
+        scriptedSession([
+          {
+            type: "assistant",
+            message: {
+              content: [
+                { type: "tool_use", name: "todo_write", input: { todos: [{ content: "step", done: false }] } },
+              ],
+            },
+          },
+          { type: "user", message: { content: [{ type: "tool_result", content: "todos updated" }] } },
+          { type: "result", subtype: "success", result: "Done.", usage: { input_tokens: 3, output_tokens: 1 } },
+        ]),
+      );
+      const context = executionContext(anthropicVendor());
+      try {
+        const events = await collect(context);
+        // A tool-only transcript has no visible text: the summary is the answer.
+        expect(events.filter((event) => event.type === "thought" && event.content === "Done.")).toHaveLength(1);
+        expect(events.some((event) => event.type === "action" && event.tool === "todo_write")).toBe(true);
+        expect(events.some((event) => event.type === "observation")).toBe(true);
+      } finally {
+        context.cleanup();
+      }
+    });
+
+    it("keeps the result summary out of the transcript when partial events streamed the text", { timeout: 60_000 }, async () => {
+      queryMock.mockImplementation(() =>
+        scriptedSession([
+          { type: "stream_event", event: { type: "message_start" } },
+          { type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "4" } } },
+          { type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "." } } },
+          { type: "assistant", message: { content: [{ type: "text", text: "4." }] } },
+          { type: "result", subtype: "success", result: "4.", usage: { input_tokens: 1, output_tokens: 1 } },
+        ]),
+      );
+      const context = executionContext(anthropicVendor());
+      try {
+        const events = await collect(context);
+        const streamed = events
+          .filter((event) => event.type === "thought_delta")
+          .map((event) => event.content)
+          .join("");
+        // Deltas win; the whole assistant block and the result summary are duplicates.
+        expect(streamed).toBe("4.");
+        expect(events.filter((event) => event.type === "thought" && event.content === "4.")).toHaveLength(0);
+        expect(events.at(-1)?.type).toBe("complete");
+      } finally {
+        context.cleanup();
+      }
+    });
+
+    it("hands the SDK an aborted controller when the run was cancelled during setup", { timeout: 60_000 }, async () => {
+      let handed: AbortController | undefined;
+      queryMock.mockImplementation((params: { options?: { abortController?: AbortController } }) => {
+        handed = params.options?.abortController;
+        return scriptedSession([
+          { type: "assistant", message: { content: [{ type: "text", text: "late" }] } },
+          { type: "result", subtype: "success", result: "late", usage: { input_tokens: 1, output_tokens: 1 } },
+        ]);
+      });
+      // The consumer aborted while the driver was still setting up: its abort event
+      // has already been dispatched, so only an explicit check can cancel the CLI.
+      const context = executionContext(anthropicVendor(), { signal: AbortSignal.abort() });
+      try {
+        const events = await collect(context);
+        expect(handed?.signal.aborted).toBe(true);
+        expect(events.at(-1)?.type).toBe("complete");
+      } finally {
+        context.cleanup();
+      }
+    });
   });
 });

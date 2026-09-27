@@ -1,14 +1,15 @@
 /**
  * @file capability-banner
- * @description Formats registered plugin ids for Step-0 config banners.
+ * @description Formats the capability ids of a run for Step-0 config banners.
  *
  * Responsibilities:
- * - Render plugin ids so a column run is reproducible from the trace alone
+ * - Render prompt/reasoning/context/harness/toolset ids plus the policy switches
+ *   so a column run is reproducible from the trace alone
  */
 
 import type { PipelineConfig } from "@agentprism/contracts";
 
-/** Compact plugin-id suffix for driver opening banners. */
+/** Compact capability-id suffix for driver opening banners (emitted under the `plugins=` key). */
 export function formatCapabilityPluginIds(config: PipelineConfig): string {
   const policy = config as Record<string, unknown>;
   return (

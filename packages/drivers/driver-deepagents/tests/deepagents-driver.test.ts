@@ -166,6 +166,27 @@ describe("DeepAgentsDriver", () => {
       context.cleanup();
     }
   });
+
+  it("raises AbortError instead of reporting a cancelled run as a success", { timeout: 60_000 }, async () => {
+    const driver = new DeepAgentsDriver();
+    const model = new ScriptedChatModel([new AIMessage("never delivered")]);
+    // A cancelled graph stream ends normally once the in-flight node returns, so
+    // the driver must not read that as an answered column.
+    const context = executionContext(model, { signal: AbortSignal.abort() });
+    try {
+      const events: ArenaEvent[] = [];
+      let thrown: unknown = null;
+      try {
+        for await (const event of driver.run(context)) events.push(event);
+      } catch (error) {
+        thrown = error;
+      }
+      expect((thrown as Error)?.name).toBe("AbortError");
+      expect(events.some((event) => event.type === "complete")).toBe(false);
+    } finally {
+      context.cleanup();
+    }
+  });
 });
 
 describe("reserved tool names and read-only filesystem scope", () => {

@@ -7,6 +7,7 @@
  * - Run the framework's Runner with an Arena-backed Model and function tools
  * - Keep step/turn accounting and stream text/thinking onto ArenaEvents
  * - Map the SDK's run-item stream onto action/observation events
+ * - Translate the SDK's silent cancellation into the shared AbortError
  *
  * The SDK owns the agent loop; the model is an implementation of its public
  * Model interface over LlmAdapter, so provider configuration, wire capture and
@@ -173,8 +174,21 @@ export class OpenAIAgentsDriver implements AgentDriver {
       }
       for (const queued of extra.splice(0)) yield queued;
 
+      // An aborted run ends its stream silently (no event, no error) and marks
+      // itself cancelled, so without this checkpoint the column would report a
+      // successful, empty answer. Same abort checkpoint the harness uses for its
+      // nested runs: a cancelled column must fail, never look answered.
+      if (stream.cancelled) {
+        const aborted = new Error("Aborted");
+        aborted.name = "AbortError";
+        throw aborted;
+      }
+
       yield finishEvent(state, true);
     } catch (error) {
+      // Cancellation is not a column failure: the abort error leaves untouched,
+      // exactly like every other backend's abort path.
+      if ((error as Error)?.name === "AbortError") throw error;
       // Server-side detail log; the client-facing event stays sanitized.
       console.error(`[openai-agents-driver] column "${label}" failed:`, error);
       yield arenaErrorEvent({

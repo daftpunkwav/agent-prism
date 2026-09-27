@@ -32,7 +32,7 @@ import {
   buildSystemUser,
   type AgentExecutionContext,
   type ContextAnalytics,
-  type ContextTuning,
+  type ContextPipelineOptions,
 } from "@agentprism/harness";
 import { createRunState, emitStreamEvent, emitToolOutcomeEvents, eventOf, finishEvent, recursionLimitFor, formatCapabilityPluginIds } from "@agentprism/driver-run-support";
 import { bindRegistryTools } from "./bind-registry-tools.js";
@@ -45,7 +45,7 @@ export function contextPolicyMiddleware(
   question: string,
   retrieveSnippets: (query: string) => string,
   analytics?: ContextAnalytics,
-  contextTuning?: ContextTuning,
+  contextTuning?: ContextPipelineOptions,
   harness?: string,
 ): AgentMiddleware {
   return createMiddleware({

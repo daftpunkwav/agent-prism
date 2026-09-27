@@ -182,6 +182,27 @@ describe("OpenAIAgentsDriver", () => {
       context.cleanup();
     }
   });
+
+  it("raises AbortError instead of reporting a silent success for a cancelled run", { timeout: 60_000 }, async () => {
+    const driver = new OpenAIAgentsDriver();
+    const llm = new ScriptedLlm([{ text: "never delivered" }]);
+    // The SDK ends an aborted run's stream with no event and no error, so a
+    // swallowed cancellation is indistinguishable from "the model said nothing".
+    const context = executionContext(llm, { signal: AbortSignal.abort() });
+    try {
+      const events: ArenaEvent[] = [];
+      let thrown: unknown = null;
+      try {
+        for await (const event of driver.run(context)) events.push(event);
+      } catch (error) {
+        thrown = error;
+      }
+      expect((thrown as Error)?.name).toBe("AbortError");
+      expect(events.some((event) => event.type === "complete")).toBe(false);
+    } finally {
+      context.cleanup();
+    }
+  });
 });
 
 describe("bindRegistryToolsForAgents", () => {

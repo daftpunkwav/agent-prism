@@ -11,7 +11,7 @@ import { AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 import { applyContextPipeline } from "@agentprism/harness";
-import type { ContextTuning, ToolAccess } from "@agentprism/harness";
+import type { ContextPipelineOptions, ToolAccess } from "@agentprism/harness";
 import type { ToolExecutionResult } from "@agentprism/contracts";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -47,7 +47,7 @@ export interface ReasoningGraphDeps {
   /** Workspace retrieval before each model call for vector/hybrid strategies (built by the driver from the execution context). */
   retrieveSnippets?: (query: string) => string;
   /** Operator-tuned context strategy budgets (absent fields keep built-in defaults). */
-  contextTuning?: ContextTuning;
+  contextTuning?: ContextPipelineOptions;
   /** Harness level for the tool drift guard ("bare" disables the guard). */
   harness?: string;
   signal?: AbortSignal;
