@@ -101,6 +101,18 @@ export type ChildToHost = BridgeLlmRequest | BridgeToolRequest | BridgeEvent | B
 export type HostToChild = BridgeStart | BridgeLlmResponse | BridgeToolResult;
 
 /**
+ * Completion the host serves once a bridge child has spent its step budget.
+ *
+ * Both bootstraps can outlive the budget: autogen's MaxMessageTermination counts
+ * chat messages (a reflecting turn makes several model calls, and neither role's
+ * messages are bounded by it), and the crewai bootstrap has no internal bound at
+ * all. Past the budget the host stops paying for completions and pushes the child
+ * to wrap up — the arena keeps the ledger, so the arena keeps the bound.
+ */
+export const BRIDGE_BUDGET_EXHAUSTED_NOTE =
+  "[arena] Step budget exhausted: stop calling tools and reply with the best final answer for what is done.";
+
+/**
  * Projects one neutral wire message into the host LlmMessage shape. Shared by
  * both framework bridges (autogen, crewai): the projection is pure wire-contract
  * parsing, so it lives beside the wire types. Tool-call args arrive as JSON

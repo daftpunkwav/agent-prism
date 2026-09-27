@@ -10,8 +10,8 @@
  *   internal budget, unlike the autogen MaxMessageTermination bound)
  * - Answer tool_request lines through the shared tool-batch executor (events preserved)
  * - Translate bridge events into ArenaEvents (role speech rides the reflect
- *   channel; the crew's final answer is the bridge's own final outcome, not a
- *   channel extraction) and surface the final complete event
+ *   channel, the crew's own final output closes the thought channel as the
+ *   answer) and surface the final complete event
  *
  * The framework keeps the orchestration (role crew, sequential/hierarchical
  * process, delegation); the arena keeps the model, the tools, the budget, and
@@ -28,32 +28,28 @@
  * mapping (reflect-only here vs autogen coder/reviewer thought+reflect).
  */
 
-import { fileURLToPath } from "node:url";
 import type { ArenaEvent, LlmAssistantMessage, LlmMessage } from "@agentprism/contracts";
 import { arenaErrorEvent, completeEvent, sanitizeErrorMessage, tokenUpdateEvent } from "@agentprism/contracts";
 import { buildMetrics } from "@agentprism/telemetry";
 import type { AgentExecutionContext } from "@agentprism/harness";
 import { applyContextPipeline, buildSystemUser, createColumnSnippetRetriever, recordAdapterUsage } from "@agentprism/harness";
 import {
+  BRIDGE_BUDGET_EXHAUSTED_NOTE,
   eventOf,
   runChildBridge,
   executeToolCalls,
   stepBudgetFor,
   priorToolNamesFromWire,
+  resolveBridgeScript,
   toLlmMessage,
   withArenaSystem,
   withHistory,
   type ChildBridgeHandlers,
 } from "@agentprism/driver-run-support";
 
-/** Completion served once the step budget is spent (see llmComplete). */
-const BRIDGE_BUDGET_EXHAUSTED_NOTE =
-  "[arena] Step budget exhausted: stop calling tools and reply with the best final answer for what is done.";
-
 /** Absolute path of the bundled bootstrap script (package root /python). */
 export function bootstrapScriptPath(importMetaUrl: string): string {
-  // dist/crewai-bridge.js -> ../../python/bootstrap.py (package root /python)
-  return fileURLToPath(new URL("../../python/bootstrap.py", importMetaUrl));
+  return resolveBridgeScript(importMetaUrl);
 }
 
 export interface CrewaiBridgeOptions {
@@ -116,7 +112,11 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
       if (stats.turns > maxSteps) {
         // The crewai bootstrap has no internal budget knob: a crew looping on
         // a task would keep consuming the arena model. Past the budget, stop
-        // paying for completions and push the crew to wrap up.
+        // paying for completions and push the crew to wrap up. Verified against
+        // crewai 1.15: the host really stops paying (no further model calls),
+        // and crewai may end the crew through its own agent-retry path (it
+        // parses a completion that does not fit its output protocol); this
+        // column's contract is the bound, not the framework's failure text.
         return BRIDGE_BUDGET_EXHAUSTED_NOTE;
       }
       priorToolNames = priorToolNamesFromWire(request.messages);
@@ -190,8 +190,8 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
     handlers,
     onEvent: (message) => {
       if (message.type !== "event") return;
-      // Role speech rides the reflect channel (the crew's final answer is the
-      // framework's own crew output, not a channel extraction).
+      // Role speech rides the reflect channel; the crew's own final output is
+      // emitted as the closing thought once the session settles (see the tail).
       push(eventOf({ type: "reflect", pipeline: label, step: stats.step, content: `[CrewAI ${message.speaker}] ${message.content}`, workspace: workspaceName }));
     },
   }).then(
@@ -232,6 +232,19 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
       turn: context.turn,
       runId: context.identity.runId,
       agentId: context.identity.agentId,
+    });
+  } else if (outcome.answer.trim() !== "") {
+    // The crew's own output must reach the answer channel: role speech rides the
+    // reflect channel (critiques must never win answer extraction), and extraction
+    // reads the thought channel — without this the column would complete with an
+    // empty answer. Same contract as the pattern fallback, whose closing worker
+    // turn is the answer.
+    yield eventOf({
+      type: "thought",
+      pipeline: label,
+      step: stats.step,
+      content: outcome.answer,
+      workspace: workspaceName,
     });
   }
   yield completeEvent({

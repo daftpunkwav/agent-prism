@@ -24,6 +24,12 @@ bridge LLM subclasses crewai.llms.base_llm.BaseLLM, the custom-LLM seam
 crewai has provided since 0.114 — earlier releases lack the module, and 1.x
 rejects non-BaseLLM objects at Agent construction (the llm field validates
 `str | BaseLLM | None` and the executor isinstance-checks it).
+
+Non-interactive: crewai 1.x asks a first-run "share this execution trace?" consent
+question on stdin, and this process's stdin carries the NDJSON protocol — the
+prompt would consume protocol lines and the session would die with an empty model
+response. CREWAI_TESTING=true is crewai's own switch for that prompt path (its
+only reader is the tracing prompts), so it is set before crewai is imported.
 """
 
 from __future__ import annotations
@@ -35,6 +41,10 @@ import sys
 import threading
 from concurrent.futures import Future
 from typing import Any
+
+# Must precede the crewai imports: the tracing prompts read this at call time,
+# and the value has to be in place before any crew runs.
+os.environ.setdefault("CREWAI_TESTING", "true")
 
 from crewai import Agent, Crew, Process, Task
 from crewai.llms.base_llm import BaseLLM

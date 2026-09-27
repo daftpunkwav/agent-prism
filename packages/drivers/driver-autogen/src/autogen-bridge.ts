@@ -22,22 +22,23 @@
  * Intentionally isomorphic with driver-crewai/src/crewai-bridge.ts: the event
  * pump, the tool handler, and the outcome tail are mirrored and structural
  * changes must land in both. The real divergences are the llm handler (tool
- * binding here vs the crewai step-budget note) and the event-channel mapping
+ * binding here vs the crewai per-turn budget note) and the event-channel mapping
  * (coder/reviewer thought+reflect here vs crewai reflect-only).
  */
 
-import { fileURLToPath } from "node:url";
 import type { ArenaEvent, LlmAssistantMessage, ToolDefinition } from "@agentprism/contracts";
 import { arenaErrorEvent, completeEvent, sanitizeErrorMessage, tokenUpdateEvent } from "@agentprism/contracts";
 import { buildMetrics } from "@agentprism/telemetry";
 import type { AgentExecutionContext } from "@agentprism/harness";
 import { applyContextPipeline, buildSystemUser, createColumnSnippetRetriever, recordAdapterUsage } from "@agentprism/harness";
 import {
+  BRIDGE_BUDGET_EXHAUSTED_NOTE,
   eventOf,
   runChildBridge,
   executeToolCalls,
   stepBudgetFor,
   priorToolNamesFromWire,
+  resolveBridgeScript,
   toLlmMessage,
   withArenaSystem,
   withHistory,
@@ -46,8 +47,7 @@ import {
 
 /** Absolute path of the bundled bootstrap script (package root /python). */
 export function bootstrapScriptPath(importMetaUrl: string): string {
-  // dist/autogen-bridge.js -> ../../python/bootstrap.py (package root /python)
-  return fileURLToPath(new URL("../../python/bootstrap.py", importMetaUrl));
+  return resolveBridgeScript(importMetaUrl);
 }
 
 export interface AutogenBridgeOptions {
@@ -107,6 +107,13 @@ export async function* runAutogenFrameworkBridge(options: AutogenBridgeOptions):
     llmComplete: async (request) => {
       stats.turns += 1;
       stats.step += 1;
+      if (stats.turns > maxSteps) {
+        // The child's own bound counts chat messages, not model calls, and a
+        // reflecting turn spends several: past this column's step budget the host
+        // stops paying for completions and pushes the chat to wrap up (the same
+        // enforcement the crewai bridge applies for its unbounded child).
+        return BRIDGE_BUDGET_EXHAUSTED_NOTE;
+      }
       priorToolNames = priorToolNamesFromWire(request.messages);
       let messages = request.messages.map(toLlmMessage);
       if (firstCompletion) {

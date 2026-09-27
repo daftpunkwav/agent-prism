@@ -151,9 +151,19 @@ class BridgeChatCompletionClient(ChatCompletionClient):
         json_output: Any = None,
         extra_create_args: Any = None,
         cancellation_token: Any = None,
+        tool_choice: Any = None,
+        **kwargs: Any,
     ) -> CreateResult:
+        # Accept the model-client surface across the pinned range: 0.6 reflects on
+        # tool results by asking with tool_choice="none" ("Do not use tools in
+        # reflection flow"), and unknown future kwargs must not crash the bridge —
+        # the wire protocol carries no tool_choice, so "none" is honoured by
+        # withholding the tool schemas from that completion (the arena port has no
+        # tool_choice field to forward).
+        del kwargs
         self._counter += 1
         request_id = f"llm-{self._counter}"
+        bind_tools = tools or [] if tool_choice != "none" else []
         payload = await self._session.request(
             {
                 "type": "llm_request",
@@ -163,7 +173,7 @@ class BridgeChatCompletionClient(ChatCompletionClient):
                     for message in messages
                     for item in _neutral_messages(message)
                 ],
-                "tools": [_tool_schema(tool) for tool in (tools or [])],
+                "tools": [_tool_schema(tool) for tool in bind_tools],
             }
         )
         parsed = json.loads(payload) if payload else {"content": "", "toolCalls": []}
@@ -189,8 +199,18 @@ class BridgeChatCompletionClient(ChatCompletionClient):
         json_output: Any = None,
         extra_create_args: Any = None,
         cancellation_token: Any = None,
+        tool_choice: Any = None,
+        **kwargs: Any,
     ) -> Any:
-        result = await self.create(messages, tools, json_output, extra_create_args, cancellation_token)
+        result = await self.create(
+            messages,
+            tools,
+            json_output,
+            extra_create_args,
+            cancellation_token,
+            tool_choice,
+            **kwargs,
+        )
         yield result
 
     async def close(self) -> None:
@@ -321,6 +341,13 @@ async def main() -> None:
         ),
         model_client=client,
         tools=remote_tools,
+        # Reflect on tool results before ending the turn. With autogen's default
+        # (False) the coder never sees a tool's output: it echoes the raw result
+        # as its whole turn, the chat moves on, and the run ends without the
+        # final answer the role instruction promises. Reflecting hands the tool
+        # results back to the model (the host maps them to tool turns) — the same
+        # one follow-up pass the TypeScript pattern fallback performs.
+        reflect_on_tool_use=True,
     )
     reviewer = AssistantAgent(
         REVIEWER_NAME,

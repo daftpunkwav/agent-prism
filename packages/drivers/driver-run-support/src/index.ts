@@ -22,5 +22,6 @@ export * from "./tool-batch.js";
 export * from "./tool-schema.js";
 export * from "./bridge-protocol.js";
 export * from "./bridge-prompt.js";
+export * from "./bridge-script.js";
 export * from "./child-bridge.js";
 export * from "./python-probe.js";
