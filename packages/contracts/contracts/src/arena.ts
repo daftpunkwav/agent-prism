@@ -465,7 +465,8 @@ export type JudgeRequest = z.infer<typeof JudgeRequestSchema>;
 /** One matrix cell: a template comparison with optional routing overrides. */
 export const MatrixCellSchema = z.object({
   template_id: z.string().min(1).max(100),
-  dimension: DimensionIdSchema.nullish(),
+  // Open like ArenaRunRequest.dimension: registered custom dimensions are legal axes.
+  dimension: z.string().max(64).nullish(),
   selections: z.array(z.string()).max(16).default([]),
   baseline: BaselineOverridesSchema.nullish(),
 });

@@ -28,7 +28,8 @@ export const EventTypeSchema = z.enum([
   "token_update",
   "thinking",
 ]);
-export type EventType = z.infer<typeof EventTypeSchema>;
+/** The discriminated union below is the single source: this alias cannot drift. */
+export type EventType = ArenaEvent["type"];
 
 /** Token usage stats (carried by token_update / complete events). */
 export const TokenStatsSchema = z.object({

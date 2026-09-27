@@ -87,9 +87,11 @@ export const RUNTIME_KNOB_FIELDS: readonly RuntimeKnobFieldMeta[] = [
   { key: "harnessRetries.verify", group: "harness", kind: "number", min: HARNESS_RETRIES_MIN, max: HARNESS_RETRIES_MAX, step: 1, default: HARNESS_RETRIES_DEFAULT },
   { key: "harnessRetries.reflect", group: "harness", kind: "number", min: HARNESS_RETRIES_MIN, max: HARNESS_RETRIES_MAX, step: 1, default: HARNESS_RETRIES_DEFAULT },
   { key: "harnessRetries.selfEvolve", group: "harness", kind: "number", min: HARNESS_RETRIES_MIN, max: HARNESS_RETRIES_MAX, step: 1, default: HARNESS_RETRIES_DEFAULT },
-  { key: "subagentMaxSteps", group: "tools", kind: "number", min: 1, max: 100, step: 1, default: 20 },
-  { key: "ralphMaxRounds", group: "tools", kind: "number", min: 1, max: 16, step: 1, default: 3 },
-  { key: "mcpFetchTimeoutMs", group: "tools", kind: "number", min: 5_000, max: 300_000, step: 5_000, default: 30_000 },
+  // Defaults mirror config/settings.ts env defaults: the settings UI reset writes
+  // meta.default, so a mismatch silently resets these three to other values.
+  { key: "subagentMaxSteps", group: "tools", kind: "number", min: 1, max: 100, step: 1, default: 10 },
+  { key: "ralphMaxRounds", group: "tools", kind: "number", min: 1, max: 64, step: 1, default: 8 },
+  { key: "mcpFetchTimeoutMs", group: "tools", kind: "number", min: 5_000, max: 300_000, step: 5_000, default: 15_000 },
   { key: "agentMaxDelegationDepth", group: "tools", kind: "number", min: 0, max: 3, step: 1, default: 1 },
   { key: "llmTimeoutMs", group: "llm", kind: "number", min: 10_000, max: 600_000, step: 10_000, default: 120_000 },
   { key: "llmMaxRetries", group: "llm", kind: "number", min: 0, max: 5, step: 1, default: 2 },

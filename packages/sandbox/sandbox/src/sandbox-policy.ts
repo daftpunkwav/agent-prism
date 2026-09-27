@@ -63,7 +63,7 @@ function normalizeTarget(target: string): string {
   const stripped = target.replace(/[/\\]+$/, "");
   if (stripped === "") return "/";
   if (/^[a-zA-Z]:$/.test(stripped)) return `${stripped.toLowerCase()}\\`;
-  return target;
+  return stripped;
 }
 
 /** Sudo layers are transparent to attackers; strip repeated prefixes (any case). */

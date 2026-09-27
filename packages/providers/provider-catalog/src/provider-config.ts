@@ -14,6 +14,9 @@ import { DEFAULT_WEBSITE_URL, DECODE_FIELD_RANGES, MAX_ENDPOINTS } from "@agentp
 import { CREDENTIAL_REFERENCE_PATTERN, connectionFingerprint, normalizeModelIds, parseLlmEndpoint } from "./endpoints.js";
 
 function clampDecodeValue(value: unknown, min: number, max: number, fallback: number): number {
+  // An empty string is a missing value, not zero (Number("") === 0 would otherwise
+  // clamp temperature to 0 and max_output_tokens to its minimum).
+  if (value === null || value === undefined || value === "") return fallback;
   const num = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(num)) return fallback;
   return Math.min(max, Math.max(min, num));

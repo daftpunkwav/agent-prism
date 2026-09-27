@@ -62,19 +62,22 @@ export const LlmEndpointUpdateSchema = z.object({
   label: z.string().max(100).default(""),
   provider_name: z.string().max(100).default(""),
   api_key: z.string().max(4096).default(""),
+  // Optional, not `.default("")`: an omitted base_url keeps the documented
+  // "start from the default endpoint" behaviour, while an explicitly empty string is a
+  // configuration error. Both collapsed to "" before, so an empty field silently
+  // resolved to the default (third-party) endpoint and billed the operator's key there.
   base_url: z
     .string()
     .max(500)
-    .default("")
     .refine((value) => {
-      if (value === "") return true;
       try {
         validateLlmBaseUrl(value);
         return true;
       } catch {
         return false;
       }
-    }, "base_url is invalid"),
+    }, "base_url must be a valid URL (omit the field to use the default endpoint)")
+    .optional(),
   use_full_url: z.boolean().default(true),
   api_format: z.string().default("anthropic_messages"),
   auth_field: z.string().max(100).default("ANTHROPIC_AUTH_TOKEN"),
@@ -133,7 +136,20 @@ export type ProviderConfigPublic = z.infer<typeof ProviderConfigPublicSchema>;
 /** Provider config update request. */
 export const ProviderConfigUpdateSchema = z.object({
   notes: z.string().max(500).default(""),
-  website_url: z.string().max(500).default(""),
+  // Same validation as the endpoint field (empty stays legal for this optional field).
+  website_url: z
+    .string()
+    .max(500)
+    .default("")
+    .refine((value) => {
+      if (value === "") return true;
+      try {
+        validateWebsiteUrl(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }, "website_url is invalid"),
   endpoints: z.array(LlmEndpointUpdateSchema).max(MAX_ENDPOINTS).default([]),
   default_endpoint_id: z.string().max(64).default(""),
   temperature: z.number().min(DECODE_FIELD_RANGES.temperature.min).max(DECODE_FIELD_RANGES.temperature.max).default(0.0),
@@ -150,9 +166,12 @@ export const ProviderConfigUpdateSchema = z.object({
   model: z.string().max(200).default(DEFAULT_MODEL_ID),
   // Length is a schema constraint (not a transform-time throw): in zod 4 a raw throw inside
   // .transform escapes even safeParse as an uncaught exception (HTTP 500), never a 422 issue.
+  // One MAX_ENDPOINTS slot belongs to the top-level model itself: the legacy
+  // derivation turns N model ids into N + 1 endpoints, and the overflow used to be
+  // sliced off silently. Capping at MAX_ENDPOINTS - 1 turns it into a 422.
   models: z
     .array(z.string().max(200, "Model id is too long"))
-    .max(MAX_ENDPOINTS)
+    .max(MAX_ENDPOINTS - 1)
     .default([])
     .transform((items) => {
       const seen = new Set<string>();

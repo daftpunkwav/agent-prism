@@ -1,6 +1,6 @@
 /**
  * @file routes/sessions
- * @description Execution-session read routes: filtered listing, query pages, detail, and export.
+ * @description Execution-session routes: listing, query pages, detail, export, and deletion.
  *
  * Responsibilities:
  * - Register session endpoints and map to application use cases
@@ -52,7 +52,9 @@ export function registerSessionRoutes(app: HttpApp, deps: HttpApplicationDeps): 
     let limit: number | undefined;
     if (limitRaw !== undefined) {
       limit = Number(limitRaw);
-      if (!Number.isInteger(limit) || limit < 0) throw AppError.badRequest(`Invalid limit: ${limitRaw}`);
+      // limit=0 is rejected here like the detail route does: the advanced path
+      // clamps it to 1, so accepting it would answer two different pages for one query.
+      if (!Number.isInteger(limit) || limit < 1) throw AppError.badRequest(`Invalid limit: ${limitRaw}`);
       limit = Math.min(limit, MAX_LIST_LIMIT);
     }
     // Advanced query (text search / sort / offset / multi-select / time windows /
