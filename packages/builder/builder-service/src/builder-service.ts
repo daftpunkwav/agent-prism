@@ -556,20 +556,27 @@ export class BuilderService {
         },
       );
 
-      while (true) {
-        const next = await iterator.next();
-        if (next.done) {
-          output = next.value;
-          break;
-        }
-        // Raw arena events land in the journal as they stream (full-fidelity trail).
-        if (next.value.stream === "event") {
-          this.deps.traceStore.append(id, { kind: "event", turn, event: next.value.event });
-          if (next.value.event.type === "action" || next.value.event.type === "observation") {
-            toolEvents.push(next.value.event);
+      try {
+        while (true) {
+          const next = await iterator.next();
+          if (next.done) {
+            output = next.value;
+            break;
           }
+          // Raw arena events land in the journal as they stream (full-fidelity trail).
+          if (next.value.stream === "event") {
+            this.deps.traceStore.append(id, { kind: "event", turn, event: next.value.event });
+            if (next.value.event.type === "action" || next.value.event.type === "observation") {
+              toolEvents.push(next.value.event);
+            }
+          }
+          yield next.value;
         }
-        yield next.value;
+      } finally {
+        // A consumer that stops early (SSE client gone) must still close the turn's
+        // channel and abort its in-flight driver work instead of relying on the
+        // caller's signal also being aborted.
+        await iterator.return?.(undefined as never);
       }
 
       const result = output as BuilderTurnOutput;
