@@ -32,6 +32,21 @@ const MAX_TRACKED_RUNS = 256;
  */
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|secret|credential|password|^token$/i;
 
+/** URL userinfo plus the vendor key shapes that appear in free-form SDK messages. */
+const URL_CREDENTIALS_PATTERN = /\/\/[^/\s@]+:[^/\s@]+@/g;
+const SECRET_VALUE_PATTERN = /(sk-|api[_-]?key["'\s:=]+)[A-Za-z0-9_\-]{8,}/gi;
+
+/**
+ * Redacts credentials inside a free-form error message: SDK errors routinely echo the
+ * request URL (which may embed userinfo) or the key itself, and this text is persisted
+ * to the builder trace journal and the arena wire log.
+ */
+function redactSecrets(message: string): string {
+  return message
+    .replace(URL_CREDENTIALS_PATTERN, "//<redacted>@")
+    .replace(SECRET_VALUE_PATTERN, "$1<redacted>");
+}
+
 interface RunTiming {
   startedAt: number;
   firstTokenAt: number | null;
@@ -341,10 +356,13 @@ export function createLlmWireTraceHandler(options: LlmWireTraceHandlerOptions): 
     override handleLLMError(err: Error, runId: string): void {
       try {
         const finished = finishRun(runId);
+        // SDK messages routinely echo the request URL, and a base URL may embed
+        // credentials (see model-factory): redact exactly like the request path.
+        const redacted = redactSecrets(err.message);
         options.sink({
           kind: "llm_error",
-          title: `LLM error: ${err.message.slice(0, 200)}`,
-          data: { model: finished?.timing.model ?? "", error: err.message },
+          title: `LLM error: ${redacted.slice(0, 200)}`,
+          data: { model: finished?.timing.model ?? "", error: redacted },
           durationMs: finished?.durationMs ?? null,
         });
       } catch (error) {

@@ -248,14 +248,17 @@ const INTERPRETER_HEADS = new Set(["bash", "sh", "dash", "zsh", "ksh", "cmd", "p
 
 /** Wrapper flags per interpreter family: POSIX shells take exactly one word; cmd/PowerShell join the rest. */
 const POSIX_WRAPPER_FLAGS = new Set(["-c"]);
-const WIN_WRAPPER_FLAGS = new Set(["-c", "/c", "-command"]);
+// -encodedcommand/-enc carry base64 PowerShell (i.e. the real command is invisible to
+// every static rule below), so the wrapper review must not fail open on them.
+const WIN_WRAPPER_FLAGS = new Set(["-c", "/c", "-command", "-encodedcommand", "-enc", "-e"]);
 
 /**
  * Reviews commands smuggled through an explicit interpreter wrapper
  * (`bash -c 'rm -rf /'`, `cmd /c ...`, `powershell -Command ...`). The
  * wrapped text is re-parsed and judged by the same rules, recursively.
- * Interpreters that take arbitrary code (python -c, node -e) are out of
- * static reach and stay documented fail-open.
+ * Interpreters that take arbitrary code (python -c, node -e, `Invoke-Expression`,
+ * `& ([scriptblock]::Create(...))`) are out of static reach and stay documented
+ * fail-open: this file is a safety net for the obvious wrappers, not a boundary.
  */
 function reviewInterpreterWrapper(segment: CommandSegment, platform: string, depth: number): SandboxVerdict {
   if (depth >= MAX_RECURSION_DEPTH) return null;
