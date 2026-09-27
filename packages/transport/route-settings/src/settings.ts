@@ -12,11 +12,20 @@
  * stores); absent controllers skip registration so a host without the seams
  * keeps booting. Skill writes reject bundled names and duplicate creates with
  * 409; unknown names and invalid input answer 400 (see skillErrorStatus).
- * MCP replace failures parse as 400 with the parser's message.
+ * MCP replace failures parse as 400 with the parser's message; a persistence
+ * failure propagates to the shell's 5xx mapping instead.
  */
 
 import type { HttpApplicationDeps } from "@agentprism/http-runtime";
 import { readJsonRaw, type HttpApp } from "@agentprism/http-runtime";
+
+/**
+ * True for the MCP store's own validation errors. Matched by class NAME so this leaf
+ * does not have to depend on the tool-mcp package (boundaries forbid that edge).
+ */
+function isMcpStoreError(error: unknown): error is Error {
+  return error instanceof Error && error.name === "McpStoreError";
+}
 
 /**
  * Skill store errors are plain Errors with operator-readable messages; the two
@@ -30,6 +39,10 @@ function skillErrorDetail(error: unknown): string {
 
 function skillErrorStatus(error: unknown): 400 | 409 {
   const message = skillErrorDetail(error);
+  // Defects answer 400 before the identity sentinels are consulted: the unknown-name
+  // message quotes the requested name, so a legal kebab name such as
+  // "read-only-notes" would otherwise be reported as a 409 bundled-skill conflict.
+  if (message.startsWith("unknown user skill") || message.startsWith("invalid")) return 400;
   return message.includes("read-only") || message.includes("already exists") ? 409 : 400;
 }
 
@@ -47,8 +60,9 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
   }
   if (memoryStatus !== undefined) {
     app.get("/api/settings/memory", (c) => c.json(memoryStatus.status()));
-    app.post("/api/settings/memory/clear", (c) => {
-      memoryStatus.clear();
+    app.post("/api/settings/memory/clear", async (c) => {
+      // Clearing persists; awaiting turns a write failure into the mapped 5xx.
+      await memoryStatus.clear();
       return c.json(memoryStatus.status());
     });
   }
@@ -106,7 +120,10 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
       try {
         return c.json({ servers: mcp.replace(body.servers) });
       } catch (error) {
-        return c.json({ detail: error instanceof Error ? error.message : String(error) }, 400);
+        // Validation is the request's fault; a write failure (disk full, EACCES) is
+        // ours and must not read as "your request was invalid".
+        if (!isMcpStoreError(error)) throw error;
+        return c.json({ detail: error.message }, 400);
       }
     });
   }

@@ -55,8 +55,12 @@ export function mockRuntimeKnobs() {
   } as any;
 }
 
-/** Stateful memory-status double: clear() zeroes both counters. */
-export function mockMemoryStatus() {
+/**
+ * Stateful memory-status double: clear() zeroes both counters. Accepts a failure
+ * mode so the route's persist-failure mapping can be exercised (the real store
+ * persists on clear and can reject).
+ */
+export function mockMemoryStatus(options: { failClear?: string } = {}) {
   let episodicCount = 2;
   let semanticCount = 3;
   return {
@@ -66,7 +70,8 @@ export function mockMemoryStatus() {
       episodicPath: "data/memory_episodic.json",
       semanticPath: "data/memory_semantic.json",
     }),
-    clear: () => {
+    clear: async () => {
+      if (options.failClear !== undefined) throw new Error(options.failClear);
       episodicCount = 0;
       semanticCount = 0;
     },
@@ -119,11 +124,14 @@ export function mockMcp() {
   return {
     list: () => servers.map((server) => ({ ...server })),
     replace: (input: unknown) => {
-      if (!Array.isArray(input)) throw new Error("MCP_SERVERS must be a JSON array of server configs");
+      // Mirrors the real store: validation failures carry McpStoreError's name so the
+      // route can answer 400 while a persistence failure becomes a 5xx.
+      const invalid = (message: string) => Object.assign(new Error(message), { name: "McpStoreError" });
+      if (!Array.isArray(input)) throw invalid("MCP_SERVERS must be a JSON array of server configs");
       for (const entry of input) {
         const record = entry as Record<string, unknown>;
         if (typeof record.command !== "string" || record.command.trim() === "") {
-          throw new Error("MCP_SERVERS[0].command must be a non-empty string");
+          throw invalid("MCP_SERVERS[0].command must be a non-empty string");
         }
       }
       servers = input.map((entry) => ({ ...(entry as Record<string, unknown>) }));

@@ -4,7 +4,7 @@
  *
  * Responsibilities:
  * - Keep middleware and health checks; expose the composed-app shell
- * - Map application errors and serialize events onto responses
+ * - Map application and builder errors onto JSON responses
  *
  * Domain routes live in the route-* leaves and are mounted by the composition
  * root (apps/server); this shell never imports them (no runtime cycle).
@@ -51,7 +51,12 @@ export interface McpController {
 /** Memory store status snapshot + maintenance action. */
 export interface MemoryStatusController {
   status(): { episodicCount: number; semanticCount: number; episodicPath: string; semanticPath: string };
-  clear(): void;
+  /**
+   * Clears both stores. Async because clearing persists: the route awaits it, so a
+   * failed write surfaces as a 5xx instead of an unhandled rejection that would take
+   * the server (and every running arena column) down.
+   */
+  clear(): Promise<void>;
 }
 
 export interface HttpApplicationDeps {
@@ -148,10 +153,10 @@ export function createHttpApplication(deps: HttpApplicationDeps): HttpApp {
   // ===== error mapping =====
   app.onError((error, c) => {
     if (error instanceof AppError) {
-      return c.json({ detail: error.detail }, error.status as 400 | 401 | 404 | 413 | 422 | 500);
+      return c.json({ detail: error.detail }, error.status as 400 | 401 | 404 | 409 | 413 | 422 | 500);
     }
     if (error instanceof BuilderError) {
-      return c.json({ detail: error.detail }, error.status as 400 | 401 | 404 | 413 | 422 | 500);
+      return c.json({ detail: error.detail }, error.status as 400 | 401 | 404 | 409 | 413 | 422 | 500);
     }
     return c.json({ detail: sanitizeErrorMessage(error) }, 500);
   });

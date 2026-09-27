@@ -598,9 +598,10 @@ export async function assemble(): Promise<RuntimeComponents> {
         episodicPath: MEMORY_EPISODIC_PATH,
         semanticPath: MEMORY_SEMANTIC_PATH,
       }),
-      clear: () => {
-        episodicMemory.clear();
-        semanticMemory.clear();
+      clear: async () => {
+        // Both stores persist on clear: await them so a write failure becomes a
+        // response the operator sees, never a floating rejection.
+        await Promise.all([episodicMemory.clear(), semanticMemory.clear()]);
       },
     },
     skills: {

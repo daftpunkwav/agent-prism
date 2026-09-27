@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { buildTestApp } from "./mock-deps.js";
+import { buildTestApp, mockMemoryStatus } from "./mock-deps.js";
 
 describe("settings routes", () => {
   it("reads runtime knobs with their field metadata", async () => {
@@ -49,6 +49,14 @@ describe("settings routes", () => {
     const after = (await cleared.json()) as any;
     expect(after.episodicCount).toBe(0);
     expect(after.semanticCount).toBe(0);
+  });
+
+  it("answers 5xx when clearing memory cannot persist (never a floating rejection)", async () => {
+    const app = buildTestApp({ memoryStatus: mockMemoryStatus({ failClear: "disk full" }) });
+    const res = await app.request("/api/settings/memory/clear", { method: "POST" });
+    // The store persists on clear; a rejected write must reach the client as a
+    // server error instead of becoming an unhandled rejection that kills the host.
+    expect(res.status).toBe(500);
   });
 
   it("creates, toggles, updates, and deletes a user skill over the routes", async () => {

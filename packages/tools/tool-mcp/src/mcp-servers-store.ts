@@ -43,8 +43,17 @@ export interface McpServersStoreOptions {
   codec?: McpStoreCodec;
 }
 
-/** Validation error carrying an operator-readable message (routes map to 400). */
-export class McpStoreError extends Error {}
+/**
+ * Validation error carrying an operator-readable message (routes map to 400).
+ * The name is set explicitly so a transport leaf that must not depend on this package
+ * can still tell a validation defect (400) from a persistence failure (5xx).
+ */
+export class McpStoreError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "McpStoreError";
+  }
+}
 
 /**
  * Persistent MCP server registry. `servers` is a stable array instance that is
