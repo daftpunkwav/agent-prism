@@ -208,6 +208,7 @@ contained rather than losing the store.
 
 `apps/web/next.config.ts` rewrites `/api/*` to `http://127.0.0.1:<BACKEND_PORT>` in dev,
 resolving env, then root `.env`, then the default 8281. `compress: false` is required for
-SSE because gzip buffering holds the stream until completion. Security headers include a
-CSP whose `connect-src` is `'self' ws: wss:`, so a direct cross-origin API mode requires
-adding the backend origin there explicitly.
+SSE because gzip buffering holds the stream until completion. `apps/web/src/middleware.ts`
+adds the CSP with a per-request script nonce (production allows inline scripts only with
+that nonce), and its `connect-src` is `'self' ws: wss:`, so a direct cross-origin API mode
+requires adding the backend origin there explicitly.

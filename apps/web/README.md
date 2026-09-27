@@ -22,8 +22,8 @@ For the role table and dependency constraints see
 `scripts/dev.mjs` does three things a bare `next dev` would not: it probes the
 port first (bind + connect double check) and exits with guidance on conflict; it
 accepts `-p/--port` to move the port; and it forces `NODE_ENV=development` so a
-shell-global production value cannot trigger the production CSP, which breaks
-client hydration.
+shell-global production value cannot downgrade the CSP to the production one
+(which carries no hot-reload allowances) while developing.
 
 ## Ports and proxying
 
@@ -36,10 +36,13 @@ client hydration.
 - `compress: false` is deliberate: Next's gzip buffers the proxied SSE stream
   and flushes only at completion, which would render arena traces all at once
   instead of step by step.
-- CSP is looser in dev (`unsafe-inline`/`unsafe-eval` for hot reload) and
-  tightened for production builds. Switching to a direct cross-origin backend
-  (`NEXT_PUBLIC_API_BASE`) requires adding that address to `connect-src`, or
-  REST and SSE requests are silently blocked.
+- CSP lives in `src/middleware.ts`, not in `next.config.ts`, because it carries a
+  per-request script nonce: production allows inline scripts only with that nonce
+  (Next's inlined flight payload and the theme/skin/locale bootstrap scripts),
+  and dev additionally allows `unsafe-inline`/`unsafe-eval` for hot reload.
+  Switching to a direct cross-origin backend (`NEXT_PUBLIC_API_BASE`) requires
+  adding that address to `connect-src` there, or REST and SSE requests are
+  silently blocked.
 
 ## Source layout
 
@@ -48,6 +51,7 @@ client hydration.
 | `src/app/` | App Router pages: `arena`, `builder`, `sessions`, `projects`, `settings`, plus `guide` and `learn` |
 | `src/components/` | Presentation components shared across pages |
 | `src/i18n/` | Locale catalogs (`catalogs/en`, `catalogs/zh-CN`) and the guide/learn content; see [src/i18n/README.md](src/i18n/README.md) |
+| `src/middleware.ts` | Per-request CSP with the script nonce for inline scripts |
 | `scripts/` | `dev.mjs` launcher and `check-i18n.mjs` gate |
 
 ## Dependencies

@@ -59,16 +59,10 @@ function resolveBackendPort(): number {
 /**
  * Security response headers — applied site-wide.
  *
- * CSP is deliberately loose (script-src 'self' 'unsafe-inline' 'unsafe-eval') to stay
- * compatible with Next.js dev-mode hot reload; tighten before production builds.
- *
- * connect-src defaults to 'self': the same-origin proxy architecture (/api/* forwarded
- * via next.config) is fully allowed. If switching to "direct cross-origin" mode
- * (setting NEXT_PUBLIC_API_BASE to the backend), the backend address must be added
- * here explicitly, or CSP will silently block REST and SSE streaming requests.
+ * The Content-Security-Policy is NOT here: it needs a per-request script nonce, so it
+ * lives in `src/middleware.ts` (a second CSP header would be enforced in addition to
+ * that one, and the intersection would block the nonced inline scripts).
  */
-const isProd = process.env.NODE_ENV === "production";
-
 const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -76,21 +70,6 @@ const SECURITY_HEADERS = [
   {
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-  },
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      isProd ? "script-src 'self'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "font-src 'self' data:",
-      // Same-origin proxy is enough by default; append the backend address for direct-connection mode (see the file-header note)
-      "connect-src 'self' ws: wss:",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "object-src 'none'",
-    ].join("; "),
   },
 ];
 

@@ -198,6 +198,7 @@ per-path 写队列与 `.bak` 副本。损坏的单条 session 记录被遏制，
 
 `apps/web/next.config.ts` 在 dev 中把 `/api/*` 重写到
 `http://127.0.0.1:<BACKEND_PORT>`，依次解析 env、根 `.env`、默认 8281。SSE 需要
-`compress: false`，因为 gzip 缓冲会把流保持到完成。安全头包含一个 CSP，其
-`connect-src` 为 `'self' ws: wss:`，因此直接的跨源 API 模式需要在那里显式加入后端
-origin。
+`compress: false`，因为 gzip 缓冲会把流保持到完成。CSP 由
+`apps/web/src/middleware.ts` 下发（携带每请求 script nonce，生产环境只放行带该
+nonce 的内联脚本），其 `connect-src` 为 `'self' ws: wss:`，因此直接的跨源 API 模式
+需要在那里显式加入后端 origin。

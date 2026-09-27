@@ -19,8 +19,8 @@ projects、settings 页面与应用内 guide/learn 文档站。它只通过同�
 
 `scripts/dev.mjs` 做了三件裸 `next dev` 不会做的事：先探测端口（bind + connect
 双重探测），冲突时给出排查指引并退出；接受 `-p/--port` 换端口；强制
-`NODE_ENV=development`，防止 shell 全局的 production 值触发生产 CSP——那会破坏
-客户端 hydration。
+`NODE_ENV=development`，防止 shell 全局的 production 值在开发期把 CSP 降级为
+生产版本（生产版本不含热更新所需的宽松项）。
 
 ## 端口与代理
 
@@ -31,9 +31,11 @@ projects、settings 页面与应用内 guide/learn 文档站。它只通过同�
   编辑 `.env` 即唯一配置源，代理自动跟随。
 - `compress: false` 是刻意的：Next 的 gzip 会缓冲代理的 SSE 流、直到运行结束
   才一次性刷出，arena 轨迹将无法逐步渲染。
-- CSP 在 dev 下宽松（热更新需要 `unsafe-inline`/`unsafe-eval`），生产构建收紧。
-  若切换为直连后端模式（`NEXT_PUBLIC_API_BASE`），必须把后端地址加入
-  `connect-src`，否则 REST 与 SSE 请求会被静默拦截。
+- CSP 在 `src/middleware.ts`（不在 `next.config.ts`），因为它携带每请求的 script
+  nonce：生产环境只放行带该 nonce 的内联脚本（Next 内联的 flight 数据与
+  theme/skin/locale 引导脚本），dev 额外放行 `unsafe-inline`/`unsafe-eval` 以支持
+  热更新。若切换为直连后端模式（`NEXT_PUBLIC_API_BASE`），必须把后端地址加入
+  那里的 `connect-src`，否则 REST 与 SSE 请求会被静默拦截。
 
 ## 源码导览
 
@@ -42,6 +44,7 @@ projects、settings 页面与应用内 guide/learn 文档站。它只通过同�
 | `src/app/` | App Router 页面：`arena`、`builder`、`sessions`、`projects`、`settings`，以及 `guide` 与 `learn` |
 | `src/components/` | 跨页面共享的展示组件 |
 | `src/i18n/` | 多语言目录（`catalogs/en`、`catalogs/zh-CN`）与 guide/learn 内容；见 [src/i18n/README.md](src/i18n/README.md) |
+| `src/middleware.ts` | 携带 script nonce 的每请求 CSP |
 | `scripts/` | `dev.mjs` 启动器与 `check-i18n.mjs` 门禁 |
 
 ## 依赖

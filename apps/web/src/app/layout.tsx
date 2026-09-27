@@ -5,10 +5,12 @@
  * Responsibilities:
  * - Render the global shell and load fonts and styles
  * - Resolve the SSR locale from the mirror cookie for html lang and metadata
- * - Inject the pre-paint theme/locale scripts
+ * - Inject the pre-paint theme/locale scripts (nonce-carrying: the production CSP
+ *   allows no inline script without the per-request nonce from middleware)
  */
 
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "@agentprism/ui/styles/global.css";
@@ -43,6 +45,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getServerLocale();
+  // Minted by src/middleware.ts; absent only if a request reaches the layout without it.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
     <html
@@ -52,9 +56,9 @@ export default async function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable}`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        <script dangerouslySetInnerHTML={{ __html: skinScript }} />
-        <script dangerouslySetInnerHTML={{ __html: localeBootstrapScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: skinScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: localeBootstrapScript }} />
       </head>
       <body className="antialiased">
         <I18nProvider initialLocale={locale}>
