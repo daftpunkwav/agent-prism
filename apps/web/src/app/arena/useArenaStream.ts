@@ -200,6 +200,11 @@ export function useArenaStream() {
             : metricsToTokenStats(event.metrics);
         }
         if (event.workspace) next.workspace = event.workspace;
+        // A retry can fail first and succeed on the next attempt (the harness forwards
+        // the intermediate error so the timeline shows why). A successful terminal
+        // complete therefore clears the banner, or the column stays red forever and
+        // history would store the stale error text as its answer.
+        if (event.metrics?.success !== false) next.error = undefined;
         // complete events are not appended to the events list (avoids TraceView rendering an empty segment)
       } else if (event.type === "error") {
         next.error = event.message || t("arena.stream.runError");

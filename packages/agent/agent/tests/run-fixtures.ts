@@ -61,6 +61,26 @@ export function testSpec(driver: AgentDriver, overrides: Partial<AgentRunSpec> =
 }
 
 /** Driver stub that exposes its execution context, then ends silently or throws. */
+/**
+ * Driver that converges internally the way the real backends do: it yields an error
+ * event and a `complete(success:false)`, then RETURNS normally. The agent layer must
+ * read that terminal state, not "did an exception escape".
+ */
+export function convergingFailureDriver(): AgentDriver {
+  return {
+    frameworkId: "stub",
+    displayName: "Stub",
+    async *run(): AsyncGenerator<ArenaEvent> {
+      yield { type: "error", pipeline: "col", message: "provider 503" } as ArenaEvent;
+      yield {
+        type: "complete",
+        pipeline: "col",
+        metrics: { success: false, duration_ms: 1, input_tokens: 0, output_tokens: 0, total_tokens: 0, tool_calls: 0, steps: 1, context_window: 1, max_input_tokens: 1, max_output_tokens: 1, context_usage_pct: 0, input_usage_pct: 0 },
+      } as ArenaEvent;
+    },
+  };
+}
+
 export function captureDriver(
   onContext: (ctx: AgentExecutionContext) => void,
   failure?: Error,

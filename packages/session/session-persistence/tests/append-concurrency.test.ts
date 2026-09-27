@@ -6,6 +6,8 @@
  * - Pin that concurrent appends get distinct, gapless sequence numbers
  * - Pin that the whole-ledger backend does not let an older snapshot overwrite
  *   a newer one
+ * - Pin that a mutation racing a checkpoint is never lost (snapshot + log truncate
+ *   must not swallow an append the caller was told succeeded)
  */
 
 import fs from "node:fs";
@@ -52,6 +54,30 @@ describe("concurrent appendEntry", () => {
       const listed = await store.listEntries(record.id);
       expect(listed).toHaveLength(7);
       expect(new Set(listed.map((entry) => entry.seq)).size).toBe(7);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not lose an append that races a checkpoint", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-checkpoint-race-"));
+    try {
+      const store = new JsonlSessionStore(jsonlDeps(dir));
+      const record = await store.create({ kind: "arena", title: "col" });
+      // Start a checkpoint and an append in the same tick: without a shared critical
+      // section the append's log line can be truncated away while the snapshot was
+      // taken before its state change, and the caller still sees success.
+      const [stats, entry] = await Promise.all([
+        store.checkpoint(),
+        store.appendEntry(record.id, { kind: "note", content: "arrived during checkpoint" }),
+      ]);
+      expect(stats.sessions).toBeGreaterThanOrEqual(1);
+      expect(entry.seq).toBeGreaterThanOrEqual(0);
+
+      // Reload from disk: the append must survive (snapshot or replay).
+      const reloaded = new JsonlSessionStore(jsonlDeps(dir));
+      const listed = await reloaded.listEntries(record.id);
+      expect(listed.map((item) => item.content)).toContain("arrived during checkpoint");
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

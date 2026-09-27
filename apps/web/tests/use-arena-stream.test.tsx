@@ -136,6 +136,24 @@ describe("useArenaStream", () => {
     await waitFor(() => expect(run).resolves.toEqual({ aborted: true, failed: false }));
   });
 
+  it("clears a column's error banner when a later attempt completes successfully", async () => {
+    // The harness forwards an intermediate attempt error so the timeline explains a
+    // retry; a following successful complete must not leave the column red forever.
+    scriptStream();
+    const { result } = renderStream();
+    let run!: Promise<{ aborted: boolean; failed: boolean }>;
+    await act(async () => {
+      run = result.current.run(runOptions());
+    });
+    act(() => emit?.({ type: "error", pipeline: "Native", message: "provider 401" } as unknown as ArenaEvent));
+    act(() => emit?.({ type: "complete", pipeline: "Native", metrics: { ...METRICS, success: true } } as unknown as ArenaEvent));
+    await act(async () => {});
+    expect(result.current.columns["Native"]?.error).toBeUndefined();
+    // The column settled, so the stream ends here (an unfinished stream would keep the run pending).
+    act(() => settle?.());
+    await waitFor(() => expect(run).resolves.toEqual({ aborted: false, failed: false }));
+  });
+
   it("keeps the request error message when the stream never opens", async () => {
     // A rejected request (e.g. 422) throws before any column settles: the
     // disconnect verdict must not overwrite the real error message.

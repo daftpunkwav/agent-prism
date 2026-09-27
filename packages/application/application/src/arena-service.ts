@@ -43,18 +43,20 @@ export interface ArenaServiceDeps {
 const OUTLINE_TEXT_CAP = 1000;
 
 /**
+ * How many events the outline fold keeps per run. The outline only needs the
+ * per-turn draft (head + newest tail) and the verdicts, so a long run must not
+ * hold its whole stream in memory for a digest. Retention matches the runner's
+ * per-pipeline bucket default so both ends of the run agree on what survives;
+ * anything dropped is counted and reported in the digest.
+ */
+const OUTLINE_EVENT_RETENTION = 5_000;
+
+/**
  * Bounded shallow copy for outline folding: caps the text fields the outline
  * reads (thought content, observation result, error message) so holding the
  * whole stream cannot accumulate full tool outputs. Previews cap at 240 chars,
  * so the folded outline is identical to folding the originals.
  */
-/**
- * How many events the outline fold keeps per run. The outline only needs the
- * per-turn draft (head + newest tail) and the verdicts, so a long run must not
- * hold its whole stream in memory for a digest. Retention matches the runner's
- * per-pipeline bucket default so both ends of the run agree on what survives.
- */
-const OUTLINE_EVENT_RETENTION = 5_000;
 
 function boundedForOutline(event: ArenaEvent): ArenaEvent {
   if (event.type !== "thought" && event.type !== "thought_delta" && event.type !== "observation" && event.type !== "error") {
@@ -205,6 +207,7 @@ export class ArenaService {
       ),
     );
     let eventsYielded = 0;
+    let outlineDropped = 0;
     const collected: ArenaEvent[] = [];
     try {
       const runner = await this.ensureRunner();
@@ -216,6 +219,7 @@ export class ArenaService {
           // Tail retention (same policy as the runner's buckets): drop the oldest
           // outline material once the cap is reached instead of growing forever.
           if (collected.length > OUTLINE_EVENT_RETENTION) {
+            outlineDropped += collected.length - OUTLINE_EVENT_RETENTION;
             collected.splice(0, collected.length - OUTLINE_EVENT_RETENTION);
           }
           yield event;
@@ -228,6 +232,9 @@ export class ArenaService {
         // turn map without persisting the full event stream.
         const digest = outlineDigest(outlineTurns(collected));
         if (digest.length > 0) {
+          // The ledger note is the only trace of the outline, so it must admit when
+          // the tail retention dropped earlier events (their turns fold as "open").
+          if (outlineDropped > 0) digest.push(`(${outlineDropped} earlier event(s) omitted)`);
           await this.safeSession("outline", () =>
             this.deps.sessions.appendEntry(session.id, "note", digest.join("\n")),
           );

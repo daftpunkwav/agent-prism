@@ -45,6 +45,27 @@ const MAX_TURN_EVENTS = 800;
 /** Receive-poll cadence while waiting for pump chunks. */
 const CHANNEL_POLL_MS = 1_000;
 
+/**
+ * Whether a finished turn's event stream ended in failure. The terminal state decides,
+ * not the presence of an error event: the verification loop forwards an intermediate
+ * attempt error so the timeline shows why a retry happened, and a turn that then
+ * succeeded must still commit (only an error AFTER the terminal complete, a failed
+ * complete, or no complete at all counts as failed).
+ */
+export function turnFailed(events: readonly ArenaEvent[]): boolean {
+  let completeIndex = -1;
+  let lastErrorIndex = -1;
+  for (let index = 0; index < events.length; index += 1) {
+    const kind = events[index]?.type;
+    if (kind === "complete") completeIndex = index;
+    else if (kind === "error") lastErrorIndex = index;
+  }
+  if (completeIndex === -1) return true;
+  const complete = events[completeIndex];
+  if (complete?.type === "complete" && complete.metrics?.success === false) return true;
+  return lastErrorIndex > completeIndex;
+}
+
 /** Trace kinds the runner emits (session lifecycle + LLM wire traffic). */
 export type TurnTraceKind = "llm_request" | "llm_response" | "llm_error" | "session";
 
@@ -253,7 +274,7 @@ export async function* runBuilderTurn(
         workspaceName: complete?.workspace ?? input.workspaceName ?? "",
         metrics: complete?.metrics ?? null,
         aborted: internalAbort.signal.aborted,
-        errorSeen: complete === undefined || events.some((event) => event.type === "error"),
+        errorSeen: turnFailed(events),
       });
     } catch (error) {
       const message = sanitizeErrorMessage(error);

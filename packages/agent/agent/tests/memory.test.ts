@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { PipelineConfigSchema, type EpisodicMemoryEntry, type MemoryServicePort, type SemanticFact } from "@agentprism/contracts";
 import type { AgentExecutionContext } from "@agentprism/harness";
-import { captureDriver, collect, testDeps, testSpec } from "./run-fixtures.js";
+import { captureDriver, collect, convergingFailureDriver, testDeps, testSpec } from "./run-fixtures.js";
 
 /** In-memory stub of the contracts memory port, recording every call. */
 function stubMemory(): MemoryServicePort & {
@@ -81,6 +81,20 @@ describe("memory wiring", () => {
       config: PipelineConfigSchema.parse({ label: "col", harness: "bare", memory: "full" }),
     }));
     expect((seen as unknown as AgentExecutionContext).memoryRecall).toBeUndefined();
+  });
+
+  it("records an internally converged failure as unsuccessful", async () => {
+    // The backends converge their own failures into error + complete(success:false) and
+    // return normally; the recorded experience must follow that terminal state, not the
+    // absence of a thrown exception.
+    const deps = testDeps();
+    const memory = stubMemory();
+    await collect(deps, testSpec(convergingFailureDriver(), {
+      config: PipelineConfigSchema.parse({ label: "col", harness: "bare", memory: "full" }),
+      memory,
+    }));
+    expect(memory.records).toHaveLength(1);
+    expect(memory.records[0]?.success).toBe(false);
   });
 
   it("records failed runs as unsuccessful experiences without failing the run", async () => {

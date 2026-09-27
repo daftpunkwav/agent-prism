@@ -58,6 +58,12 @@ export interface JsonlSessionStoreDeps {
 }
 
 /**
+ * Mutation key: one queue per store, because `checkpoint()` must not interleave with
+ * a mutation (see the `mutations` field).
+ */
+const STORE_MUTATION_KEY = "store";
+
+/**
  * Append-only JSONL SessionStore with snapshot compaction.
  *
  * Every mutation appends one line instead of rewriting the whole ledger, so an
@@ -75,12 +81,16 @@ export class JsonlSessionStore implements SessionStore {
   private readonly entries = new Map<string, SessionEntry[]>();
   private readonly blobs: SessionBlobStore;
   /**
-   * Serializes mutations per session (creates share one key): seq assignment and
-   * the log append must not interleave, or two appends claim the same seq.
+   * Serializes every state change of this store under one key.
+   *
+   * Per-session keys would be enough for seq assignment, but `checkpoint()` rewrites
+   * the snapshot and truncates the log: a mutation that lands inside that window is
+   * applied in memory, then dropped by the truncate, and the caller has already been
+   * told it succeeded. One key makes mutations and checkpoint mutually exclusive, at
+   * the cost of serializing appends across sessions (they share one log anyway).
    */
   private readonly mutations = new SerialQueue();
   private corrupt = 0;
-  private loaded = false;
   private loadPromise: Promise<void> | null = null;
 
   constructor(deps: JsonlSessionStoreDeps) {
@@ -99,9 +109,7 @@ export class JsonlSessionStore implements SessionStore {
   private async ensureLoaded(): Promise<void> {
     // Memoize the PROMISE: a concurrent caller must await the same load instead of
     // reading an empty ledger while the first load is still in flight.
-    this.loadPromise ??= this.load().then(() => {
-      this.loaded = true;
-    });
+    this.loadPromise ??= this.load();
     await this.loadPromise;
   }
 
@@ -110,25 +118,27 @@ export class JsonlSessionStore implements SessionStore {
     await this.ensureLoaded();
     const title = input.title.trim();
     if (title === "") throw new SessionValidationError("title must be non-empty");
-    if (this.records.size >= MAX_SESSIONS_PER_STORE) {
-      throw new SessionValidationError(`store holds the cap of ${MAX_SESSIONS_PER_STORE} sessions`);
-    }
-    const now = this.clock.now();
-    const record: SessionRecord = {
-      id: this.idGenerator.next(),
-      kind: input.kind,
-      title: title.slice(0, MAX_SESSION_TITLE_CHARS),
-      status: "active",
-      createdAt: now,
-      updatedAt: now,
-      summary: null,
-      metadata: { ...(input.metadata ?? {}) },
-      entryCount: 0,
-    };
-    this.records.set(record.id, record);
-    this.entries.set(record.id, []);
-    await this.append({ op: "create", id: record.id, kind: record.kind, title: record.title, metadata: record.metadata, at: now });
-    return { ...record };
+    return this.mutations.run(STORE_MUTATION_KEY, async () => {
+      if (this.records.size >= MAX_SESSIONS_PER_STORE) {
+        throw new SessionValidationError(`store holds the cap of ${MAX_SESSIONS_PER_STORE} sessions`);
+      }
+      const now = this.clock.now();
+      const record: SessionRecord = {
+        id: this.idGenerator.next(),
+        kind: input.kind,
+        title: title.slice(0, MAX_SESSION_TITLE_CHARS),
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+        summary: null,
+        metadata: { ...(input.metadata ?? {}) },
+        entryCount: 0,
+      };
+      this.records.set(record.id, record);
+      this.entries.set(record.id, []);
+      await this.append({ op: "create", id: record.id, kind: record.kind, title: record.title, metadata: record.metadata, at: now });
+      return { ...record };
+    });
   }
 
   /** Returns the record or null when unknown (read path never throws). */
@@ -141,26 +151,28 @@ export class JsonlSessionStore implements SessionStore {
   /** Marks completed, merging summary/metadata (unknown ids throw). */
   async complete(id: string, finish: SessionFinishInput = {}): Promise<SessionRecord> {
     await this.ensureLoaded();
-    const record = this.require(id);
-    const summary = finish.summary?.trim() ?? "";
-    record.status = "completed";
-    record.updatedAt = this.clock.now();
-    if (summary !== "") record.summary = summary.slice(0, MAX_SUMMARY_CHARS);
-    Object.assign(record.metadata, finish.metadata ?? {});
-    await this.append({
-      op: "complete",
-      id,
-      at: record.updatedAt,
-      summary: record.summary,
-      metadata: { ...record.metadata },
+    return this.mutations.run(STORE_MUTATION_KEY, async () => {
+      const record = this.require(id);
+      const summary = finish.summary?.trim() ?? "";
+      record.status = "completed";
+      record.updatedAt = this.clock.now();
+      if (summary !== "") record.summary = summary.slice(0, MAX_SUMMARY_CHARS);
+      Object.assign(record.metadata, finish.metadata ?? {});
+      await this.append({
+        op: "complete",
+        id,
+        at: record.updatedAt,
+        summary: record.summary,
+        metadata: { ...record.metadata },
+      });
+      return { ...record };
     });
-    return { ...record };
   }
 
   /** Marks failed with the caller reason (unknown ids throw). */
   async fail(id: string, reason: string): Promise<SessionRecord> {
     await this.ensureLoaded();
-    return this.mutations.run(id, async () => {
+    return this.mutations.run(STORE_MUTATION_KEY, async () => {
       const record = this.require(id);
       record.status = "failed";
       record.updatedAt = this.clock.now();
@@ -173,7 +185,7 @@ export class JsonlSessionStore implements SessionStore {
   /** Marks cancelled by the requester (abort supersedes failure). */
   async cancel(id: string, reason = "cancelled by client"): Promise<SessionRecord> {
     await this.ensureLoaded();
-    return this.mutations.run(id, async () => {
+    return this.mutations.run(STORE_MUTATION_KEY, async () => {
       const record = this.require(id);
       record.status = "cancelled";
       record.updatedAt = this.clock.now();
@@ -191,7 +203,7 @@ export class JsonlSessionStore implements SessionStore {
     await this.ensureLoaded();
     // Queued: seq is read before the spill await, so a concurrent append would
     // claim the same seq and overwrite the same blob.
-    return this.mutations.run(sessionId, async () => {
+    return this.mutations.run(STORE_MUTATION_KEY, async () => {
       const record = this.require(sessionId);
       const content = entry.content.trim();
       if (content === "") throw new SessionValidationError("entry content must be non-empty");
@@ -238,17 +250,18 @@ export class JsonlSessionStore implements SessionStore {
   /** Deletes record plus entries; false when unknown (logs the delete). */
   async delete(id: string): Promise<boolean> {
     await this.ensureLoaded();
-    const existed = this.records.delete(id);
-    this.entries.delete(id);
-    if (existed) {
+    return this.mutations.run(STORE_MUTATION_KEY, async () => {
+      const existed = this.records.delete(id);
+      this.entries.delete(id);
+      if (!existed) return false;
       try {
         await this.blobs.deleteSessionBlobs(id);
       } catch (error) {
         console.warn(`[jsonl-session-store] blob purge failed for ${id}: ${error instanceof Error ? error.message : String(error)}`);
       }
       await this.append({ op: "delete", id, at: this.clock.now() });
-    }
-    return existed;
+      return true;
+    });
   }
 
   /** Full spilled text for one entry; null when inline or unavailable (read path never throws). */
@@ -269,16 +282,21 @@ export class JsonlSessionStore implements SessionStore {
    */
   async checkpoint(): Promise<{ sessions: number; entries: number }> {
     await this.ensureLoaded();
-    const sessions = [...this.records.entries()].map(([id, record]) => ({
-      record: { ...record },
-      entries: [...(this.entries.get(id) ?? [])],
-    }));
-    await this.snapshot.write({ version: 1 as const, sessions });
-    await this.log.rewrite([]);
-    return {
-      sessions: sessions.length,
-      entries: sessions.reduce((sum, item) => sum + item.entries.length, 0),
-    };
+    // Queued: building the snapshot, writing it and truncating the log must not
+    // interleave with a mutation, or that mutation's log line disappears while its
+    // state change was already answered as committed.
+    return this.mutations.run(STORE_MUTATION_KEY, async () => {
+      const sessions = [...this.records.entries()].map(([id, record]) => ({
+        record: { ...record },
+        entries: [...(this.entries.get(id) ?? [])],
+      }));
+      await this.snapshot.write({ version: 1 as const, sessions });
+      await this.log.rewrite([]);
+      return {
+        sessions: sessions.length,
+        entries: sessions.reduce((sum, item) => sum + item.entries.length, 0),
+      };
+    });
   }
 
   private require(id: string): SessionRecord {
