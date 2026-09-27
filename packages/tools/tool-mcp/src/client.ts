@@ -59,6 +59,9 @@ export interface McpServerConfig {
   enabled?: boolean;
 }
 
+/** How many unparseable bodies get their own warning before the log goes quiet. */
+const MAX_REPORTED_DROPS = 3;
+
 /** Default per-request timeout in ms. */
 export const MCP_DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -92,6 +95,8 @@ export class McpClient {
   private readonly pending = new Map<number, PendingCall>();
   private pump: Promise<void> | null = null;
   private closed = false;
+  /** Bodies that failed to parse (protocol mismatch); reported a bounded number of times. */
+  private droppedBodies = 0;
 
   private readonly roots: string[];
 
@@ -185,6 +190,11 @@ export class McpClient {
   }
 
 
+  /** Unparseable message bodies seen so far (0 for a spec-conforming server). */
+  get droppedBodyCount(): number {
+    return this.droppedBodies;
+  }
+
   /** Kills the child and rejects pending calls (idempotent). */
   close(): void {
     if (this.closed) return;
@@ -261,6 +271,15 @@ export class McpClient {
           try {
             message = JSON.parse(body) as Record<string, unknown>;
           } catch {
+            // Never silent: an unparseable body means the server is not speaking the
+            // newline-delimited protocol (pretty-printed JSON, a log line on stdout).
+            // Without this the only symptom is a request that times out.
+            this.droppedBodies += 1;
+            if (this.droppedBodies <= MAX_REPORTED_DROPS) {
+              console.warn(`[mcp] dropped unparseable message body: ${body.slice(0, 120)}`);
+            } else if (this.droppedBodies === MAX_REPORTED_DROPS + 1) {
+              console.warn("[mcp] further unparseable bodies are counted silently (see droppedBodies)");
+            }
             continue;
           }
           if (typeof message.id !== "number") continue;

@@ -55,6 +55,20 @@ describe("ScopedFileSystem.readFileHead", () => {
     }
   });
 
+  it("keeps a file's own trailing replacement character", () => {
+    const ws = workspace();
+    try {
+      // A file that really ends with U+FFFD must not lose its last character to a
+      // heuristic aimed at a cut multi-byte sequence.
+      ws.fs.writeFile("fffd.txt", "abc�");
+      const head = ws.fs.readFileHead("fffd.txt", 100);
+      expect(head.text).toBe("abc�");
+      expect(head.truncated).toBe(false);
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("rejects a missing file like readFile does", () => {
     const ws = workspace();
     try {
@@ -81,6 +95,56 @@ describe("read tool on an oversized file", () => {
   });
 });
 
+describe("read tool offset beyond the head window", () => {
+  it("reaches a line that lives past the first window", async () => {
+    const ws = workspace();
+    try {
+      // ~1.2 MiB of filler: past the plain head window, so only a line-scanning read
+      // can reach line 40000.
+      const filler = Array.from({ length: 40_000 }, (_v, i) => `line ${i} ${"x".repeat(20)}`);
+      writeFileSync(join(ws.root, "big.log"), `${filler.join("\n")}\nNEEDLE-TAIL\n`);
+      const result = await readTool.execute(ws as never, { path: "big.log", offset: 40_001, limit: 1 });
+      expect(result.ok).toBe(true);
+      expect(result.result).toContain("NEEDLE-TAIL");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
+  it("keeps a line that spans a scan window boundary in one piece", async () => {
+    const ws = workspace();
+    try {
+      // The first line is longer than one 256 KiB window, so the window walker hands
+      // over mid-line; the next line must still come back whole.
+      const longLine = "L".repeat(300_000);
+      writeFileSync(join(ws.root, "span.log"), `${longLine}
+SECOND-LINE
+THIRD-LINE
+`);
+      const result = await readTool.execute(ws as never, { path: "span.log", offset: 2, limit: 2 });
+      expect(result.ok).toBe(true);
+      expect(result.result).toContain("SECOND-LINE");
+      expect(result.result).toContain("THIRD-LINE");
+      expect(result.result).not.toContain("LLSECOND");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
+  it("says so when the offset lies beyond the scan budget", async () => {
+    const ws = workspace();
+    try {
+      const filler = Array.from({ length: 9_000 }, (_v, i) => `line ${i} ${"y".repeat(100)}`);
+      writeFileSync(join(ws.root, "huge.log"), `${filler.join("\n")}\n`);
+      const result = await readTool.execute(ws as never, { path: "huge.log", offset: 100_000, limit: 5 });
+      expect(result.ok).toBe(true);
+      expect(result.result).toContain("beyond the readable window");
+    } finally {
+      ws.cleanup();
+    }
+  });
+});
+
 describe("grep tool byte budget", () => {
   it("searches an oversized file through its head and reports that", async () => {
     const ws = workspace();
@@ -89,8 +153,10 @@ describe("grep tool byte budget", () => {
       writeFileSync(join(ws.root, "bundle.js"), `${"q".repeat(3 * 1024 * 1024)}NEEDLE`);
       const result = await grepTool.execute(ws as never, { pattern: "NEEDLE" });
       expect(result.ok).toBe(true);
-      // The tail past the head cap is not searched, and the result says so.
+      // The tail past the head cap is not searched, and the result says so instead of
+      // reading as a verdict on the whole file.
       expect(result.result).toContain("No matches for NEEDLE");
+      expect(result.result).toContain("searched only in their first");
       const headHit = await grepTool.execute(ws as never, { pattern: "qqqq" });
       expect(headHit.result).toContain("searched only in their first");
     } finally {

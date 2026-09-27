@@ -17,17 +17,11 @@ import { extractAnswerFromEvents } from "@agentprism/contracts";
 import { buildInitialMessages, type AgentExecutionContext } from "@agentprism/harness";
 import { selfConsistencyAttempts, selfConsistencyOutcomeEvents } from "@agentprism/driver-run-support";
 import { afterLlm, createReasoningState, isFinished } from "./reasoning-state.js";
-import { collectPriorToolNames, executeToolCalls } from "./tool-batch.js";
+import { collectPriorToolNames, executeToolCalls, isToolBatchMessage } from "./tool-batch.js";
 import { streamLlmTurn } from "./stream-turn.js";
 
 function isAssistantMessage(item: ArenaEvent | LlmAssistantMessage): item is LlmAssistantMessage {
   return "role" in item && item.role === "assistant";
-}
-
-function isToolMessage(
-  item: ArenaEvent | { role: string },
-): item is { role: "tool"; content: string; toolCallId: string; name?: string } {
-  return "role" in item && item.role === "tool";
 }
 
 /**
@@ -73,7 +67,7 @@ export async function* runSelfConsistencyLoop(args: {
         continue;
       }
       for await (const item of executeToolCalls(context, response, context.question, priorToolNames, stats)) {
-        if (isToolMessage(item)) messages.push(item);
+        if (isToolBatchMessage(item)) messages.push(item);
         else {
           attemptEvents.push(item);
           yield item;

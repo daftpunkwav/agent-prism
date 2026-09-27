@@ -23,13 +23,16 @@ export class SerialQueue {
     // The same handler on both settle paths: a rejected predecessor must not
     // swallow the next task (its own caller already saw the rejection).
     const result = tail.then(task, task);
-    this.tails.set(
-      key,
-      result.then(
-        () => undefined,
-        () => undefined,
-      ),
+    const settled = result.then(
+      () => undefined,
+      () => undefined,
     );
+    this.tails.set(key, settled);
+    // Forget the entry once nothing is queued behind it: keys are session ids, so the
+    // map would otherwise keep one promise per session for the life of the process.
+    void settled.then(() => {
+      if (this.tails.get(key) === settled) this.tails.delete(key);
+    });
     return result;
   }
 }

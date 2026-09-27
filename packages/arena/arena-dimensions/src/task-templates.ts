@@ -340,7 +340,10 @@ export const TEMPLATES: TaskTemplate[] = [
     question: "Run `seq 1 2000 | tail -n 1` with the bash tool and reply with the number only.",
     suggested_dimension: "context",
     suggested_selections: ["sliding", "tool_tail", "token_budget"],
-    judge: judge({ type: "numeric", operator: "==", value: 2000, tolerance: 0.001 }),
+    // "last": the question itself contains 2000 (the command and the range), so an
+    // answer that merely echoes it would pass an "any" match. The verdict must be the
+    // concluding number — the point of the task is whether the tail survived.
+    judge: judge({ type: "numeric", operator: "==", value: 2000, tolerance: 0.001, numeric_match: "last" }),
     category: "scored",
   },
 ];

@@ -29,7 +29,7 @@ const DEFAULT_PASS_THRESHOLD = 0.6;
  * `except ValueError`, a log line quoting "invalid") is not a failure, while real
  * failures start their line with the keyword.
  */
-const ERROR_INDICATOR_PATTERN = /^\s*(?:error|failed|exception|traceback|invalid|errno|not found|command not found)\b/i;
+const ERROR_INDICATOR_PATTERN = /^\s*(?:error|failed|exception|traceback|invalid|errno|not found|command not found)\b/im;
 
 interface ExtractedSignals {
   totalEvents: number;

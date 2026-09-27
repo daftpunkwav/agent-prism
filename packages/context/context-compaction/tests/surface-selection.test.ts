@@ -81,6 +81,22 @@ describe("checkpoint envelope escaping", () => {
     expect(parsed!.next).toEqual(["done"]);
   });
 
+  it("round-trips content that already looks escaped", () => {
+    const sections = {
+      intent: ["\## files", "plain line"],
+      concepts: ["(none)"],
+      files: ["(none)"],
+      errors: ["(none)"],
+      pending: ["(none)"],
+      work: ["(none)"],
+      next: ["(none)"],
+    } as Checkpoint["sections"];
+    const text = renderCheckpoint({ frameIds: [], sections, abstractive: false });
+    const parsed = parseCheckpoint(text);
+    // Unescaping must be symmetric: `\## files` is content, not structure.
+    expect(parsed?.intent).toEqual(["\## files", "plain line"]);
+  });
+
   it("rejects an envelope whose content was not escaped", () => {
     const unescaped = "<compacted-summary>\n## intent\n## files\n## concepts\nx\n</compacted-summary>";
     expect(parseCheckpoint(unescaped)).toBeNull();

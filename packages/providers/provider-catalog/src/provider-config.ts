@@ -60,7 +60,16 @@ function parseEndpoints(raw: Record<string, unknown>, seed: LlmEnvSeed, ids: IdG
   }
   let endpoints: LlmEndpoint[] = rawEndpoints.slice(0, MAX_ENDPOINTS).map((item) => parseLlmEndpoint(item, ids));
   if (endpoints.length === 0) {
-    endpoints = legacyEndpointsFromTopLevel(raw, seed, ids).slice(0, MAX_ENDPOINTS);
+    const derived = legacyEndpointsFromTopLevel(raw, seed, ids);
+    if (derived.length > MAX_ENDPOINTS) {
+      // Loud, not silent: the top-level model plus N model ids can exceed the endpoint
+      // cap, and dropping the tail without a word used to hide a model the operator
+      // had configured. (The request reaches this point only through validation.)
+      console.warn(
+        `[providers] Legacy model list derives ${derived.length} endpoints; keeping the first ${MAX_ENDPOINTS} and dropping ${derived.length - MAX_ENDPOINTS}`,
+      );
+    }
+    endpoints = derived.slice(0, MAX_ENDPOINTS);
   }
 
   // id dedup: duplicate ids get fresh ids

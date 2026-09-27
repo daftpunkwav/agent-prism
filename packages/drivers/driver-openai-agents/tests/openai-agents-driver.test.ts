@@ -219,6 +219,32 @@ describe("bindRegistryToolsForAgents", () => {
     expect(bound.map((tool) => tool.name)).toEqual(registry.listDefinitions().map((definition) => definition.name));
     expect(bound[0]?.type).toBe("function");
   });
+
+  it("converges a throwing tool into error text and rethrows an abort", async () => {
+    const registry = createBuiltinToolRegistry();
+    const bound = bindRegistryToolsForAgents(
+      {
+        registry,
+        names: new Set(registry.listDefinitions().map((definition) => definition.name)),
+        execute: async (name: string) => {
+          if (name === "read") throw new Error("disk on fire");
+          throw Object.assign(new Error("aborted"), { name: "AbortError" });
+        },
+      },
+      { question: "q", harness: "bare" },
+    );
+    // The SDK's invoke takes the model's raw JSON string (it parses it itself).
+    const invoke = (tool: unknown, args: Record<string, unknown>): Promise<unknown> =>
+      (tool as { invoke: (ctx: unknown, input: string) => Promise<unknown> }).invoke({}, JSON.stringify(args));
+    const read = bound.find((tool) => tool.name === "read");
+    const write = bound.find((tool) => tool.name === "write");
+    await expect(invoke(read, { path: "a.txt" })).resolves.toContain("failed");
+    // A cancellation must not surface as our tool-failure text. (The SDK converts a
+    // thrown tool error into its own generic output, so the abort cannot reject the
+    // invoke here; the run's own signal handling is what stops the column.)
+    const aborted = await invoke(write, { path: "a.txt", content: "x" });
+    expect(String(aborted)).not.toContain("failed");
+  });
 });
 
 describe("toToolParameters", () => {

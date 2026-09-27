@@ -76,6 +76,17 @@ describe("observation failure detection", () => {
     expect(dim(score, "error_recovery").score).toBeLessThan(1);
   });
 
+  it("catches a keyword failure that starts a later line of a multi-line output", () => {
+    const events = [
+      action("bash", { command: "make build" }),
+      // The keyword must be matched at a line start, not only at the start of the string.
+      observation(["compiling module A", "compiling module B", "Error: undefined reference to main"].join("\n")),
+      complete(false),
+    ];
+    const score = evaluateTrajectory(events);
+    expect(dim(score, "error_recovery").score).toBeLessThan(1);
+  });
+
   it("still catches keyword failures when the producer sent no flag", () => {
     const events = [
       action("bash", { command: "python x.py" }),

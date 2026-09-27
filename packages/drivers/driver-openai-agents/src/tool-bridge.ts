@@ -83,7 +83,10 @@ export function bindRegistryToolsForAgents(tools: ToolAccess, options: AgentTool
         } catch (error) {
           // tool-registry's contract leaves handler failures to the driver, which
           // converges them: abort rethrows, anything else becomes error text the
-          // model can recover from (same shape as the other columns).
+          // model can recover from (same shape as the other columns). The SDK wraps a
+          // thrown tool error into its own output text before it reaches the driver, so
+          // the rethrow here keeps the intent (and matches the other bridges) without
+          // being the mechanism that stops a cancelled column.
           if ((error as Error)?.name === "AbortError") throw error;
           return `Error: tool ${definition.name} failed: ${sanitizeErrorMessage(error)}`;
         }

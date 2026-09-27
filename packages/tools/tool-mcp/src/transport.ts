@@ -19,7 +19,7 @@ import { StringDecoder } from "node:string_decoder";
 
 /** One spawned MCP server process (duplex byte streams as text lines). */
 export interface McpChildProcess {
-  /** Writes one framed message (adds headers + body). */
+  /** Writes one message, framed as a single newline-delimited line. */
   write(message: string): void;
   /** Async stream of deframed message bodies (ends on process exit). */
   messages(): AsyncIterable<string>;
@@ -108,13 +108,20 @@ export class NodeMcpTransport implements McpTransport {
       }
     });
     const finish = (): void => {
+      // Flush the incremental decoder: it can only hold an incomplete multi-byte
+      // sequence, never a whole message (a body is only emitted on its newline), so a
+      // server that dies without a trailing newline loses that last message — the
+      // protocol requires the newline.
       for (const message of decoder.push(textDecoder.end())) {
         queue.push(message);
       }
       ended = true;
       wake();
     };
+    // 'close' (not just 'exit') is what guarantees stdio is drained, so the tail of the
+    // stream still reaches the consumer; both paths are idempotent via `ended`.
     child.on("exit", finish);
+    child.on("close", finish);
     child.on("error", finish);
     let exitResolve: (value: { code: number | null; signal: string | null }) => void = () => {};
     const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {

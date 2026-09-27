@@ -76,7 +76,9 @@ export class SessionTelemetry {
   settledTransition(id: string, status: SessionStatus, at: number): void {
     if (!TERMINAL.includes(status) || this.settled.has(id)) return;
     const start = this.starts.get(id);
-    const kind = start?.kind ?? this.settled.get(id) ?? "agent";
+    // `settled.has(id)` above already returned for a known id, so the start entry is
+    // the only source of the kind; an orphan settle falls back to the generic kind.
+    const kind = start?.kind ?? "agent";
     // Remember the id (for duplicate suppression and later kind lookups) and close the
     // open gauge by dropping the start entry the duration came from.
     this.rememberSettled(id, kind);

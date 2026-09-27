@@ -166,12 +166,13 @@ export const ProviderConfigUpdateSchema = z.object({
   model: z.string().max(200).default(DEFAULT_MODEL_ID),
   // Length is a schema constraint (not a transform-time throw): in zod 4 a raw throw inside
   // .transform escapes even safeParse as an uncaught exception (HTTP 500), never a 422 issue.
-  // One MAX_ENDPOINTS slot belongs to the top-level model itself: the legacy
-  // derivation turns N model ids into N + 1 endpoints, and the overflow used to be
-  // sliced off silently. Capping at MAX_ENDPOINTS - 1 turns it into a 422.
+  // The legacy derivation turns N model ids into up to N + 1 endpoints (the top-level
+  // model becomes the first one, and a model id equal to it is skipped), so N may
+  // legitimately be MAX_ENDPOINTS: the derived count is what the endpoint cap applies
+  // to, and the derivation reports its own overflow loudly.
   models: z
     .array(z.string().max(200, "Model id is too long"))
-    .max(MAX_ENDPOINTS - 1)
+    .max(MAX_ENDPOINTS)
     .default([])
     .transform((items) => {
       const seen = new Set<string>();

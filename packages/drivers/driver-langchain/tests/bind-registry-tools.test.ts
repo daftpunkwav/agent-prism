@@ -72,6 +72,36 @@ describe("bindRegistryTools schema derivation", () => {
     expect(args.questions).toEqual([{ id: "test1", question: "可用?", options: ["行", "不行"] }]);
   });
 
+  it("converges a throwing tool into error text the model can recover from", async () => {
+    // tool-registry's contract leaves handler failures to the driver; a throw that
+    // escaped here would abort the whole column instead of returning text.
+    const registry = createBuiltinToolRegistry();
+    const bound = bindRegistryTools({
+      registry,
+      execute: async () => {
+        throw new Error("disk on fire");
+      },
+    });
+    const read = bound.find((item) => item.name === "read");
+    const out = await (read as unknown as { invoke: (a: unknown) => Promise<unknown> }).invoke({ path: "a.txt" });
+    expect(String(out)).toContain("failed");
+    expect(String(out)).not.toContain("disk on fire");
+  });
+
+  it("propagates an abort instead of reporting it as a tool failure", async () => {
+    const registry = createBuiltinToolRegistry();
+    const bound = bindRegistryTools({
+      registry,
+      execute: async () => {
+        throw Object.assign(new Error("aborted"), { name: "AbortError" });
+      },
+    });
+    const read = bound.find((item) => item.name === "read");
+    await expect(
+      (read as unknown as { invoke: (a: unknown) => Promise<unknown> }).invoke({ path: "a.txt" }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("ask_user accepts double-wrapped options (regression: options[0]-array)", async () => {
     const registry = createBuiltinToolRegistry();
     let seen: Record<string, unknown> | null = null;

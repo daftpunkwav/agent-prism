@@ -49,6 +49,10 @@ export class NativeDriver implements AgentDriver {
     try {
       yield* this.runLoop(context, { label, workspaceName, started, stats });
     } catch (error) {
+      // Cancellation is not a column failure: the abort error leaves untouched, exactly
+      // like every other backend's abort path (agent-execution owns the cancelled
+      // terminal), so a stopped column never emits a stale error event.
+      if ((error as Error)?.name === "AbortError") throw error;
       // Server-side detail log; the client-facing event stays sanitized. Converging
       // here (instead of letting the throw escape) keeps the harness retry loop alive:
       // verification/loop.ts only retries after seeing error + complete(false).

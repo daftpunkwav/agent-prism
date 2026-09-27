@@ -104,12 +104,15 @@ async function executeGrep(workspace: ToolWorkspace, args: ToolArgs): Promise<To
       }
       if (truncated) break;
     }
-    if (lines.length === 0) {
-      return { result: `No matches for ${pattern}`, fileDiff: null, ok: true };
-    }
     const suffixes: string[] = [];
     if (truncated) suffixes.push(`(results truncated at ${MAX_MATCH_LINES} lines)`);
     if (headOnlyFiles > 0) suffixes.push(`${headOnlyFiles} file(s) larger than ${MAX_GREP_FILE_BYTES} bytes were searched only in their first ${MAX_GREP_FILE_BYTES} bytes`);
+    if (lines.length === 0) {
+      // "No matches" must not read as a verdict on the whole workspace when the walk
+      // stopped early or only part of some files was searched.
+      const qualifier = suffixes.length === 0 ? "" : ` (${suffixes.join("; ")})`;
+      return { result: `No matches for ${pattern}${qualifier}`, fileDiff: null, ok: true };
+    }
     const suffix = suffixes.length === 0 ? "" : `\n…(${suffixes.join("; ")})`;
     return { result: boundText(workspace, "grep", lines.join("\n") + suffix), fileDiff: null, ok: true };
   } catch (error) {

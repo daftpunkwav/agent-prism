@@ -74,12 +74,13 @@ export class SemanticMemory {
    */
   async recordFact(fact: Omit<SemanticFact, "id">): Promise<SemanticFact> {
     await this.pruneExpired();
-    // Room for the fact about to be written, so the cap holds once this call returns.
-    await this.enforceCapacity(1);
     const key = [normalizePart(fact.subject), normalizePart(fact.predicate), normalizePart(fact.object)].join("|");
     for (const existing of this.store.list()) {
       const existingKey = [normalizePart(existing.subject), normalizePart(existing.predicate), normalizePart(existing.object)].join("|");
       if (existingKey === key) {
+        // Refresh in place. No capacity dance here: an update does not grow the store,
+        // and evicting a fact to record this one would drop unrelated knowledge (the
+        // weakest fact could be the very one being refreshed).
         const merged: SemanticFact = {
           ...existing,
           confidence: fact.confidence,
@@ -90,6 +91,8 @@ export class SemanticMemory {
         return this.store.save(merged);
       }
     }
+    // Room for the fact about to be inserted, so the cap holds once this call returns.
+    await this.enforceCapacity(1);
     const record: SemanticFact = { ...fact, id: this.nextId() };
     return this.store.save(record);
   }

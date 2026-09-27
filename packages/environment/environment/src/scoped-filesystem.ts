@@ -26,6 +26,28 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { estimateTokensFromChars } from "@agentprism/contracts";
 
+/**
+ * Index just past the last COMPLETE UTF-8 character in `buffer[0..length)`.
+ * A character cut by the cap leaves 1-3 trailing continuation bytes (0b10xxxxxx);
+ * walking back over them and comparing with what the lead byte needs says how much
+ * of the cut character to drop.
+ */
+function completeUtf8End(buffer: Buffer, length: number): number {
+  let index = length;
+  let continuation = 0;
+  while (index > 0 && continuation < 3) {
+    const byte = buffer[index - 1] as number;
+    if ((byte & 0b1100_0000) !== 0b1000_0000) break;
+    index -= 1;
+    continuation += 1;
+  }
+  if (index === 0) return length;
+  const lead = buffer[index - 1] as number;
+  const needed = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc2 ? 2 : 1;
+  // `needed` counts the lead byte, `continuation` what we actually have.
+  return needed <= continuation + 1 ? length : index - 1;
+}
+
 /** Workspace/directory operation error. */
 export class WorkspaceError extends Error {
   constructor(message: string) {
@@ -271,13 +293,18 @@ export class ScopedFileSystem {
   }
 
   /**
-   * Reads at most `maxBytes` of a file and reports whether more remains. Callers
-   * that only inspect a head (grep windows, symbol indexes, model reads) must use
-   * this: `readFile` materializes the whole file first, so a multi-gigabyte asset
-   * costs its full size in memory before any cap applies. A multi-byte character
-   * cut by the byte cap is dropped instead of surfacing as a replacement character.
+   * Reads at most `maxBytes` starting at `startByte` and reports whether more content
+   * follows. Callers that only inspect a window (grep, symbol indexes, model reads,
+   * offset reads) must use this: `readFile` materializes the whole file first, so a
+   * multi-gigabyte asset costs its full size in memory before any cap applies. A
+   * multi-byte character cut by the byte cap is dropped instead of surfacing as a
+   * replacement character.
    */
-  readFileHead(filePath: string, maxBytes: number): { text: string; truncated: boolean } {
+  readFileHead(
+    filePath: string,
+    maxBytes: number,
+    startByte = 0,
+  ): { text: string; truncated: boolean; bytesRead: number } {
     const target = this.canonicalize(filePath);
     if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`);
     const real = this.safeReadPath(target);
@@ -286,12 +313,21 @@ export class ScopedFileSystem {
       fd = openSync(real, "r");
       const size = fstatSync(fd).size;
       const limit = Math.max(0, Math.trunc(maxBytes));
-      const buffer = Buffer.alloc(Math.min(limit, size));
-      const read = buffer.length === 0 ? 0 : readSync(fd, buffer, 0, buffer.length, 0);
-      const text = buffer.subarray(0, read).toString("utf8");
+      const from = Math.max(0, Math.trunc(startByte));
+      const remaining = Math.max(0, size - from);
+      const buffer = Buffer.alloc(Math.min(limit, remaining));
+      const read = buffer.length === 0 ? 0 : readSync(fd, buffer, 0, buffer.length, from);
+      // Drop only the multi-byte character the byte cap cut in half (trailing
+      // continuation bytes), never a character the file really ends with.
+      const end = completeUtf8End(buffer, read);
       return {
-        text: text.endsWith("\uFFFD") ? text.slice(0, -1) : text,
-        truncated: size > read,
+        text: buffer.subarray(0, end).toString("utf8"),
+        // "More content follows" counts from the window's start, so a caller reading
+        // successive windows can stop exactly at the last one. `bytesRead` is the
+        // distance to the next window (it can exceed the text's byte length when a
+        // character was cut).
+        truncated: from + read < size,
+        bytesRead: read,
       };
     } catch {
       throw new WorkspaceError(`Error: file not found: ${filePath}`);

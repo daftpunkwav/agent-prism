@@ -157,7 +157,10 @@ export function prepareMessagesForLlm(
     return [...systems, ...applied.messages];
   }
   if (strategy === "checkpoint") {
-    const applied = applyCheckpointCompaction(rest, { compactTargetTokens: options.compactTargetTokens });
+    const applied = applyCheckpointCompaction(rest, {
+      compactTargetTokens: options.compactTargetTokens,
+      ...(options.charsPerToken !== undefined ? { charsPerToken: options.charsPerToken } : {}),
+    });
     return [...systems, ...applied.messages];
   }
 

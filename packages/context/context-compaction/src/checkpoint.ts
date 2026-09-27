@@ -113,17 +113,22 @@ export async function buildCheckpoint(
  * content can come from a model (the summarizer port) or from transcripts that
  * happen to contain a `## heading`, and an unescaped one would silently split the
  * section it belongs to.
+ *
+ * A line that already starts with a backslash is escaped too, so unescaping stays
+ * symmetric: otherwise `\## files` would come back as `## files` and the round trip
+ * would not be lossless.
  */
+function isStructuralLine(line: string): boolean {
+  return /^##\s/.test(line) || line === CHECKPOINT_OPEN_TAG || line === CHECKPOINT_CLOSE_TAG;
+}
+
 function escapeContentLine(line: string): string {
-  return /^##\s/.test(line) || line === CHECKPOINT_OPEN_TAG || line === CHECKPOINT_CLOSE_TAG ? `\\${line}` : line;
+  return isStructuralLine(line) || line.startsWith("\\") ? `\\${line}` : line;
 }
 
 /** Reverses `escapeContentLine` (only for lines that were escaped). */
 function unescapeContentLine(line: string): string {
-  if (/^\\##\s/.test(line) || line === `\\${CHECKPOINT_OPEN_TAG}` || line === `\\${CHECKPOINT_CLOSE_TAG}`) {
-    return line.slice(1);
-  }
-  return line;
+  return isStructuralLine(line.slice(1)) || line.slice(1).startsWith("\\") ? line.slice(1) : line;
 }
 
 /** Renders a checkpoint envelope (fixed section order, never dropped). */
