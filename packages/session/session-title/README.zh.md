@@ -7,4 +7,4 @@
 - `normalize`：对标题文本做 trim、collapse 与封顶，带稳定的回退链。
 - `title`：首个 prompt 压缩加关键词回退；`Titler` port 支持模型生成标题，失败时
   确定性回退。
-- 依赖 `contracts` 的 session 词汇，仅类型。
+- 无 `@agentprism` 依赖：输入为纯标题字段。

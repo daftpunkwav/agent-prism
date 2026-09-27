@@ -21,7 +21,7 @@ capability families and dependency rules.
 | **Session ledger** | The durable execution-session record, with kinds `arena`, `agent`, and `builder` and statuses `active`, `completed`, `failed`, and `cancelled` | `contracts/session.ts`, `@agentprism/session` |
 | **Builder** | The conversational assembly service that composes a column from blocks and chats with it turn by turn | `@agentprism/builder` |
 | **Template** | A task with a judge spec, 15 scored and 11 quick, used for one-click comparison matrices | `@agentprism/arena-dimensions` (`task-templates.ts`) |
-| **Matrix** | 1 to 8 template cells executed sequentially through ArenaService with SSE progress | `@agentprism/application` (`MatrixService`) |
+| **Matrix** | 1 to 32 template cells executed sequentially through ArenaService with SSE progress | `@agentprism/application` (`MatrixService`) |
 
 ## Layer map
 
@@ -53,7 +53,7 @@ capability families and dependency rules.
 │  telemetry         Token / metrics                                           │
 ├─────────────────────────────────────────────────┤
 │  contracts         Zod enums / event schemas / port definitions  ← leaf,     │
-│                    zero runtime deps                                        │
+│                    no @agentprism deps (zod is its only runtime dep)        │
 │  client            Frontend API client        (both depend only on contracts)│
 │  ui                Shared UI fragments                                       │
 └─────────────────────────────────────────────────┘

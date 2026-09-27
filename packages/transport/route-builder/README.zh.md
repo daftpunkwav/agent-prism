@@ -7,5 +7,5 @@ Builder 领域路由：`registerBuilderRoutes(app, deps)` 挂载 catalog、sessi
 
 ## 依赖
 
-- Runtime：`contracts / http-runtime`，service 经 `HttpApplicationDeps` 注入，加上
+- Runtime：`contracts / http-runtime / builder-service`，service 经 `HttpApplicationDeps` 注入，加上
   `hono` 用于 SSE 流式输出。

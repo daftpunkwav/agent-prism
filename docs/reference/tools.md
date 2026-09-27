@@ -81,6 +81,7 @@ overrides by name at execution, or bind an injected port such as `SessionQueryPo
   defaults to 30 000 ms. Tools are namespaced `mcp__<server>__<tool>` and sanitized to the
   provider tool-name grammar; a name longer than 64 characters — or one that sanitizing
   collapses onto an already-registered name — is skipped, never truncated. Attachment is
-  best-effort on arena top-level columns only: entries with `enabled: false` persist but
-  never attach, dead servers warn and are skipped, nested turns never inherit processes, and
-  `read_only` columns never mount remote.
+  best-effort on top-level runs: arena, thread, and matrix columns, plus Builder turns whose
+  composition sets `mcp_policy` to anything but `off`. Entries with `enabled: false` persist
+  but never attach, dead servers warn and are skipped, nested turns never inherit processes,
+  and `read_only` columns never mount remote tools.

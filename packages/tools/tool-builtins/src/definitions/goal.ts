@@ -7,9 +7,8 @@
  * - Move it through active/paused/blocked/completed (blocked demands a reason)
  * - Render the standing objective for plans, handoffs, and wrap-ups
  *
- * Localized DSH goal domain (without the cordis service, /goal command plane,
- * and round-driver): todo_write tracks steps, this tracks the objective those
- * steps serve — including the two states todos lack (paused, blocked). One goal
+ * todo_write tracks steps; this tracks the objective those steps serve —
+ * including the two states todos lack (paused, blocked). One goal
  * per workspace; setting a new one replaces the old (whole-object replacement,
  * same honesty rule as todo_write).
  */

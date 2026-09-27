@@ -7,9 +7,9 @@
  * - Declare the tool's JSON schema
  * - Parse and apply *** Begin Patch format in one call (not atomic: earlier hunks persist on mid-patch failure)
  *
- * The wire format is project-ized from opencode's Patch module (V4A): markers
- * and chunk semantics match, the implementation targets this project's
- * ToolDefinition / ScopedFileSystem ports instead of opencode's Effect stack.
+ * The wire format is the V4A patch convention: its markers and chunk semantics
+ * are followed as specified, implemented over this project's ToolDefinition and
+ * ScopedFileSystem ports.
  */
 
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";
@@ -218,8 +218,8 @@ async function executeApplyPatch(workspace: ToolWorkspace, args: ToolArgs): Prom
   try {
     for (const hunk of hunks) {
       if (hunk.type === "add") {
-        // createFile (not writeFile): "Add File" over an existing file must fail loudly
-        // instead of silently clobbering, mirroring opencode's apply_patch semantics.
+        // createFile (not writeFile): "Add File" over an existing file must fail
+        // loudly instead of silently clobbering it.
         view.fs.createFile(hunk.path, hunk.contents);
         notes.push(`Created ${hunk.path} (~${estimateTokensFromChars(hunk.contents.length)} tokens)`);
         continue;

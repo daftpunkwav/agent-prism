@@ -44,3 +44,7 @@ card, in the Builder palette, and in the baseline panel as `custom.memory_top_n`
 Reference implementation for a dimension that shapes prompt-mounted state rather
 than the message list — see
 [`docs/reference/add-a-custom-dimension.md`](../../../docs/reference/add-a-custom-dimension.md).
+
+## Dependencies
+
+- Runtime: `contracts` only (the descriptor types). The host registers the dimension.

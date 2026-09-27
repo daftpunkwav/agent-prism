@@ -109,10 +109,10 @@ export class MapToolRegistry implements ToolRegistry {
       return outcome;
     }
 
-    // Cooperative deadline (deepseek-harness timeout-policy parity): when the tool
-    // declares timeoutMs, arm a derived signal, await quiescence (never abandon
-    // the tool promise), then replace the outcome with a structured timeout only
-    // when our own timer fired. Caller cancellation still rethrows AbortError.
+    // Cooperative deadline: when the tool declares timeoutMs, arm a derived
+    // signal, await quiescence (never abandon the tool promise), then replace the
+    // outcome with a structured timeout only when our own timer fired. Caller
+    // cancellation still rethrows AbortError.
     if (definition.timeoutMs === undefined) {
       // No catch: AbortError and handler failures propagate unchanged to the driver,
       // which converges them (abort rethrows, other errors become error text).

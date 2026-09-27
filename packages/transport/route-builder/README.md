@@ -4,4 +4,4 @@ Builder domain routes: `registerBuilderRoutes(app, deps)` mounts catalog, sessio
 
 ## Dependencies
 
-- Runtime: `contracts / http-runtime` (services injected via `HttpApplicationDeps`), plus `hono` (SSE streaming).
+- Runtime: `contracts / http-runtime / builder-service` (services injected via `HttpApplicationDeps`), plus `hono` (SSE streaming).

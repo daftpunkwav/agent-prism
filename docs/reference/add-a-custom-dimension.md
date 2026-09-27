@@ -20,8 +20,8 @@ packages/custom/summary-budget/        one dimension = one package
   tests/                               the dimension's own tests
 ```
 
-The repository ships three worked examples: `summary-budget` (budget hook),
-`memory-top-n` (prompt-mount hook), and `tool-replay` (message hook).
+The repository ships three worked examples: `summary-budget` (`contextTuning` hook),
+`memory-top-n` (`memory` hook), and `tool-replay` (`messages` hook).
 
 ## The descriptor
 

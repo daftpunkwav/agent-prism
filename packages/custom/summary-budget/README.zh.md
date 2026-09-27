@@ -44,3 +44,7 @@ token 值按本次运行的 `charsPerToken` 换算，因此运维为中文场景
 本包是参考实现。要做自己的维度：复制本目录，改包名/id/选项，替换钩子即可——见
 [`docs/reference/add-a-custom-dimension.zh.md`](../../../docs/reference/add-a-custom-dimension.zh.md)
 （四个钩子槽位、driver 覆盖表与约束）。
+
+## 依赖
+
+- Runtime：仅 `contracts`（描述符类型）。由宿主注册该维度。

@@ -19,7 +19,7 @@ import 相符的依赖。`pnpm check:deps` 会因过期、缺失或仅测试用�
 
 ## tsconfig.json
 
-在与同级 leaf 相同的深度 extend `../../tsconfig.base.json`。
+extend `../../../tsconfig.base.json`——向上三层，与所有同级 leaf 相同。
 
 ## 源码
 

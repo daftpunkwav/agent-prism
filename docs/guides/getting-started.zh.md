@@ -44,7 +44,7 @@ pnpm dev:web         # Next.js frontend   → http://localhost:8280
 `{"status":"ok","service":"arena"}`。
 
 端口来自 settings。`BACKEND_PORT` 默认 8281，`FRONTEND_PORT` 默认 8280。Web dev
-启动器会探测其端口，并接受 `-p` 覆盖，如 `node scripts/dev.mjs -p 3000`。
+启动器会探测其端口，并接受 `-p` 覆盖，如 `node apps/web/scripts/dev.mjs -p 3000`。
 `CORS_ORIGINS` 可增加允许的 origin，通配符 `*` 在 settings 加载时被拒绝。
 
 ## 第一次对比

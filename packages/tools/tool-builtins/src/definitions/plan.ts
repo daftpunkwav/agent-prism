@@ -4,11 +4,11 @@
  *
  * Responsibilities:
  * - Persist a freeform approach document to .agent-plan.md (propose/read/clear)
- * - Validate the document starts with a # heading (DSH plan discipline)
+ * - Validate the document starts with a # heading
  *
- * Localized DSH plan-mode minus the approval half: there is no human reviewer
- * in this runtime, so propose records the plan and instructs the model to carry
- * it out (instead of presenting it for approval that can never come). The durable
+ * Plan mode minus the approval half: there is no human reviewer in this
+ * runtime, so propose records the plan and instructs the model to carry it out
+ * (instead of presenting it for approval that can never come). The durable
  * half — write it down first, keep it in the workspace, reviewable post-hoc —
  * is fully real. Complements goal (objective) and todo_write (steps) with the
  * sequenced narrative linking them.

@@ -79,5 +79,6 @@
   数组，其中每 server 的 `timeoutMs` 默认 30 000 ms。tool 命名空间为
   `mcp__<server>__<tool>`，并按 provider 的 tool name 文法净化；净化后总长超过 64 字符、
   或与已注册名冲突者会被跳过，而不会被截断。
-  仅在 arena 顶层列上尽力挂载：`enabled: false` 的条目照常持久化但绝不挂载，宕机
-  server 告警并跳过，嵌套 turn 绝不继承进程，`read_only` 列绝不挂载远程。
+  仅在顶层 run 上尽力挂载：arena、thread、matrix 列，以及把 `mcp_policy` 设为 `off` 以外
+  的 Builder turn。`enabled: false` 的条目照常持久化但绝不挂载，宕机 server 告警并跳过，
+  嵌套 turn 绝不继承进程，`read_only` 列绝不挂载远程工具。

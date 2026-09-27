@@ -29,7 +29,7 @@ driver 复用 `buildSystemUser`、`applyContextPipeline`，以及来自 `driver-
 
 ## Event 输出
 
-driver 产出带 pipeline label 的 `ArenaEvent`。运行时侧的 `stampEvent` 会回填缺失的
+driver 产出带 pipeline label 的 `ArenaEvent`。执行层（agent）的 `stampEvent` 会回填缺失的
 `turn` 字段，但 turn 数据错误的 event 会破坏 turn 过滤与答案提取，因此字段由
 driver 准确设置。reasoning 与 planner 的思考经 `reflect` event 承载，使答案提取
 保持不被污染；答案提取读取最后一条 thought，否则最后一条 observation。

@@ -6,4 +6,4 @@
 
 ## 依赖
 
-- Runtime：`contracts / runtime / telemetry / harness / sandbox / tool-registry / tool-builtins`。
+- Runtime：`contracts / runtime / telemetry / harness / sandbox / tool-registry / tool-builtins / tool-mcp`。

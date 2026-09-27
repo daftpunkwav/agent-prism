@@ -4,4 +4,4 @@ Agent-thread routes. `registerThreadRoutes` mounts create, list, detail, fork, r
 
 ## Dependencies
 
-- Runtime: `application / contracts / http-runtime`.
+- Runtime: `contracts / http-runtime` and `hono` (`application` is a dev dependency, used by the tests).

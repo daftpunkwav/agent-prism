@@ -26,7 +26,7 @@ application       Use-case services (ArenaService and others)
 
 arena             Dimension routing, parallel Runner, breaker
 agent             Single-column execution lifecycle
-drivers           Native / LangChain / LangGraph / PlanExecute / SelfCritique / AutoGen / CrewAI
+drivers           Native / LangChain / LangGraph / DeepAgents / OpenAIAgents / ClaudeAgentSdk / PlanExecute / SelfCritique / AutoGen / CrewAI
 dimensions        Experiment dimension catalog and options
 evaluation        Judging and comparison reports
 providers         LLM provider config and model construction

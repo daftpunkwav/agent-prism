@@ -8,5 +8,4 @@ Regex-based code symbol index: definitions, references, and dependents.
   word boundaries, and reverse-dependency (importer) lookup.
 - `tool`: read-only `symbols` builtin (defs/refs/search/dependents), all toolsets.
 - Uses heuristics rather than a parser tree, so it has zero dependencies, is
-  deterministic, and works on syntactically broken files. Depends on `contracts` +
-  `tool-registry`.
+  deterministic, and works on syntactically broken files. Depends on `contracts`.

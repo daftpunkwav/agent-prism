@@ -1,7 +1,7 @@
 # `@agentprism/environment`
 
-Sandboxed filesystem and child-process execution. Zero @agentprism dependencies.
+Sandboxed filesystem and child-process execution. Depends only on `contracts`.
 
 ## Dependencies
 
-- Runtime: none (leaf node).
+- Runtime: `contracts`.

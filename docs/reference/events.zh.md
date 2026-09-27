@@ -37,7 +37,8 @@ Clock；以及可选 `agentId`。
   driver event 也包含在内。
 - `TokenStats`：`input_tokens`、`output_tokens`、`total_tokens`、`context_window`、
   `max_input_tokens`、`max_output_tokens`、`context_usage_pct`、`input_usage_pct`。
-  默认 context window 128 000，max input 120 000，max output 2048。
+  `TokenStats` 本身没有默认值；tracker 的回退为 context window 128 000、max input 120 000、
+  max output 96 000。
 - `PipelineMetrics` 额外含 `success`、`duration_ms`、`tool_calls`、`steps`。
 - 嵌套的 subagent 与 ralph_loop event 在内部消费，绝不上传重放。其 token 经
   `complete` event metrics 折叠进父级。

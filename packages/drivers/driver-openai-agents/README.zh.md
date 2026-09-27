@@ -11,3 +11,7 @@ Arena 的模型与工具端口之上。
 - 注册表工具绑定为 function tool；每次调用都经 `tools.execute`，并使用与
   LangChain 列相同的漂移护栏与结果提醒。
 - 温度/max tokens/thinking 来自列上配置好的模型，不再二次应用 SDK 侧 `modelSettings`。
+
+## 依赖
+
+- Runtime：`contracts / driver-run-support / harness`，加上 `@openai/agents` 与 `zod`。

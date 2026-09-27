@@ -5,7 +5,7 @@
  * Responsibilities:
  * - Define the in-memory SessionBlobStore (default for every backend)
  * - Spill oversized entry texts: full body to the sidecar, preview plus
- *   locator into the entry (localized DSH spill-policy, ledger arm)
+ *   locator into the entry
  *
  * Entries keep the 8000-char inline budget; only the SHAPE of oversized
  * content changes (locator-first preview instead of a silent head cut).

@@ -6,8 +6,8 @@
  * - Declare the tool's JSON schema
  * - Walk workspace files and return `path:line: text` matches
  *
- * Project-ized from opencode's grep tool semantics (ripgrep there, pure TS
- * regex over the scoped filesystem walker here) so no external binary is needed.
+ * Pure TypeScript regex over the scoped filesystem walker: search needs no
+ * external binary.
  */
 
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";

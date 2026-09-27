@@ -60,7 +60,7 @@ sequenceDiagram
   `numeric`, `exclude`, `regex`, and `none`.
 - `buildComparisonReport` assembles per-column reports: metrics, artifacts, hard
   metrics, one LLM narrative call, and optional ablation rows.
-- `POST /api/arena/matrix` on SSE channel `"matrix"` executes 1 to 8 template cells
+- `POST /api/arena/matrix` on SSE channel `"matrix"` executes 1 to 32 template cells
   sequentially through `ArenaService` and emits `matrix_progress` and a final
   `matrix_report`. Per-cell failures stay isolated.
 - `scripts/run-matrix.mjs` reads `GET /api/arena/templates` for scored templates and

@@ -10,10 +10,11 @@
 
 - family 目录聚合相关 leaf，并携带一张角色表 `README.md`。索引见
   [packages/README.md](../../packages/README.md)。
-- leaf 是真实的 workspace package，命名为 `@agentprism/<leaf>`，恰好提供：
-  `src/` 与公开 barrel `src/index.ts`、就近放置的 `tests/`、说明职责、seam 面与
-  依赖方向的 `README.md`、含 `private: true` 的 `package.json`，以及 extend 根基础
-  配置的 `tsconfig.json`。
+- leaf 是真实的 workspace package，命名为 `@agentprism/<leaf>`，提供：
+  `src/` 与公开 barrel `src/index.ts`、说明职责、seam 面与依赖方向的 `README.md`、
+  含 `private: true` 的 `package.json`，以及 extend 根基础配置的 `tsconfig.json`。
+  leaf 通常也提供就近的 `tests/`；行为由根 `tests/http-transport/` 套件覆盖的三个
+  route leaf 没有本地 `tests/`。
 - 单 leaf family 与 family 名同名，例如 `agent/agent` 与 `contracts/contracts`，
   遵循 [architecture.zh.md](../architecture.zh.md) 中的统一布局约定。
 
@@ -32,14 +33,14 @@
 1. `contracts` 导入零个 `@agentprism/*`。`environment` 与 `persistence` 同样是
    无依赖 leaf。
 2. 八个 `context-*` leaf 无依赖。
-3. Plugin leaf 消费 seam，绝不消费 composer 或 providers：
-   - `tool-registry` 仅依赖 `contracts`。`tool-builtins` 仅依赖 `contracts`、
-     `environment`、`tool-registry` 与 `tool-symbols`。`tool-mcp` 仅依赖
-     `contracts` 与 `tool-registry`。
-   - `driver-run-support` 仅依赖 `contracts`、`environment`、`runtime`、`telemetry`、
-     `harness` 与 `zod`（共享的 tool-schema 派生）。backend 额外引入
-     `driver-run-support`；LangChain 家族还引入 `driver-langchain`
-     （`driver-langgraph`、`driver-deepagents`）。
+3. Plugin leaf 消费 seam，绝不消费 composer 或 providers。当前**声明的**依赖：
+   - `tool-registry` 依赖 `contracts`；`tool-builtins` 依赖 `contracts`、`environment`、
+     `tool-registry` 与 `tool-symbols`；`tool-mcp` 依赖 `contracts`。
+   - `driver-run-support` 依赖 `contracts`、`harness`、`telemetry` 与 `zod`
+     （共享的 tool-schema 派生）。每个 backend 都额外引入 `driver-run-support`；
+     LangChain 家族还引入 `driver-langchain`（`driver-langgraph`、`driver-deepagents`）。
+   - `provider-catalog` 依赖 `contracts`、`config` 与 `persistence`。
+     `provider-langchain` 额外引入 `provider-catalog`。
    - `provider-catalog` 仅依赖 `contracts`、`config`、`persistence`、
      `environment`、`runtime` 与 `telemetry`。`provider-langchain` 额外引入
      `provider-catalog`。
@@ -49,8 +50,8 @@
    `contracts`，routes 还依赖 `http-runtime`。shell 绝不反向依赖 routes。
 6. `apps/web` 只能依赖 `client`、`ui` 与 `arena-view`。
 
-完整的逐 package 规则列表是 `scripts/check-boundaries.mjs` 中的 `RULES` 数组，
-它是唯一事实来源。
+`scripts/check-boundaries.mjs` 中的 `RULES` 数组是每个 package **允许**导入集合的
+唯一事实来源——它是上列声明依赖的超集，也是门禁实际强制的集合。
 
 ## 名称解析
 

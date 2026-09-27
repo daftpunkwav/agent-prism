@@ -4,8 +4,7 @@
  *
  * Responsibilities:
  * - Declare the tool's JSON schema
- * - Match workspace files against a glob pattern (project-ized from opencode's
- *   glob tool semantics; implemented over the scoped filesystem walker)
+ * - Match workspace files against a glob pattern over the scoped filesystem walker
  */
 
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";

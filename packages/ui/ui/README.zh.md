@@ -6,4 +6,4 @@
 
 ## 依赖
 
-- Runtime：`contracts`，加上 `react` 与 `react-dom` peers。
+- Runtime：`contracts` 与 `lucide-react`，加上 `react` 与 `react-dom` peers。

@@ -4,4 +4,4 @@ Presentational components (React peer dependency): theme/locale toggles, selecto
 
 ## Dependencies
 
-- Runtime: `contracts` (plus `react / react-dom` peers).
+- Runtime: `contracts` and `lucide-react` (plus `react / react-dom` peers).

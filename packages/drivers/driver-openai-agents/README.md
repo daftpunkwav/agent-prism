@@ -11,3 +11,7 @@ and tool dispatch) over the Arena model and tool ports.
   with the same drift guard and result reminder the LangChain column uses.
 - Model settings (temperature, max tokens, thinking) come from the configured
   column model; SDK-side `modelSettings` are not re-applied.
+
+## Dependencies
+
+- Runtime: `contracts / driver-run-support / harness`, plus `@openai/agents` and `zod`.

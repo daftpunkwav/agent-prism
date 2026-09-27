@@ -12,7 +12,7 @@
 | 2. 审批闸门 | `packages/sandbox`，`approval.ts` | `approval_mode: unless_trusted` 把 shell 工具限制为已知安全的只读命令 | `config.approval_mode`，baseline 字段 |
 | 3. OS 写沙箱 | `packages/environment`，`sandbox-launcher.ts` 与 `win-sandbox-helper.ts` | Windows restricted-token spawn，子进程只能在 workspace 根内写入 | `config.sandbox_mode: os`，baseline 字段 |
 
-`beforeExecute` 链上的审查顺序见 `agent/src/agent-execution.ts` 的
+`beforeExecute` 链上的审查顺序见 `agent/src/tool-access.ts` 的
 `buildToolAccess`：调用方 hook，然后审批闸门，然后静态分析。OS 层不是审查步骤。
 它包裹 `process-runner.ts` 中通过审查者的实际 spawn，因此静态分析无法判断的命令，
 如 `python -c "..."` 这类解释器逃逸，仍会被约束。
@@ -57,7 +57,7 @@ Arena 对比中的 baseline-only 控制字段设置，即 `dimensions` 中的
 - `sandbox_mode`：`off`，默认，或 `os`。未知值在 `normalizeSandboxMode` 中回退到
   `off` 并告警，因此 containment 是选择加入，绝不静默启用。
 
-启用 `sandbox_mode: os` 时，`agent-execution` 会向交给工具的 workspace 附加一个
+启用 `sandbox_mode: os` 时，执行层会向交给工具的 workspace 附加一个
 sandbox 提示，可写根为 workspace 根。`bash` 与 `run_job` 把它转发进每次 spawn。
 嵌套 run 继承该配置，因而继承该提示。
 
@@ -98,4 +98,4 @@ sandbox 提示，可写根为 workspace 根。`bash` 与 `run_job` 把它转发�
 - 真实 OS，非 Windows 跳过：
   `packages/environment/environment/tests/win-sandbox.real.test.ts` 固定根内写入
   成功、根外访问拒绝、junction containment、TEMP 重定向、超时杀进程树、以及失败
-  关闭 setup。`run-tool.test.ts` 端到端覆盖 tool 级路径。
+  关闭 setup。`packages/agent/agent/tests/sandbox-guard.test.ts` 覆盖 tool 级路径。

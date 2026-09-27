@@ -11,4 +11,4 @@
 - `tool`：只读的 `symbols` 内置 tool，含 defs、refs、search、dependents，三个
   toolset 全开。
 - 采用启发式而非 tree-sitter：零依赖、确定性、在语法损坏的文件上仍可用。
-  依赖 `contracts` 与 `tool-registry`。
+  仅依赖 `contracts`。

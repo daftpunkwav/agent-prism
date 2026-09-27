@@ -4,4 +4,4 @@ Single-column execution lifecycle: runs one column by composing the harness with
 
 ## Dependencies
 
-- Runtime: `contracts / runtime / telemetry / harness / sandbox / tool-registry / tool-builtins`.
+- Runtime: `contracts / runtime / telemetry / harness / sandbox / tool-registry / tool-builtins / tool-mcp`.

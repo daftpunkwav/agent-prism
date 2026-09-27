@@ -22,5 +22,8 @@ Neutral execution semantics: context pipeline, prompt assembly, reasoning modes,
 
 ## Dependencies
 
-- Allowed: `contracts / environment / runtime / telemetry` (all mostly types / foundation).
+- Runtime: the eight `context-*` leaves (`context-analytics`, `context-budget`,
+  `context-chunking`, `context-compaction`, `context-instructions`, `context-mentions`,
+  `context-retrieval`, `context-time`) plus `contracts / environment / runtime /
+  telemetry`.
 - Forbidden: `drivers / tools / providers / @langchain/*` and any upper-layer composer.

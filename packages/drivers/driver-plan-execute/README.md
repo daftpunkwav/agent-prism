@@ -7,3 +7,7 @@ then an executor ReAct loop works the plan with one budgeted replan on stall.
 - Planner/replan deliberation rides `reflect` events so answer extraction stays clean.
 - Consumes only the harness seam (`buildSystemUser`, `applyContextPipeline`) plus
   `driver-run-support` run support; no imports from other driver leaves.
+
+## Dependencies
+
+- Runtime: `contracts / driver-run-support / harness / telemetry`. Native-family loop.

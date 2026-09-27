@@ -7,9 +7,9 @@
  * - Return a bounded head/tail preview plus locator and retrieval guidance
  * - Degrade loudly (never silently, never into an error) when spilling fails
  *
- * Localized DSH spill-policy: tools keep returning plain strings, so the
- * persist-then-prune arm lives at the truncate call sites instead of a
- * post-execute waterfall. Deliberately narrow, mirroring the reference:
+ * Tools keep returning plain strings, so the persist-then-prune arm lives at
+ * the truncate call sites instead of a post-execute waterfall. Deliberately
+ * narrow:
  * - Threshold keys on UTF-8 bytes; small results pass through untouched.
  * - The read tool stays on bare truncate (it IS the retrieval path: spill
  *   files are read back with offset/limit, so spilling read outputs would loop).

@@ -17,7 +17,8 @@ id 加入 `DimensionIdSchema`，并在
 ## 选项目录
 
 `packages/dimensions/dimensions/src/dimensions/<name>.ts` 保存选项表，含 `value` 与
-label 以及默认值，参照 `mcp.ts`、`skill.ts` 或 `orchestration.ts`。存在两种形态：
+label，参照 `mcp.ts`、`skill.ts` 或 `orchestration.ts`。默认值单独登记在
+`dimension-catalog.ts` 的 `STATIC_DEFAULT_BASE` 中。存在两种形态：
 
 - static 选项直接列在 catalog 中并原样供给 /meta：temperature、thinking、
   thinking_budget、max_steps、mcp、skill、orchestration、memory、history_mode。
@@ -60,4 +61,4 @@ dimension 改变每列的一件事。
 
 选项与默认值在 dimensions leaf 中获得单元测试，catalog 对等在 `apps/web/tests` 下
 运行。dimension 行加入 [../reference/dimensions.zh.md](../reference/dimensions.zh.md)
-以及 `packages/dimensions/README.md` 的 family 表。
+以及 `packages/dimensions/dimensions/README.md` 的 id 列表。

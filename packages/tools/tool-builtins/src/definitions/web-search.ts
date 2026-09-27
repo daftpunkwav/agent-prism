@@ -7,9 +7,9 @@
  * - Route to one REST search backend selected by env (no SDK dependencies)
  * - Fail closed with a setup hint when no provider is configured
  *
- * Localized DSH web-search (exa/perplexity/deepseek backends): plain fetch against
- * Exa or Tavily keeps the model-visible schema stable while backends stay swappable.
- * No key on the box means no search: the tool reports how to enable itself instead
+ * Plain fetch against Exa or Tavily (selected by SEARCH_PROVIDER) keeps the
+ * model-visible schema stable while the backend stays swappable. No key on the
+ * box means no search: the tool reports how to enable itself instead
  * of pretending (judging grounding stays absent until an operator opts in).
  */
 

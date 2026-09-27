@@ -8,4 +8,4 @@ Agent-thread 路由。`registerThreadRoutes` 基于持久 `ThreadService` 挂载
 
 ## 依赖
 
-- Runtime：`application / contracts / http-runtime`。
+- Runtime：`contracts / http-runtime` 与 `hono`（`application` 是 dev 依赖，供测试使用）。

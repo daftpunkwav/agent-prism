@@ -17,3 +17,7 @@ Deep Agents framework driver：`deepagents` 中间件栈——规划工具、虚
   不会绕过该列的工具集策略。
 - deepagents 不做 token 级流式，因此当 thought 通道没有任何内容时，最后一次完整的
   模型输出会作为收尾 thought 块发出。
+
+## 依赖
+
+- Runtime：`contracts / driver-run-support / driver-langchain / harness`，加上 `@langchain/core`、`@langchain/langgraph` 与 `deepagents`。

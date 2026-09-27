@@ -5,11 +5,11 @@
  * Responsibilities:
  * - Ship repo-derived expert runbooks as embedded skills (no build-step assets)
  * - Discover workspace `.skills/<name>/SKILL.md` overrides (workspace wins)
- * - Validate skill names with the DSH kebab-case grammar
+ * - Validate skill names against the kebab-case grammar
  *
- * Localized DSH skill catalog (without the cordis/session machinery): skills are
- * loaded on demand through the `skill` tool, never auto-injected, so context
- * stays lean. Bodies are embedded as string constants instead of .md assets on
+ * Skills are loaded on demand through the `skill` tool, never auto-injected, so
+ * context stays lean. Bodies are embedded as string constants instead of .md
+ * assets on
  * purpose: tsc does not copy asset files to dist, and a copy step for two short
  * runbooks would be machinery without payoff. Content derives from AGENTS.md.
  */
@@ -21,7 +21,7 @@ export interface Skill {
   source: "bundled" | "workspace" | "user";
 }
 
-/** DSH skill-name grammar: kebab-case, shared so registries never drift. */
+/** Skill-name grammar: kebab-case, shared so registries never drift. */
 export const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Directory inside the workspace holding project skills (each skill is one SKILL.md). */

@@ -28,5 +28,8 @@
 
 ## 依赖
 
-- 允许：`contracts / environment / runtime / telemetry`，多为类型或基础设施。
+- Runtime：八个 `context-*` 叶子（`context-analytics`、`context-budget`、
+  `context-chunking`、`context-compaction`、`context-instructions`、`context-mentions`、
+  `context-retrieval`、`context-time`），加上 `contracts / environment / runtime /
+  telemetry`。
 - 禁止：`drivers / tools / providers / @langchain/*` 以及任何上层 composer。

@@ -13,6 +13,8 @@
    - `tests/agent-execution/`：run 记账与 workspace 生命周期，横跨 `agent` 与
      `runtime`。
    - `tests/arena-runner/`：column-session 隔离、breaker 交互与 metrics 透传。
+   - `tests/drivers/`：driver banner 一致性、reasoning-support 声明，以及跨 driver
+     家族的后端注册。
    - `tests/http-transport/`：请求契约，覆盖 routes、auth、error mapping、limits、
      settings 与 SSE 流，含 13 个测试文件与共享 `mock-deps.ts`。
 3. app 测试：`apps/web/tests/` 覆盖 i18n catalog 对等、locale 解析与组件测试；
@@ -27,7 +29,7 @@ pnpm test:coverage         # 同一次运行，覆盖率报告写入 cov-report/
 pnpm smoke                 # 对运行中的服务做 HTTP 探测（见冒烟测试）
 pnpm typecheck             # packages (build first) + apps + tests
 pnpm typecheck:tests       # tsc -p tsconfig.tests.json --noEmit
-pnpm verify                # build + typecheck + coverage + boundaries + check:deps
+pnpm verify                # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps
 ```
 
 没有 per-package 测试脚本。根 `vitest.config.ts` 的 include 模式覆盖每个 leaf：
@@ -45,8 +47,9 @@ testing-library 与所配置的环境。
 没有任何测试触达的文件同样计入，因此新模块无法在缺少对应测试的情况下进入代码树。
 报告写入 `cov-report/`，包含文本表与 JSON 摘要。
 
-覆盖率阈值在任何指标跌破启用时基线约四个百分点时使运行失败（启用时基线：
-statements 87、branches 75、functions 88、lines 89）。该余量吸收运行间噪声，以及
+覆盖率阈值在任何指标跌破启用时基线约四个百分点时使运行失败：实际门禁为
+statements 84、branches 71、functions 85、lines 86（启用时基线为 87/75/88/89）。
+该余量吸收运行间噪声，以及
 Windows 参考平台无法触达的平台门控代码；同时让大范围回归变红，而不是任由覆盖率
 无声下滑。覆盖率提升后应上调阈值；门禁变红的正确响应是补回测试，而非调低数字。
 
@@ -97,7 +100,7 @@ runner 会跳过与安全相关的用例。
 | HTTP 契约：auth、limits、errors、SSE | `tests/http-transport/` |
 | 组合装配 | `apps/server/tests/`。`mount-routes` 检查每 leaf 一个 endpoint；`load-drivers` 检查 registry 非空且含 `native` |
 | i18n 完整性 | `apps/web/tests/catalog-parity.test.ts` 检查 en 与 zh-CN key 对等，以及 `pnpm --filter @agentprism/web check:i18n` |
-| Driver banner 一致性 | driver-run-support 的 banner 测试，覆盖全部 backend，以 `PIPELINE_BANNER_PREFIX` 为单一来源 |
+| Driver banner 一致性 | `tests/drivers/` 下的 banner 测试，覆盖全部 backend，以 `PIPELINE_BANNER_PREFIX` 为单一来源 |
 | Toolset 成员 | contracts enums 与 tool-registry 测试 |
 | Event 契约 | `contracts` 中的 zod schema 与 transport、journey 测试 |
 
@@ -108,5 +111,5 @@ runner 会跳过与安全相关的用例。
 - 时间经注入的 `Clock` 保持确定性；ID 经注入的 `IdGenerator` 保持确定性。套件测试
   不使用真实 sleep。
 - 行为增量被显式固定。compaction 策略有单元测试固定相对 `sliding` 的增量。
-- 完整门禁集为 `pnpm verify`：build、typecheck、覆盖率、import 边界、依赖卫生与对外
+- 完整门禁集为 `pnpm verify`：build、typecheck、覆盖率、web lint、i18n catalog、import 边界、依赖卫生与对外
   导出的测试覆盖。

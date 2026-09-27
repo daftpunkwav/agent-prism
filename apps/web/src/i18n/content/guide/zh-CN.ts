@@ -1080,7 +1080,7 @@ const overviewSections: GuideSection[] = [
     title: "字段总表",
     group: "overview",
     lead:
-      "十四个对比维与 `PipelineConfig` 字段一一对应；也可全部出现在基线面板中。多轮历史走 `ArenaRunRequest.messages`，不属于对比维。",
+      "十六个对比维与 `PipelineConfig` 字段一一对应；也可全部出现在基线面板中。多轮历史走 `ArenaRunRequest.messages`，不属于对比维。",
     blocks: [{ kind: "fieldMatrix" }],
   },
   {
@@ -1119,7 +1119,7 @@ const overviewSections: GuideSection[] = [
 const hero: GuideHero = {
   eyebrow: "OPTICAL BENCH · REFERENCE",
   title: "维度与基线说明",
-  lead: "控制变量法的结构化参考：字段如何映射、基线如何锁定、十四对比维在各框架上是否真实生效，以及多轮对话如何按轮次分段对比。",
+  lead: "控制变量法的结构化参考：字段如何映射、基线如何锁定、十六对比维在各框架上是否真实生效，以及多轮对话如何按轮次分段对比。",
   actions: [
     { href: "/arena", label: "打开 Arena", icon: "flask", variant: "primary" },
     { href: "/learn", label: "学习路径", icon: "arrow", variant: "ghost" },

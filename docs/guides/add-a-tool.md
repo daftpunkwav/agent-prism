@@ -23,9 +23,9 @@ from `contracts` with `name`, `description`, `jsonSchema`, `mutatesWorkspace`, o
 
 - Input validation fails closed and throws on duplicates, empty values, or oversize
   input. Limits are exposed as `MAX_*` constants, as in `todo.ts` and `ask-user.ts`.
-- Output is routed through the shared helpers in `definitions/caps.ts`. `truncate()`
-  middle-prunes at `MAX_OUTPUT = 32 * 1024` characters. `boundText()` persists then
-  prunes to the workspace `.spills/` directory. See
+- Output is routed through the shared helpers: `truncate()` and `MAX_OUTPUT = 32 * 1024`
+  live in `definitions/caps.ts`, while `boundText()` (which persists to the workspace
+  `.spills/` directory before pruning) lives in `definitions/spill.ts`. See
   [../reference/tools.md](../reference/tools.md).
 - `execute()` returns a structured `ToolExecutionResult` of `{result, fileDiff, ok, code?}`.
   `fileDiff` is emitted after successful write or edit work so the UI can render diffs.
@@ -46,8 +46,9 @@ rows is added there. Trace UI summary cases live in the web trace components.
 
 ## Tests
 
-Leaf tests live in `packages/tools/tool-builtins/tests/`. Cross-domain behavior such as
-toolset authorization through `MapToolRegistry` gets journey coverage under `tests/`.
+Leaf tests live in `packages/tools/tool-builtins/tests/`. Toolset authorization is
+covered by the leaf tests as well (`packages/tools/tool-registry/tests/`,
+`packages/tools/tool-builtins/tests/`, and `packages/harness/harness/tests/tool-guard.test.ts`).
 
 ## Documentation
 

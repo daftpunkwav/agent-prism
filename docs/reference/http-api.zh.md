@@ -56,8 +56,8 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
 
 | 方法 | 路径 | 用途 | 备注 |
 |---|---|---|---|
-| GET | `/api/arena/meta` | dimensions、选项与 templates 元数据 | `min_select` 为 1；UI 可以停在零选择并禁用 run |
-| POST | `/api/arena/run` | 启动一次对比 run | SSE，事件名 `"arena"`。Body：`question` 为 1 至 4000 字符，`dimension` 默认 `framework` 且接受任意已注册的自定义维度 id（未知对比轴在开流前以 422 拒绝），`selections` 至多 16、至少 1，省略表示全部，可选 `column_sessions`，`attachments` 至多 5 个、每个 64 KiB 文本。`onAbort` 取消该 run，abort 记为 `cancelled`。流内失败作为 `error` event 发出，绝不静默关闭 |
+| GET | `/api/arena/meta` | dimension 与 baseline 元数据 | 维度卡片及其选项、frameworks、`baseline_defaults`、`baseline_fields`、`model_compare_ready`。UI 可以停在零选择并禁用 run |
+| POST | `/api/arena/run` | 启动一次对比 run | SSE，事件名 `"arena"`。Body：`question` 为 1 至 4000 字符，`dimension` 默认 `framework` 且接受任意已注册的自定义维度 id（未知对比轴在开流前以 422 拒绝），`selections` 为 1 至 16 个维度取值（空数组或省略会以流内 `error` event 失败），可选 `column_sessions`，`attachments` 至多 5 个、每个 64 KiB 文本。`onAbort` 取消该 run，abort 记为 `cancelled`。流内失败作为 `error` event 发出，绝不静默关闭 |
 | POST | `/api/arena/answer` | 回答一个待处理的 ask_user 问题 | body 为 `agent_id`、`question_id`、`answer`；无活跃列等待时 404 |
 | GET | `/api/arena/pending-asks` | 等待人工回答的列 | 返回 `{pending}`，每个活跃列为一个 `{agentId, questions}` 条目，含完整待答 ask_user 问题 |
 | POST | `/api/arena/stop-column` | 仅停止一个活跃列 | body `agent_id` 来自列 event；其他列继续运行；被停止的列以 `Column stopped by user` 错误与 failed complete 结算；已结算时 404 |

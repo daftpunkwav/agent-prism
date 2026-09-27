@@ -6,9 +6,9 @@
  * - List bundled plus workspace skills (workspace overrides same-named bundled)
  * - Return full skill bodies for the exact names from the list
  *
- * Localized DSH tool-skill (loader half only): no session catalog injection, no
- * script execution — the model lists first, then loads before acting on matching
- * tasks. Read-only: safe in every toolset.
+ * Loader half only: no catalog injection, no script execution — the model lists
+ * first, then loads before acting on matching tasks. Read-only: safe in every
+ * toolset.
  */
 
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";

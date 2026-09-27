@@ -18,7 +18,7 @@ runtime declarations and suggests demoting test-only dependencies to `devDepende
 
 ## tsconfig.json
 
-Extends `../../tsconfig.base.json` at the same depth as sibling leaves.
+Extends `../../../tsconfig.base.json` — three levels up, the same path every sibling leaf uses.
 
 ## Source
 

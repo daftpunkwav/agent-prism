@@ -28,7 +28,7 @@ graded in the reasoning support table described below.
 
 ## Event output
 
-Drivers yield `ArenaEvent` values with the pipeline label. The runtime-side `stampEvent`
+Drivers yield `ArenaEvent` values with the pipeline label. The agent-side `stampEvent`
 backfills a missing `turn` field, but events with wrong turn data corrupt turn filtering
 and answer extraction, so fields are set accurately by the driver. Reasoning and planner
 deliberation ride `reflect` events so answer extraction, which reads the last thought or

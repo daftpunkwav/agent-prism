@@ -9,3 +9,7 @@ Self-Critique framework driver：ReAct executor 循环，每批 tool 后有一�
   消息，每次 run 最多 2 次 critic 强制重试。
 - critic 结论经 `reflect` event 承载，使答案提取保持干净。
 - 仅消费 harness seam 与 `driver-run-support` 的 run 支持。
+
+## 依赖
+
+- Runtime：`contracts / driver-run-support / harness / telemetry`。native 系列循环。

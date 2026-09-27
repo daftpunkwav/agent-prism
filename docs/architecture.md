@@ -9,18 +9,20 @@ When this document disagrees with the code, the code and
 
 The `packages/<capability-family>/<leaf>` two-level structure rests on three mechanisms.
 
-1. Seams first. Seam packages define abstract services and bind no implementation.
-   `tool-registry` owns `ToolRegistry`, `driver-run-support` owns `DriverLookup`, and
-   `provider-catalog` owns `ProviderLookup`. Implementations live in separate leaves.
+1. Seams first. `contracts` defines the service ports (`ToolRegistry`, `DriverLookup`,
+   `ProviderLookup`, …); the seam packages carry the default implementation and registry
+   (`MapToolRegistry`, `FrameworkDriverRegistry`, `ProviderLookupAdapter`), and backends
+   live in separate leaves.
 2. Backend registration. Each backend leaf is packaged and declared independently and
    registers at composition time. Driver backends register on `DriverLookup`: `native`
    runs in process, `langchain` and `langgraph` bridge external frameworks, and
    `plan_execute` and `self_critique` are native-family loops. Tool implementations
    register on `ToolRegistry`: `tool-builtins` and `tool-mcp`.
 3. Explicit composition. `apps/server/src/assemble.ts` assembles the single deliverable.
-   Each capability-family directory carries a `Package | Role | Seam` table in its
-   `README.md`; each leaf ships `src/`, `tests/`, `README.md`, `package.json`, and
-   `tsconfig.json`.
+   Each capability-family directory carries a `Package | Role | Wired at` table in its
+   `README.md`; each leaf ships `src/`, `README.md`, `package.json`, and `tsconfig.json`.
+   A leaf usually ships `tests/` too; the route leaves whose behavior is covered from the
+   root `tests/http-transport/` suite rely on the convention rather than a local directory.
 
 There is no global context object. Assembly uses explicit parameter injection and
 registry instances, and the composition root is unique. See
@@ -40,9 +42,9 @@ package exposes and that can be replaced by another implementation.
 | `config` | Settings, paths, and `.env` loading | `loadSettings`; no registration key |
 | `telemetry` | Token accounting and metrics | `TokenTracker`, `buildMetrics`; no registration key |
 | `harness` | Neutral execution semantics: context pipeline, prompt assembly, reasoning modes, verification loop | `AgentExecutionContext`, `applyContextPipeline`, `MapPromptSectionRegistry`, `MapContextPolicyRegistry`, `tool-guard` |
-| `memory/{memory-store, memory-episodic, memory-semantic, memory-service}` | Cross-session memory: atomic store and search index, episodic and semantic layers, and the service port adapter | `MemoryServicePort` adapter consumes `contracts` and `persistence`; mounted by the composition root |
+| `memory/{memory-store, memory-episodic, memory-semantic, memory-service}` | Cross-session memory: atomic store and search index, episodic and semantic layers, and the service port adapter | `MemoryServicePort` adapter composes the episodic and semantic layers; mounted by the composition root |
 | `tools/tool-registry` | Tool seam, no implementation | `MapToolRegistry` implements `contracts.ToolRegistry`; `normalizeToolset`, `selectToolNames`, `selectToolRegistry` |
-| `tools/tool-builtins` | Built-in tool implementations | `createBuiltinToolRegistry` with read, write, edit, ls, bash, apply-patch, glob, grep, web_fetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter |
+| `tools/tool-builtins` | Built-in tool implementations | `createBuiltinToolRegistry` with read, write, edit, ls, bash, apply_patch, glob, grep, web_fetch, todo_write, ask_user, web_search, run_job, bash_session, subagent, skill, goal, ralph_loop, plan, session_query, symbols, scatter |
 | `drivers/driver-run-support` | Driver seam and shared runtime support | `FrameworkDriverRegistry` implements `contracts.DriverLookup`; `registerDriversBestEffort` takes injected loaders and warns on a failing backend |
 | `drivers/driver-native` | In-process native backend | registered as `native` on `DriverLookup` |
 | `drivers/driver-langchain` | LangChain backend and LC/message bridging | registered as `langchain` on `DriverLookup` |
@@ -83,16 +85,29 @@ are acyclic.
 
 ```
 apps/web ──► client / ui / arena-view ──► contracts
-apps/server (assemble) ──► application / arena / drivers / providers / transport / …
-http-runtime + route-* ──► application / builder ──► arena ──► agent ──► harness ──► runtime ──► environment
-(route-* ──► http-runtime; the shell never depends back on routes)  │          │          └──────► telemetry ──► contracts
-                                           │          └─────► tool-builtins ──► tool-registry ──► contracts
-                                           └─────► dimensions ──► contracts
-driver-* ──► driver-run-support ──► harness + telemetry; langchain and langgraph leaves additionally carry @langchain/* external deps
+
+apps/server (assemble) ──► application / builder / arena / drivers / providers / transport / …
+
+route-* ──► http-runtime
+route-* ──► application or builder        (the shell never depends back on routes)
+
+application ──► arena-runner ──► agent ──► harness ──► runtime ──► environment ──► contracts
+                    │              │         ├─────► telemetry ──► contracts
+                    │              │         └─────► context-* ──► contracts
+                    │              └─────► tool-builtins / tool-mcp ──► tool-registry ──► contracts
+                    └─────► arena-dimensions ──► dimensions + harness
+
+builder-service ──► builder-turns ──► agent        (the builder family does not depend on arena)
+                             └─────► arena-view ──► contracts
+
+driver-* ──► driver-run-support ──► harness + telemetry
+driver-langchain / driver-langgraph / driver-deepagents additionally carry @langchain/* (a
+langgraph or deepagents leaf also takes driver-langchain)
+
 provider-langchain ──► provider-catalog ──► config + persistence
 evaluation ──► contracts + runtime
-client / config / dimensions / ui / arena-view ──► contracts
-contracts / environment / persistence ──► no @agentprism dependencies; leaf nodes
+client / dimensions / ui / arena-view ──► contracts | config ──► contracts + persistence
+persistence ──► no dependencies | contracts ──► zod only | environment ──► contracts
 ```
 
 Iron rules are enforced by `scripts/check-boundaries.mjs`. Declaration honesty is
@@ -103,12 +118,12 @@ enforced by `scripts/check-package-deps.mjs` through `pnpm check:deps`.
   `contracts`, `environment`, `tool-registry`, and `tool-symbols`; `tool-mcp` only on
   `contracts` and `tool-registry`. The tool seam sits below both the composer and the
   implementations.
-- `driver-run-support` depends only on `contracts`, `environment`, `runtime`, `telemetry`,
-  and `harness`, with zero backend dependencies. `driver-native` and `driver-langchain`
-  additionally take `driver-run-support`; `driver-langgraph` additionally takes
-  `driver-langchain`. Driver plugins consume the harness seam and never depend on a
-  composer or on providers. Their relation to tools goes through `contracts` types such
-  as `ToolDefinition` and never through concrete tool packages.
+- `driver-run-support` depends only on `contracts`, `harness`, and `telemetry`, with zero
+  backend dependencies. Every driver leaf additionally takes `driver-run-support`;
+  `driver-langgraph` and `driver-deepagents` also take `driver-langchain`. Driver plugins
+  consume the harness seam and never depend on a composer or on providers. Their relation
+  to tools goes through `contracts` types such as `ToolDefinition` and never through
+  concrete tool packages.
 - `provider-catalog` depends only on `contracts`, `config`, `persistence`,
   `environment`, `runtime`, and `telemetry`; `provider-langchain` additionally takes
   `provider-catalog`.
@@ -142,7 +157,8 @@ These terms recur across packages with scoped meanings.
   runner. A worker runs exactly one column and never leaves the server process.
 - **pipeline**: the per-column configuration bundle `PipelineConfig`, used as a label
   and key in event and report maps.
-- **job / task / turn**: a job is the background arena run process `run-job`; a task is a
+- **job / task / turn**: a job is a background shell command started by the `run_job`
+  tool; a task is a
   preset judged exercise from `task-templates`; a turn is one request/response cycle of a
   builder or thread conversation.
 - **endpoint vs model**: an endpoint is a configured provider target with id, base URL,

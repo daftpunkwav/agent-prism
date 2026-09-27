@@ -9,7 +9,7 @@ modules in `packages/dimensions/dimensions/src/dimensions/`, and the templates i
 
 | Dimension | PipelineConfig field | Options, default in bold | Option source |
 |---|---|---|---|
-| `framework` | `framework` | **native**, langchain, langgraph, deepagents, openai_agents, claude_agent_sdk, plan_execute, self_critique, autogen, crewai | runtime-synced from the driver registry |
+| `framework` | `framework` | **native**, plan_execute, self_critique, langchain, langgraph, deepagents, openai_agents, claude_agent_sdk, autogen, crewai | runtime-synced from the driver registry, in registration order |
 | `prompt` | `prompt_profile` | **zero_shot**, few_shot, cot_prompt, structured, terse | static |
 | `reasoning` | `reasoning` | **react**, cot_tool, tot, reflexion, self_consistency | derived from contracts `REASONING_MODE_META` |
 | `context` | `context` | **sliding**, summary, vector, hybrid, tool_tail, token_budget | static catalog filtered by the live policy registry |
@@ -53,7 +53,8 @@ Notes:
   sentinel `-1` for no step budget; LangChain and LangGraph bound the graph at a
   200 000-step ceiling while Native runs unbounded until the model stops calling tools or
   the run is aborted. Custom lane values are accepted by `DimensionRouter.route` for
-  numeric dimensions and fail with `422` when out of range.
+  numeric dimensions; an out-of-range value fails loudly, which the run path reports as an
+  in-stream `error` event and thread creation as `422` when the pinned baseline cannot replay.
 - Per-value option semantics are documented in the in-app guide under `/guide` in
   `apps/web/src/i18n/content/guide/`.
 

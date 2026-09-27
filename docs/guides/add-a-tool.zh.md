@@ -24,9 +24,10 @@ tool 名加入 `packages/contracts/contracts/src/enums.ts` 中的
 
 - 输入校验失败关闭，对重复、空值或超限输入抛错。上限以 `MAX_*` 常量暴露，见
   `todo.ts` 与 `ask-user.ts`。
-- 输出经 `definitions/caps.ts` 中的共享 helper。`truncate()` 在
-  `MAX_OUTPUT = 32 * 1024` 字符处中部修剪。`boundText()` 先持久化再修剪到 workspace
-  的 `.spills/` 目录。见 [../reference/tools.zh.md](../reference/tools.zh.md)。
+- 输出经共享 helper：`truncate()` 与 `MAX_OUTPUT = 32 * 1024` 位于
+  `definitions/caps.ts`；`boundText()`（先持久化到 workspace 的 `.spills/` 目录再
+  修剪）位于 `definitions/spill.ts`。见
+  [../reference/tools.zh.md](../reference/tools.zh.md)。
 - `execute()` 返回结构化 `ToolExecutionResult`，即 `{result, fileDiff, ok, code?}`。
   成功的 write 或 edit 工作后发出 `fileDiff`，使 UI 能渲染 diff。
 
@@ -45,8 +46,9 @@ summary case 位于 web trace 组件。
 
 ## 测试
 
-leaf 测试位于 `packages/tools/tool-builtins/tests/`。经 `MapToolRegistry` 的
-toolset 授权等跨域行为在 `tests/` 下补 journey 覆盖。
+leaf 测试位于 `packages/tools/tool-builtins/tests/`。toolset 授权同样由 leaf 测试
+覆盖（`packages/tools/tool-registry/tests/`、`packages/tools/tool-builtins/tests/`
+与 `packages/harness/harness/tests/tool-guard.test.ts`）。
 
 ## 文档
 

@@ -53,3 +53,7 @@ Previously shipped as three context strategies pinned to the `context` dimension
 replay-granularity choice is a comparison axis of its own, so it now contributes one
 dimension — the context dimension keeps its six builtin strategies, and this dimension
 absorbs the three former rows.
+
+## Dependencies
+
+- Runtime: `contracts` only (the descriptor types). The host registers the dimension.

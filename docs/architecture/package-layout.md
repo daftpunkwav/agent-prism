@@ -8,10 +8,12 @@ two-level path `packages/<family>/<leaf>/`. There are no flat packages.
 
 - A family directory groups related leaves and carries a role-table `README.md`. The
   index is [packages/README.md](../../packages/README.md).
-- A leaf is a real workspace package named `@agentprism/<leaf>` that ships exactly:
-  `src/` with the public barrel `src/index.ts`, co-located `tests/`, a `README.md`
-  stating responsibilities, seam surface, and dependency direction, `package.json` with
-  `private: true`, and a `tsconfig.json` that extends the root base.
+- A leaf is a real workspace package named `@agentprism/<leaf>` that ships: `src/` with
+  the public barrel `src/index.ts`, a `README.md` stating responsibilities, seam surface,
+  and dependency direction, `package.json` with `private: true`, and a `tsconfig.json`
+  that extends the root base. A leaf normally carries a co-located `tests/` directory; the
+  three route leaves whose behavior is covered from the root `tests/http-transport/` suite
+  do not.
 - Single-leaf families mirror the family name, for example `agent/agent` and
   `contracts/contracts`, following the uniform-layout convention described in
   [architecture.md](../architecture.md).
@@ -28,20 +30,19 @@ Enforced by `pnpm boundaries` from `scripts/check-boundaries.mjs`. Declaration h
 is enforced separately by `pnpm check:deps`. See
 [../operations/quality-gates.md](../operations/quality-gates.md).
 
-1. `contracts` imports zero `@agentprism/*`. `environment` and `persistence` are also
-   dependency-free leaves.
+1. `contracts` imports zero `@agentprism/*`. `persistence` is fully dependency-free, and
+   `environment` depends only on `contracts`.
 2. The eight `context-*` leaves are dependency-free.
-3. Plugin leaves consume seams, never composers or providers:
-   - `tool-registry` depends only on `contracts`. `tool-builtins` only on `contracts`,
-     `environment`, `tool-registry`, and `tool-symbols`. `tool-mcp` only on `contracts`
-     and `tool-registry`.
-   - `driver-run-support` depends only on `contracts`, `environment`, `runtime`,
-     `telemetry`, `harness`, and `zod` (the shared tool-schema derivation). Backends
-     additionally take `driver-run-support`; the LangChain family also takes
-     `driver-langchain` (`driver-langgraph`, `driver-deepagents`).
-   - `provider-catalog` depends only on `contracts`, `config`, `persistence`,
-     `environment`, `runtime`, and `telemetry`. `provider-langchain` additionally takes
-     `provider-catalog`.
+3. Plugin leaves consume seams, never composers or providers. Declared dependencies
+   today:
+   - `tool-registry` on `contracts`; `tool-builtins` on `contracts`, `environment`,
+     `tool-registry`, and `tool-symbols`; `tool-mcp` on `contracts`.
+   - `driver-run-support` on `contracts`, `harness`, `telemetry`, and `zod` (the shared
+     tool-schema derivation). Every backend additionally takes `driver-run-support`; the
+     LangChain family also takes `driver-langchain` (`driver-langgraph`,
+     `driver-deepagents`).
+   - `provider-catalog` on `contracts`, `config`, and `persistence`. `provider-langchain`
+     additionally takes `provider-catalog`.
 4. `arena` never touches `@langchain/*` or providers. `application` never touches
    provider or evaluation implementations.
 5. `http-runtime` and `route-*` depend only on `application`, `builder`, `config`, and
@@ -49,8 +50,9 @@ is enforced separately by `pnpm check:deps`. See
    back on routes.
 6. `apps/web` may depend only on `client`, `ui`, and `arena-view`.
 
-The full per-package rule list is the `RULES` array in `scripts/check-boundaries.mjs`,
-which is the single source of truth.
+The `RULES` array in `scripts/check-boundaries.mjs` is the single source of truth for the
+*allowed* import set of each package — a superset of the declared dependencies above, and
+the set the gate actually enforces.
 
 ## Name resolution
 

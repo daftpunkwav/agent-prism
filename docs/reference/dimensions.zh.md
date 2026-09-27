@@ -11,7 +11,7 @@
 
 | Dimension | PipelineConfig 字段 | 选项，默认值加粗 | 选项来源 |
 |---|---|---|---|
-| `framework` | `framework` | **native**、langchain、langgraph、deepagents、openai_agents、claude_agent_sdk、plan_execute、self_critique、autogen、crewai | 从 driver registry 运行时同步 |
+| `framework` | `framework` | **native**、plan_execute、self_critique、langchain、langgraph、deepagents、openai_agents、claude_agent_sdk、autogen、crewai | 从 driver registry 运行时同步，按注册顺序 |
 | `prompt` | `prompt_profile` | **zero_shot**、few_shot、cot_prompt、structured、terse | static |
 | `reasoning` | `reasoning` | **react**、cot_tool、tot、reflexion、self_consistency | 从 contracts `REASONING_MODE_META` 派生 |
 | `context` | `context` | **sliding**、summary、vector、hybrid、tool_tail、token_budget | static catalog，经实时 policy registry 过滤 |
@@ -51,8 +51,8 @@
   参数接受其 `DECODE_FIELD_RANGES` 范围。`max_steps` 接受 1 至 100 000，以及
   `unlimited` token，后者是哨兵 `-1`，表示无 step 预算；LangChain 与 LangGraph 把图
   限制在 200 000 step 上限，而 Native 无界运行直到模型停止调用 tool 或 run 被中止。
-  自定义 lane 值由 `DimensionRouter.route` 对数值 dimension 接受，超出范围时以
-  `422` 失败。
+  自定义 lane 值由 `DimensionRouter.route` 对数值 dimension 接受；超出范围会响亮失败，
+  run 路径将其报告为流内 `error` event，线程创建则在钉住的 baseline 无法重放时返回 `422`。
 - 每个取值的选项语义记录在应用内 guide，位于 `/guide` 与
   `apps/web/src/i18n/content/guide/`。
 

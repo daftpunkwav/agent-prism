@@ -15,8 +15,9 @@ mapping is the common case. Precedents are `mcp` to `mcp_policy`, `skill` to
 ## Option catalog
 
 `packages/dimensions/dimensions/src/dimensions/<name>.ts` holds the option table of
-`value` and label plus the default, following `mcp.ts`, `skill.ts`, or
-`orchestration.ts`. Two flavors exist:
+`value` and label, following `mcp.ts`, `skill.ts`, or `orchestration.ts`. The default
+value is registered separately in `STATIC_DEFAULT_BASE` in `dimension-catalog.ts`.
+Two flavors exist:
 
 - Static options are listed directly in the catalog and serve /meta as-is: temperature,
   thinking, thinking_budget, max_steps, mcp, skill, orchestration, memory, and
@@ -65,5 +66,5 @@ parity is gate-checked. FieldMatrix-style copy counts are updated in both locale
 
 Options and defaults get unit tests in the dimensions leaf, and catalog parity runs under
 `apps/web/tests`. The dimension row is added to
-[../reference/dimensions.md](../reference/dimensions.md) and to the family table in
-`packages/dimensions/README.md`.
+[../reference/dimensions.md](../reference/dimensions.md) and the id list in
+`packages/dimensions/dimensions/README.md`.

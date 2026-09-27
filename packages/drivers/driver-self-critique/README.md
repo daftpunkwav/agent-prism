@@ -7,3 +7,7 @@ Self-Critique framework driver: a ReAct executor loop with a per-batch critic pa
   inject a redirection message (max 2 critic-forced retries per run).
 - Critic verdicts ride `reflect` events so answer extraction stays clean.
 - Consumes only the harness seam plus `driver-run-support` run support.
+
+## Dependencies
+
+- Runtime: `contracts / driver-run-support / harness / telemetry`. Native-family loop.

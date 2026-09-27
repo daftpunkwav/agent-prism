@@ -4,7 +4,7 @@ All gates are plain npm scripts. No pre-commit hooks are wired in the repository
 them manually or in CI. The standard full sweep is:
 
 ```bash
-pnpm verify    # build + typecheck + coverage + boundaries + check:deps + check:exports
+pnpm verify    # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 pnpm --filter @agentprism/web lint         # web ESLint, after UI code changes
 pnpm --filter @agentprism/web check:i18n   # web i18n gate, after frontend copy changes
 ```

@@ -45,7 +45,7 @@ Health probe: `curl http://127.0.0.1:8281/api/health` returns
 
 Ports come from settings. `BACKEND_PORT` defaults to 8281 and `FRONTEND_PORT` to 8280.
 The web dev launcher probes its port and accepts `-p` to override, as in
-`node scripts/dev.mjs -p 3000`. `CORS_ORIGINS` may add allowed origins; a wildcard `*` is
+`node apps/web/scripts/dev.mjs -p 3000`. `CORS_ORIGINS` may add allowed origins; a wildcard `*` is
 rejected at settings load.
 
 ## First comparison

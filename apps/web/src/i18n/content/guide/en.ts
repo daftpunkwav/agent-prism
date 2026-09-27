@@ -1084,7 +1084,7 @@ const overviewSections: GuideSection[] = [
     title: "Field matrix",
     group: "overview",
     lead:
-      "The fourteen comparison dimensions map one-to-one onto `PipelineConfig` fields, and all of them can also appear in the baseline panel. Multi-turn history travels via `ArenaRunRequest.messages` and is not a comparison dimension.",
+      "The sixteen comparison dimensions map one-to-one onto `PipelineConfig` fields, and all of them can also appear in the baseline panel. Multi-turn history travels via `ArenaRunRequest.messages` and is not a comparison dimension.",
     blocks: [{ kind: "fieldMatrix" }],
   },
   {
@@ -1123,7 +1123,7 @@ const overviewSections: GuideSection[] = [
 const hero: GuideHero = {
   eyebrow: "OPTICAL BENCH · REFERENCE",
   title: "Dimensions & Baselines",
-  lead: "A structured reference for the control-variable method: how fields map, how baselines lock, whether the fourteen comparison dimensions take real effect across frameworks, and how multi-turn conversations are compared turn by turn.",
+  lead: "A structured reference for the control-variable method: how fields map, how baselines lock, whether the sixteen comparison dimensions take real effect across frameworks, and how multi-turn conversations are compared turn by turn.",
   actions: [
     { href: "/arena", label: "Open Arena", icon: "flask", variant: "primary" },
     { href: "/learn", label: "Learning Path", icon: "arrow", variant: "ghost" },

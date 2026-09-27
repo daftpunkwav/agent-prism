@@ -6,7 +6,7 @@
 标准的全量扫描为：
 
 ```bash
-pnpm verify    # 构建 + typecheck + coverage + boundaries + check:deps + check:exports
+pnpm verify    # 构建 + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 pnpm --filter @agentprism/web lint         # web ESLint，改动 UI 代码后运行
 pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文案后运行
 ```

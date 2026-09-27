@@ -10,19 +10,20 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 
 `packages/<capability-family>/<leaf>` 两级结构建立在三个机制之上。
 
-1. Seam 优先。seam package 只定义抽象服务，不绑定实现。
-   `tool-registry` 拥有 `ToolRegistry`，`driver-run-support` 拥有
-   `DriverLookup`，`provider-catalog` 拥有 `ProviderLookup`。实现位于
-   独立的 leaf。
+1. Seam 优先。`contracts` 定义服务端口（`ToolRegistry`、`DriverLookup`、
+   `ProviderLookup` 等）；seam package 提供默认实现与注册表
+   （`MapToolRegistry`、`FrameworkDriverRegistry`、`ProviderLookupAdapter`），
+   backend 位于独立的 leaf。
 2. 后端注册。每个 backend leaf 独立打包和声明，在组合时注册。
    driver backend 注册到 `DriverLookup`：`native` 在进程内运行，
    `langchain` 与 `langgraph` 桥接外部框架，`plan_execute` 与
    `self_critique` 是 native 系列循环。tool 实现注册到
    `ToolRegistry`：`tool-builtins` 与 `tool-mcp`。
 3. 显式组合。`apps/server/src/assemble.ts` 装配唯一交付物。
-   每个能力族目录在其 `README.md` 中维护 `Package | Role | Seam` 表；
-   每个 leaf 提供 `src/`、`tests/`、`README.md`、`package.json` 与
-   `tsconfig.json`。
+   每个能力族目录在其 `README.md` 中维护 `Package | Role | Wired at` 表；
+   每个 leaf 提供 `src/`、`README.md`、`package.json` 与 `tsconfig.json`。
+   leaf 通常也提供 `tests/`；行为由根 `tests/http-transport/` 套件覆盖的
+   route leaf 依赖该约定而非本地目录。
 
 不存在全局 context 对象。装配使用显式参数注入与注册表实例，
 组合根唯一。见 [architecture/composition-root.zh.md](architecture/composition-root.zh.md)。
@@ -41,9 +42,9 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 | `config` | Settings、paths 与 `.env` 加载 | `loadSettings`；无 registration key |
 | `telemetry` | Token 统计与 metrics | `TokenTracker`、`buildMetrics`；无 registration key |
 | `harness` | 中性执行语义：context pipeline、prompt 装配、reasoning 模式、verification 循环 | `AgentExecutionContext`、`applyContextPipeline`、`MapPromptSectionRegistry`、`MapContextPolicyRegistry`、`tool-guard` |
-| `memory/{memory-store, memory-episodic, memory-semantic, memory-service}` | 跨 session 记忆：原子 store 与搜索索引、episodic 与 semantic 两层、以及 service port adapter | `MemoryServicePort` adapter 消费 `contracts` 与 `persistence`；由组合根挂载 |
+| `memory/{memory-store, memory-episodic, memory-semantic, memory-service}` | 跨 session 记忆：原子 store 与搜索索引、episodic 与 semantic 两层、以及 service port adapter | `MemoryServicePort` adapter 组合 episodic 与 semantic 两层；由组合根挂载 |
 | `tools/tool-registry` | Tool seam，无实现 | `MapToolRegistry` 实现 `contracts.ToolRegistry`；`normalizeToolset`、`selectToolNames`、`selectToolRegistry` |
-| `tools/tool-builtins` | 内置 tool 实现 | `createBuiltinToolRegistry`，含 read、write、edit、ls、bash、apply-patch、glob、grep、web_fetch、todo_write、ask_user、web_search、run_job、bash_session、subagent、skill、goal、ralph_loop、plan、session_query、symbols、scatter |
+| `tools/tool-builtins` | 内置 tool 实现 | `createBuiltinToolRegistry`，含 read、write、edit、ls、bash、apply_patch、glob、grep、web_fetch、todo_write、ask_user、web_search、run_job、bash_session、subagent、skill、goal、ralph_loop、plan、session_query、symbols、scatter |
 | `drivers/driver-run-support` | Driver seam 与共享运行时支持 | `FrameworkDriverRegistry` 实现 `contracts.DriverLookup`；`registerDriversBestEffort` 接受注入的 loader，后端失败时告警 |
 | `drivers/driver-native` | 进程内 native backend | 以 `native` 注册到 `DriverLookup` |
 | `drivers/driver-langchain` | LangChain backend 与 LC/message 桥接 | 以 `langchain` 注册到 `DriverLookup` |
@@ -84,15 +85,26 @@ Agent Prism 是一个多 pipeline 并行对比平台。本文定义系统结构�
 ```
 apps/web ──► client / ui / arena-view ──► contracts
 apps/server (assemble) ──► application / arena / drivers / providers / transport / …
-http-runtime + route-* ──► application / builder ──► arena ──► agent ──► harness ──► runtime ──► environment
-(route-* ──► http-runtime; the shell never depends back on routes)  │          │          └──────► telemetry ──► contracts
-                                           │          └─────► tool-builtins ──► tool-registry ──► contracts
-                                           └─────► dimensions ──► contracts
-driver-* ──► driver-run-support ──► harness + telemetry; langchain and langgraph leaves additionally carry @langchain/* external deps
+route-* ──► http-runtime
+route-* ──► application 或 builder            （shell 绝不反向依赖 route）
+
+application ──► arena-runner ──► agent ──► harness ──► runtime ──► environment ──► contracts
+                    │              │         ├─────► telemetry ──► contracts
+                    │              │         └─────► context-* ──► contracts
+                    │              └─────► tool-builtins / tool-mcp ──► tool-registry ──► contracts
+                    └─────► arena-dimensions ──► dimensions + harness
+
+builder-service ──► builder-turns ──► agent        （builder 家族不依赖 arena）
+                             └─────► arena-view ──► contracts
+
+driver-* ──► driver-run-support ──► harness + telemetry
+driver-langchain / driver-langgraph / driver-deepagents 另外携带 @langchain/*（langgraph
+或 deepagents leaf 还依赖 driver-langchain）
+
 provider-langchain ──► provider-catalog ──► config + persistence
 evaluation ──► contracts + runtime
-client / config / dimensions / ui / arena-view ──► contracts
-contracts / environment / persistence ──► no @agentprism dependencies; leaf nodes
+client / dimensions / ui / arena-view ──► contracts | config ──► contracts + persistence
+persistence ──► 无依赖 | contracts ──► 仅 zod | environment ──► contracts
 ```
 
 铁律由 `scripts/check-boundaries.mjs` 强制。声明真实性由
@@ -103,10 +115,9 @@ contracts / environment / persistence ──► no @agentprism dependencies; lea
   `contracts`、`environment`、`tool-registry` 与 `tool-symbols`；`tool-mcp`
   仅依赖 `contracts` 与 `tool-registry`。tool seam 位于 composer 与
   实现两者之下。
-- `driver-run-support` 仅依赖 `contracts`、`environment`、`runtime`、`telemetry`
-  与 `harness`，零 backend 依赖。`driver-native` 与 `driver-langchain`
-  额外引入 `driver-run-support`；`driver-langgraph` 额外引入
-  `driver-langchain`。driver plugin 消费 harness seam，绝不依赖
+- `driver-run-support` 仅依赖 `contracts`、`harness` 与 `telemetry`，零 backend
+  依赖。每个 driver leaf 都额外引入 `driver-run-support`；`driver-langgraph` 与
+  `driver-deepagents` 还引入 `driver-langchain`。driver plugin 消费 harness seam，绝不依赖
   composer 或 providers。其与 tools 的关系仅经 `contracts` 类型
   如 `ToolDefinition`，绝不依赖具体 tool package。
 - `provider-catalog` 仅依赖 `contracts`、`config`、`persistence`、
@@ -139,7 +150,7 @@ contracts / environment / persistence ──► no @agentprism dependencies; lea
   `spawnWorker`。一个 worker 恰好运行一个 column，且始终留在 server 进程内。
 - **pipeline**：每列配置包 `PipelineConfig`，在 event 与 report map 中
   用作 label 与 key。
-- **job / task / turn**：job 是后台 arena run 进程 `run-job`；task 是
+- **job / task / turn**：job 是由 `run_job` tool 启动的后台 shell 命令；task 是
   `task-templates` 中预设的被评判练习；turn 是 builder 或 thread 会话的
   一次请求/响应周期。
 - **endpoint 与 model**：endpoint 是已配置的 provider 目标，含 id、base URL

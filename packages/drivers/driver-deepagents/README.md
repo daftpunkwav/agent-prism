@@ -17,3 +17,7 @@ virtual filesystem and subagent delegation — over the LangGraph runtime.
   column's toolset policy.
 - deepagents runs the model without token streaming, so the last whole model output
   is emitted as the closing thought block when nothing reached the thought channel.
+
+## Dependencies
+
+- Runtime: `contracts / driver-run-support / driver-langchain / harness`, plus `@langchain/core`, `@langchain/langgraph`, and `deepagents`.

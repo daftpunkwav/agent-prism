@@ -63,7 +63,7 @@ sequenceDiagram
 - `buildComparisonReport` 装配每列 report：metrics、artifacts、hard metrics、
   一次 LLM 叙述调用、可选 ablation 行。
 - `POST /api/arena/matrix` 在 SSE 通道 `"matrix"` 上经 `ArenaService` 顺序执行
-  1 至 8 个 template cell，发出 `matrix_progress` 与最终 `matrix_report`。
+  1 至 32 个 template cell，发出 `matrix_progress` 与最终 `matrix_report`。
   每 cell 失败相互隔离。
 - `scripts/run-matrix.mjs` 读取 `GET /api/arena/templates` 的 scored 模板，
   并从 CLI 驱动该 endpoint。

@@ -6,4 +6,4 @@
 
 ## 依赖
 
-- Runtime：`arena-dimensions / arena-runner / contracts / environment / persistence / runtime`。
+- Runtime：`arena-dimensions / arena-runner / contracts / environment / persistence / runtime / session-outline / session-projection / session-query / session-telemetry / session-title`，加上 `zod`。

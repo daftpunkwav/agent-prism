@@ -11,7 +11,7 @@ OS level rather than by inspecting the command text.
 | 2. Approval gate | `packages/sandbox`, `approval.ts` | `approval_mode: unless_trusted` restricts shell tools to known-safe read-only commands | `config.approval_mode`, a baseline field |
 | 3. OS write sandbox | `packages/environment`, `sandbox-launcher.ts` and `win-sandbox-helper.ts` | Windows restricted-token spawn, so child processes may write only inside the workspace root | `config.sandbox_mode: os`, a baseline field |
 
-Review order on the `beforeExecute` chain in `agent/src/agent-execution.ts`
+Review order on the `beforeExecute` chain in `agent/src/tool-access.ts`
 `buildToolAccess` is: caller hook, then approval gate, then static analysis. The OS layer
 is not a review step. It wraps the actual spawn of whatever passed review in
 `process-runner.ts`, so commands that static analysis cannot judge, such as interpreter
@@ -110,5 +110,5 @@ into every spawn. Nested runs inherit the config and therefore the hint.
 - Real OS, skipped off Windows:
   `packages/environment/environment/tests/win-sandbox.real.test.ts` pins inside-root
   write success, outside-root access denial, junction containment, TEMP redirection,
-  timeout kill-tree, and fail-closed setup. `run-tool.test.ts` covers the tool-level path
-  end to end.
+  timeout kill-tree, and fail-closed setup. `packages/agent/agent/tests/sandbox-guard.test.ts`
+  covers the tool-level path.

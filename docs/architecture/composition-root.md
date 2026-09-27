@@ -63,7 +63,7 @@ budgets, and driver knobs. The cross-session memory stores `EpisodicMemory` over
 `data/memory_episodic.json` and `SemanticMemory` over `data/memory_semantic.json` are
 bridged into one `MemoryServiceAdapter`.
 
-It returns `{ settings, app }`, typed as `RuntimeComponents`.
+It returns `{ settings, app, flushDurableStores }`, typed as `RuntimeComponents`.
 
 ## Driver registration
 
@@ -86,7 +86,7 @@ the ten backends.
 `registerDriversBestEffort(registry, loaders)` treats a failing backend as a warning
 rather than an error, so only a fully empty registry fails startup. The optional
 `DRIVERS` env var restricts the loader subset; unset means all builtins, and unknown
-names warn and are ignored. Adding a backend means adding a loader here. See
+names warn and are ignored. A filter that matches no known loader refuses to start. Adding a backend means adding a loader here. See
 [../guides/add-a-driver.md](../guides/add-a-driver.md).
 
 ## Route mounting

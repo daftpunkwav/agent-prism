@@ -18,8 +18,8 @@ packages/custom/summary-budget/        一个维度 = 一个包
   tests/                               该维度自己的测试
 ```
 
-仓库自带三个示例：`summary-budget`（预算钩子）、`memory-top-n`（prompt 挂载钩子）、
-`tool-replay`（消息钩子）。
+仓库自带三个示例：`summary-budget`（`contextTuning` 钩子）、`memory-top-n`（`memory` 钩子）、
+`tool-replay`（`messages` 钩子）。
 
 ## 描述符
 

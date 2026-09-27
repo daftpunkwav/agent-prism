@@ -3,13 +3,12 @@
  * @description Builtin todo_write tool: workspace-scoped task planning list.
  *
  * Responsibilities:
- * - Declare the tool's JSON schema (whole-list replacement, DSH todo_write semantics)
+ * - Declare the tool's JSON schema (whole-list replacement)
  * - Persist the list to .agent-todos.json so it survives turns and restarts
  * - Validate items loudly (fail-closed with a message, never silently flatten)
  *
- * Localized port of the DSH tool-todo idea without the cordis/session-projection
- * machinery: one workspace owns one list, each call replaces the whole list.
- * Parallel in_progress items are allowed (arena columns run sequential work, but
+ * One workspace owns one list; each call replaces the whole list. Parallel
+ * in_progress items are allowed (arena columns run sequential work, but
  * rejecting a model's parallel marking would break runs for no local gain).
  */
 

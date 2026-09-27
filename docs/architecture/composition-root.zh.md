@@ -63,7 +63,7 @@ registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf �
 `data/memory_episodic.json` 的 `EpisodicMemory` 与基于 `data/memory_semantic.json`
 的 `SemanticMemory`，桥接进一个 `MemoryServiceAdapter`。
 
-返回 `{ settings, app }`，类型为 `RuntimeComponents`。
+返回 `{ settings, app, flushDurableStores }`，类型为 `RuntimeComponents`。
 
 ## Driver 注册
 
@@ -85,8 +85,8 @@ registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf �
 
 `registerDriversBestEffort(registry, loaders)` 把失败的后端视为告警而非错误，
 因此只有完全空的 registry 才使启动失败。可选 `DRIVERS` env var 限定 loader
-子集，未设表示全部内置，未知名称告警并忽略。新增 backend 意味着在此新增一个
-loader。见 [../guides/add-a-driver.zh.md](../guides/add-a-driver.zh.md)。
+子集，未设表示全部内置，未知名称告警并忽略；若过滤后一个已知 loader 都不剩，
+则拒绝启动。新增 backend 意味着在此新增一个 loader。见 [../guides/add-a-driver.zh.md](../guides/add-a-driver.zh.md)。
 
 ## 路由挂载
 

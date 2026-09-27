@@ -50,3 +50,7 @@ This package is the reference implementation. To build your own dimension: copy
 this directory, rename the package/id/options, and swap the hook — see
 [`docs/reference/add-a-custom-dimension.md`](../../../docs/reference/add-a-custom-dimension.md)
 (the four hook slots, the driver coverage table, and the rules).
+
+## Dependencies
+
+- Runtime: `contracts` only (the descriptor types). The host registers the dimension.

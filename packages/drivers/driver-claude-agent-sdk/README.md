@@ -16,3 +16,7 @@ Arena tools served over an in-process MCP server.
 - The CLI is resolved from `ARENA_CLAUDE_CODE_PATH`, else a globally installed Claude Code;
   the SDK's ~245 MB per-platform binary is skipped in `pnpm-workspace.yaml`
   (`ignoredOptionalDependencies`) — remove an entry there to use the bundled binary instead.
+
+## Dependencies
+
+- Runtime: `contracts / driver-run-support / harness`, plus `@anthropic-ai/claude-agent-sdk`, `@modelcontextprotocol/sdk`, and `zod` (the MCP tool server).

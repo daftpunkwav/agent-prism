@@ -40,3 +40,7 @@ Arena 维度卡片、Builder 积木面板，以及基线面板的 `custom.memory
 
 这是"塑形 prompt 挂载态"（而非消息列表）的参考实现——见
 [`docs/reference/add-a-custom-dimension.zh.md`](../../../docs/reference/add-a-custom-dimension.zh.md)。
+
+## 依赖
+
+- Runtime：仅 `contracts`（描述符类型）。由宿主注册该维度。
