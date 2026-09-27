@@ -30,7 +30,7 @@ pnpm test:coverage         # same run, writing coverage reports to cov-report/
 pnpm smoke                 # probe a running server over HTTP (see Smoke)
 pnpm typecheck             # packages (build first) + apps + tests
 pnpm typecheck:tests       # tsc -p tsconfig.tests.json --noEmit
-pnpm verify                # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps
+pnpm verify                # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 ```
 
 There are no per-package test scripts. The root `vitest.config.ts` include patterns pick
@@ -117,7 +117,9 @@ suites are Win32-only, so another runner would skip the security-relevant cases.
 - Test files live beside the code they own. A test that needs two packages' internals is
   a journey test and goes through public barrels only.
 - Time is deterministic through the injected `Clock`; IDs are deterministic through the
-  injected `IdGenerator`. Suite tests use no real sleeps.
+  injected `IdGenerator`. Assertions never sleep to wait for state. A few suites do measure
+  wall clock or poll a real child process (the spawn suites and their retry opt-in); those
+  are the exception and stay listed here rather than growing silently.
 - Behavioral deltas are pinned explicitly. The compaction strategies have unit tests that
   pin the delta against `sliding`.
 - The full gate set is `pnpm verify`: build, typecheck, coverage, web lint, i18n catalogs, import boundaries,

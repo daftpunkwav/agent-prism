@@ -367,6 +367,10 @@ export function useArenaStream() {
           setError(t("arena.stream.disconnected"));
           runResult.failed = true;
         }
+        // The SSE client swallows an abort and resolves, so the cancelled outcome must
+        // come from the signal itself: reporting it as a clean finish would let a
+        // cancelled partial run be committed by any caller that trusts the result.
+        if (signal.aborted) return { aborted: true, failed: false };
         return runResult;
       } catch (err) {
         if (isAbortError(err) || signal.aborted) {

@@ -40,6 +40,7 @@ function stubComponents(
     } as RuntimeComponents["settings"],
     app: { fetch: fetchImpl } as RuntimeComponents["app"],
     flushDurableStores: async () => undefined,
+    checkpointStores: async () => undefined,
   };
 }
 

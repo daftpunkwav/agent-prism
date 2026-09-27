@@ -74,6 +74,27 @@ describe("assemble() happy path", () => {
     expect(Array.isArray(body.dimensions)).toBe(true);
     expect(body.dimensions.length).toBeGreaterThan(0);
   });
+
+  it(
+    "wires the builder endpoints, the arena runner factory, and log reads",
+    { timeout: COMPOSITION_TIMEOUT },
+    async () => {
+      const { assemble } = await import("../src/assemble.js");
+      const { app } = await assemble();
+
+      // Builder endpoints: a lazy factory the boot smoke test never reached. A missing
+      // block would leave the builder composer without a model to run.
+      const catalog = await app.request("/api/builder/catalog");
+      expect(catalog.status).toBe(200);
+      const catalogBody = (await catalog.json()) as any;
+      expect(Array.isArray(catalogBody.endpoints)).toBe(true);
+
+      // Runner factory: reached through the arena logs route, which resolves a run's
+      // traces; the factory itself must build a runner without throwing.
+      const logs = await app.request("/api/arena/logs?runId=missing-run");
+      expect([200, 404]).toContain(logs.status);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

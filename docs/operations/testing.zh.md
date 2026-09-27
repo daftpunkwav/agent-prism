@@ -29,7 +29,7 @@ pnpm test:coverage         # 同一次运行，覆盖率报告写入 cov-report/
 pnpm smoke                 # 对运行中的服务做 HTTP 探测（见冒烟测试）
 pnpm typecheck             # packages (build first) + apps + tests
 pnpm typecheck:tests       # tsc -p tsconfig.tests.json --noEmit
-pnpm verify                # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps
+pnpm verify                # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 ```
 
 没有 per-package 测试脚本。根 `vitest.config.ts` 的 include 模式覆盖每个 leaf：
@@ -108,8 +108,9 @@ runner 会跳过与安全相关的用例。
 
 - 测试文件与其所拥有的代码就近放置。需要两个 package 内部的测试属于 journey 测试，
   只经公开 barrel。
-- 时间经注入的 `Clock` 保持确定性；ID 经注入的 `IdGenerator` 保持确定性。套件测试
-  不使用真实 sleep。
+- 时间经注入的 `Clock` 保持确定性；ID 经注入的 `IdGenerator` 保持确定性。断言不会靠
+  sleep 等待状态。少数套件确实会测量墙钟或轮询真实子进程（spawn 类套件及其 retry
+  例外），这些属例外并在此登记，不允许静默扩大。
 - 行为增量被显式固定。compaction 策略有单元测试固定相对 `sliding` 的增量。
 - 完整门禁集为 `pnpm verify`：build、typecheck、覆盖率、web lint、i18n catalog、import 边界、依赖卫生与对外
   导出的测试覆盖。

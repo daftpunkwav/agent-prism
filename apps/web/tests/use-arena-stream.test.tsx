@@ -26,18 +26,20 @@ const answerMock = vi.mocked(answerArenaQuestion);
 
 type StreamParams = Parameters<typeof streamArenaRun>[0];
 
-/** Installs a stream double the test drives by hand: emit events, settle, or abort. */
+/**
+ * Installs a stream double the test drives by hand: emit events, settle, or abort.
+ * An abort RESOLVES (like the real client, which swallows the abort and returns), so
+ * the hook's cancellation path is exercised as production runs it.
+ */
 let emit: ((event: ArenaEvent) => void) | undefined;
 let settle: (() => void) | undefined;
 function scriptStream() {
   streamMock.mockImplementation(
     (params: StreamParams) =>
-      new Promise<void>((resolve, reject) => {
+      new Promise<void>((resolve) => {
         emit = params.onEvent;
         settle = resolve;
-        params.signal?.addEventListener("abort", () =>
-          reject(Object.assign(new Error("The operation was aborted"), { name: "AbortError" })),
-        );
+        params.signal?.addEventListener("abort", () => resolve());
       }),
   );
 }

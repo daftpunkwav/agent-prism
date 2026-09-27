@@ -20,12 +20,15 @@ Put a new test in the directory it belongs to. Single-package tests go in the pa
 own `tests/`; only genuinely multi-package flows go under the root `tests/` journey
 directories.
 
-## What the app layer does not test
+## What the app layer tests
 
-Listeners and serve (`main` and `server`), signal handling, and Next.js pages and
-components, which need a browser runtime. The assembly root allows only a read-only boot
-smoke test, `apps/server/tests/assemble.test.ts`, which covers health, sessions, and meta,
-starts no runs, and writes nothing. Business logic belongs to journey tests.
+`apps/server/tests/` covers the host as far as reading allows: the boot smoke
+(`assemble.test.ts`: health, sessions, meta, builder endpoints, arena logs), the entry
+sequencing (`main.test.ts`: assemble → startServer → signal handlers, plus the shutdown
+order), signal-driven graceful shutdown (`lifecycle.test.ts`), and the port preflight.
+`apps/web/tests/` holds the jsdom + testing-library suites for pages, sections, and hooks.
+Neither layer starts a real browser, and no test drives the UI end to end; the CI `smoke`
+job boots the built host over HTTP for that. Business logic still belongs to journey tests.
 
 ## Single responsibility
 
