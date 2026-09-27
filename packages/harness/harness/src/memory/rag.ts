@@ -28,7 +28,15 @@ export function buildRagStore(workspace: { fs: ScopedFileSystem }): ChunkIndex |
     const files = workspace.fs.listFiles("", { recursive: true });
     if (files.length === 0) return null;
     const index = new ChunkIndex();
-    const sizes = new Map(workspace.fs.listFileEntries().map((entry) => [entry.path, entry.size]));
+    const entries = workspace.fs.listFileEntries();
+    const sizes = new Map(entries.map((entry) => [entry.path, entry.size]));
+    // Freshness rank for the index's recency boost: 0 = most recently modified.
+    // Without this every chunk shares one rank and the boost is inert.
+    const freshness = new Map(
+      [...entries]
+        .sort((left, right) => right.mtimeMs - left.mtimeMs)
+        .map((entry, rank) => [entry.path, rank]),
+    );
     let skippedLarge = 0;
     let ingested = 0;
     for (const filePath of files) {
@@ -46,8 +54,14 @@ export function buildRagStore(workspace: { fs: ScopedFileSystem }): ChunkIndex |
         index.add(
           chunks.map((chunk) => ({
             path: chunk.path,
-            content: chunk.location === "" ? chunk.content : `${chunk.content}`,
-            ageRank: Number.MAX_SAFE_INTEGER,
+            // A snippet without a source label makes the model guess where it came
+            // from (the prompt asks it to cite paths); chunks that already carry a
+            // `[path]` prefix from the chunker are left as they are.
+            content:
+              chunk.location === "" || chunk.content.startsWith(`[${chunk.path}]`)
+                ? chunk.content
+                : `[${chunk.path} ${chunk.location}] ${chunk.content}`,
+            ageRank: freshness.get(chunk.path) ?? Number.MAX_SAFE_INTEGER,
           })),
         );
         ingested += chunks.length;

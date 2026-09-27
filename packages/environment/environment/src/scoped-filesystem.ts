@@ -241,12 +241,13 @@ export class ScopedFileSystem {
   }
 
   /** Lists file relative paths with byte sizes (whole tree). */
-  listFileEntries(): Array<{ path: string; size: number }> {
-    const entries: Array<{ path: string; size: number }> = [];
+  listFileEntries(): Array<{ path: string; size: number; mtimeMs: number }> {
+    const entries: Array<{ path: string; size: number; mtimeMs: number }> = [];
     for (const rel of this.listFiles("", { recursive: true })) {
       try {
         const stat = statSync(path.join(this.root, rel));
-        entries.push({ path: rel, size: stat.size });
+        // mtime rides along so callers can rank freshness without a second stat pass.
+        entries.push({ path: rel, size: stat.size, mtimeMs: stat.mtimeMs });
       } catch {
         continue;
       }

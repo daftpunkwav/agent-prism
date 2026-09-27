@@ -22,7 +22,7 @@ import {
   type SurfaceFrame,
 } from "@agentprism/context-compaction";
 import type { LlmMessage } from "@agentprism/contracts";
-import { messageText } from "./message-text.js";
+import { estimateMessageTokens, messageText } from "./message-text.js";
 
 /** Overflow target that triggers compaction (estimated tokens to condense). */
 export const CHECKPOINT_COMPACT_TARGET_TOKENS = 2_000;
@@ -50,22 +50,23 @@ function toFrame(message: LlmMessage, index: number, total: number): SurfaceFram
 function compactWithDetails(
   rest: readonly LlmMessage[],
   target: number,
+  charsPerToken?: number,
 ): { messages: LlmMessage[]; span: NonNullable<ReturnType<typeof selectSpan>> | null; checkpoint: Checkpoint | null; spanTokens: number } {
   // One frame surface for everything below: toFrame flattens every message's
   // text and this runs on every LLM call under the checkpoint strategy, so
   // span selection and both token measurements must reuse it instead of
   // re-flattening the transcript.
   const frames = rest.map((m, i) => toFrame(m, i, rest.length));
-  const totalTokens = surfaceTokens(frames);
+  const totalTokens = surfaceTokens(frames, charsPerToken);
   if (totalTokens <= target) {
     return { messages: [...rest], span: null, checkpoint: null, spanTokens: 0 };
   }
   const overflow = Math.max(0, totalTokens - target);
-  const span = selectSpan(frames, Math.min(overflow, target));
+  const span = selectSpan(frames, Math.min(overflow, target), { charsPerToken });
   if (span === null) return { messages: [...rest], span: null, checkpoint: null, spanTokens: 0 };
 
   const spanFrames = frames.slice(span.start, span.end + 1);
-  const spanTokens = surfaceTokens(spanFrames);
+  const spanTokens = surfaceTokens(spanFrames, charsPerToken);
   // Extractive fill inline (sync pipeline): the Summarizer port stays a host
   // option for future async paths, the deterministic fill needs no model.
   const checkpoint: Checkpoint = {
@@ -89,9 +90,13 @@ function compactWithDetails(
  */
 export function applyCheckpointCompaction(
   rest: readonly LlmMessage[],
-  options: { compactTargetTokens?: number } = {},
+  options: { compactTargetTokens?: number; charsPerToken?: number } = {},
 ): { messages: LlmMessage[]; checkpointEmitted: boolean } {
-  const { messages, checkpoint } = compactWithDetails(rest, options.compactTargetTokens ?? CHECKPOINT_COMPACT_TARGET_TOKENS);
+  const { messages, checkpoint } = compactWithDetails(
+    rest,
+    options.compactTargetTokens ?? CHECKPOINT_COMPACT_TARGET_TOKENS,
+    options.charsPerToken,
+  );
   return { messages, checkpointEmitted: checkpoint !== null };
 }
 
@@ -104,14 +109,21 @@ export function applyCheckpointCompaction(
 export function applyCheckpointCompactionWithJournal(
   rest: readonly LlmMessage[],
   journal: CompactionJournal,
-  options: { compactTargetTokens?: number; now: number },
+  options: { compactTargetTokens?: number; now: number; charsPerToken?: number },
 ): { messages: LlmMessage[]; checkpointEmitted: boolean } {
-  const applied = compactWithDetails(rest, options.compactTargetTokens ?? CHECKPOINT_COMPACT_TARGET_TOKENS);
+  const applied = compactWithDetails(
+    rest,
+    options.compactTargetTokens ?? CHECKPOINT_COMPACT_TARGET_TOKENS,
+    options.charsPerToken,
+  );
   if (applied.checkpoint === null || applied.span === null) {
     return { messages: applied.messages, checkpointEmitted: false };
   }
   try {
-    const afterTokens = Math.max(1, Math.ceil(renderCheckpoint(applied.checkpoint).length / 4));
+    const afterTokens = estimateMessageTokens(
+      { role: "system", content: renderCheckpoint(applied.checkpoint) },
+      options.charsPerToken,
+    );
     journal.append({ span: applied.span, checkpoint: applied.checkpoint, beforeTokens: applied.spanTokens, afterTokens, at: options.now });
   } catch {
     // Audit-only: a full or contended journal must not fail the turn.

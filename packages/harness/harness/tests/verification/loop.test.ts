@@ -33,6 +33,10 @@ function thought(content: string): ArenaEvent {
   };
 }
 
+function errorEvent(message: string): ArenaEvent {
+  return { ...thought(""), type: "error", message };
+}
+
 function complete(): ArenaEvent {
   return {
     type: "complete",
@@ -119,6 +123,43 @@ describe("runVerificationLoop", () => {
     expect(events.filter((e) => e.type === "complete")).toHaveLength(1);
     expect(events.filter((e) => e.type === "verify")).toHaveLength(2);
     expect(events.some((e) => e.type === "verify" && e.passed === true)).toBe(true);
+  });
+
+  it("forwards an intermediate attempt error and names it in the verify verdict", async () => {
+    let attempts = 0;
+    const invoke = vi
+      .fn()
+      .mockResolvedValueOnce({ text: '{"passed": false, "reason": "incomplete"}', toolCalls: [] })
+      .mockResolvedValueOnce({ text: '{"passed": true, "reason": "ok"}', toolCalls: [] });
+
+    const events: ArenaEvent[] = [];
+    for await (const event of runVerificationLoop(
+      {
+        level: "verify",
+        question: "q",
+        llm: { invoke, stream: vi.fn() },
+        feedback: { text: "" },
+        pipelineLabel: "col",
+        workspaceName: "ws",
+      },
+      async function* () {
+        attempts += 1;
+        if (attempts === 1) {
+          yield errorEvent("provider 401");
+          yield complete();
+          return;
+        }
+        yield thought("good final answer");
+        yield complete();
+      },
+    )) {
+      events.push(event);
+    }
+
+    // The failure is evidence: a retry that hides it leaves no way to tell a model
+    // that answered nothing from a call that never ran.
+    expect(events.filter((e) => e.type === "error").map((e) => e.message)).toEqual(["provider 401"]);
+    expect(events.filter((e) => e.type === "verify").some((e) => e.content.includes("provider 401"))).toBe(true);
   });
 
   it("honors a retry cap override below the built-in default", async () => {

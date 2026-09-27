@@ -108,13 +108,37 @@ export async function buildCheckpoint(
   return { frameIds, sections, abstractive: true };
 }
 
+/**
+ * Escapes a content line that would otherwise read back as structure. Section
+ * content can come from a model (the summarizer port) or from transcripts that
+ * happen to contain a `## heading`, and an unescaped one would silently split the
+ * section it belongs to.
+ */
+function escapeContentLine(line: string): string {
+  return /^##\s/.test(line) || line === CHECKPOINT_OPEN_TAG || line === CHECKPOINT_CLOSE_TAG ? `\\${line}` : line;
+}
+
+/** Reverses `escapeContentLine` (only for lines that were escaped). */
+function unescapeContentLine(line: string): string {
+  if (/^\\##\s/.test(line) || line === `\\${CHECKPOINT_OPEN_TAG}` || line === `\\${CHECKPOINT_CLOSE_TAG}`) {
+    return line.slice(1);
+  }
+  return line;
+}
+
 /** Renders a checkpoint envelope (fixed section order, never dropped). */
 export function renderCheckpoint(checkpoint: Checkpoint): string {
-  const bodies = CHECKPOINT_SECTIONS.map((section) => `## ${section}\n${checkpoint.sections[section].join("\n")}`);
+  const bodies = CHECKPOINT_SECTIONS.map(
+    (section) => `## ${section}\n${checkpoint.sections[section].map(escapeContentLine).join("\n")}`,
+  );
   return `${CHECKPOINT_OPEN_TAG}\n${bodies.join("\n\n")}\n${CHECKPOINT_CLOSE_TAG}`;
 }
 
-/** Parses a rendered envelope back into sections (null when malformed). */
+/**
+ * Parses a rendered envelope back into sections (null when malformed).
+ * Structural heads are read strictly: exactly the known sections, in order, once
+ * each — content that looks like a head only survives because rendering escapes it.
+ */
 export function parseCheckpoint(text: string): Record<CheckpointSection, string[]> | null {
   const open = text.indexOf(CHECKPOINT_OPEN_TAG);
   const close = text.indexOf(CHECKPOINT_CLOSE_TAG);
@@ -122,20 +146,17 @@ export function parseCheckpoint(text: string): Record<CheckpointSection, string[
   const body = text.slice(open + CHECKPOINT_OPEN_TAG.length, close);
   const sections = {} as Record<CheckpointSection, string[]>;
   const heads = [...body.matchAll(/^## (\w+)\s*$/gm)];
-  if (heads.length === 0) return null;
+  if (heads.length !== CHECKPOINT_SECTIONS.length) return null;
   for (let i = 0; i < heads.length; i += 1) {
     const name = heads[i]?.[1] as string;
-    if (!(CHECKPOINT_SECTIONS as readonly string[]).includes(name)) return null;
+    if (name !== CHECKPOINT_SECTIONS[i]) return null;
     const start = (heads[i]?.index ?? 0) + (heads[i]?.[0]?.length ?? 0);
     const end = i + 1 < heads.length ? (heads[i + 1]?.index ?? body.length) : body.length;
     sections[name as CheckpointSection] = body
       .slice(start, end)
       .split("\n")
-      .map((line) => line.trim())
+      .map((line) => unescapeContentLine(line.trim()))
       .filter((line) => line !== "");
-  }
-  for (const section of CHECKPOINT_SECTIONS) {
-    if (sections[section] === undefined) return null;
   }
   return sections;
 }

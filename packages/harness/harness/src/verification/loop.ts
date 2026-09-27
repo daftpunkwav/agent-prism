@@ -89,21 +89,31 @@ export async function* runVerificationLoop(
 
     for await (const event of attempt()) {
       collected.push(event);
-      if (!isLast && (event.type === "complete" || event.type === "error")) {
-        continue;
-      }
+      // An intermediate COMPLETE is terminal-looking and stays suppressed; an
+      // intermediate ERROR is evidence (provider 401, tool crash, timeout) and is
+      // forwarded so the timeline shows why an attempt was retried.
+      if (!isLast && event.type === "complete") continue;
       yield event;
     }
 
     const answer = extractAnswerFromEvents(collected);
     const toolCalls = countActionEvents(collected);
+    const attemptError = collected.find((event) => event.type === "error");
     const verdict =
       answer !== ""
         ? await verifyResult(deps.question, answer, toolCalls, deps.llm, {
             signal: deps.signal,
             tracker: deps.tracker,
           })
-        : { passed: false, reason: "No valid output" };
+        : {
+            passed: false,
+            // Report the real failure instead of a generic "no output", which is
+            // indistinguishable from a model that simply answered nothing.
+            reason:
+              attemptError !== undefined && attemptError.message !== ""
+                ? `attempt failed: ${attemptError.message}`
+                : "No valid output",
+          };
 
     yield controlEvent(
       "verify",
