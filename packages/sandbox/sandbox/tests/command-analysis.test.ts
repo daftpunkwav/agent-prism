@@ -114,10 +114,17 @@ describe("LayeredSandboxPolicy blocks destruction", { retry: 1 }, () => {
     }
   });
 
+  it("reviews a wrapper nested inside another wrapper", () => {
+    expect(blocked("bash -c \"bash -c 'rm -rf /'\"")).toMatch(/^Blocked by sandbox policy/);
+    expect(blocked("bash -c \"bash -c 'echo hi'\"")).toBeNull();
+  });
+
   it("lets benign interpreter wrappers through to the tool", () => {
     for (const command of ["bash -c 'echo hi'", "bash -c 'git status'", "sh -c 'cat /etc/passwd'", 'powershell -Command "Get-Process | Select Name"']) {
       expect(blocked(command), command).toBeNull();
     }
+    // A wrapper flag with nothing wrapped is not a command at all.
+    expect(blocked("bash -c")).toBeNull();
   });
 });
 
@@ -135,6 +142,15 @@ describe("LayeredSandboxPolicy allows legitimate work", { retry: 1 }, () => {
   it("passes safe redirection targets", () => {
     expect(blocked("echo hi > /dev/null")).toBeNull();
     expect(blocked("echo hi > NUL", "win32")).toBeNull();
+    // Input redirection writes nothing.
+    expect(blocked("cat < input.txt")).toBeNull();
+  });
+
+  it("blocks only a recursive chmod/chown of the filesystem root", () => {
+    expect(blocked("chmod -R 755 /")).toMatch(/recursive chmod of filesystem root/);
+    expect(blocked("chown -R user /")).toMatch(/recursive chown of filesystem root/);
+    // A recursive permission change inside a project directory stays allowed.
+    expect(blocked("chmod -R 755 dist")).toBeNull();
   });
 });
 

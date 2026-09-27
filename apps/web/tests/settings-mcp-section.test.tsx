@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * @file settings mcp section tests
- * @description Locks the MCP settings tab: list load, enable toggle through the
- * full-list replace, and the create flow.
+ * @description Locks the MCP settings tab list surface: load and display names,
+ * the search filter, the count, and the enable/delete rows.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -21,71 +21,117 @@ vi.mock("@agentprism/client", async (importOriginal) => ({
 const fetchMock = vi.mocked(fetchMcpServers);
 const saveMock = vi.mocked(saveMcpServers);
 
+const mcp = getCatalog("en").settings.mcp;
+
 const SERVERS: McpServerEntry[] = [
   { command: "npx -y server-a", name: "alpha", enabled: true },
   { command: "node mcp.js", enabled: false },
+  { command: "C:\\tools\\browser.cmd", enabled: true, args: ["--headless"] },
 ];
 
-function renderSection() {
+function renderSection(onFlash: (message: string) => void = () => {}) {
   return render(
     <I18nProvider initialLocale="en">
-      <McpSection onFlash={() => {}} />
+      <McpSection onFlash={onFlash} />
     </I18nProvider>,
   );
 }
 
-describe("McpSection", () => {
+async function loaded(onFlash?: (message: string) => void): Promise<void> {
+  renderSection(onFlash);
+  await waitFor(() => expect(screen.getByText("alpha")).toBeDefined());
+}
+
+describe("McpSection list", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
 
-  it("loads the list and derives display names (explicit name, else whole command)", async () => {
+  it("derives a display name per row and marks the disabled ones", async () => {
     fetchMock.mockResolvedValue(SERVERS);
-    renderSection();
-    await waitFor(() => expect(screen.getByText("alpha")).toBeDefined());
-    // A command without path separators derives its display name as-is.
-    // Name and transport summary render the same string for this fixture.
+    await loaded();
+    // Explicit name wins; otherwise the command basename, whichever separator the path uses.
+    // The row shows the command as both its display name and its transport summary.
     expect(screen.getAllByText("node mcp.js").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(getCatalog("en").settings.mcp.disabledBadge)).toBeDefined();
+    expect(screen.getByText("browser.cmd")).toBeDefined();
+    expect(screen.getByText(mcp.disabledBadge)).toBeDefined();
+    expect(screen.getByText(mcp.count.replace("{count}", "3"))).toBeDefined();
+  });
+
+  it("filters the list by name, command, and basename", async () => {
+    fetchMock.mockResolvedValue(SERVERS);
+    await loaded();
+    fireEvent.change(screen.getByPlaceholderText(mcp.searchPlaceholder), { target: { value: "browser" } });
+    expect(screen.queryByText("alpha")).toBeNull();
+    expect(screen.getByText("browser.cmd")).toBeDefined();
+    // Case-insensitive, and the raw command matches too.
+    fireEvent.change(screen.getByPlaceholderText(mcp.searchPlaceholder), { target: { value: "NPX -Y" } });
+    expect(screen.getByText("alpha")).toBeDefined();
+    expect(screen.queryByText("browser.cmd")).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText(mcp.searchPlaceholder), { target: { value: "nothing-here" } });
+    expect(screen.getByText(mcp.empty)).toBeDefined();
   });
 
   it("toggling a server saves the full list with the flipped flag", async () => {
     fetchMock.mockResolvedValue(SERVERS);
     saveMock.mockImplementation(async (next) => next);
-    renderSection();
-    await waitFor(() => expect(screen.getByText("alpha")).toBeDefined());
-    fireEvent.click(screen.getByRole("switch", { name: getCatalog("en").settings.mcp.toggleAria.replace("{name}", "alpha") }));
+    await loaded();
+    fireEvent.click(screen.getByRole("switch", { name: mcp.toggleAria.replace("{name}", "alpha") }));
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const sent = saveMock.mock.calls[0]?.[0] ?? [];
+    expect(sent).toHaveLength(SERVERS.length);
     expect(sent.find((entry) => entry.name === "alpha")?.enabled).toBe(false);
-    expect(sent.find((entry) => entry.name === undefined)?.enabled).toBe(false);
+    // Every other entry is carried over untouched.
+    expect(sent.find((entry) => entry.command === "C:\\tools\\browser.cmd")).toEqual(SERVERS[2]);
   });
 
-  it("the create flow posts a normalized server through the full-list replace", async () => {
-    fetchMock.mockResolvedValue([]);
+  it("deletes a server once the confirmation is accepted", async () => {
+    fetchMock.mockResolvedValue(SERVERS);
     saveMock.mockImplementation(async (next) => next);
-    renderSection();
-    await waitFor(() => expect(screen.getByText(getCatalog("en").settings.mcp.empty)).toBeDefined());
-    fireEvent.click(screen.getByRole("button", { name: getCatalog("en").settings.mcp.create }));
-    fireEvent.change(screen.getByPlaceholderText(getCatalog("en").settings.mcp.namePlaceholder), {
-      target: { value: "beta" },
-    });
-    fireEvent.change(screen.getByPlaceholderText(getCatalog("en").settings.mcp.commandPlaceholder), {
-      target: { value: "deno run mcp.ts" },
-    });
-    fireEvent.change(screen.getByPlaceholderText(getCatalog("en").settings.mcp.argsPlaceholder), {
-      target: { value: "--allow-net\n--quiet" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: getCatalog("en").settings.mcp.save }));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: mcp.deleteAria.replace("{name}", "alpha") }));
+    expect(confirm).toHaveBeenCalledWith(mcp.deleteConfirm.replace("{name}", "alpha"));
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const sent = saveMock.mock.calls[0]?.[0] ?? [];
-    expect(sent).toHaveLength(1);
-    expect(sent[0]).toMatchObject({
-      name: "beta",
-      command: "deno run mcp.ts",
-      args: ["--allow-net", "--quiet"],
-      enabled: true,
-    });
+    expect(sent.map((entry) => entry.command)).toEqual(["node mcp.js", "C:\\tools\\browser.cmd"]);
+  });
+
+  it("keeps the list untouched when the delete confirmation is dismissed", async () => {
+    fetchMock.mockResolvedValue(SERVERS);
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    await loaded();
+    fireEvent.click(screen.getByRole("button", { name: mcp.deleteAria.replace("{name}", "alpha") }));
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(screen.getByText("alpha")).toBeDefined();
+  });
+
+  it("flashes the server message when a list replace fails", async () => {
+    fetchMock.mockResolvedValue(SERVERS);
+    saveMock.mockRejectedValue(new Error("read-only config"));
+    const onFlash = vi.fn();
+    await loaded(onFlash);
+    fireEvent.click(screen.getByRole("switch", { name: mcp.toggleAria.replace("{name}", "alpha") }));
+    await waitFor(() => expect(onFlash).toHaveBeenCalledWith("read-only config"));
+    // The flag is only flipped through the returned list, so the row keeps its state.
+    expect(screen.getByRole("switch", { name: mcp.toggleAria.replace("{name}", "alpha") }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("reports a failed initial load instead of an empty list", async () => {
+    fetchMock.mockRejectedValue(new Error("server down"));
+    renderSection();
+    await waitFor(() => expect(screen.getByText("server down")).toBeDefined());
+    expect(screen.getByText(mcp.empty)).toBeDefined();
+  });
+
+  it("opens the create form with empty fields", async () => {
+    fetchMock.mockResolvedValue([]);
+    renderSection();
+    await waitFor(() => expect(screen.getByText(mcp.empty)).toBeDefined());
+    fireEvent.click(screen.getByRole("button", { name: mcp.create }));
+    expect(screen.getByText(mcp.createTitle)).toBeDefined();
+    expect(screen.getByPlaceholderText(mcp.commandPlaceholder)).toHaveProperty("value", "");
+    expect(screen.getByRole("switch", { name: mcp.enabledAria }).getAttribute("aria-checked")).toBe("true");
   });
 });

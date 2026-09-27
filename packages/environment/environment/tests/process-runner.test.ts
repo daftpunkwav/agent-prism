@@ -26,7 +26,7 @@ const GRANDCHILD_SCRIPT =
   "process.stdout.write('parent-done');";
 
 describe("runProcess when a grandchild holds stdio pipes", { retry: 1 }, () => {
-  it("settles as soon as the direct child exits, without waiting for the grandchild (regression F-202)", async () => {
+  it("settles as soon as the direct child exits, without waiting for the grandchild", async () => {
     const started = Date.now();
     const result = await runProcess({
       argv: [process.execPath, "-e", GRANDCHILD_SCRIPT],
@@ -154,6 +154,15 @@ describe("splitShellCommand", { retry: 1 }, () => {
     expect(splitShellCommand(`echo a\\ b`, true)).toEqual(["echo", "a b"]);
     // An empty quoted pair is a real (empty) argv token, as in shells.
     expect(splitShellCommand(`echo ''`, true)).toEqual(["echo", ""]);
+  });
+
+  it("honors escapes inside quotes and a trailing backslash", () => {
+    // Inside quotes a backslash escapes the quote itself or another backslash.
+    expect(splitShellCommand(`echo "a\\"b"`, true)).toEqual(["echo", `a"b`]);
+    expect(splitShellCommand(`echo "a\\\\b"`, true)).toEqual(["echo", "a\\b"]);
+    // A backslash before an ordinary character is kept; a trailing one is dropped.
+    expect(splitShellCommand(`echo "a\\b"`, true)).toEqual(["echo", "a\\b"]);
+    expect(splitShellCommand("echo tail\\", true)).toEqual(["echo", "tail"]);
   });
 
   it("keeps quote characters on non-posix (windows) tokenization", () => {

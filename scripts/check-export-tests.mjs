@@ -61,7 +61,6 @@ const PENDING = {
   "@agentprism/provider-catalog": ["ProviderLookupAdapter", "defaultEnvLookup"],
   "@agentprism/provider-langchain": ["createColumnRuntime", "llmMessagesToLc", "serializeWireResponse"],
   "@agentprism/runtime": ["Workspace"],
-  "@agentprism/sandbox": ["shellCommandFromArgs"],
   "@agentprism/session-format": ["SessionMigrationError"],
   "@agentprism/tool-builtins": ["parseSkillFile", "setWebSearchEnvReader", "utf8Bytes"],
   "@agentprism/tool-mcp": ["buildMcpChildEnv"],

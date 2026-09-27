@@ -106,17 +106,19 @@ export default defineConfig({
       clean: false,
       reporter: ["text", "json-summary"],
       reportsDirectory: "cov-report",
-      // CI gate, roughly four points under the baseline at introduction
-      // (statements 87 / branches 75 / functions 88 / lines 89). The margin
-      // absorbs run-to-run noise and the platform-gated code Windows cannot
-      // reach (POSIX shell branches), while still failing a broad regression
-      // instead of letting coverage slide. Raise the bar as coverage improves;
-      // a red gate means restore the tests, not lower the numbers.
+      // CI gate, roughly 1.5 points under the measured baseline (statements
+      // 90.35 / branches 79.73 / functions 91.69 / lines 92.44). Windows is the
+      // reference platform (see the CI workflow): the platform-gated sandbox and
+      // process-runner cases only execute there, so the same run that gates the
+      // merge is the run these numbers come from. The margin absorbs run-to-run
+      // noise and the suites' spawn jitter while still failing a broad
+      // regression. Raise the bar as coverage improves; a red gate means restore
+      // the tests, not lower the numbers.
       thresholds: {
-        statements: 84,
-        branches: 71,
-        functions: 85,
-        lines: 86,
+        statements: 89,
+        branches: 78,
+        functions: 90,
+        lines: 91,
       },
     },
   },
