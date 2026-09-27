@@ -9,6 +9,10 @@ CrewAI-pattern framework driver: a role crew running a task pipeline.
   answer, and the pipeline ends on the reviewer's turn.
 - `max_steps` budgets every crew LLM call, and `taskTurnCapFor` grants one extra turn per
   task under reflexion.
+- Tests: `tests/crewai-bridge.test.ts` drives the protocol against a fake bootstrap;
+  `tests/crewai-live-bridge.test.ts` runs the real `python/bootstrap.py` end to end with a
+  scripted host model (skips itself when no interpreter can import the framework; crewai
+  needs Python < 3.14).
 - Faithful-pattern implementation of CrewAI's crew, task, and process model on the arena's
   shared ports; not vendor code.
 
@@ -30,7 +34,10 @@ This driver runs on two interchangeable backends, selected per column run:
   in-process column's model call — arena system prompt merged in front of the
   crew's role copy, the column's context pipeline, and the prior-turn history on
   the first request — and hands the crew the assembled task prompt (question +
-  mentions + retrieval + profile suffix). Install:
+  mentions + retrieval + profile suffix). Role speech rides `reflect`, and the crew's own
+  final output closes the thought channel as the column's answer. The child runs
+  non-interactively (`CREWAI_TESTING`): crewai 1.x otherwise asks a first-run trace-consent
+  question on stdin, which carries the bridge protocol. Install:
   `pip install -r python/requirements.txt` into the interpreter that
   `ARENA_PYTHON` points at (default `python`, then `python3`). Probe results
   are cached for the server process lifetime — restart the runtime after

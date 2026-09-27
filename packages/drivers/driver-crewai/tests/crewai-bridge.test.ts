@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
 import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmMessage } from "@agentprism/contracts";
-import { PipelineConfigSchema } from "@agentprism/contracts";
+import { PipelineConfigSchema, extractAnswerFromEvents } from "@agentprism/contracts";
 import { RagStoreCache, createContextAnalytics, type AgentExecutionContext } from "@agentprism/harness";
 import { MapToolRegistry } from "@agentprism/tool-registry";
 import { TokenTracker } from "@agentprism/telemetry";
@@ -74,6 +74,9 @@ describe("runCrewaiFrameworkBridge", () => {
     const complete = events.at(-1);
     expect(complete?.type).toBe("complete");
     expect(complete?.metrics?.success).toBe(true);
+    // The crew's own final output closes the thought channel: role speech rides
+    // reflect, so without it the column would report an empty answer.
+    expect(extractAnswerFromEvents(events)).toBe("flood done");
   });
 
   it("runs the crew's completions on the arena prompt, context pipeline and history", async () => {

@@ -2,7 +2,7 @@
  * @file crewai-driver test
  * @description Locks the sequential pipeline, hierarchical manager, and budgets.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmStreamPart, ToolDefinition } from "@agentprism/contracts";
 import { extractAnswerFromEvents, PipelineConfigSchema } from "@agentprism/contracts";
 import { RagStoreCache } from "@agentprism/harness";
@@ -84,7 +84,18 @@ async function collect(driver: CrewAIDriver, ctx: AgentExecutionContext): Promis
   return events;
 }
 
+// Every case in this file covers the TypeScript pattern fallback. Pin the runtime
+// so a machine with crewai installed does not route them through the Python
+// bridge (crewai-live-bridge.test.ts covers that path on such a machine).
+beforeEach(() => {
+  vi.stubEnv("ARENA_CREWAI_RUNTIME", "ts");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("CrewAIDriver sequential process", () => {
+
   it("reports the provider's own token counts, not a prompt-size estimate", async () => {
     const llm = stubLlm(
       [],

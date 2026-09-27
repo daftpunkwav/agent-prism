@@ -2,7 +2,7 @@
  * @file autogen-driver test
  * @description Locks group-chat rounds: selection, tool proxy, termination, budgets.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmStreamPart, ToolDefinition } from "@agentprism/contracts";
 import { extractAnswerFromEvents, PipelineConfigSchema } from "@agentprism/contracts";
 import { RagStoreCache } from "@agentprism/harness";
@@ -73,7 +73,20 @@ async function collect(driver: AutogenDriver, ctx: AgentExecutionContext): Promi
   return events;
 }
 
+// Every case in this file covers the TypeScript pattern fallback. Pin the runtime:
+// on a machine whose interpreter can import autogen_agentchat the driver would
+// otherwise route every column through the Python bridge (which has its own suite
+// in autogen-live-bridge.test.ts), and the suite would depend on the machine's
+// Python environment.
+beforeEach(() => {
+  vi.stubEnv("ARENA_AUTOGEN_RUNTIME", "ts");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("AutogenDriver", () => {
+
   it("alternates coder/reviewer rounds until the reviewer terminates", async () => {
     const llm = stubLlm(
       ["coder", "reviewer", "coder", "reviewer"],
