@@ -17,7 +17,10 @@ import { firstUsableTitle, normalizeTitle, TITLE_FALLBACK } from "./normalize.js
 /** Async title generator hook (host-supplied, e.g. an LLM call). */
 export type Titler = (input: { question: string; answer: string }) => Promise<string>;
 
-/** Stopwords excluded from keyword titles (English + common CJK particles). */
+/**
+ * Stopwords excluded from keyword titles. English only: the tokenizer emits whole CJK
+ * runs, so single particles can never match here (CJK filtering needs segmentation).
+ */
 const STOPWORDS = new Set([
   "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with", "is", "are",
   "how", "what", "why", "please", "帮我", "请", "的", "了", "在", "和", "与",

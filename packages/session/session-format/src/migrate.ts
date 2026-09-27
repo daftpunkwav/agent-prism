@@ -9,7 +9,8 @@
  *
  * Migration is pure and total over readable inputs: every v1 document maps
  * to exactly one v2 document, and v2 documents pass through untouched.
- * Backfills are explicit constants (null/{}/length), never guessed content.
+ * Backfills are explicit constants (null/{}/length); enum values outside the known set
+ * fall back to the documented defaults ("agent" / "active") rather than being dropped.
  */
 
 import { SESSION_ENVELOPE_V1, SESSION_ENVELOPE_VERSION, detectEnvelopeVersion } from "./envelope.js";

@@ -19,7 +19,10 @@ export interface CodeChunk {
   startLine: number;
   /** 1-based end line (inclusive). */
   endLine: number;
-  /** Symbol path when determinable (e.g. `class A > method b`), else null. */
+  /**
+   * Symbol path when determinable (a file-level definition name), else null. Indented
+   * members stay inside their parent block, so `class A > method b` is not produced.
+   */
   symbol: string | null;
   /** Block kind detected by the splitter. */
   kind: "function" | "class" | "block" | "window";

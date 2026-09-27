@@ -8,8 +8,10 @@
  * - Merge layers lowest-priority-first with same-name workspace wins
  *
  * Precedence (low to high): bundled defaults < repo AGENTS.md < workspace
- * AGENTS.md < workspace AGENTS.local.md. Higher layers replace same-named
- * lower layers; distinct names accumulate in priority order.
+ * AGENTS.md < workspace AGENTS.local.md. Layer entries are keyed per layer (repo
+ * files carry a repo- prefix), so a same-named file from a lower layer is injected
+ * alongside the higher one rather than being replaced. Distinct names accumulate in
+ * priority order.
  */
 
 export interface InstructionLayer {
@@ -58,7 +60,8 @@ export const INSTRUCTION_FILES = ["AGENTS.md", "AGENTS.local.md"] as const;
 
 /**
  * Loads instruction layers: bundled defaults plus file layers.
- * Missing/unreadable files are skipped (counted, never thrown).
+ * Unreadable files and empty files are counted in `skipped`; a file that does not
+ * exist is skipped without counting (absence is the normal case).
  */
 export function loadInstructionLayers(
   files: InstructionFileAccess,

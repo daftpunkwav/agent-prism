@@ -4,7 +4,8 @@
  *              prompt (single source; edit copy here only).
  *
  * Responsibilities:
- * - Own the compact handoff system instruction and the transcript wrapper
+ * - Own the compact handoff system instruction (the transcript wrapper is built
+ *   inline in builder-service.ts)
  */
 
 /** System instruction for the compaction call: a structured handoff note. */

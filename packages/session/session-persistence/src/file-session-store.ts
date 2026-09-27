@@ -8,7 +8,8 @@
  *
  * Single-document layout mirrors BuilderSessionStore (whole-file atomic writes
  * with .bak recovery from the persistence layer); entries are milestones, not
- * event streams, so write-through stays cheap without debouncing.
+ * event streams, so every mutation rewrites the whole ledger (single writer, no
+ * debouncing: write-through is O(ledger), not O(1)).
  */
 
 import { z } from "zod";
