@@ -8,7 +8,7 @@
  * - Cancel runs when the client disconnects
  */
 
-import type { ArenaEvent, ArenaRunRequest, AskUserReply, AskUserQuestion, Clock, ColumnRuntimeFactory, ComparisonReport, DriverLookup, HarnessLevel, IdGenerator, MemoryServicePort, PipelineConfig, PipelineMetrics, ReportPublisher } from "@agentprism/contracts";
+import type { ArenaEvent, ArenaRunRequest, AskUserReply, AskUserQuestion, Clock, ColumnRuntimeFactory, ComparisonReport, DriverLookup, HarnessLevel, IdGenerator, MemoryServicePort, ModelCallOutcome, PipelineConfig, PipelineMetrics, ReportPublisher } from "@agentprism/contracts";
 import { arenaErrorEvent, completeEvent, DEFAULT_ASK_USER_WAIT_MS, DriverReservedError, sanitizeErrorMessage, systemErrorEvent, systemReportEvent } from "@agentprism/contracts";
 import { runAgentExecution, type AgentToolTuning } from "@agentprism/agent";
 import type { McpServerConfig } from "@agentprism/tool-mcp";
@@ -454,7 +454,10 @@ export class ArenaRunner {
         // Claude Agent SDK column, whose CLI subprocess makes the calls itself. Either
         // way the breaker reflects the shared dependency, not whichever column finished
         // last, and a column that is stopping reports nothing.
-        const reportModelCall = (outcome: { ok: boolean; error?: unknown }): void => {
+        // The sink's parameter is the contracts type, not a structural inline: the
+        // same named contract the two reporters (wire-trace handler, driver context)
+        // consume, so an outcome-shape evolution cannot pass type checking here.
+        const reportModelCall = (outcome: ModelCallOutcome): void => {
           if (linked.signal.aborted) return;
           if (outcome.ok) breaker.recordSuccess();
           else breaker.recordFailure();
