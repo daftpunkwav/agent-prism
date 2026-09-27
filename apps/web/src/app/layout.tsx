@@ -6,7 +6,7 @@
  * - Render the global shell and load fonts and styles
  * - Resolve the SSR locale from the mirror cookie for html lang and metadata
  * - Inject the pre-paint theme/locale scripts (nonce-carrying: the production CSP
- *   allows no inline script without the per-request nonce from middleware)
+ *   allows no inline script without the per-request nonce from the proxy)
  */
 
 import type { Metadata } from "next";
@@ -45,7 +45,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getServerLocale();
-  // Minted by src/middleware.ts; absent only if a request reaches the layout without it.
+  // Minted by src/proxy.ts; absent only if a request reaches the layout without it.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
