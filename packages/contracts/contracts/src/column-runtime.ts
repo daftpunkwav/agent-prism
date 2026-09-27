@@ -24,10 +24,24 @@ export interface ColumnRuntime {
 /** Consumer of captured LLM wire records (request/response/error). Must never block the model loop. */
 export type LlmWireSink = (record: LlmWireRecord) => void;
 
+/**
+ * One model call's outcome, reported at the call site (the adapter), not inferred
+ * from a column's end state: driver bugs and downstream faults are otherwise
+ * indistinguishable, and a column that fails for its own reasons must not count
+ * against the shared endpoint.
+ */
+export interface ModelCallOutcome {
+  ok: boolean;
+  /** Present on failures (transport, provider, or SDK error). */
+  error?: unknown;
+}
+
 /** Optional per-column extras passed when the composition-root factory builds a runtime. */
 export interface ColumnRuntimeCreateOptions {
   /** Receives every captured LLM wire record for this column (arena run logs). */
   wireSink?: LlmWireSink;
+  /** Receives one outcome per model call (endpoint health for the arena breaker). */
+  onModelCall?: (outcome: ModelCallOutcome) => void;
 }
 
 /** Factory port for building a ColumnRuntime from a pipeline config. */

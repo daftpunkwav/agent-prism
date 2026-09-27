@@ -432,10 +432,15 @@ export class ArenaRunner {
         // exception because its CLI subprocess makes the model calls itself.
         const runtime = this.deps.modelFactory.create(config, {
           wireSink: (record) => logs?.appendWire(config.label, turn, record),
+          // Endpoint health: one report per model call, so the breaker reflects the
+          // shared dependency instead of whichever column finished last.
+          onModelCall: (outcome) => {
+            if (outcome.ok) breaker.recordSuccess();
+            else breaker.recordFailure();
+          },
         });
         agentId = this.deps.idGenerator.next();
         this.columnAborts.set(agentId, columnAbort);
-        let sawError = false;
         for await (const event of runAgentExecution(
           {
             workspaceRegistry: this.deps.workspaceRegistry,
@@ -466,16 +471,13 @@ export class ArenaRunner {
             signal: linked.signal,
           },
         )) {
-          // Downstream failures (LLM timeouts etc.) are absorbed by the agent layer into error
-          // events and never reach this layer's catch
-          if (event.type === "error") sawError = true;
+          // Downstream failures (LLM timeouts etc.) are absorbed by the agent layer into
+          // error events and never reach this layer's catch.
           channel.push(event);
         }
-        // Client cancellation does not change counters; a column ending with an error event counts as failure, otherwise success
-        if (!linked.signal.aborted) {
-          if (sawError) breaker.recordFailure();
-          else breaker.recordSuccess();
-        }
+        // No breaker accounting here: endpoint health arrives per model call (the
+        // adapter's onModelCall), so a driver that fails on its own cannot trip the
+        // shared endpoint, and breaker state no longer depends on finish order.
       } catch (error) {
         const columnStopped = columnAbort.signal.aborted && !signal.aborted;
         if (columnStopped) {
@@ -485,10 +487,8 @@ export class ArenaRunner {
           // An unimplemented framework is a dimension configuration error, not a downstream endpoint failure; do not count toward the breaker
           this.emitFailure(channel, config, request, runId, `Framework "${error.frameworkId}" is not implemented`);
         } else {
-          // Client cancellation / shutdown aborts are not downstream failures; do not count toward breaker failures
-          if (!linked.signal.aborted && (error as Error)?.name !== "AbortError") {
-            breaker.recordFailure();
-          }
+          // Not counted toward the breaker: this catch sees driver-level failures too,
+          // and endpoint health is reported per model call instead.
           this.emitFailure(channel, config, request, runId, sanitizeErrorMessage(error));
         }
       } finally {

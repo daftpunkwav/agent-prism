@@ -1,9 +1,10 @@
 /**
  * @file arena breaker tests
- * @description Locks breaker accounting for error-terminated columns.
+ * @description Locks breaker accounting: endpoint health, not column end state.
  *
  * Responsibilities:
- * - Trip the breaker under repeated endpoint failures and short-circuit afterwards
+ * - Pin that a failing column with no model calls does not trip the shared endpoint
+ * - Trip the breaker from reported model-call failures and short-circuit afterwards
  */
 
 import { randomUUID } from "node:crypto";
@@ -58,12 +59,19 @@ describe("ArenaRunner breaker", () => {
     rmSync(runsRoot, { recursive: true, force: true });
   });
 
-  it("columns ending in error count toward the breaker; after threshold, short-circuit without calling the model factory", async () => {
-    const registry = new FrameworkDriverRegistry();
-    registry.register(makeFailingDriver());
+  /**
+   * Runner with an instrumented model factory. When `reportFailure` is set the factory
+   * reports a failed model call, exactly like the provider adapter does when the
+   * endpoint itself is down.
+   */
+  function makeRunner(
+    registry: FrameworkDriverRegistry,
+    observeCount: (count: number) => void,
+    reportFailure = false,
+  ): ArenaRunner {
     let createCount = 0;
     const workspaces = new WorkspaceRegistry({ runsRoot, maxWorkspaces: 8, ttlSeconds: 3600, clock: { now: () => 0 } });
-    const runner = new ArenaRunner({
+    return new ArenaRunner({
       registry,
       router: { route: (): PipelineConfig[] => [makeConfig()] } as never,
       workspaceRegistry: workspaces,
@@ -71,8 +79,10 @@ describe("ArenaRunner breaker", () => {
         publish: async () => null,
       },
       modelFactory: {
-        create: () => {
+        create: (_config, options) => {
           createCount += 1;
+          observeCount(createCount);
+          if (reportFailure) options?.onModelCall?.({ ok: false, error: new Error("LLM failed") });
           return {
             llm: { invoke: async () => ({ text: "", toolCalls: [] }), stream: async function* () {} },
             llmVendor: {},
@@ -85,10 +95,44 @@ describe("ArenaRunner breaker", () => {
       clock: { now: () => 0 },
       maxConcurrentRuns: 2,
     });
+  }
+
+  it("does not trip the breaker for a column that fails on its own", async () => {
+    const registry = new FrameworkDriverRegistry();
+    registry.register(makeFailingDriver());
+    let createCount = 0;
+    const runner = makeRunner(registry, (count) => {
+      createCount = count;
+    });
 
     const request = makeRequest();
 
-    // First 3: driver and model factory are called; column ends with error
+    // Three rounds of driver-level failure: the endpoint was never called, so the
+    // columns of the next round must still get their model runtime.
+    for (let round = 0; round < 4; round += 1) {
+      const events: ArenaEvent[] = [];
+      for await (const event of runner.streamParallel(request)) events.push(event);
+      expect(events.some((e) => e.type === "error" && e.message === "LLM failed")).toBe(true);
+    }
+    expect(createCount).toBe(4);
+  });
+
+  it("trips from reported model-call failures and then short-circuits", async () => {
+    const registry = new FrameworkDriverRegistry();
+    registry.register(makeFailingDriver());
+    let createCount = 0;
+    const runner = makeRunner(
+      registry,
+      (count) => {
+        createCount = count;
+      },
+      true,
+    );
+
+    const request = makeRequest();
+
+    // Each round reports one failed model call before the column converges to error:
+    // that is the endpoint's own health signal.
     for (let round = 0; round < 3; round += 1) {
       const events: ArenaEvent[] = [];
       for await (const event of runner.streamParallel(request)) events.push(event);
@@ -96,7 +140,7 @@ describe("ArenaRunner breaker", () => {
     }
     expect(createCount).toBe(3);
 
-    // 4th: circuit short-circuits; model factory and driver are not touched
+    // 4th: circuit short-circuits; the model factory is not touched
     const shortCircuited: ArenaEvent[] = [];
     for await (const event of runner.streamParallel(request)) shortCircuited.push(event);
     expect(createCount).toBe(3);

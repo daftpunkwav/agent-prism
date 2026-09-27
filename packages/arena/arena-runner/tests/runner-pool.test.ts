@@ -48,6 +48,8 @@ function makeRunner(overrides?: {
   breakerThreshold?: number;
   eventRetention?: number;
   reportPublisher?: ReportPublisher;
+  /** Report a failed model call when the factory builds a runtime (endpoint health). */
+  reportModelFailure?: boolean;
 }): ArenaRunner {
   return new ArenaRunner({
     registry: { get: () => ({}), names: new Set() } as unknown as DriverLookup,
@@ -58,7 +60,12 @@ function makeRunner(overrides?: {
       },
     },
     reportPublisher: overrides?.reportPublisher ?? { publish: async () => null },
-    modelFactory: { create: () => ({}) },
+    modelFactory: {
+      create: (_config: unknown, options?: { onModelCall?: (outcome: { ok: boolean; error?: unknown }) => void }) => {
+        if (overrides?.reportModelFailure === true) options?.onModelCall?.({ ok: false, error: new Error("llm timeout") });
+        return {};
+      },
+    },
     idGenerator: (() => {
       let n = 0;
       return { next: () => `id-${(n += 1)}` };
@@ -146,8 +153,8 @@ describe("ArenaRunner.streamParallel", () => {
     expect(configs.every((c) => c.temperature === 0.3)).toBe(true);
   });
 
-  it("counts an in-column error toward the breaker and short-circuits the next run", async () => {
-    const runner = makeRunner({ breakerThreshold: 1 });
+  it("counts a reported model-call failure toward the breaker and short-circuits the next run", async () => {
+    const runner = makeRunner({ breakerThreshold: 1, reportModelFailure: true });
     runMock.mockImplementation(async function* () {
       yield { type: "error", pipeline: "col-a", message: "llm timeout", turn: 1 };
       yield { type: "complete", pipeline: "col-a", metrics: { ...METRICS, success: false }, turn: 1 };
@@ -160,6 +167,20 @@ describe("ArenaRunner.streamParallel", () => {
     expect(runMock).toHaveBeenCalledTimes(1);
     expect(second.some((event) => event.type === "error" && /circuit-broken/.test(event.message))).toBe(true);
     expect(runner.breakerCount()).toBe(1);
+  });
+
+  it("does not count a driver-level column failure toward the endpoint", async () => {
+    const runner = makeRunner({ breakerThreshold: 1 });
+    runMock.mockImplementation(async function* () {
+      yield { type: "error", pipeline: "col-a", message: "driver bug", turn: 1 };
+      yield { type: "complete", pipeline: "col-a", metrics: { ...METRICS, success: false }, turn: 1 };
+    } as never);
+    await drain(runner, request());
+    // No model call ever failed here: a column that fails on its own must not take
+    // the shared endpoint down for the columns that are healthy.
+    const second = await drain(runner, request());
+    expect(runMock).toHaveBeenCalledTimes(2);
+    expect(second.some((event) => event.type === "error" && /circuit-broken/.test(event.message))).toBe(false);
   });
 
   it("delivers human answers through the ask registry when the column waits", async () => {
