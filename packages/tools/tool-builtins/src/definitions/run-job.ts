@@ -15,6 +15,7 @@
  * sandbox deny-list as bash (see sandbox toBeforeExecute).
  */
 
+import { onWorkspaceDispose } from "./process-scopes.js";
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";
 import { WorkspaceError, spawnBackground, splitShellCommand, type BackgroundJob } from "@agentprism/environment";
 import { truncate } from "./caps.js";
@@ -64,6 +65,15 @@ interface JobScope {
 }
 
 const JOBS = new Map<string, JobScope>();
+
+// Workspace release kills whatever the run left behind: a job that outlives its
+// workspace holds an OS process plus up to MAX_OUTPUT_CHARS of buffer.
+onWorkspaceDispose((root) => {
+  const scope = JOBS.get(root);
+  if (scope === undefined) return;
+  for (const record of scope.records.values()) record.job.kill();
+  JOBS.delete(root);
+});
 
 function scopeFor(root: string): JobScope {
   let scope = JOBS.get(root);

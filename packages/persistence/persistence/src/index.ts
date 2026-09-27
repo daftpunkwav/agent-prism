@@ -9,3 +9,4 @@
 export * from "./json-store.js";
 export * from "./json-file.js";
 export * from "./append-file.js";
+export * from "./serial-queue.js";

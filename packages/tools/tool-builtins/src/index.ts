@@ -7,6 +7,7 @@
  */
 
 export * from "./builtins.js";
+export { disposeWorkspaceProcesses, onWorkspaceDispose } from "./definitions/process-scopes.js";
 export { setToolTuning, toolTuningValue, type ToolTuning } from "./tuning.js";
 export { readTool } from "./definitions/read.js";
 export { writeTool } from "./definitions/write.js";

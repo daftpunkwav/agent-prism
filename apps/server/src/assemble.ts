@@ -33,6 +33,7 @@ import {
   createBuiltinToolRegistry,
   createUserSkill,
   deleteUserSkill,
+  disposeWorkspaceProcesses,
   listSkillsForSettings,
   setSkillEnabled,
   updateUserSkill,
@@ -171,6 +172,8 @@ export async function assemble(): Promise<RuntimeComponents> {
     maxWorkspaces: settings.maxWorkspaces,
     ttlSeconds: settings.workspaceTtlSeconds,
     lruActiveWindowSeconds: settings.workspaceLruWindowSeconds,
+    // A released workspace takes its background jobs and resident shell with it.
+    onRelease: ({ root }) => disposeWorkspaceProcesses(root),
   });
   const providerSync = new ProviderDimensionSync({ dimensionCatalog, providerLookup });
   const router = new DimensionRouter({

@@ -57,6 +57,7 @@ export class WorkspaceRegistry {
   private readonly maxWorkspaces: number;
   private readonly ttlSeconds: number;
   private readonly runsRoot: string;
+  private readonly onRelease?: (workspace: { name: string; root: string }) => void;
   private readonly clock: Clock;
   /** TTL/LRU time source: monotonic clock (immune to system clock adjustments), injectable fake clock for tests. */
   private readonly monotonicNow: () => number;
@@ -75,6 +76,13 @@ export class WorkspaceRegistry {
     clock: Clock;
     /** Monotonic clock (seconds); defaults to performance.now — a different epoch from the injected Clock, do not mix. */
     monotonicNow?: () => number;
+    /**
+     * Release hook for host-owned resources bound to a workspace (background
+     * jobs, resident shells): every eviction and every explicit remove runs it,
+     * so process state cannot outlive the directory it belonged to. The host
+     * wires it because this package must not know about tool packages.
+     */
+    onRelease?: (workspace: { name: string; root: string }) => void;
   }) {
     // NaN-proof like Semaphore/CircuitBreaker: Math.max(1, NaN) is NaN, which would
     // silently disable the quota (size >= NaN is always false) and leak memory.
@@ -84,6 +92,7 @@ export class WorkspaceRegistry {
     this.lruActiveWindowSeconds = options.lruActiveWindowSeconds ?? WorkspaceRegistry.DEFAULT_LRU_ACTIVE_WINDOW;
     this.runsRoot = options.runsRoot;
     this.clock = options.clock;
+    this.onRelease = options.onRelease;
     this.monotonicNow = options.monotonicNow ?? defaultMonotonicNow;
     mkdirSync(this.runsRoot, { recursive: true });
   }
@@ -372,6 +381,9 @@ export class WorkspaceRegistry {
     this.lastAccess.delete(name);
     this.protectedNames.delete(name);
     if (workspace !== undefined) {
+      // Kill host resources first: after the directory is gone a still-running
+      // job would be unreachable by name.
+      this.onRelease?.({ name, root: workspace.root });
       try {
         rmRf(workspace.root);
       } catch (error) {

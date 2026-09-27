@@ -9,10 +9,14 @@
  */
 
 import {
+  closeSync,
+  fstatSync,
   lstatSync,
   mkdirSync,
-  readdirSync,
+  openSync,
   readFileSync,
+  readSync,
+  readdirSync,
   realpathSync,
   statSync,
   unlinkSync,
@@ -263,6 +267,42 @@ export class ScopedFileSystem {
       return readFileSync(real, "utf-8");
     } catch {
       throw new WorkspaceError(`Error: file not found: ${filePath}`);
+    }
+  }
+
+  /**
+   * Reads at most `maxBytes` of a file and reports whether more remains. Callers
+   * that only inspect a head (grep windows, symbol indexes, model reads) must use
+   * this: `readFile` materializes the whole file first, so a multi-gigabyte asset
+   * costs its full size in memory before any cap applies. A multi-byte character
+   * cut by the byte cap is dropped instead of surfacing as a replacement character.
+   */
+  readFileHead(filePath: string, maxBytes: number): { text: string; truncated: boolean } {
+    const target = this.canonicalize(filePath);
+    if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`);
+    const real = this.safeReadPath(target);
+    let fd: number | null = null;
+    try {
+      fd = openSync(real, "r");
+      const size = fstatSync(fd).size;
+      const limit = Math.max(0, Math.trunc(maxBytes));
+      const buffer = Buffer.alloc(Math.min(limit, size));
+      const read = buffer.length === 0 ? 0 : readSync(fd, buffer, 0, buffer.length, 0);
+      const text = buffer.subarray(0, read).toString("utf8");
+      return {
+        text: text.endsWith("\uFFFD") ? text.slice(0, -1) : text,
+        truncated: size > read,
+      };
+    } catch {
+      throw new WorkspaceError(`Error: file not found: ${filePath}`);
+    } finally {
+      if (fd !== null) {
+        try {
+          closeSync(fd);
+        } catch {
+          // Closing a read-only descriptor cannot fail in a way callers can act on.
+        }
+      }
     }
   }
 

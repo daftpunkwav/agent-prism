@@ -27,7 +27,7 @@ import {
   type SessionRecord,
   type SessionStore,
 } from "@agentprism/contracts";
-import type { AppendFile, JsonFile } from "@agentprism/persistence";
+import { SerialQueue, type AppendFile, type JsonFile } from "@agentprism/persistence";
 import {
   InMemoryBlobStore,
   MAX_ENTRIES_PER_SESSION,
@@ -73,6 +73,11 @@ export class JsonlSessionStore implements SessionStore {
   private readonly records = new Map<string, SessionRecord>();
   private readonly entries = new Map<string, SessionEntry[]>();
   private readonly blobs: SessionBlobStore;
+  /**
+   * Serializes mutations per session (creates share one key): seq assignment and
+   * the log append must not interleave, or two appends claim the same seq.
+   */
+  private readonly mutations = new SerialQueue();
   private corrupt = 0;
   private loaded = false;
   private loadPromise: Promise<void> | null = null;
@@ -154,23 +159,27 @@ export class JsonlSessionStore implements SessionStore {
   /** Marks failed with the caller reason (unknown ids throw). */
   async fail(id: string, reason: string): Promise<SessionRecord> {
     await this.ensureLoaded();
-    const record = this.require(id);
-    record.status = "failed";
-    record.updatedAt = this.clock.now();
-    record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
-    await this.append({ op: "fail", id, at: record.updatedAt, reason: record.summary });
-    return { ...record };
+    return this.mutations.run(id, async () => {
+      const record = this.require(id);
+      record.status = "failed";
+      record.updatedAt = this.clock.now();
+      record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
+      await this.append({ op: "fail", id, at: record.updatedAt, reason: record.summary });
+      return { ...record };
+    });
   }
 
   /** Marks cancelled by the requester (abort supersedes failure). */
   async cancel(id: string, reason = "cancelled by client"): Promise<SessionRecord> {
     await this.ensureLoaded();
-    const record = this.require(id);
-    record.status = "cancelled";
-    record.updatedAt = this.clock.now();
-    record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
-    await this.append({ op: "cancel", id, at: record.updatedAt, reason: record.summary });
-    return { ...record };
+    return this.mutations.run(id, async () => {
+      const record = this.require(id);
+      record.status = "cancelled";
+      record.updatedAt = this.clock.now();
+      record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
+      await this.append({ op: "cancel", id, at: record.updatedAt, reason: record.summary });
+      return { ...record };
+    });
   }
 
   /** Appends a milestone entry; rejects empty content and a full session. */
@@ -179,26 +188,30 @@ export class JsonlSessionStore implements SessionStore {
     entry: { kind: SessionEntry["kind"]; content: string },
   ): Promise<SessionEntry> {
     await this.ensureLoaded();
-    const record = this.require(sessionId);
-    const content = entry.content.trim();
-    if (content === "") throw new SessionValidationError("entry content must be non-empty");
-    const list = this.entries.get(sessionId) ?? [];
-    if (list.length >= MAX_ENTRIES_PER_SESSION) {
-      throw new SessionValidationError(`session holds the cap of ${MAX_ENTRIES_PER_SESSION} entries`);
-    }
-    const stored: SessionEntry = {
-      sessionId,
-      seq: list.length,
-      at: this.clock.now(),
-      kind: entry.kind,
-      content: await spillOversizedEntry(this.blobs, sessionId, list.length, content),
-    };
-    list.push(stored);
-    this.entries.set(sessionId, list);
-    record.entryCount = list.length;
-    record.updatedAt = stored.at;
-    await this.append({ op: "entry", sessionId, seq: stored.seq, at: stored.at, kind: stored.kind, content: stored.content });
-    return { ...stored };
+    // Queued: seq is read before the spill await, so a concurrent append would
+    // claim the same seq and overwrite the same blob.
+    return this.mutations.run(sessionId, async () => {
+      const record = this.require(sessionId);
+      const content = entry.content.trim();
+      if (content === "") throw new SessionValidationError("entry content must be non-empty");
+      const list = this.entries.get(sessionId) ?? [];
+      if (list.length >= MAX_ENTRIES_PER_SESSION) {
+        throw new SessionValidationError(`session holds the cap of ${MAX_ENTRIES_PER_SESSION} entries`);
+      }
+      const stored: SessionEntry = {
+        sessionId,
+        seq: list.length,
+        at: this.clock.now(),
+        kind: entry.kind,
+        content: await spillOversizedEntry(this.blobs, sessionId, list.length, content),
+      };
+      list.push(stored);
+      this.entries.set(sessionId, list);
+      record.entryCount = list.length;
+      record.updatedAt = stored.at;
+      await this.append({ op: "entry", sessionId, seq: stored.seq, at: stored.at, kind: stored.kind, content: stored.content });
+      return { ...stored };
+    });
   }
 
   /** Newest-first entries for one session (unknown sessions throw). */

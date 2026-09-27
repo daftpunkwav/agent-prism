@@ -28,13 +28,24 @@ async function executeRead(workspace: ToolWorkspace, args: ToolArgs): Promise<To
   try {
     const view = asWorkspaceView(workspace);
     const filePath = String(args.path ?? "");
-    const content = view.fs.readFile(filePath);
+    const cap = toolTuningValue("maxFileChars", MAX_FILE);
+    // Read a bounded head instead of the whole file: an oversized asset used to be
+    // fully materialized (and split into lines) before any cap applied. Four bytes
+    // per character is the UTF-8 upper bound, so the byte cap cannot cut text the
+    // char cap wants to keep.
+    const head = view.fs.readFileHead(filePath, cap * 4);
     const offset = readInt(args, "offset", 0);
     const limit = readInt(args, "limit", 0);
-    let lines = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    let lines = head.text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
     if (offset > 0) lines = lines.slice(offset - 1);
     if (limit > 0) lines = lines.slice(0, limit);
-    return { result: truncate(lines.join("\n"), toolTuningValue("maxFileChars", MAX_FILE)), fileDiff: null, ok: true };
+    const joined = lines.join("\n");
+    // Loud, not silent: the model must know it is looking at a prefix — and the note
+    // stays inside the same cap, so a tiny cap keeps the old bounded shape.
+    const note = "\n…(file longer: read with offset/limit for the rest)";
+    const capped = head.truncated || joined.length > cap;
+    const result = capped && cap > note.length ? `${truncate(joined, cap - note.length)}${note}` : truncate(joined, cap);
+    return { result, fileDiff: null, ok: true };
   } catch (error) {
     if (error instanceof WorkspaceError) {
       return { result: error.message, fileDiff: null, ok: false, code: "workspace_error" };

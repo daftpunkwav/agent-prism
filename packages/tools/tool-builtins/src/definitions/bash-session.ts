@@ -16,6 +16,7 @@
  * fails closed toward bash/run_job. Process-scoped like run_job (restart orphans).
  */
 
+import { onWorkspaceDispose } from "./process-scopes.js";
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";
 import { WorkspaceError, spawnPersistentShell, type PersistentShell } from "@agentprism/environment";
 import { toolTuningValue } from "../tuning.js";
@@ -46,6 +47,14 @@ interface ShellRecord {
 
 /** Process-scoped shells namespaced by workspace root (see file header for lifetime limits). */
 const SHELLS = new Map<string, ShellRecord>();
+
+// Workspace release kills the resident shell; otherwise it outlives its workspace.
+onWorkspaceDispose((root) => {
+  const record = SHELLS.get(root);
+  if (record === undefined) return;
+  record.shell.kill();
+  SHELLS.delete(root);
+});
 
 function markerFor(seq: number): string {
   return `__AP_DONE_${seq}__`;

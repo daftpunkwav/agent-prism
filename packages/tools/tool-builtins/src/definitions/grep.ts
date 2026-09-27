@@ -32,6 +32,11 @@ export const GREP_JSON_SCHEMA: Record<string, unknown> = {
 /** Maximum matched lines returned before truncation kicks in. */
 const MAX_MATCH_LINES = 200;
 
+/** Per-file byte cap: larger files are searched only through their head. */
+const MAX_GREP_FILE_BYTES = 2 * 1024 * 1024;
+/** Total bytes scanned per call; the walk stops (loudly) once it is spent. */
+const MAX_GREP_TOTAL_BYTES = 32 * 1024 * 1024;
+
 async function executeGrep(workspace: ToolWorkspace, args: ToolArgs): Promise<ToolExecutionResult> {
   try {
     const view = asWorkspaceView(workspace);
@@ -59,15 +64,27 @@ async function executeGrep(workspace: ToolWorkspace, args: ToolArgs): Promise<To
     const files = view.fs.listFiles(basePath, { recursive: true });
     const lines: string[] = [];
     let truncated = false;
+    // Byte budgets keep one call from pinning the event loop on a dependency tree:
+    // a giant file is searched through its head only, and the walk stops once the
+    // total budget is spent. Both cases are reported instead of silently dropping.
+    let bytesLeft = MAX_GREP_TOTAL_BYTES;
+    let headOnlyFiles = 0;
     for (const file of files) {
       if (globMatcher !== null) {
         // ripgrep semantics: a pattern without "/" matches the file name, otherwise the path
         const subject = globFilter.includes("/") ? file : file.split("/").pop() ?? file;
         if (!globMatcher.test(subject)) continue;
       }
+      if (bytesLeft <= 0) {
+        truncated = true;
+        break;
+      }
       let content: string;
       try {
-        content = view.fs.readFile(file);
+        const head = view.fs.readFileHead(file, Math.min(MAX_GREP_FILE_BYTES, bytesLeft));
+        content = head.text;
+        bytesLeft -= content.length;
+        if (head.truncated) headOnlyFiles += 1;
       } catch {
         // Files that vanish or become unreadable mid-walk are skipped; no binary detection (binary files are searched as UTF-8).
         continue;
@@ -90,7 +107,10 @@ async function executeGrep(workspace: ToolWorkspace, args: ToolArgs): Promise<To
     if (lines.length === 0) {
       return { result: `No matches for ${pattern}`, fileDiff: null, ok: true };
     }
-    const suffix = truncated ? `\n…(results truncated at ${MAX_MATCH_LINES} lines)` : "";
+    const suffixes: string[] = [];
+    if (truncated) suffixes.push(`(results truncated at ${MAX_MATCH_LINES} lines)`);
+    if (headOnlyFiles > 0) suffixes.push(`${headOnlyFiles} file(s) larger than ${MAX_GREP_FILE_BYTES} bytes were searched only in their first ${MAX_GREP_FILE_BYTES} bytes`);
+    const suffix = suffixes.length === 0 ? "" : `\n…(${suffixes.join("; ")})`;
     return { result: boundText(workspace, "grep", lines.join("\n") + suffix), fileDiff: null, ok: true };
   } catch (error) {
     if (error instanceof WorkspaceError) {

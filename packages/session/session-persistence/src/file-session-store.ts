@@ -26,7 +26,7 @@ import {
   type SessionRecord,
   type SessionStore,
 } from "@agentprism/contracts";
-import type { JsonFile } from "@agentprism/persistence";
+import { SerialQueue, type JsonFile } from "@agentprism/persistence";
 import {
   InMemoryBlobStore,
   MAX_ENTRIES_PER_SESSION,
@@ -95,6 +95,10 @@ export class FileSessionStore implements SessionStore {
   private readonly records = new Map<string, SessionRecord>();
   private readonly entries = new Map<string, SessionEntry[]>();
   private readonly blobs: SessionBlobStore;
+  /** Serializes mutations per session so seq assignment cannot interleave. */
+  private readonly mutations = new SerialQueue();
+  /** Serializes whole-ledger writes: a slower flush must never overwrite a newer one. */
+  private readonly writes = new SerialQueue();
 
   constructor(deps: FileSessionStoreDeps) {
     this.file = deps.file;
@@ -137,34 +141,40 @@ export class FileSessionStore implements SessionStore {
 
   /** Marks completed, merging summary/metadata (unknown ids throw). */
   async complete(id: string, finish: SessionFinishInput = {}): Promise<SessionRecord> {
-    const record = this.require(id);
-    const summary = finish.summary?.trim() ?? "";
-    record.status = "completed";
-    record.updatedAt = this.clock.now();
-    if (summary !== "") record.summary = summary.slice(0, MAX_SUMMARY_CHARS);
-    Object.assign(record.metadata, finish.metadata ?? {});
-    await this.flush();
-    return { ...record };
+    return this.mutations.run(id, async () => {
+      const record = this.require(id);
+      const summary = finish.summary?.trim() ?? "";
+      record.status = "completed";
+      record.updatedAt = this.clock.now();
+      if (summary !== "") record.summary = summary.slice(0, MAX_SUMMARY_CHARS);
+      Object.assign(record.metadata, finish.metadata ?? {});
+      await this.flush();
+      return { ...record };
+    });
   }
 
   /** Marks failed with the caller-sanitized reason (unknown ids throw). */
   async fail(id: string, reason: string): Promise<SessionRecord> {
-    const record = this.require(id);
-    record.status = "failed";
-    record.updatedAt = this.clock.now();
-    record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
-    await this.flush();
-    return { ...record };
+    return this.mutations.run(id, async () => {
+      const record = this.require(id);
+      record.status = "failed";
+      record.updatedAt = this.clock.now();
+      record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
+      await this.flush();
+      return { ...record };
+    });
   }
 
   /** Marks cancelled by the requester (abort supersedes failure). */
   async cancel(id: string, reason = "cancelled by client"): Promise<SessionRecord> {
-    const record = this.require(id);
-    record.status = "cancelled";
-    record.updatedAt = this.clock.now();
-    record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
-    await this.flush();
-    return { ...record };
+    return this.mutations.run(id, async () => {
+      const record = this.require(id);
+      record.status = "cancelled";
+      record.updatedAt = this.clock.now();
+      record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
+      await this.flush();
+      return { ...record };
+    });
   }
 
   /** Appends a milestone entry; rejects empty content and a full session. */
@@ -172,26 +182,30 @@ export class FileSessionStore implements SessionStore {
     sessionId: string,
     entry: { kind: SessionEntry["kind"]; content: string },
   ): Promise<SessionEntry> {
-    const record = this.require(sessionId);
-    const content = entry.content.trim();
-    if (content === "") throw new SessionValidationError("entry content must be non-empty");
-    const list = this.entries.get(sessionId) ?? [];
-    if (list.length >= MAX_ENTRIES_PER_SESSION) {
-      throw new SessionValidationError(`session holds the cap of ${MAX_ENTRIES_PER_SESSION} entries`);
-    }
-    const stored: SessionEntry = {
-      sessionId,
-      seq: list.length,
-      at: this.clock.now(),
-      kind: entry.kind,
-      content: await spillOversizedEntry(this.blobs, sessionId, list.length, content),
-    };
-    list.push(stored);
-    this.entries.set(sessionId, list);
-    record.entryCount = list.length;
-    record.updatedAt = stored.at;
-    await this.flush();
-    return { ...stored };
+    // Queued: seq is read before the spill await, so a concurrent append would
+    // claim the same seq and overwrite the same blob.
+    return this.mutations.run(sessionId, async () => {
+      const record = this.require(sessionId);
+      const content = entry.content.trim();
+      if (content === "") throw new SessionValidationError("entry content must be non-empty");
+      const list = this.entries.get(sessionId) ?? [];
+      if (list.length >= MAX_ENTRIES_PER_SESSION) {
+        throw new SessionValidationError(`session holds the cap of ${MAX_ENTRIES_PER_SESSION} entries`);
+      }
+      const stored: SessionEntry = {
+        sessionId,
+        seq: list.length,
+        at: this.clock.now(),
+        kind: entry.kind,
+        content: await spillOversizedEntry(this.blobs, sessionId, list.length, content),
+      };
+      list.push(stored);
+      this.entries.set(sessionId, list);
+      record.entryCount = list.length;
+      record.updatedAt = stored.at;
+      await this.flush();
+      return { ...stored };
+    });
   }
 
   /** Newest-first entries for one session (unknown sessions throw). */
@@ -303,11 +317,15 @@ export class FileSessionStore implements SessionStore {
   }
 
   private async flush(): Promise<void> {
-    const sessions = [...this.records.entries()].map(([id, record]) => ({
-      record: { ...record },
-      entries: [...(this.entries.get(id) ?? [])],
-    }));
-    await this.file.write({ version: 1 as const, sessions });
+    // The snapshot is built INSIDE the queued task and writes stay ordered: an
+    // older snapshot must never land after a newer one and drop a change.
+    await this.writes.run("ledger", async () => {
+      const sessions = [...this.records.entries()].map(([id, record]) => ({
+        record: { ...record },
+        entries: [...(this.entries.get(id) ?? [])],
+      }));
+      await this.file.write({ version: 1 as const, sessions });
+    });
   }
 
   private require(id: string): SessionRecord {
