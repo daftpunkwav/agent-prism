@@ -443,7 +443,7 @@ export function spawnBackground(options: BackgroundJobOptions): BackgroundJob {
   });
   child.on("error", () => {
     // Bad binary and friends: mark finished; the exit code stays null and the
-    // buffered output (often empty) is whatever the OS gave us.
+    // buffered output (often empty) is whatever the OS delivered before the error.
     running = false;
     if (escalate !== null) {
       clearTimeout(escalate);
