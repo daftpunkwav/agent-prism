@@ -59,11 +59,15 @@ restoring the tests, not lowering the numbers.
 
 ## Public surface
 
-`pnpm check:exports` walks every package's `src/index.ts`, classifies the public exports
-as callable or data, and fails when a callable export is referenced by no test harness
-file. Data exports (constants, schemas, enums) are not gated: they carry no behavior of
-their own. `scripts/check-export-tests.mjs` holds a `PENDING` list of callable exports
-that still lack a test. The list is a worklist and may only shrink.
+`pnpm check:exports` walks every package's `src/index.ts`, resolves each export to the
+declaration behind it (through local re-export clauses, aliases, relative specifiers and
+`@agentprism/*` forwards), and fails when a callable export is referenced by no test
+harness file. Data exports (constants, schemas, enums, types) are not gated: they carry
+no behavior of their own. A callable forwarded from another workspace package counts as
+covered where it is declared — the same binding, tested once. An export whose
+declaration cannot be resolved is reported rather than assumed to be data.
+`scripts/check-export-tests.mjs` holds a `PENDING` list of callable exports that still
+lack a test. The list is a worklist and may only shrink.
 
 ## Smoke
 
@@ -107,7 +111,7 @@ suites are Win32-only, so another runner would skip the security-relevant cases.
 |---|---|
 | HTTP contract: auth, limits, errors, SSE | `tests/http-transport/` |
 | Composition wiring | `apps/server/tests/`. `mount-routes` checks one endpoint per leaf; `load-drivers` checks the registry is non-empty and includes `native` |
-| i18n integrity | `apps/web/tests/catalog-parity.test.ts` for en and zh-CN key parity, and `pnpm --filter @agentprism/web check:i18n` |
+| i18n integrity | `apps/web/tests/catalog-parity.test.ts` for en and zh-CN key parity; `pnpm --filter @agentprism/web check:i18n` runs that file plus the inline-CJK sweep (it deliberately does not re-run the whole web suite) |
 | Driver banner consistency | the `tests/drivers/` banner test across all backends, with `PIPELINE_BANNER_PREFIX` as the single source |
 | Toolset membership | contracts enums and tool-registry tests |
 | Event contract | zod schemas in `contracts` and transport and journey tests |

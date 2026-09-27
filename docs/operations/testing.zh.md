@@ -55,10 +55,13 @@ Windows 参考平台无法触达的平台门控代码；同时让大范围回归
 
 ## 对外接口
 
-`pnpm check:exports` 遍历每个 package 的 `src/index.ts`，把公开导出分为可调用与数据两
-类；若某个可调用导出没有被任何测试脚手架文件引用，则失败。数据类导出（常量、schema、
-enum）不设门禁：它们自身不携带行为。`scripts/check-export-tests.mjs` 里有一个
-`PENDING` 列表，记录仍缺测试的可调用导出。该列表是待办清单，只允许缩短。
+`pnpm check:exports` 遍历每个 package 的 `src/index.ts`，把每个导出解析到其背后的声明
+（穿过本地再导出子句、别名、相对路径与 `@agentprism/*` 转发）；若某个可调用导出没有被
+任何测试脚手架文件引用，则失败。数据类导出（常量、schema、enum、类型）不设门禁：它们
+自身不携带行为。从其它 workspace package 转发来的可调用导出按"声明处已覆盖"计算——同一
+绑定只需测一次。无法解析到声明的导出会被报告，而不是当作数据放行。
+`scripts/check-export-tests.mjs` 里有一个 `PENDING` 列表，记录仍缺测试的可调用导出。
+该列表是待办清单，只允许缩短。
 
 ## 冒烟测试
 
@@ -99,7 +102,7 @@ runner 会跳过与安全相关的用例。
 |---|---|
 | HTTP 契约：auth、limits、errors、SSE | `tests/http-transport/` |
 | 组合装配 | `apps/server/tests/`。`mount-routes` 检查每 leaf 一个 endpoint；`load-drivers` 检查 registry 非空且含 `native` |
-| i18n 完整性 | `apps/web/tests/catalog-parity.test.ts` 检查 en 与 zh-CN key 对等，以及 `pnpm --filter @agentprism/web check:i18n` |
+| i18n 完整性 | `apps/web/tests/catalog-parity.test.ts` 检查 en 与 zh-CN key 对等；`pnpm --filter @agentprism/web check:i18n` 跑该文件加内联 CJK 扫描（刻意不重跑整个 web 套件） |
 | Driver banner 一致性 | `tests/drivers/` 下的 banner 测试，覆盖全部 backend，以 `PIPELINE_BANNER_PREFIX` 为单一来源 |
 | Toolset 成员 | contracts enums 与 tool-registry 测试 |
 | Event 契约 | `contracts` 中的 zod schema 与 transport、journey 测试 |
