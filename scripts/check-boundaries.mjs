@@ -303,6 +303,13 @@ const RULES = [
     roots: ["apps/web/src"],
     forbid: /from\s+["']@agentprism\/(?!client|ui|arena-view)[^"']+["']/,
   },
+  {
+    // Front-end leaves: the web rule alone only constrained one direction of the
+    // "contracts client + view packages" invariant, so these three had no rule.
+    name: "front-end leaves → contracts only",
+    roots: ["packages/client/client/src", "packages/ui/ui/src", "packages/arena-view/arena-view/src"],
+    forbid: /from\s+["']@agentprism\/(?!contracts)[^"']+["']/,
+  },
 ];
 
 function walk(dir) {

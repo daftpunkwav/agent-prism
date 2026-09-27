@@ -46,7 +46,7 @@ const PENDING = [
   // packages/providers/provider-langchain
   "createColumnRuntime", "llmMessagesToLc", "serializeWireResponse",
   // packages/tools/tool-mcp
-  "NodeMcpTransport", "buildMcpChildEnv",
+  "buildMcpChildEnv",
   // two-symbol packages
   "eventTurn", "phaseCategoryOfTool",
   "buildCorsOriginList", "toLlmEnvSeed",

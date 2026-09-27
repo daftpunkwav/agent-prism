@@ -72,10 +72,24 @@ function scanImports(srcDir) {
         continue;
       }
       if (!/\.(ts|tsx)$/.test(entry.name)) continue;
-      for (const line of fs.readFileSync(full, "utf8").split(/\r?\n/)) {
+      const lines = fs.readFileSync(full, "utf8").split(/\r?\n/);
+      // The `from "..."` clause of a multi-line import sits on the closing line, which
+      // does not start with `import`. Walk back to the statement's first line so a
+      // multi-line `import type` is still classified as type-only (it used to become a
+      // phantom value edge, which could report cycles that do not exist).
+      const isTypeOnlyImportAt = (index) => {
+        for (let back = index; back >= 0 && index - back < 40; back -= 1) {
+          const candidate = lines[back];
+          if (/^\s*import\s+type\b/.test(candidate)) return true;
+          if (/^\s*(import|export)\b/.test(candidate)) return false;
+          if (/;\s*$/.test(candidate)) return false;
+        }
+        return false;
+      };
+      for (const [index, line] of lines.entries()) {
         for (const m of line.matchAll(/from\s+["'](@agentprism\/[^"']+)["']/g)) {
           const dep = m[1].split("/").slice(0, 2).join("/");
-          (/^\s*import\s+type\b/.test(line) ? typeOnly : value).add(dep);
+          (isTypeOnlyImportAt(index) ? typeOnly : value).add(dep);
         }
         for (const m of line.matchAll(/import\(\s*["'](@agentprism\/[^"']+)["']/g)) {
           value.add(m[1].split("/").slice(0, 2).join("/"));

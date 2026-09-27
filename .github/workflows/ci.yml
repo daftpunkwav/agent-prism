@@ -59,7 +59,7 @@ jobs:
       - name: Build packages
         shell: pwsh
         run: |
-          $output = pnpm -r --filter=!@agentprism/web --filter=!@agentprism/server build 2>&1 | Out-String
+          $output = pnpm -r build 2>&1 | Out-String
           $code = $LASTEXITCODE
           Write-Output $output
           if ($code -ne 0) {
