@@ -12,6 +12,9 @@ Arena tools served over an in-process MCP server.
   in-process MCP server named `arena` and pre-approved, so every tool call runs through
   `tools.execute` on the same guarded path as the other columns.
 - Permission mode is `dontAsk` (deny rather than prompt): there is no human at the CLI.
+- The CLI takes one prompt, so prior turns travel as a `[Conversation so far]` transcript
+  block in front of this turn's request (`promptWithHistory`); the assistant turns cannot
+  be replayed as messages the way an in-process column replays them.
 - `settingSources: []` keeps a developer's own CLAUDE.md/settings out of a comparison run.
 - The CLI is resolved from `ARENA_CLAUDE_CODE_PATH`, else a globally installed Claude Code;
   the SDK's ~245 MB per-platform binary is skipped in `pnpm-workspace.yaml`

@@ -16,7 +16,7 @@
  * outside drivers.
  */
 
-import type { ArenaEvent, AgentDriver } from "@agentprism/contracts";
+import type { ArenaEvent, AgentDriver, ChatTurnMessage } from "@agentprism/contracts";
 import {
   OBSERVATION_MAX_CHARS,
   PIPELINE_BANNER_PREFIX,
@@ -24,7 +24,7 @@ import {
   sanitizeErrorMessage,
   tokenUpdateEvent,
 } from "@agentprism/contracts";
-import { buildSystemUser, recordAdapterUsage, type AgentExecutionContext } from "@agentprism/harness";
+import { buildHistoryMessages, buildSystemUser, recordAdapterUsage, type AgentExecutionContext } from "@agentprism/harness";
 import {
   createRunState,
   emitToolOutcomeEvents,
@@ -84,13 +84,50 @@ function toolResultText(block: BlockLike): string {
   return parts.join("");
 }
 
+/**
+ * Renders the column's prior turns as a transcript block.
+ *
+ * The CLI takes either one prompt string or a stream of *user* messages, so it
+ * cannot accept a seeded assistant transcript the way an in-process column does.
+ * Prior turns therefore travel as text in front of this turn's request — the
+ * stateless-API adaptation of the same history every other backend mounts as
+ * real messages (same turn selection and skipping rules: buildHistoryMessages).
+ * The block is omitted entirely for a first turn.
+ */
+function historyTranscript(history: ChatTurnMessage[] | undefined): string {
+  const turns = buildHistoryMessages(history);
+  if (turns.length === 0) return "";
+  const lines: string[] = ["[Conversation so far]"];
+  for (const turn of turns) {
+    if (turn.role === "tool") {
+      lines.push(`Tool result (${turn.name ?? "tool"}): ${turn.content}`);
+      continue;
+    }
+    if (turn.role === "assistant") {
+      if (turn.content !== "") lines.push(`Assistant: ${turn.content}`);
+      for (const call of turn.toolCalls ?? []) {
+        lines.push(`Assistant tool call: ${call.name} ${JSON.stringify(call.args ?? {})}`);
+      }
+      continue;
+    }
+    if (turn.role === "user" && turn.content !== "") lines.push(`User: ${turn.content}`);
+  }
+  return lines.length > 1 ? lines.join("\n") : "";
+}
+
+/** This turn's prompt: the assembled user part, preceded by the prior-turn transcript when there is one. */
+export function promptWithHistory(user: string, history: ChatTurnMessage[] | undefined): string {
+  const transcript = historyTranscript(history);
+  return transcript === "" ? user : `${transcript}\n\n[Current request]\n${user}`;
+}
+
 /** Claude Agent SDK Driver: Claude Code loop + Arena tools over MCP. */
 export class ClaudeAgentSdkDriver implements AgentDriver {
   readonly frameworkId = "claude_agent_sdk";
   readonly displayName = "Claude Agent SDK";
 
   async *run(context: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
-    const { config, question, tracker, tools, workspace } = context;
+    const { config, question, history, tracker, tools, workspace } = context;
     const label = config.label;
     const state = createRunState(label, tracker, context.clock);
     state.workspaceName = workspace.name;
@@ -143,7 +180,7 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
       });
 
       const session = query({
-        prompt: user,
+        prompt: promptWithHistory(user, history),
         options: {
           model: transport.model,
           cwd: workspace.cwd(),

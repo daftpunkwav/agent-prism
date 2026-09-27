@@ -13,6 +13,8 @@ Claude Agent SDK driver：在子进程中运行 Claude Code 的 agent 循环，A
 - Claude Code 内置工具全部关闭（`tools: []`）；注册表以进程内 MCP server（名为 `arena`）
   暴露并预先放行，因此每次工具调用都经 `tools.execute`，与其他列走同一受控路径。
 - 权限模式为 `dontAsk`（无人应答，直接拒绝而非弹窗）。
+- CLI 只接受一段 prompt，因此历史轮次以 `[Conversation so far]` transcript 块前置在
+  本轮请求之前（`promptWithHistory`）；assistant 轮无法像进程内列那样以消息回放。
 - `settingSources: []` 确保开发者本机的 CLAUDE.md/settings 不会混进对比运行。
 - CLI 解析顺序：`ARENA_CLAUDE_CODE_PATH` → 全局安装的 Claude Code；SDK 自带的
   每平台 ~245 MB 二进制已在 `pnpm-workspace.yaml`（`ignoredOptionalDependencies`）

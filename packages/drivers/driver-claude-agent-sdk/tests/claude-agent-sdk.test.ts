@@ -20,7 +20,7 @@ import { ConfigurationError, PipelineConfigSchema } from "@agentprism/contracts"
 import type { AgentExecutionContext } from "@agentprism/harness";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import { TokenTracker } from "@agentprism/telemetry";
-import { ClaudeAgentSdkDriver } from "../src/claude-driver.js";
+import { ClaudeAgentSdkDriver, promptWithHistory } from "../src/claude-driver.js";
 import { CLAUDE_CODE_PATH_ENV, resolveClaudeCodePath } from "../src/cli-path.js";
 import { claudeSubprocessEnv, resolveClaudeTransport } from "../src/endpoint.js";
 import { arenaAllowedToolIds, callArenaTool, createArenaMcpServer, mcpToolId } from "../src/mcp-tools.js";
@@ -49,6 +49,36 @@ function anthropicVendor(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+describe("promptWithHistory", () => {
+  it("passes the user part through when there is no history", () => {
+    expect(promptWithHistory("do the task", [])).toBe("do the task");
+    expect(promptWithHistory("do the task", undefined)).toBe("do the task");
+    // Turns that render to nothing (empty text without tool calls) leave no block.
+    expect(promptWithHistory("do the task", [{ role: "assistant", content: "" }])).toBe("do the task");
+  });
+
+  it("renders every rendered turn kind in order, ahead of the request", () => {
+    const prompt = promptWithHistory("do the task", [
+      { role: "user", content: "q1" },
+      { role: "assistant", content: "", toolCalls: [{ id: "c1", name: "read", args: { path: "a.txt" } }] },
+      { role: "tool", content: "file body", toolCallId: "c1", name: "read" },
+      { role: "assistant", content: "done" },
+    ]);
+    expect(prompt).toBe(
+      [
+        "[Conversation so far]",
+        "User: q1",
+        'Assistant tool call: read {"path":"a.txt"}',
+        "Tool result (read): file body",
+        "Assistant: done",
+        "",
+        "[Current request]",
+        "do the task",
+      ].join("\n"),
+    );
+  });
+});
 
 describe("resolveClaudeTransport", () => {
   it("reads the endpoint, credential and model off the configured model", () => {
@@ -374,6 +404,36 @@ describe("ClaudeAgentSdkDriver", () => {
       } finally {
         context.cleanup();
       }
+    });
+
+    it("prepends the prior-turn transcript to the prompt (the CLI cannot be seeded)", { timeout: 60_000 }, async () => {
+      let handed: { prompt?: unknown } | undefined;
+      queryMock.mockImplementation((params: { prompt?: unknown }) => {
+        handed = params;
+        return scriptedSession([
+          { type: "assistant", message: { content: [{ type: "text", text: "answer" }] } },
+          { type: "result", subtype: "success", result: "answer", usage: { input_tokens: 1, output_tokens: 1 } },
+        ]);
+      });
+      const context = executionContext(anthropicVendor(), {
+        history: [
+          { role: "user", content: "earlier question" },
+          { role: "assistant", content: "earlier answer" },
+        ],
+      });
+      try {
+        const events = await collect(context);
+        expect(events.at(-1)?.type).toBe("complete");
+      } finally {
+        context.cleanup();
+      }
+      const prompt = String(handed?.prompt ?? "");
+      expect(prompt).toContain("[Conversation so far]");
+      expect(prompt).toContain("User: earlier question");
+      expect(prompt).toContain("Assistant: earlier answer");
+      expect(prompt).toContain("[Current request]");
+      // This turn's assembled user part stays after the transcript.
+      expect(prompt.indexOf("User: earlier question")).toBeLessThan(prompt.indexOf("[Current request]"));
     });
 
     it("hands the SDK an aborted controller when the run was cancelled during setup", { timeout: 60_000 }, async () => {
