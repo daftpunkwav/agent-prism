@@ -12,7 +12,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LlmAssistantMessage, LlmMessage, ToolExecutionResult } from "@agentprism/contracts";
 import type { AgentExecutionContext } from "@agentprism/harness";
-import { collectPriorToolNames, executeToolCalls } from "../src/tool-batch.js";
+import { collectPriorToolNames, executeToolCalls, isToolBatchMessage } from "../src/tool-batch.js";
 
 function assistantWithCalls(...calls: Array<{ name: string; args?: Record<string, unknown> }>): LlmAssistantMessage {
   return {
@@ -55,6 +55,13 @@ async function collect(
   for await (const item of executeToolCalls(context, response, question, prior, stats)) out.push(item);
   return out;
 }
+
+describe("isToolBatchMessage", () => {
+  it("splits tool messages from arena events", () => {
+    expect(isToolBatchMessage({ role: "tool", content: "r", toolCallId: "c1" } as never)).toBe(true);
+    expect(isToolBatchMessage({ type: "observation", result: "r" } as never)).toBe(false);
+  });
+});
 
 describe("collectPriorToolNames", () => {
   it("collects assistant tool-call names in order", () => {
