@@ -157,9 +157,12 @@ export function prepareMessagesForLlm(
     return [...systems, ...applied.messages];
   }
   if (strategy === "checkpoint") {
+    // The strategy reads `charsPerToken` into a default-parameter chain, so an
+    // explicit undefined behaves exactly like an absent key (same pass-through
+    // shape as the budget branch above).
     const applied = applyCheckpointCompaction(rest, {
       compactTargetTokens: options.compactTargetTokens,
-      ...(options.charsPerToken !== undefined ? { charsPerToken: options.charsPerToken } : {}),
+      charsPerToken: options.charsPerToken,
     });
     return [...systems, ...applied.messages];
   }

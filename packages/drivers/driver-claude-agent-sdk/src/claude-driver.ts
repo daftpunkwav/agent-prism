@@ -160,8 +160,8 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
         type: message.type,
         subtype: message.subtype,
         errorStatus: message.error_status,
-        // The CLI's own result field is `is_error` (snake_case); MessageLike.isError is
-        // a legacy alias nothing in the stream sets, so read the real field here.
+        // The CLI's own result flag is `is_error` (snake_case); the classifier's
+        // ClaudeHealthMessage.isError is its camelCase counterpart.
         isError: message.is_error,
         rateLimitStatus: message.rate_limit_info?.status,
       });

@@ -122,10 +122,10 @@ async function executeRead(workspace: ToolWorkspace, args: ToolArgs): Promise<To
       // Read a bounded head instead of the whole file: an oversized asset used to be
       // fully materialized (and split into lines) before any cap applied.
       const head = view.fs.readFileHead(filePath, cap * 4);
-      let lines = toLines(head.text);
-      if (limit > 0) lines = lines.slice(0, limit);
+      const allLines = toLines(head.text);
+      const lines = limit > 0 ? allLines.slice(0, limit) : allLines;
       text = lines.join("\n");
-      moreContent = head.truncated || lines.length < toLines(head.text).length;
+      moreContent = head.truncated || lines.length < allLines.length;
     }
     // Loud, not silent: the model must know it is looking at a prefix — and the note
     // stays inside the same cap, so a tiny cap keeps the old bounded shape.
