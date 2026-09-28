@@ -15,6 +15,11 @@
  * Unknown names warn and are ignored. The claude_agent_sdk backend needs a
  * Claude Code CLI on the host and an anthropic-format provider endpoint; it
  * fails fast per column when either is missing, without blocking startup.
+ *
+ * The AutoGen and CrewAI loaders also fire their runtime-probe prewarm at load:
+ * the probe cache is module-wide, so warming at startup keeps the one-time
+ * framework-import cost off the first run's request path (the DRIVERS filter
+ * skips the prewarm together with the backend).
  */
 
 import { FrameworkDriverRegistry, registerDriversBestEffort, type DriverLoader } from "@agentprism/driver-run-support";
@@ -52,11 +57,22 @@ export const builtinDriverLoaders: readonly DriverLoader[] = [
   },
   {
     name: "AutoGen",
-    load: () => import("@agentprism/driver-autogen").then((m) => new m.AutogenDriver()),
+    load: () =>
+      import("@agentprism/driver-autogen").then((m) => {
+        // Warm the module-wide probe cache in the background so the first
+        // auto-mode run skips the framework-import stall on the request path.
+        void m.prewarmFrameworkRuntime();
+        return new m.AutogenDriver();
+      }),
   },
   {
     name: "CrewAI",
-    load: () => import("@agentprism/driver-crewai").then((m) => new m.CrewAIDriver()),
+    load: () =>
+      import("@agentprism/driver-crewai").then((m) => {
+        // Same probe prewarm as AutoGen (see that loader's note).
+        void m.prewarmFrameworkRuntime();
+        return new m.CrewAIDriver();
+      }),
   },
 ];
 

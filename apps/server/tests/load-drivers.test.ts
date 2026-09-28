@@ -59,6 +59,11 @@ describe("driver composition", () => {
     async () => {
       const saved = process.env["DRIVERS"];
       delete process.env["DRIVERS"];
+      // Loading the AutoGen/CrewAI backends fires their runtime-probe prewarm;
+      // a bogus interpreter makes that background spawn fail instantly instead
+      // of importing a heavy framework inside this test (see prewarmFrameworkRuntime).
+      const savedPython = process.env["ARENA_PYTHON"];
+      process.env["ARENA_PYTHON"] = "definitely-not-a-real-interpreter-xyz";
       try {
         const registry = await registerFrameworkDrivers();
         const ids = registry.listAvailable().map((driver) => driver.id);
@@ -69,6 +74,8 @@ describe("driver composition", () => {
       } finally {
         if (saved === undefined) delete process.env["DRIVERS"];
         else process.env["DRIVERS"] = saved;
+        if (savedPython === undefined) delete process.env["ARENA_PYTHON"];
+        else process.env["ARENA_PYTHON"] = savedPython;
       }
     },
   );

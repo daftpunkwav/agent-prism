@@ -6,7 +6,7 @@
  * - Re-export the driver and the crew primitives
  */
 
-export { CrewAIDriver, taskTurnCapFor } from "./crewai-driver.js";
+export { CrewAIDriver, prewarmFrameworkRuntime, taskTurnCapFor } from "./crewai-driver.js";
 export {
   CREW_COMPLETE_KEYWORD,
   CREW_ROLES,

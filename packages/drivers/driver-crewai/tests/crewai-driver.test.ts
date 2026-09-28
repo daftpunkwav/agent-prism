@@ -10,7 +10,7 @@ import type { AgentExecutionContext } from "@agentprism/harness";
 import { MapToolRegistry } from "@agentprism/tool-registry";
 import { TokenTracker } from "@agentprism/telemetry";
 import { SystemClock } from "@agentprism/runtime";
-import { CrewAIDriver, taskTurnCapFor } from "../src/crewai-driver.js";
+import { CrewAIDriver, prewarmFrameworkRuntime, taskTurnCapFor } from "../src/crewai-driver.js";
 import { CREW_COMPLETE_KEYWORD, crewProcess, parseManagerAssignment } from "../src/crew.js";
 
 /**
@@ -278,5 +278,21 @@ describe("CrewAIDriver runtime picker", () => {
     expect(reflects.some((content) => content.includes("task 1/3 → Researcher"))).toBe(true);
     const complete = events.find((event) => event.type === "complete");
     expect(complete?.metrics?.success).toBe(true);
+  });
+
+  it("prewarm resolves to the probed interpreter (null for a missing one)", async () => {
+    // auto exercises the real probe path; the bogus interpreter keeps the
+    // outcome deterministic on any machine (the probe cache keys on the
+    // interpreter name, so no installed-framework machine can flip this).
+    vi.stubEnv("ARENA_CREWAI_RUNTIME", "auto");
+    vi.stubEnv("ARENA_PYTHON", "definitely-not-a-real-interpreter-xyz");
+    await expect(prewarmFrameworkRuntime()).resolves.toBeNull();
+  });
+
+  it("prewarm skips the probe entirely under ARENA_CREWAI_RUNTIME=ts", async () => {
+    vi.stubEnv("ARENA_CREWAI_RUNTIME", "ts");
+    // Contract: resolves null without touching an interpreter (no spawn to observe;
+    // the ts knob makes the null outcome unconditional and instant).
+    await expect(prewarmFrameworkRuntime()).resolves.toBeNull();
   });
 });

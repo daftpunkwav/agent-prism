@@ -6,7 +6,7 @@
  * - Re-export the driver and the group-chat primitives
  */
 
-export { AutogenDriver, reviewerBudgetFor } from "./autogen-driver.js";
+export { AutogenDriver, prewarmFrameworkRuntime, reviewerBudgetFor } from "./autogen-driver.js";
 export {
   AUTOGEN_TERMINATE_KEYWORD,
   CODER_INSTRUCTION,

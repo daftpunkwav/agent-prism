@@ -58,6 +58,19 @@ export function reviewerBudgetFor(reasoning: string): number {
   return reasoning === "reflexion" ? 3 : 2;
 }
 
+/**
+ * Fire-and-forget startup prewarm of the runtime probe. The outcome lands in the
+ * module-wide probe cache (python-probe.ts), so the first auto-mode run picks the
+ * interpreter at zero probe cost instead of awaiting one full framework import on
+ * the request path. `ts` pins the pattern fallback, which never probes, so the
+ * spawn is skipped. Callers must not await this on a request path; the promise
+ * never rejects.
+ */
+export function prewarmFrameworkRuntime(): Promise<string | null> {
+  if (runtimeFromEnv(process.env["ARENA_AUTOGEN_RUNTIME"]) === "ts") return Promise.resolve(null);
+  return probeFrameworkRuntime("autogen_agentchat");
+}
+
 interface DriverStats {
   step: number;
   turns: number;

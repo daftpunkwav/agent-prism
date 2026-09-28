@@ -10,7 +10,7 @@ import type { AgentExecutionContext } from "@agentprism/harness";
 import { MapToolRegistry } from "@agentprism/tool-registry";
 import { TokenTracker } from "@agentprism/telemetry";
 import { SystemClock } from "@agentprism/runtime";
-import { AutogenDriver, reviewerBudgetFor } from "../src/autogen-driver.js";
+import { AutogenDriver, prewarmFrameworkRuntime, reviewerBudgetFor } from "../src/autogen-driver.js";
 import { AUTOGEN_TERMINATE_KEYWORD } from "../src/group-chat.js";
 
 /** Scripted LLM: queued invoke replies (selections) and stream replies (speaker turns). */
@@ -205,5 +205,21 @@ describe("AutogenDriver runtime picker", () => {
     expect(reflects.some((content) => content.includes("speaker: reviewer"))).toBe(true);
     const complete = events.find((event) => event.type === "complete");
     expect(complete?.metrics?.success).toBe(true);
+  });
+
+  it("prewarm resolves to the probed interpreter (null for a missing one)", async () => {
+    // auto exercises the real probe path; the bogus interpreter keeps the
+    // outcome deterministic on any machine (the probe cache keys on the
+    // interpreter name, so no installed-framework machine can flip this).
+    vi.stubEnv("ARENA_AUTOGEN_RUNTIME", "auto");
+    vi.stubEnv("ARENA_PYTHON", "definitely-not-a-real-interpreter-xyz");
+    await expect(prewarmFrameworkRuntime()).resolves.toBeNull();
+  });
+
+  it("prewarm skips the probe entirely under ARENA_AUTOGEN_RUNTIME=ts", async () => {
+    vi.stubEnv("ARENA_AUTOGEN_RUNTIME", "ts");
+    // Contract: resolves null without touching an interpreter (no spawn to observe;
+    // the ts knob makes the null outcome unconditional and instant).
+    await expect(prewarmFrameworkRuntime()).resolves.toBeNull();
   });
 });
