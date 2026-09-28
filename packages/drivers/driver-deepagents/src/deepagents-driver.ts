@@ -163,9 +163,12 @@ export class DeepAgentsDriver implements AgentDriver {
       const agent = createDeepAgent({
         model,
         tools: lcTools,
-        // prefix (not a bare string): the framework's own profile prompt keeps its
-        // planning/filesystem/subagent operating instructions after the Arena prompt.
-        systemPrompt: { prefix: system },
+        // A plain string: the framework normalizes it to { prefix }, so the
+        // Arena prompt lands before the framework's own profile prompt and the
+        // planning/filesystem/subagent operating instructions stay after it.
+        // The structured { prefix } form is deprecated upstream (removed in the
+        // next major release), so the string form is the durable spelling.
+        systemPrompt: system,
         middleware: [
           contextPolicyMiddleware(
             config.context,
