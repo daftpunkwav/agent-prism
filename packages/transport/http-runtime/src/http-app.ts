@@ -95,6 +95,41 @@ function tokensMatch(presented: string, expected: string): boolean {
   return timingSafeEqual(presentedDigest, expectedDigest);
 }
 
+/**
+ * Methods that can change server state. Browsers attach an Origin header to
+ * cross-site requests of every one of these — including the "simple" requests
+ * that skip CORS preflight.
+ */
+const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Cross-site state-change guard: the CORS allowlist alone cannot stop another
+ * website from SENDING a state-changing request to this API — "simple" requests
+ * (e.g. Content-Type: text/plain) skip the preflight, the browser executes them,
+ * and only the response is withheld from the attacker's page. A malicious page
+ * could therefore drive the loopback listener (unauthenticated under the default
+ * empty API_TOKEN) into runs, config writes, or MCP-list changes. Browsers always
+ * attach Origin to such requests, so a state-changing request carrying a
+ * non-allowlisted Origin is rejected outright. Origin-less requests (curl,
+ * server-to-server) and allowlisted frontend origins pass unchanged; reading
+ * (GET/HEAD) stays open and keeps leaning on the CORS response filter.
+ */
+function crossSiteGuard(allowedOrigins: string[]): MiddlewareHandler {
+  const allowed = new Set(allowedOrigins);
+  return async (c, next) => {
+    if (!STATE_CHANGING_METHODS.has(c.req.method.toUpperCase())) {
+      await next();
+      return;
+    }
+    const origin = c.req.header("Origin");
+    if (origin === undefined || origin === "" || allowed.has(origin)) {
+      await next();
+      return;
+    }
+    return c.json({ detail: "Forbidden: cross-origin request" }, 403);
+  };
+}
+
 /** API token auth: /api/health and /health are exempt. */
 function apiTokenMiddleware(token: string): MiddlewareHandler {
   return async (c, next) => {
@@ -131,6 +166,9 @@ export function createHttpApplication(deps: HttpApplicationDeps): HttpApp {
     }),
   );
 
+  // Cross-site state-change guard: shares the CORS allowlist single source
+  // (same list, same CORS_ORIGINS remedy for a custom frontend origin).
+  app.use("*", crossSiteGuard(buildCorsOriginList(settings.corsOrigins, settings.frontendPort)));
   // Request size precheck (Content-Length) + auth
   app.use("*", async (c, next) => {
     c.set("appSettings", settings);
