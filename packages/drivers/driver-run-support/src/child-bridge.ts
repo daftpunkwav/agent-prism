@@ -38,6 +38,14 @@ export interface ChildBridgeOptions {
   signal?: AbortSignal;
   /** Called for every `event` message, in arrival order. */
   onEvent?: (event: Extract<ChildToHost, { type: "event" }>) => void;
+  /**
+   * Optional run-level watchdog: kill the child after this many milliseconds
+   * without any inbound protocol message (a hung bridge would otherwise hang
+   * the column until the caller aborts). Disabled by default: the transport
+   * cannot distinguish a hung bridge from one legitimately blocked in a long
+   * tool round-trip, so the budget is an operator decision.
+   */
+  idleTimeoutMs?: number;
 }
 
 export type ChildBridgeOutcome =
@@ -154,6 +162,8 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
         if (typeof message !== "object" || message === null || typeof message.type !== "string") {
           continue;
         }
+        // A parsed protocol message is progress: re-arm the optional idle watchdog.
+        armIdleTimer();
         // The handler is async (it awaits tool executes); an unawaited rejection
         // here would surface as an unhandled rejection and take the process down.
         void handleMessage(message).catch(() => {});
@@ -170,11 +180,44 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
     // a completed session does not leave a pending handle behind.
     let forceKillTimer: ReturnType<typeof setTimeout> | null = null;
 
+    // Optional idle watchdog (see ChildBridgeOptions.idleTimeoutMs). Any inbound
+    // protocol message counts as progress; a full budget of silence kills the
+    // child through the same kill + SIGKILL fallback as the abort path.
+    const idleBudgetMs =
+      options.idleTimeoutMs !== undefined && Number.isFinite(options.idleTimeoutMs) && options.idleTimeoutMs > 0
+        ? Math.trunc(options.idleTimeoutMs)
+        : null;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearIdleTimer = (): void => {
+      if (idleTimer !== null) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+    };
+    const scheduleForceKill = (): void => {
+      if (forceKillTimer !== null) clearTimeout(forceKillTimer);
+      // Force-kill fallback; on Windows kill() is already terminal so this is a no-op there.
+      forceKillTimer = setTimeout(() => child.kill("SIGKILL"), 3000);
+      forceKillTimer.unref?.();
+    };
+    const armIdleTimer = (): void => {
+      if (idleBudgetMs === null) return;
+      clearIdleTimer();
+      idleTimer = setTimeout(() => {
+        idleTimer = null;
+        errorMessage = `bootstrap idle timeout after ${idleBudgetMs}ms`;
+        child.kill();
+        scheduleForceKill();
+      }, idleBudgetMs);
+      idleTimer.unref?.();
+    };
+
     child.on("close", () => {
       if (forceKillTimer !== null) {
         clearTimeout(forceKillTimer);
         forceKillTimer = null;
       }
+      clearIdleTimer();
       // An abort wins over a concurrently-arrived final: the session was
       // cancelled, so reporting success would surface a killed run as an answer
       // (the abort listener has already written the reason into errorMessage).
@@ -202,6 +245,7 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
         clearTimeout(forceKillTimer);
         forceKillTimer = null;
       }
+      clearIdleTimer();
       errorMessage = `failed to run bootstrap: ${error.message}`;
       finish({ ok: false, message: errorMessage });
     });
@@ -210,14 +254,15 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
       "abort",
       () => {
         errorMessage = options.signal?.reason instanceof Error ? options.signal.reason.message : "aborted";
+        // The explicit abort supersedes the idle watchdog: one force-kill timer is enough.
+        clearIdleTimer();
         child.kill();
-        // Force-kill fallback; on Windows kill() is already terminal so this is a no-op there.
-        forceKillTimer = setTimeout(() => child.kill("SIGKILL"), 3000);
-        forceKillTimer.unref?.();
+        scheduleForceKill();
       },
       { once: true },
     );
 
+    armIdleTimer();
     writeLine(options.start);
   });
 }

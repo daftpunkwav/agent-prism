@@ -13,16 +13,31 @@ export interface AcquireOptions {
   signal?: AbortSignal;
 }
 
+/** Semaphore construction knobs. */
+export interface SemaphoreOptions {
+  /**
+   * Optional bound on queued acquirers (default unbounded). Past the bound,
+   * acquire rejects immediately without consuming a permit: a burst fails fast
+   * instead of growing the wait queue without limit. Opt-in only — the
+   * unbounded default preserves the previous behavior.
+   */
+  maxQueued?: number;
+}
+
 /** Counting semaphore bounding concurrent runs; FIFO waiters, abort-safe acquire. */
 export class Semaphore {
   private available: number;
   private readonly waiters: Array<() => void> = [];
+  /** Queue bound (null = unbounded), NaN-proofed like the permit count. */
+  private readonly maxQueued: number | null;
 
-  constructor(permits: number) {
+  constructor(permits: number, options: SemaphoreOptions = {}) {
     // Guard the public API: NaN would hang every acquirer forever (NaN > 0 is false)
     // and fractions would over-admit workers, so normalize to a finite integer >= 1.
     const normalized = Number.isFinite(permits) ? Math.trunc(permits) : 1;
     this.available = Math.max(1, normalized);
+    const maxQueued = options.maxQueued;
+    this.maxQueued = maxQueued !== undefined && Number.isFinite(maxQueued) ? Math.max(0, Math.trunc(maxQueued)) : null;
   }
 
   /** Queued acquirer count (telemetry: run/column queue depth). */
@@ -49,6 +64,10 @@ export class Semaphore {
     if (this.available > 0) {
       this.available -= 1;
       return this.makeRelease();
+    }
+    // Fast-fail past the queue bound; no permit is consumed and queued waiters are untouched.
+    if (this.maxQueued !== null && this.waiters.length >= this.maxQueued) {
+      throw new Error("semaphore queue full");
     }
     return new Promise((resolve, reject) => {
       // When a waiter is woken, release transfers the permit directly; no double decrement.

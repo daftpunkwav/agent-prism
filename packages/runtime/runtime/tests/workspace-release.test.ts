@@ -7,7 +7,7 @@
  * - Pin that the hook receives the directory the resources belong to
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -61,5 +61,30 @@ describe("WorkspaceRegistry release hook", () => {
     registry.create("ws-new");
     expect(released.map((entry) => entry.name)).toEqual(["ws-old"]);
     expect(registry.get("ws-old")).toBeUndefined();
+  });
+
+  it("contains a throwing release hook: removal reclaims the directory and eviction keeps running", () => {
+    const runsRoot = join(mkdtempSync(join(tmpdir(), "ws-release-")), "runs");
+    roots.push(runsRoot);
+    let seconds = 0;
+    const registry = new WorkspaceRegistry({
+      runsRoot,
+      clock: new SystemClock(),
+      maxWorkspaces: 1,
+      ttlSeconds: 10,
+      monotonicNow: () => seconds,
+      onRelease: () => {
+        throw new Error("disposer exploded");
+      },
+    });
+    const first = registry.create("ws-a");
+    // Explicit removal must still reclaim the directory despite the hook failure.
+    registry.remove("ws-a");
+    expect(registry.count()).toBe(0);
+    expect(existsSync(first.root)).toBe(false);
+    // The quota eviction path must not be wedged by the throwing hook either.
+    registry.create("ws-b");
+    registry.create("ws-c");
+    expect(registry.count()).toBe(1);
   });
 });

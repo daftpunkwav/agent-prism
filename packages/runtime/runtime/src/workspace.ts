@@ -382,8 +382,14 @@ export class WorkspaceRegistry {
     this.protectedNames.delete(name);
     if (workspace !== undefined) {
       // Kill host resources first: after the directory is gone a still-running
-      // job would be unreachable by name.
-      this.onRelease?.({ name, root: workspace.root });
+      // job would be unreachable by name. The hook is host-wired and must never
+      // break reclamation: a throwing hook is contained here so the directory
+      // still gets deleted and the eviction loops keep running.
+      try {
+        this.onRelease?.({ name, root: workspace.root });
+      } catch (error) {
+        console.warn(`[runtime] Workspace release hook failed for ${name}: ${error instanceof Error ? error.message : String(error)}`);
+      }
       try {
         rmRf(workspace.root);
       } catch (error) {

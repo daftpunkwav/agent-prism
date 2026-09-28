@@ -19,7 +19,17 @@ export function onWorkspaceDispose(dispose: (root: string) => void): void {
   DISPOSERS.add(dispose);
 }
 
-/** Kills every process scope owned by one workspace root (idempotent). */
+/**
+ * Kills every process scope owned by one workspace root (idempotent).
+ * Each disposer is isolated: one broken tool's cleanup must not strand the
+ * other tools' resources nor abort the caller's eviction loop.
+ */
 export function disposeWorkspaceProcesses(root: string): void {
-  for (const dispose of DISPOSERS) dispose(root);
+  for (const dispose of DISPOSERS) {
+    try {
+      dispose(root);
+    } catch (error) {
+      console.warn(`[process-scopes] Workspace disposer failed for ${root}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }

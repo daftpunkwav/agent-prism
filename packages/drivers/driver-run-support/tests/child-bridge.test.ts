@@ -108,6 +108,20 @@ describe("runChildBridge", () => {
     }
   }, 15_000);
 
+  it("kills a silent child through the optional idle watchdog", async () => {
+    // The "hang" scenario emits one protocol message and then goes silent: with
+    // a small idle budget the watchdog (not the abort signal) must settle the
+    // session as a failure.
+    const outcome: ChildBridgeOutcome = await runChildBridge({
+      ...baseOptions({ scenario: "hang" }),
+      idleTimeoutMs: 200,
+    });
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.message).toContain("idle timeout");
+    }
+  }, 15_000);
+
   it("reports the abort, not a concurrently-arrived final, when abort lands first", async () => {
     const controller = new AbortController();
     // The child writes its final and then hangs; the host aborts before the

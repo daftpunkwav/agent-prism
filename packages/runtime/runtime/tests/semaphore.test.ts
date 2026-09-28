@@ -84,4 +84,29 @@ describe("Semaphore", () => {
     const next = await Promise.race([semaphore.acquire(), failAfter(1000)]);
     next();
   });
+
+  it("rejects fast once the optional queue bound is full, without consuming permits", async () => {
+    const semaphore = new Semaphore(1, { maxQueued: 1 });
+    const release = await semaphore.acquire(); // fill capacity
+    const queued = semaphore.acquire(); // takes the single queue slot
+    await tick();
+    expect(semaphore.queueDepth).toBe(1);
+    // One past the bound: immediate rejection, not a queued wait.
+    await expect(semaphore.acquire()).rejects.toThrow("semaphore queue full");
+    expect(semaphore.queueDepth).toBe(1);
+    // The bound must not have inflated the permit count: handover still works.
+    release();
+    (await queued)();
+    const next = await Promise.race([semaphore.acquire(), failAfter(1000)]);
+    next();
+  });
+
+  it("treats a zero queue bound as reject-when-full", async () => {
+    const semaphore = new Semaphore(1, { maxQueued: 0 });
+    const release = await semaphore.acquire();
+    await expect(semaphore.acquire()).rejects.toThrow("semaphore queue full");
+    release();
+    const next = await Promise.race([semaphore.acquire(), failAfter(1000)]);
+    next();
+  });
 });
