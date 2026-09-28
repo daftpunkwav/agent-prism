@@ -18,7 +18,11 @@
 
 import type { ModelCallOutcome } from "@agentprism/contracts";
 
-/** Message fields this classifier reads (the SDK's own union is not exported to drivers). */
+/**
+ * Message fields this classifier reads: a hand-rolled structural subset of the CLI's
+ * stream messages. `reportHealth` in claude-driver.ts maps their snake_case fields
+ * onto these camelCase names.
+ */
 export interface ClaudeHealthMessage {
   type?: unknown;
   subtype?: unknown;

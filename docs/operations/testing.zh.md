@@ -112,9 +112,10 @@ runner 会跳过与安全相关的用例。
 - 测试文件与其所拥有的代码就近放置。需要两个 package 内部的测试属于 journey 测试，
   只经公开 barrel。
 - 时间经注入的 `Clock` 保持确定性；ID 经注入的 `IdGenerator` 保持确定性。断言不会靠
-  sleep 等待状态。确有三个套件断言墙钟预算——`arena-view/tests/answer-compare.test.ts`、
-  `tool-mcp/tests/client.test.ts`、`arena-runner/tests/runner-pool.test.ts`（通道轮询）
-  ——而真正 spawn 子进程的套件按 suite opt-in `{ retry: 1 }` 吸收 Windows 文件锁抖动。
+  sleep 等待状态。确有两个套件断言墙钟预算（`arena-view/tests/answer-compare.test.ts`、
+  `tool-mcp/tests/client.test.ts`），`arena-runner/tests/runner-pool.test.ts` 跑在真实
+  定时器上（waitForCondition 轮询与通道 receive 超时），而真正 spawn 子进程的套件按
+  suite opt-in `{ retry: 1 }` 吸收 Windows 文件锁抖动。
 - 行为增量被显式固定。compaction 策略有单元测试固定相对 `sliding` 的增量。
 - 完整门禁集为 `pnpm verify`：build、typecheck、覆盖率、web lint、i18n catalog、import 边界、依赖卫生与对外
   导出的测试覆盖。

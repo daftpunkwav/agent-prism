@@ -119,8 +119,6 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
   env 可调的。
 - Driver 算法内部量：reflexion 轮次、critic 改向分数、replan 预算、quiet-turn 阈值。
   这些是算法身份而非部署旋钮，因此按 framework 固定。
-- Verification 循环重试预算：harness 的 prompt 文案已声明至多 2 次重试的额度，把它
-  做成可调会使 prompt 与行为脱节。
 - UI 显示数字，如截断长度、toast 时长、轮询间隔；安全底线，如沙箱命令分析与路径
   规则；以及 token 窗口回退值 `context_window` 128 000、`max_input_tokens`
   120 000、`max_output_tokens` 96 000。token 窗口已在 Provider settings 中按

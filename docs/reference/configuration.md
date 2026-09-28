@@ -123,8 +123,6 @@ These are deliberately not env-tunable.
 - Driver algorithm internals: reflexion rounds, critic redirect score, replan budgets,
   and quiet-turn thresholds. These are algorithm identity rather than deployment knobs,
   so they stay pinned per framework.
-- Verification-loop retry budgets: the harness prompt copy states the allowance of at
-  most 2 retries, and making it tunable would desync the prompt from the behavior.
 - UI display numbers such as truncation lengths, toast durations, and poll intervals,
   safety floors such as sandbox command analysis and path rules, and token-window
   fallbacks of `context_window` 128 000, `max_input_tokens` 120 000, and
