@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { HarnessLevelSchema, harnessRetryCaps } from "../src/index.js";
+import { HarnessLevelSchema, harnessRetryCaps, RUNTIME_KNOB_FIELDS, staticDefaultRuntimeKnobs } from "../src/index.js";
 
 describe("harnessRetryCaps", () => {
   it("maps the knob's camelCase selfEvolve onto the self_evolve level token", () => {
@@ -18,6 +18,21 @@ describe("harnessRetryCaps", () => {
     // key here typechecks but is never read, silently disabling the operator cap.
     for (const key of Object.keys(caps)) {
       expect(HarnessLevelSchema.safeParse(key).success).toBe(true);
+    }
+  });
+});
+
+describe("staticDefaultRuntimeKnobs", () => {
+  it("keeps every static default equal to its field metadata default", () => {
+    // The settings UI reset writes meta.default; a static default drifting from
+    // the metadata (or from the config env defaults) would silently reset that
+    // knob to a different value. Flattened lookup mirrors the dotted harness keys.
+    const knobs = staticDefaultRuntimeKnobs();
+    for (const field of RUNTIME_KNOB_FIELDS) {
+      const parts = field.key.split(".");
+      let value: unknown = knobs as unknown as Record<string, unknown>;
+      for (const part of parts) value = value[part];
+      expect(value, `static default for ${field.key}`).toBe(field.default);
     }
   });
 });

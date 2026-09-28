@@ -229,6 +229,9 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env, envFile: stri
     toolRunTimeoutMaxS: readInt(source, "TOOL_RUN_TIMEOUT_MAX_S", 120, { min: 1, max: 3_600 }),
     webFetchTimeoutMs: readInt(source, "WEB_FETCH_TIMEOUT_MS", 15_000, { min: 1_000, max: 300_000 }),
     webSearchTimeoutMs: readInt(source, "WEB_SEARCH_TIMEOUT_MS", 15_000, { min: 1_000, max: 300_000 }),
+    // Near-name pair, distinct layers: MCP_REQUEST_TIMEOUT_MS is the per-server
+    // default timeout seeded into the managed MCP server list (settings store);
+    // MCP_FETCH_TIMEOUT_MS is the runtime knob for the fetch MCP tool call.
     mcpRequestTimeoutMs: readInt(source, "MCP_REQUEST_TIMEOUT_MS", 30_000, { min: 1_000, max: 600_000 }),
     mcpFetchTimeoutMs: readInt(source, "MCP_FETCH_TIMEOUT_MS", 15_000, { min: 1_000, max: 300_000 }),
     toolSubagentMaxSteps: readInt(source, "TOOL_SUBAGENT_MAX_STEPS", 10, { min: 1, max: 40 }),

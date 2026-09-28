@@ -99,6 +99,10 @@ export const RUNTIME_KNOB_FIELDS: readonly RuntimeKnobFieldMeta[] = [
 
 /** The static default knob set (env-derived defaults layer on top in config). */
 export function staticDefaultRuntimeKnobs(): RuntimeKnobs {
+  // Every value must equal the matching RUNTIME_KNOB_FIELDS meta default (and
+  // the config/settings.ts env default): the settings UI reset writes meta.default,
+  // so a drift here silently resets operator knobs to other values. Locked by
+  // tests/runtime-knobs.test.ts.
   return {
     contextWindowMessages: 12,
     contextCharsPerToken: 4,
@@ -117,9 +121,9 @@ export function staticDefaultRuntimeKnobs(): RuntimeKnobs {
       reflect: HARNESS_RETRIES_DEFAULT,
       selfEvolve: HARNESS_RETRIES_DEFAULT,
     },
-    subagentMaxSteps: 20,
-    ralphMaxRounds: 3,
-    mcpFetchTimeoutMs: 30_000,
+    subagentMaxSteps: 10,
+    ralphMaxRounds: 8,
+    mcpFetchTimeoutMs: 15_000,
     agentMaxDelegationDepth: 1,
     llmTimeoutMs: 120_000,
     llmMaxRetries: 2,
