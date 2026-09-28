@@ -180,3 +180,71 @@ describe("createChatModel decode passthrough", () => {
     }
   });
 });
+
+describe("createChatModel budget-mode thinking", () => {
+  const pairs = [
+    { level: "low", budget_tokens: 1000, max_tokens: 1200 },
+    { level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 },
+  ];
+
+  it("sends the run-level budget even when the column level is off (budget-mode columns pin off)", () => {
+    const model = createChatModel({
+      provider: fixture("anthropic_messages"),
+      overrides: { thinkingCapable: true, thinkingLevel: "off", thinkingBudget: 500_000, thinkingMax: 1_000_000 },
+    });
+    expect((model as unknown as { thinking?: { type: string; budget_tokens?: number } }).thinking).toEqual({
+      type: "enabled",
+      budget_tokens: 500_000,
+    });
+    expect((model as unknown as { maxTokens?: number }).maxTokens).toBe(1_000_000);
+  });
+
+  it("resolves a budget-mode endpoint's default pair through the pair table", () => {
+    const provider = {
+      ...fixture("anthropic_messages"),
+      endpoints: [
+        {
+          id: "ep-budget",
+          label: "",
+          provider_name: "",
+          api_key: "k",
+          base_url: "https://budget.example.com/v1",
+          use_full_url: false,
+          api_format: "anthropic_messages",
+          auth_field: "",
+          model: "m",
+          context_window: 128000,
+          max_input_tokens: 120000,
+          max_output_tokens: 4096,
+          website_url: "",
+          enabled: true,
+          thinking_capable: true,
+          thinking_level: "super",
+          thinking_levels: [],
+          thinking_mode: "budget",
+          thinking_budget_pairs: pairs,
+          image_input: false,
+          video_input: false,
+        },
+      ],
+      default_endpoint_id: "ep-budget",
+    } as unknown as ProviderConfig;
+    // No run overrides: the endpoint's default budget level resolves its pair.
+    const model = createChatModel({ provider });
+    expect((model as unknown as { thinking?: { type: string; budget_tokens?: number } }).thinking).toEqual({
+      type: "enabled",
+      budget_tokens: 500_000,
+    });
+    expect((model as unknown as { maxTokens?: number }).maxTokens).toBe(1_000_000);
+  });
+
+  it("keeps off-without-budget free of a budget_tokens block", () => {
+    const model = createChatModel({
+      provider: fixture("anthropic_messages"),
+      overrides: { thinkingCapable: true, thinkingLevel: "off" },
+    });
+    // The SDK defaults the block to {type:"disabled"}; what matters is that no
+    // budgeted thinking rides along.
+    expect((model as unknown as { thinking?: { type: string; budget_tokens?: number } }).thinking?.budget_tokens).toBeUndefined();
+  });
+});

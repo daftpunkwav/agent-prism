@@ -151,7 +151,9 @@ export function buildPipelineBase(
     endpoint_id: endpoint.id,
     model_id: endpoint.model,
     thinking_capable: endpoint.thinking_capable,
-    thinking_level: effectiveThinkingLevel(endpoint, String(base.thinking_level ?? "off")),
+    // Raw catalog seed; applyThinkingFields clamps it once the effective mode
+    // is known (clamping here would pre-lose the seed for the other mode).
+    thinking_level: String(base.thinking_level ?? "off"),
     // Overwritten below once the effective thinking mode is known; the budget
     // seed rides the catalog default (a pair level name in budget mode, 0 otherwise).
     thinking_budget: base.thinking_budget ?? 0,
@@ -262,7 +264,12 @@ function applyThinkingFields(
       `Baseline thinking_budget "${requestedBudget}" is not applicable in level mode: unset it or switch the thinking mode`,
     );
   }
-  data.thinking_level = effectiveThinkingLevel(endpoint, requestedLevel);
+  // Record the mode that actually applied: a budget token on an endpoint
+  // without pairs (or on another format) degrades to level semantics here.
+  data.thinking_mode = "levels";
+  // Validation must match the applied semantics: a degenerate budget endpoint
+  // (no pair table) validates against its level set, not its empty table.
+  data.thinking_level = effectiveThinkingLevel({ ...endpoint, thinking_mode: "levels" }, requestedLevel);
   data.thinking_budget = 0;
   data.thinking_max_tokens = 0;
 }

@@ -316,6 +316,54 @@ describe("mutually exclusive thinking modes", () => {
     expect(config.thinking_max_tokens).toBe(0);
   });
 
+  it("records the applied mode when a budget-mode endpoint carries no pair table", () => {
+    // anthropic + capable + mode=budget, but the table is empty: the run
+    // degrades to level semantics and the column config must say so instead
+    // of labelling itself "budget" with nothing behind it.
+    const provider = {
+      endpoints: [
+        {
+          id: "ep-empty",
+          label: "",
+          model: "empty-pairs",
+          base_url: "https://empty.example.com/v1",
+          api_format: "anthropic_messages",
+          api_key: "",
+          use_full_url: false,
+          thinking_capable: true,
+          thinking_level: "high",
+          thinking_levels: [],
+          thinking_mode: "budget",
+          thinking_budget_pairs: [],
+          context_window: 128000,
+          max_input_tokens: 120000,
+          max_output_tokens: 4096,
+        },
+      ],
+      default_endpoint_id: "ep-empty",
+      temperature: 0.7,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      max_output_tokens: 2048,
+    } as unknown as ProviderConfig;
+    const lookup: ProviderLookup = {
+      load: () => provider,
+      syncEndpointCatalog: () => {},
+      lookupEndpoint: (id: string) => provider.endpoints.find((endpoint) => endpoint.id === id),
+      listEndpoints: () => provider.endpoints,
+    };
+    const sync = new ProviderDimensionSync({ dimensionCatalog: new DimensionCatalog(), providerLookup: lookup });
+    sync.syncModelOptionsFromProvider();
+    const config = buildPipelineBase(
+      { provider, providerLookup: lookup, dimensionCatalog: sync.catalog },
+      { thinking_budget: "0" },
+    );
+    expect(config.thinking_mode).toBe("levels");
+    expect(config.thinking_level).toBe("high");
+    expect(config.thinking_budget).toBe(0);
+  });
+
   it("follows the endpoint mode when the baseline omits thinking_mode", () => {
     const { provider, lookup, catalog } = makeBudgetDeps();
     const config = buildPipelineBase(

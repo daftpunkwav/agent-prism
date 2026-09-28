@@ -146,6 +146,34 @@ describe("parseLlmEndpoint", () => {
     expect(parseLlmEndpoint({}, ids).thinking_budget_pairs).toEqual([]);
   });
 
+  it("validates the default level against the pair table in budget mode", () => {
+    const pairs = [
+      { level: "low", budget_tokens: 1000, max_tokens: 1200 },
+      { level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 },
+    ];
+    // The UI stores the default budget level (a pair name) in thinking_level.
+    const endpoint = parseLlmEndpoint(
+      { thinking_mode: "budget", thinking_level: "super", thinking_budget_pairs: pairs },
+      ids,
+    );
+    expect(endpoint.thinking_level).toBe("super");
+    // An unlisted default still falls to off (fail closed, same policy as levels).
+    const unlisted = parseLlmEndpoint(
+      { thinking_mode: "budget", thinking_level: "high", thinking_budget_pairs: pairs },
+      ids,
+    );
+    expect(unlisted.thinking_level).toBe("off");
+    // In level mode a pair name is not in the allowlist: coerced to off.
+    const levelMode = parseLlmEndpoint(
+      { thinking_level: "super", thinking_levels: ["low", "high"], thinking_budget_pairs: pairs },
+      ids,
+    );
+    expect(levelMode.thinking_level).toBe("off");
+    // Budget mode with no pairs degrades to the standard allowlist.
+    const noPairs = parseLlmEndpoint({ thinking_mode: "budget", thinking_level: "high" }, ids);
+    expect(noPairs.thinking_level).toBe("high");
+  });
+
   it("preserves the openai_responses format instead of coercing it", () => {
     expect(parseLlmEndpoint({ api_format: "openai_responses" }, ids).api_format).toBe("openai_responses");
     expect(parseLlmEndpoint({ api_format: "openai_chat" }, ids).api_format).toBe("openai_chat");

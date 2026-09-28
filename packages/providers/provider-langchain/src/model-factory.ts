@@ -105,22 +105,30 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
     overrides.thinkingLevel ?? (endpoint ? effectiveThinkingLevel(endpoint, endpoint.thinking_level) : "off");
   const baseMaxTokens = overrides.maxTokens ?? provider.max_output_tokens;
   // Independent budget selection (anthropic): the run-level pair wins (budget
-  // from the run, its cap only when it exceeds the budget), then the endpoint
-  // default pair; without either the level mapping applies.
+  // from the run, its cap only when it exceeds the budget); a budget-mode
+  // endpoint's default pair resolves through the pair table; otherwise the
+  // legacy flat endpoint pair applies; without any, the level mapping does.
   const runBudget = overrides.thinkingBudget ?? 0;
   const runMax = overrides.thinkingMax ?? 0;
-  const endpointBudget = endpoint?.thinking_budget_tokens ?? 0;
-  const budgetTokens = runBudget > 0 ? runBudget : endpointBudget;
-  const budgetOverride =
-    budgetTokens > 0
-      ? {
-          budgetTokens,
-          maxTokens:
-            runBudget > 0 && runMax > budgetTokens
-              ? runMax
-              : (endpoint?.thinking_max_tokens ?? 0),
-        }
+  const budgetOverride = (() => {
+    if (runBudget > 0) {
+      return {
+        budgetTokens: runBudget,
+        maxTokens: runMax > runBudget ? runMax : (endpoint?.thinking_max_tokens ?? 0),
+      };
+    }
+    if (endpoint?.thinking_mode === "budget" && endpoint.thinking_capable) {
+      const pair = (endpoint.thinking_budget_pairs ?? []).find((candidate) => candidate.level === thinkingLevel);
+      if (pair !== undefined && pair.budget_tokens >= 1024) {
+        return { budgetTokens: pair.budget_tokens, maxTokens: pair.max_tokens };
+      }
+      return undefined;
+    }
+    const endpointBudget = endpoint?.thinking_budget_tokens ?? 0;
+    return endpointBudget > 0
+      ? { budgetTokens: endpointBudget, maxTokens: endpoint?.thinking_max_tokens ?? 0 }
       : undefined;
+  })();
 
   const thinking = buildThinkingClientOptions(apiFormat, thinkingLevel, thinkingCapable, baseMaxTokens, budgetOverride);
   const maxTokens = thinking?.maxTokens ?? baseMaxTokens;

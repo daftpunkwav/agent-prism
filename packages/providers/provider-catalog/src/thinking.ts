@@ -37,10 +37,12 @@ export interface ThinkingBudgetOverride {
 
 /**
  * Builds thinking parameters per API format.
- * Returns null for thinking-incapable models, off, or unmapped levels (no
- * thinking params attached). OpenAI-compatible formats pass the level string
- * through verbatim so vendor-defined levels (xhigh/max/…) reach the API as-is.
- * A configured budget override (anthropic) outranks the level mapping.
+ * Returns null for thinking-incapable models or unmapped levels (no thinking
+ * params attached). OpenAI-compatible formats pass the level string through
+ * verbatim so vendor-defined levels (xhigh/max/…) reach the API as-is.
+ * A configured budget override (anthropic) outranks the level — and applies
+ * even when the level is "off": budget-mode baselines pin the level off and
+ * carry their intensity in the override alone.
  */
 export function buildThinkingClientOptions(
   apiFormat: ApiFormat | string,
@@ -49,7 +51,7 @@ export function buildThinkingClientOptions(
   maxTokens: number,
   budgetOverride?: ThinkingBudgetOverride,
 ): ThinkingClientOptions | null {
-  if (!thinkingCapable || level === "off") return null;
+  if (!thinkingCapable) return null;
 
   if (apiFormat === "anthropic_messages") {
     // A configured budget pair outranks the level: budget_tokens verbatim and
@@ -61,6 +63,7 @@ export function buildThinkingClientOptions(
       }
       return options;
     }
+    if (level === "off") return null;
     // The messages API family expresses intensity two ways: a token budget —
     // numeric levels pass through verbatim as budget_tokens (protocol floor
     // 1024) and named levels use the fixed comparison table — or vendor
@@ -78,9 +81,11 @@ export function buildThinkingClientOptions(
     return trimmed === "" ? null : { thinking: { type: trimmed } };
   }
   if (apiFormat === "openai_chat" || apiFormat === "openai_responses") {
+    if (level === "off") return null;
     return { reasoningEffort: level };
   }
   // Unknown formats keep the legacy conservative mapping.
+  if (level === "off") return null;
   const effort = level === "low" || level === "medium" || level === "high" ? level : "medium";
   return { reasoningEffort: effort };
 }

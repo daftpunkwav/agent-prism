@@ -7,9 +7,22 @@ import { describe, expect, it } from "vitest";
 import { buildThinkingClientOptions, THINKING_BUDGET } from "../src/thinking.js";
 
 describe("buildThinkingClientOptions", () => {
-  it("returns null for incapable models and off levels", () => {
+  it("returns null for incapable models and off levels without a budget override", () => {
     expect(buildThinkingClientOptions("anthropic_messages", "high", false, 32000)).toBeNull();
+    expect(buildThinkingClientOptions("anthropic_messages", "high", false, 32000, { budgetTokens: 32768, maxTokens: 0 })).toBeNull();
     expect(buildThinkingClientOptions("anthropic_messages", "off", true, 32000)).toBeNull();
+    expect(buildThinkingClientOptions("openai_chat", "off", true, 32000)).toBeNull();
+  });
+
+  it("applies a budget override even when the level is off (budget-mode baselines pin off)", () => {
+    const options = buildThinkingClientOptions("anthropic_messages", "off", true, 96000, {
+      budgetTokens: 500_000,
+      maxTokens: 1_000_000,
+    });
+    expect(options?.thinking).toEqual({ type: "enabled", budget_tokens: 500_000 });
+    expect(options?.maxTokens).toBe(1_000_000);
+    // Below-floor overrides still fail closed instead of masquerading.
+    expect(buildThinkingClientOptions("anthropic_messages", "off", true, 32000, { budgetTokens: 512, maxTokens: 0 })).toBeNull();
   });
 
   it("builds anthropic thinking blocks with the level budget", () => {

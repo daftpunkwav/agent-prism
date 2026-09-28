@@ -171,7 +171,17 @@ export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
   // Custom level lists apply to every format: openai passes the string verbatim,
   // anthropic maps numeric levels to budget_tokens and named levels to the table.
   const thinkingLevels = normalizeThinkingLevels(source.thinking_levels);
-  const allowedLevels = thinkingLevels.length > 0 ? thinkingLevels : ["low", "medium", "high"];
+  const thinkingMode = parseThinkingMode(source.thinking_mode);
+  const budgetPairs = normalizeThinkingBudgetPairs(source.thinking_budget_pairs);
+  // The default selection's allowlist follows the mode: budget mode validates
+  // against the pair table's level names (the UI stores the default budget
+  // level there), level mode against the custom list or the standard set.
+  const allowedLevels =
+    thinkingMode === "budget" && budgetPairs.length > 0
+      ? budgetPairs.map((pair) => pair.level)
+      : thinkingLevels.length > 0
+        ? thinkingLevels
+        : ["low", "medium", "high"];
   const thinkingLevel = readString(source, "thinking_level", "off", 32);
   // Thinking budget pair: a configured budget must be smaller than its output
   // cap; a violating cap is dropped to 0 so the runtime auto-raise applies.
@@ -204,8 +214,8 @@ export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
     // never ends up "UI echoes the raw value while thinking params are silently absent".
     thinking_level: thinkingLevel === "off" || allowedLevels.includes(thinkingLevel) ? thinkingLevel : "off",
     thinking_levels: thinkingLevels,
-    thinking_mode: parseThinkingMode(source.thinking_mode),
-    thinking_budget_pairs: normalizeThinkingBudgetPairs(source.thinking_budget_pairs),
+    thinking_mode: thinkingMode,
+    thinking_budget_pairs: budgetPairs,
     thinking_budget_tokens: thinkingBudgetTokens,
     thinking_max_tokens: thinkingMaxTokens,
   };

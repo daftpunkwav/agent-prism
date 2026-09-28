@@ -290,7 +290,9 @@ export class ThreadService {
  * The budget fields are deliberately absent: on the wire a budget override is
  * a pair level name (resolved to numbers at assembly), while the pinned config
  * only carries the resolved numbers — replaying them would fail baseline
- * legality. Budget-mode threads follow the endpoint's current budget default.
+ * legality. Budget-mode threads follow the seeded budget default (the default
+ * endpoint's pair table seeds the catalog default; a pinned endpoint whose
+ * pair names do not intersect it fails loud at replay).
  */
 export const THREAD_BASELINE_FIELDS = [
   "framework",

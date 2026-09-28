@@ -181,6 +181,8 @@ export function ConnectionsSection({
           thinking_capable: m.thinking_capable,
           thinking_level: m.thinking_level,
           thinking_levels: [...m.thinking_levels],
+          thinking_mode: m.thinking_mode ?? "levels",
+          thinking_budget_pairs: (m.thinking_budget_pairs ?? []).map((pair) => ({ ...pair })),
           image_input: m.image_input,
           video_input: m.video_input,
         })),
@@ -226,6 +228,25 @@ export function ConnectionsSection({
                   .slice(0, 16)
               : base.thinking_levels;
             const level = typeof m.thinking_level === "string" ? m.thinking_level.trim().slice(0, 32) : "off";
+            const mode = m.thinking_mode === "budget" || m.thinking_mode === "levels" ? m.thinking_mode : base.thinking_mode;
+            const pairLevels = Array.isArray(m.thinking_budget_pairs)
+              ? (m.thinking_budget_pairs as Record<string, unknown>[])
+                .filter(
+                  (pair): pair is Record<string, unknown> & { level: string; budget_tokens: number; max_tokens: number } =>
+                    typeof pair.level === "string" &&
+                    typeof pair.budget_tokens === "number" &&
+                    typeof pair.max_tokens === "number",
+                )
+                .map((pair) => ({ level: pair.level, budget_tokens: pair.budget_tokens, max_tokens: pair.max_tokens }))
+              : (base.thinking_budget_pairs ?? []);
+            // The level allowlist follows the mode: budget mode validates against
+            // the pair names (the default budget level rides thinking_level).
+            const allowedLevels =
+              mode === "budget" && pairLevels.length > 0
+                ? pairLevels.map((pair) => pair.level)
+                : levels.length > 0
+                  ? levels
+                  : ["low", "medium", "high"];
             return {
               id: base.id,
               label: str(m.label, ""),
@@ -237,21 +258,12 @@ export function ConnectionsSection({
                 typeof m.max_output_tokens === "number" ? m.max_output_tokens : base.max_output_tokens,
               thinking_capable: m.thinking_capable === true,
               thinking_level:
-                level === "off" || levels.includes(level) || ["low", "medium", "high"].includes(level)
+                level === "off" || allowedLevels.includes(level)
                   ? level
                   : "off",
               thinking_levels: levels,
-              thinking_mode: m.thinking_mode === "budget" ? "budget" : base.thinking_mode,
-              thinking_budget_pairs: Array.isArray(m.thinking_budget_pairs)
-                ? (m.thinking_budget_pairs as Record<string, unknown>[])
-                  .filter(
-                    (pair): pair is Record<string, unknown> & { level: string; budget_tokens: number; max_tokens: number } =>
-                      typeof pair.level === "string" &&
-                      typeof pair.budget_tokens === "number" &&
-                      typeof pair.max_tokens === "number",
-                  )
-                  .map((pair) => ({ level: pair.level, budget_tokens: pair.budget_tokens, max_tokens: pair.max_tokens }))
-                : base.thinking_budget_pairs,
+              thinking_mode: mode,
+              thinking_budget_pairs: pairLevels,
               thinking_budget_tokens: typeof m.thinking_budget_tokens === "number" ? m.thinking_budget_tokens : base.thinking_budget_tokens,
               thinking_max_tokens: typeof m.thinking_max_tokens === "number" ? m.thinking_max_tokens : base.thinking_max_tokens,
               image_input: m.image_input === true,
@@ -684,7 +696,7 @@ export function ConnectionsSection({
                   <ModelModal
                     initial={modelModal.draft}
                     isNew={modelModal.isNew}
-                    apiFormat={connections.find((c) => c.key === modelModal.connKey)?.api_format ?? "anthropic_messages"}
+                    apiFormat={c.api_format}
                     defaultEndpointId={defaultEndpointId}
                     onSetDefault={onSetDefault}
                     onClose={() => setModelModal(null)}
