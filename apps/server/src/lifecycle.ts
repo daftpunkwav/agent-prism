@@ -11,6 +11,10 @@ let installed = false;
 /** Currently attached signal listeners, so disposeSignalHandlers() can remove exactly what was added. */
 const attached: Array<{ event: "SIGINT" | "SIGTERM" | "SIGBREAK"; handler: () => void }> = [];
 
+let crashInstalled = false;
+/** Currently attached crash listeners, so disposeCrashHandlers() can remove exactly what was added. */
+const crashAttached: Array<{ event: "uncaughtException" | "unhandledRejection"; handler: (error: unknown, origin: string) => void }> = [];
+
 /**
  * Removes previously installed signal handlers and resets the install latch.
  * Safe to call when nothing is installed (no-op). Intended for tests and
@@ -66,5 +70,60 @@ export function installSignalHandlers(stop: () => Promise<void>, options: { shut
     { event: "SIGINT", handler: onSigint },
     { event: "SIGTERM", handler: onSigterm },
     { event: "SIGBREAK", handler: onSigbreak },
+  );
+}
+
+/**
+ * Removes previously installed crash handlers and resets the install latch.
+ * Safe to call when nothing is installed (no-op). Intended for tests and
+ * embedding hosts that own the process lifetime.
+ */
+export function disposeCrashHandlers(): void {
+  for (const { event, handler } of crashAttached.splice(0, crashAttached.length)) {
+    process.removeListener(event, handler);
+  }
+  crashInstalled = false;
+}
+
+/**
+ * Installs last-resort crash handlers (idempotent: repeat calls are ignored).
+ *
+ * Without them an uncaught exception or unhandled rejection kills the process
+ * instantly and the debounced stores lose their unflushed tail. The handler
+ * logs the fault with its stack, runs ONE bounded best-effort flush, then exits
+ * non-zero — crash semantics are preserved (the process still dies, exit code
+ * 1), only the durable tail is saved first. A flush that hangs or throws can
+ * neither wedge the exit nor mask the crash: the grace timer is referenced on
+ * purpose as the watchdog that forces the exit.
+ */
+export function installCrashHandlers(flush: () => Promise<void>, options: { flushGraceMs?: number } = {}): void {
+  if (crashInstalled) return;
+  crashInstalled = true;
+  const graceMs = options.flushGraceMs ?? 2_000;
+  let crashing = false;
+  const onCrash = (error: unknown, origin: string): void => {
+    if (crashing) return;
+    crashing = true;
+    console.error(`[server] Fatal ${origin}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
+    console.error("[server] Attempting emergency flush before exit…");
+    const timer = setTimeout(() => {
+      console.error(`[server] Emergency flush timed out after ${graceMs}ms; forcing exit`);
+      process.exit(1);
+    }, graceMs);
+    void Promise.resolve()
+      .then(flush)
+      .catch((flushError: unknown) => {
+        console.error(`[server] Emergency flush failed: ${flushError instanceof Error ? flushError.message : String(flushError)}`);
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        process.exit(1);
+      });
+  };
+  process.on("uncaughtException", onCrash);
+  process.on("unhandledRejection", onCrash);
+  crashAttached.push(
+    { event: "uncaughtException", handler: onCrash },
+    { event: "unhandledRejection", handler: onCrash },
   );
 }

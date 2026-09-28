@@ -79,4 +79,40 @@ describe("JsonlSessionStore", () => {
       cleanup();
     }
   });
+
+  it("auto-checkpoints once the appended bytes pass the budget", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-jsonl-"));
+    const logPath = path.join(dir, "sessions.jsonl");
+    const snapshotPath = path.join(dir, "snapshot.json");
+    const build = () =>
+      new JsonlSessionStore({
+        log: new NodeAppendFile(logPath),
+        snapshot: new AtomicJsonFile(snapshotPath),
+        idGenerator: new RandomIdGenerator(),
+        clock: new SystemClock(),
+        checkpointBytes: 10,
+      });
+    try {
+      const first = build();
+      const record = await first.create({ kind: "arena", title: "auto" });
+      // The create line passes the tiny budget, so the auto-checkpoint queued
+      // behind it; appendEntry queues behind the checkpoint and resolves only
+      // after the compaction ran.
+      await first.appendEntry(record.id, { kind: "note", content: "barrier" });
+      const lines = fs.readFileSync(logPath, "utf-8").split("\n").filter(Boolean);
+      expect(lines).toHaveLength(1);
+      expect((JSON.parse(lines[0]) as { op: string }).op).toBe("entry");
+
+      // Drain the second auto-checkpoint (queued by the entry's own bytes) and
+      // confirm the state survived into the snapshot.
+      await first.checkpoint();
+      expect(fs.readFileSync(logPath, "utf-8")).toBe("");
+      const second = build();
+      await second.list();
+      expect(await second.get(record.id)).not.toBeNull();
+      expect(await second.listEntries(record.id)).toHaveLength(1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

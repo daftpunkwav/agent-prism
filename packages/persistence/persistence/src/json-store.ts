@@ -10,12 +10,43 @@
 import {
   copyFileSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { copyFile, mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+/**
+ * Removes leftover `.tmp` files in one directory (non-recursive). An atomic
+ * write that crashed between the tmp write and the rename leaves its temp file
+ * behind forever; at startup no writes are in flight in this process, so every
+ * `.tmp` sitting in a data directory is an orphan. Best-effort: a file that
+ * cannot be unlinked is warned about and skipped, never fatal. Returns the
+ * swept count (0 also when the directory does not exist yet — it is created
+ * lazily on first write).
+ */
+export function sweepOrphanTempFiles(dir: string): number {
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  let swept = 0;
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".tmp")) continue;
+    try {
+      rmSync(path.join(dir, entry.name), { force: true });
+      swept += 1;
+    } catch (error) {
+      console.warn(`[persistence] Orphan tmp sweep failed for ${entry.name}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return swept;
+}
 
 /**
  * Reads a JSON file; returns null when missing, throws a JSONDecodeError-style

@@ -47,6 +47,9 @@ type SessionOp =
   | { op: "cancel"; id: string; at: number; reason: string }
   | { op: "delete"; id: string; at: number };
 
+/** Default appended-bytes budget between automatic checkpoints (see deps.checkpointBytes). */
+export const DEFAULT_CHECKPOINT_BYTES = 32 * 1024 * 1024;
+
 /** JsonlSessionStore construction ports (log + snapshot files, id/clock). */
 export interface JsonlSessionStoreDeps {
   log: AppendFile;
@@ -55,6 +58,13 @@ export interface JsonlSessionStoreDeps {
   clock: Clock;
   /** Blob sidecar for oversized entries; defaults to ephemeral memory (tests, tooling). */
   blobs?: SessionBlobStore;
+  /**
+   * Appended-bytes budget between automatic checkpoints (default 32MB). A
+   * session writing heavily must not grow the log without bound between the
+   * host's checkpoint cadence; at the budget the store compacts on its own,
+   * which also bounds the whole-file replay memory on the next boot.
+   */
+  checkpointBytes?: number;
 }
 
 /**
@@ -70,7 +80,8 @@ const STORE_MUTATION_KEY = "store";
  * append costs the entry, not the store. Crash posture: a torn tail loses at most
  * the in-flight mutation and corrupt lines are skipped loudly (`corruptLines`).
  * `checkpoint()` rewrites snapshot + log from live state and bounds replay cost;
- * the host calls it on a cadence and on shutdown (see `checkpointStores`).
+ * the host calls it on a cadence and on shutdown (see `checkpointStores`), and
+ * the store triggers it on its own once the log grows past a size budget.
  */
 export class JsonlSessionStore implements SessionStore {
   private readonly log: AppendFile;
@@ -92,6 +103,10 @@ export class JsonlSessionStore implements SessionStore {
   private readonly mutations = new SerialQueue();
   private corrupt = 0;
   private loadPromise: Promise<void> | null = null;
+  /** Bytes appended since the last compaction (drives the size-triggered checkpoint). */
+  private appendedSinceCheckpoint = 0;
+  /** Normalized append budget between automatic checkpoints. */
+  private readonly checkpointBytes: number;
 
   constructor(deps: JsonlSessionStoreDeps) {
     this.log = deps.log;
@@ -99,6 +114,10 @@ export class JsonlSessionStore implements SessionStore {
     this.idGenerator = deps.idGenerator;
     this.clock = deps.clock;
     this.blobs = deps.blobs ?? new InMemoryBlobStore();
+    this.checkpointBytes =
+      deps.checkpointBytes !== undefined && Number.isFinite(deps.checkpointBytes) && deps.checkpointBytes > 0
+        ? Math.trunc(deps.checkpointBytes)
+        : DEFAULT_CHECKPOINT_BYTES;
   }
 
   /** Corrupt log lines skipped during the last load (0 when clean). */
@@ -306,7 +325,19 @@ export class JsonlSessionStore implements SessionStore {
   }
 
   private async append(op: SessionOp): Promise<void> {
-    await this.log.append([JSON.stringify(op)]);
+    const line = JSON.stringify(op);
+    await this.log.append([line]);
+    this.appendedSinceCheckpoint += line.length + 1;
+    if (this.appendedSinceCheckpoint >= this.checkpointBytes) {
+      // The budget resets before the compaction runs: appends landing while the
+      // queued checkpoint waits count toward the next window, so a slow
+      // checkpoint cannot trigger a back-to-back loop. checkpoint() never
+      // appends, so this cannot recurse.
+      this.appendedSinceCheckpoint = 0;
+      void this.checkpoint().catch((error: unknown) => {
+        console.warn(`[jsonl-session-store] size-triggered checkpoint failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
+    }
   }
 
   /**

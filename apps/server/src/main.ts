@@ -8,7 +8,7 @@
  */
 
 import { assemble } from "./assemble.js";
-import { installSignalHandlers } from "./lifecycle.js";
+import { installCrashHandlers, installSignalHandlers } from "./lifecycle.js";
 import { startServer } from "./server.js";
 
 /** How often the append-only session log is compacted into its snapshot. */
@@ -35,6 +35,9 @@ async function main(): Promise<void> {
     });
   }, SESSION_CHECKPOINT_INTERVAL_MS);
   checkpoint.unref?.();
+  // Last-resort crash path: an uncaught exception or unhandled rejection still
+  // exits non-zero, but saves the debounced-store tail first (bounded flush).
+  installCrashHandlers(() => components?.flushDurableStores() ?? Promise.resolve());
   installSignalHandlers(
     async () => {
       // Flush before and after draining: a turn that commits while stop() waits

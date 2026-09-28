@@ -7,11 +7,11 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { atomicWriteJsonAsync, readJsonFile } from "@agentprism/persistence";
+import { atomicWriteJsonAsync, readJsonFile, sweepOrphanTempFiles } from "@agentprism/persistence";
 
 describe("atomicWriteJsonAsync concurrent serialization", () => {
   const dir = join(tmpdir(), `aprism-json-store-${randomUUID()}`);
@@ -96,5 +96,29 @@ describe("backup skips corrupt sources", () => {
 
     expect(readJsonFile<{ v: number }>(filePath)).toEqual({ v: 2 });
     expect(readJsonFile<{ v: number }>(`${filePath}.bak`)).toEqual({ v: 1 });
+  });
+});
+
+describe("sweepOrphanTempFiles", () => {
+  const dir = join(tmpdir(), `aprism-json-sweep-${randomUUID()}`);
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("removes only .tmp files, keeps real data, and tolerates a missing directory", () => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "store.json.tmp"), "orphan", "utf-8");
+    writeFileSync(join(dir, "store.json"), "{}", "utf-8");
+    writeFileSync(join(dir, "store.json.bak"), "{}", "utf-8");
+
+    expect(sweepOrphanTempFiles(dir)).toBe(1);
+    expect(existsSync(join(dir, "store.json.tmp"))).toBe(false);
+    expect(existsSync(join(dir, "store.json"))).toBe(true);
+    expect(existsSync(join(dir, "store.json.bak"))).toBe(true);
+    // Nothing left: the second sweep is a no-op.
+    expect(sweepOrphanTempFiles(dir)).toBe(0);
+    // Missing directory: not an error.
+    expect(sweepOrphanTempFiles(join(dir, "absent"))).toBe(0);
   });
 });

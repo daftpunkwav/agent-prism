@@ -46,6 +46,14 @@ const MAX_TURN_EVENTS = 800;
 const CHANNEL_POLL_MS = 1_000;
 
 /**
+ * Backstop bound for the stream channel (oldest chunk drops past it). Trace
+ * entries are persisted at emit time and the answer is extracted from the
+ * capped local event list, so a dropped chunk only thins the live stream;
+ * an unbounded buffer would let a stalled consumer grow memory without limit.
+ */
+const CHANNEL_BACKSTOP = 5_000;
+
+/**
  * Whether a finished turn's event stream ended in failure. The terminal state decides,
  * not the presence of an error event: the verification loop forwards an intermediate
  * attempt error so the timeline shows why a retry happened, and a turn that then
@@ -183,7 +191,7 @@ export async function* runBuilderTurn(
   hooks: BuilderTurnHooks,
   input: BuilderTurnInput,
 ): AsyncGenerator<BuilderStreamChunk, BuilderTurnOutput> {
-  const channel = new EventChannel<BuilderStreamChunk | null>();
+  const channel = new EventChannel<BuilderStreamChunk | null>({ capacity: CHANNEL_BACKSTOP });
   const internalAbort = new AbortController();
   const forwardAbort = () => internalAbort.abort();
   input.signal?.addEventListener("abort", forwardAbort, { once: true });

@@ -20,9 +20,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mockAssemble = vi.fn();
 const mockStartServer = vi.fn();
 const mockInstallSignalHandlers = vi.fn();
+const mockInstallCrashHandlers = vi.fn();
 
 vi.mock("../src/assemble.js", () => ({ assemble: mockAssemble }));
-vi.mock("../src/lifecycle.js", () => ({ installSignalHandlers: mockInstallSignalHandlers }));
+vi.mock("../src/lifecycle.js", () => ({
+  installSignalHandlers: mockInstallSignalHandlers,
+  installCrashHandlers: mockInstallCrashHandlers,
+}));
 vi.mock("../src/server.js", () => ({ startServer: mockStartServer }));
 
 // ---------------------------------------------------------------------------
@@ -57,6 +61,7 @@ describe("main() entry", () => {
     mockAssemble.mockClear();
     mockStartServer.mockClear();
     mockInstallSignalHandlers.mockClear();
+    mockInstallCrashHandlers.mockClear();
     vi.restoreAllMocks();
   });
 
@@ -87,6 +92,8 @@ describe("main() entry", () => {
     expect(mockAssemble).toHaveBeenCalledOnce();
     expect(mockStartServer).toHaveBeenCalledWith(components);
     expect(mockInstallSignalHandlers).toHaveBeenCalledOnce();
+    // Crash handlers wrap the same flush so a fatal error saves the durable tail.
+    expect(mockInstallCrashHandlers).toHaveBeenCalledOnce();
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
@@ -151,6 +158,7 @@ describe("main() entry", () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("assemble blew up"));
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(mockInstallSignalHandlers).not.toHaveBeenCalled();
+    expect(mockInstallCrashHandlers).not.toHaveBeenCalled();
   });
 
   /**

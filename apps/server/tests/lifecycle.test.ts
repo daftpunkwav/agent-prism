@@ -42,6 +42,12 @@ function stripSignalListeners(): void {
   process.removeAllListeners("SIGBREAK");
 }
 
+/** Strips crash listeners we may have attached to the global process. */
+function stripCrashListeners(): void {
+  process.removeAllListeners("uncaughtException");
+  process.removeAllListeners("unhandledRejection");
+}
+
 // ---------------------------------------------------------------------------
 // installSignalHandlers
 // ---------------------------------------------------------------------------
@@ -249,5 +255,119 @@ describe("installSignalHandlers", () => {
   it("disposeSignalHandlers() is a no-op when nothing is installed", async () => {
     const { disposeSignalHandlers } = await loadFresh();
     expect(() => disposeSignalHandlers()).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// installCrashHandlers
+// ---------------------------------------------------------------------------
+
+describe("installCrashHandlers", () => {
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    stripCrashListeners();
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    stripCrashListeners();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  /** Drains the microtask chain inside the crash handler (log → flush → finally). */
+  const drain = (): Promise<void> => Promise.resolve().then(() => Promise.resolve()).then(() => Promise.resolve());
+
+  /**
+   * Invokes OUR crash listener directly instead of emitting the process-level
+   * event: the vitest worker registers its own uncaughtException/rejection
+   * handlers, and an emit would trip them alongside the one under test.
+   */
+  const fireCrash = (event: "uncaughtException" | "unhandledRejection", error: unknown): void => {
+    const handlers = process.listeners(event);
+    const handler = handlers[handlers.length - 1];
+    if (handler === undefined) throw new Error(`no ${event} listener installed`);
+    (handler as (error: unknown, origin: string) => void)(error, event);
+  };
+
+  it("flushes best-effort and exits 1 on an uncaughtException", async () => {
+    const { installCrashHandlers } = await loadFresh();
+    const flush = vi.fn().mockResolvedValue(undefined);
+    installCrashHandlers(flush);
+
+    fireCrash("uncaughtException", new Error("boom"));
+    await drain();
+
+    expect(flush).toHaveBeenCalledOnce();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("boom"));
+  });
+
+  it("exits 1 even when the emergency flush rejects", async () => {
+    const { installCrashHandlers } = await loadFresh();
+    installCrashHandlers(() => Promise.reject(new Error("flush blew up")));
+
+    fireCrash("unhandledRejection", new Error("original fault"));
+    await drain();
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("flush blew up"));
+  });
+
+  it("forces exit 1 when the flush hangs past the grace timer", async () => {
+    vi.useFakeTimers();
+    const { installCrashHandlers } = await loadFresh();
+    installCrashHandlers(() => new Promise<void>(() => undefined), { flushGraceMs: 2_000 });
+
+    fireCrash("uncaughtException", new Error("boom"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(exitSpy).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("runs the flush only once when a second fault lands mid-crash", async () => {
+    const { installCrashHandlers } = await loadFresh();
+    let releaseFlush: (() => void) | null = null;
+    const flush = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
+      releaseFlush = resolve;
+    }));
+    installCrashHandlers(flush);
+
+    fireCrash("uncaughtException", new Error("first"));
+    await Promise.resolve();
+    fireCrash("unhandledRejection", new Error("second"));
+    releaseFlush?.();
+    await drain();
+
+    expect(flush).toHaveBeenCalledOnce();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("disposeCrashHandlers() detaches listeners and allows reinstall", async () => {
+    const { disposeCrashHandlers, installCrashHandlers } = await loadFresh();
+    const flush = vi.fn().mockResolvedValue(undefined);
+    installCrashHandlers(flush);
+    // Identity, not listenerCount: the vitest worker registers its own crash
+    // handlers on the same process, so a zero count can never be asserted here.
+    const ourException = process.listeners("uncaughtException").at(-1);
+    const ourRejection = process.listeners("unhandledRejection").at(-1);
+    expect(typeof ourException).toBe("function");
+    expect(typeof ourRejection).toBe("function");
+
+    disposeCrashHandlers();
+    expect(process.listeners("uncaughtException")).not.toContain(ourException);
+    expect(process.listeners("unhandledRejection")).not.toContain(ourRejection);
+
+    // The latch is reset: reinstall works on the same module copy.
+    installCrashHandlers(flush);
+    fireCrash("uncaughtException", new Error("after reinstall"));
+    await drain();
+    expect(flush).toHaveBeenCalledOnce();
+    expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

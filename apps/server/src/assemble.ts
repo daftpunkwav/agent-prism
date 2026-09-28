@@ -70,7 +70,7 @@ import {
 import { EpisodicMemory } from "@agentprism/memory-episodic";
 import { SemanticMemory } from "@agentprism/memory-semantic";
 import { MemoryServiceAdapter } from "@agentprism/memory-service";
-import { AtomicJsonFile, NodeAppendFile, atomicWriteJson, readJsonFile } from "@agentprism/persistence";
+import { AtomicJsonFile, NodeAppendFile, atomicWriteJson, readJsonFile, sweepOrphanTempFiles } from "@agentprism/persistence";
 import { SessionService } from "@agentprism/application";
 import { FileBlobStore, JsonlSessionStore } from "@agentprism/session-persistence";
 import { RandomIdGenerator, SystemClock, WorkspaceRegistry } from "@agentprism/runtime";
@@ -173,6 +173,12 @@ export async function assemble(): Promise<RuntimeComponents> {
   }
 
   const settings = loadSettings();
+
+  // Crash debris sweep: an atomic write that died between the tmp write and the
+  // rename leaves its `.tmp` file behind forever. At startup no writes are in
+  // flight in this process, so every `.tmp` in the data directories is an orphan.
+  sweepOrphanTempFiles(DATA_DIR);
+  sweepOrphanTempFiles(BUILDER_TRACES_DIR);
 
   // Non-loopback listening requires an API token; refuse to start otherwise.
   // Loopback set shared with the URL policy (contracts isLoopbackHost): ::1 was
