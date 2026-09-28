@@ -42,6 +42,7 @@ Extension points and their constraints.
 | [reference/add-a-custom-dimension.md](reference/add-a-custom-dimension.md) | One package per custom comparison dimension: descriptor, four hooks, Arena + Builder auto-wiring |
 | [reference/configuration.md](reference/configuration.md) | Environment variables, credential references, and the `data/` layout |
 | [reference/threads.md](reference/threads.md) | Durable fork and resume threads |
+| [reference/third-party-integrations.md](reference/third-party-integrations.md) | External dependencies, isolation boundaries, and audit decisions |
 
 ## Operations
 

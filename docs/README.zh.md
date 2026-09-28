@@ -42,6 +42,7 @@ Agent Prism 的文档，按用途分组。当文档与代码冲突时，以代�
 | [reference/add-a-custom-dimension.zh.md](reference/add-a-custom-dimension.zh.md) | 一个自定义对比维度 = 一个包：描述符、四个钩子、Arena 与 Builder 自动接线 |
 | [reference/configuration.zh.md](reference/configuration.zh.md) | 环境变量、凭证引用、`data/` 布局 |
 | [reference/threads.zh.md](reference/threads.zh.md) | 持久 fork 与 resume threads |
+| [reference/third-party-integrations.zh.md](reference/third-party-integrations.zh.md) | 外部依赖、隔离边界与审计决策 |
 
 ## Operations
 
