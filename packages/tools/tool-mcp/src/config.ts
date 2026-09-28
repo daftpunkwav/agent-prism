@@ -10,6 +10,13 @@
  * An unset or blank variable means no external servers (in-process servers and
  * the mcp dimension are unaffected). Spawning happens in the agent layer, not
  * here: this module only validates.
+ *
+ * Trust boundary: a configured `command` is an arbitrary local executable by
+ * design — the managed list is operator-level trust, the same level as editing
+ * package.json scripts. Validation here is structural (types, non-empty
+ * command, env value types), never a safety judgement of what the command does;
+ * spawned servers receive only the baseline env allowlist (see transport.ts),
+ * never the host's secrets.
  */
 
 import { MCP_DEFAULT_TIMEOUT_MS, type McpServerConfig } from "./client.js";
