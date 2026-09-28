@@ -50,6 +50,8 @@ function makeRunner(overrides?: {
   reportPublisher?: ReportPublisher;
   /** Report a failed model call when the factory builds a runtime (endpoint health). */
   reportModelFailure?: boolean;
+  /** Harness retry caps the settings knobs feed the runner (forwarded into the agent spec). */
+  harnessMaxRetries?: Partial<Record<"verify" | "reflect" | "self_evolve", number>>;
 }): ArenaRunner {
   return new ArenaRunner({
     registry: { get: () => ({}), names: new Set() } as unknown as DriverLookup,
@@ -75,6 +77,7 @@ function makeRunner(overrides?: {
     breakerThreshold: overrides?.breakerThreshold ?? 1,
     eventRetention: overrides?.eventRetention,
     askUserWaitMs: 60_000,
+    harnessMaxRetries: overrides?.harnessMaxRetries,
   } as never);
 }
 
@@ -199,6 +202,20 @@ describe("ArenaRunner.streamParallel", () => {
     const second = await drain(runner, request());
     expect(runMock).toHaveBeenCalledTimes(2);
     expect(second.some((event) => event.type === "error" && /circuit-broken/.test(event.message))).toBe(false);
+  });
+
+  it("forwards the harness retry knobs into the agent spec", async () => {
+    // The settings harness-retry knobs reach the verification loop only through this
+    // spec field: dropping the pass-through would silently restore the built-in caps
+    // and no other test would notice.
+    let seen: { harnessMaxRetries?: unknown } | undefined;
+    runMock.mockImplementation((async function* (_deps: unknown, spec: { harnessMaxRetries?: unknown }) {
+      seen = spec;
+      yield { type: "complete", pipeline: "col-a", metrics: METRICS, turn: 1 };
+    }) as never);
+    const runner = makeRunner({ harnessMaxRetries: { verify: 3, self_evolve: 2 } });
+    await drain(runner, request());
+    expect(seen?.harnessMaxRetries).toEqual({ verify: 3, self_evolve: 2 });
   });
 
   it("delivers human answers through the ask registry when the column waits", async () => {

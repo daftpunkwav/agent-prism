@@ -60,4 +60,16 @@ describe("prepareMessagesForLlm", () => {
     expect(prepared.some((message) => message.role === "tool")).toBe(false);
     expect(prepared.map((message) => message.content)).toEqual(["next"]);
   });
+
+  it("checkpoint honors an explicit charsPerToken when metering overflow", () => {
+    // Three 200-char exchanges: 1 char/token overflows a 400-token target, the
+    // 4-char default does not. If the option stopped being forwarded (the budget
+    // branch's pass-through shape), the tuned call would silently not compact.
+    const exchange = (): LlmMessage[] => [user("u".repeat(200)), assistant("a".repeat(200))];
+    const messages = [...exchange(), ...exchange(), ...exchange()];
+    const tuned = prepareMessagesForLlm(messages, "checkpoint", { compactTargetTokens: 400, charsPerToken: 1 });
+    expect(tuned.some((message) => message.role === "system" && String(message.content).startsWith("[Context checkpoint]"))).toBe(true);
+    const untuned = prepareMessagesForLlm(messages, "checkpoint", { compactTargetTokens: 400 });
+    expect(untuned.some((message) => message.role === "system" && String(message.content).startsWith("[Context checkpoint]"))).toBe(false);
+  });
 });

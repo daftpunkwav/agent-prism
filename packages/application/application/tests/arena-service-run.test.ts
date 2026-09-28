@@ -204,3 +204,52 @@ describe("ArenaService.assertKnownDimension contract", () => {
     expect((thrown as { status?: number } | null)?.status).toBe(422);
   });
 });
+
+describe("ArenaService.run outline retention", () => {
+  const COMPLETE = { type: "complete", pipeline: "p", turn: 1, metrics: { success: true } };
+
+  async function runOutlineNote(events: unknown[]): Promise<string> {
+    const runner = mockRunner();
+    async function* scripted(): AsyncGenerator<unknown> {
+      for (const event of events) yield event;
+    }
+    runner.streamParallel = vi.fn().mockReturnValue(scripted());
+    const store = mockSessions();
+    const service = new ArenaService({
+      router: mockRouter() as any,
+      runnerFactory: async () => runner as any,
+      answerJudge: mockAnswerJudge(),
+      sessions: new SessionService({ store }),
+    });
+    for await (const _event of service.run({} as any)) {
+      // drain
+    }
+    const records = await store.list();
+    const entries = await store.listEntries((records[0] as { id: string }).id);
+    const note = entries.find((entry) => entry.kind === "note");
+    return note?.content ?? "";
+  }
+
+  it("writes the outline digest without an omission marker under the retention cap", async () => {
+    const note = await runOutlineNote([
+      { type: "thought", pipeline: "p", turn: 1, content: "working" },
+      COMPLETE,
+    ]);
+    expect(note).toContain("turn 1: completed");
+    expect(note).not.toContain("omitted");
+  });
+
+  it("caps the outline material and admits the dropped events in the note", async () => {
+    // One event past the 5 000 retention: the oldest drops and the note must say so,
+    // or a long run's outline would silently fold its early turns as if complete.
+    const events = Array.from({ length: 5_000 }, (_v, i) => ({
+      type: "thought",
+      pipeline: "p",
+      turn: 1,
+      content: `step ${i}`,
+    }));
+    const note = await runOutlineNote([...events, COMPLETE]);
+    expect(note).toContain("turn 1: completed");
+    expect(note).toContain("(1 earlier event(s) omitted)");
+  });
+});
