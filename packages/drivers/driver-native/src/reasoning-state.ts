@@ -13,9 +13,9 @@
 
 import type { LlmAssistantMessage, LlmMessage, ReasoningMode } from "@agentprism/contracts";
 import { parseScoreVerdict, REFLEXION_RETRY_KEYWORDS, TOT_WIDTH_DEFAULT } from "@agentprism/driver-run-support";
-import { COT_PHASE_HINT, REFLEXION_PHASE_HINT, totBranchHint, totScoreHint } from "./prompts.js";
+import { COT_PHASE_HINT, REFLEXION_PHASE_HINT, totBranchHint, totScoreHint, totSelectHint } from "./prompts.js";
 
-export { COT_PHASE_HINT, REFLEXION_PHASE_HINT, totBranchHint, totScoreHint };
+export { COT_PHASE_HINT, REFLEXION_PHASE_HINT, totBranchHint, totScoreHint, totSelectHint };
 
 export type ReasoningPhase = "think" | "act" | "evaluate" | "reflect" | "done";
 
@@ -80,6 +80,9 @@ export function phaseHint(state: ReasoningState): LlmMessage[] {
   if (state.mode === "tot" && state.phase === "evaluate") {
     const plan = state.plans[state.totRound] ?? "(none)";
     return [{ role: "user", content: totScoreHint(state.totRound, state.totWidth, plan) }];
+  }
+  if (state.mode === "tot" && state.phase === "act" && state.selectedPlan !== "") {
+    return [{ role: "user", content: totSelectHint(state.selectedPlan) }];
   }
   if (state.mode === "reflexion" && state.phase === "reflect") {
     return [{ role: "user", content: REFLEXION_PHASE_HINT }];

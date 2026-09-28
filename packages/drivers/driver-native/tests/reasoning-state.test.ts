@@ -38,8 +38,10 @@ describe("native ToT branching", () => {
     expect(state.phase).toBe("act");
     expect(state.selectedPlan).toBe("Plan B");
     expect(state.scores).toEqual([4, 9]);
-    // The execution phase binds tools again.
+    // The execution phase binds tools again and carries the winning plan.
     expect(shouldBindTools(state)).toBe(true);
+    expect(phaseHint(state)[0]?.content).toContain("ToT act");
+    expect(phaseHint(state)[0]?.content).toContain("Plan B");
   });
 
   it("scores unparsable replies as 0 so the scored branch wins", () => {

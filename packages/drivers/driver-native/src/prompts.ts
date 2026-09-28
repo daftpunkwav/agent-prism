@@ -33,6 +33,11 @@ export function totScoreHint(round: number, width: number, plan: string): string
   );
 }
 
+/** ToT act phase: carry the winning plan into the tool-bound turns (mirrors the LangGraph select node). */
+export function totSelectHint(plan: string): string {
+  return `[Phase: ToT act] The highest-scored plan was selected. Follow it.\nPlan:\n${plan}`;
+}
+
 /** Reflexion reflect phase: critique the current result. */
 export const REFLEXION_PHASE_HINT =
   "[Phase: Reflect] Evaluate whether the current result completes the task; if insufficient, say what to improve or redo.";
