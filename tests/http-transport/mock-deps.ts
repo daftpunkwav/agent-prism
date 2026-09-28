@@ -13,7 +13,21 @@ import { vi } from "vitest";
 import { FileThreadStore, SessionService, ThreadService, type ArenaService } from "@agentprism/application";
 import { InMemorySessionStore } from "@agentprism/session";
 import { AtomicJsonFile } from "@agentprism/persistence";
-import { createHttpApplication, type HttpApplicationDeps, type HttpApp } from "@agentprism/http-runtime";
+import {
+  createHttpApplication,
+  type McpController,
+  type MemoryStatusController,
+  type HttpApplicationDeps,
+  type HttpApp,
+  type RuntimeKnobsController,
+  type SkillsController,
+} from "@agentprism/http-runtime";
+import {
+  RUNTIME_KNOB_FIELDS,
+  staticDefaultRuntimeKnobs,
+  type McpServerConfigView,
+  type RuntimeKnobs,
+} from "@agentprism/contracts";
 import { registerArenaRoutes } from "@agentprism/route-arena";
 import { registerBuilderRoutes } from "@agentprism/route-builder";
 import { registerProjectRoutes } from "@agentprism/route-projects";
@@ -42,17 +56,21 @@ export function mockThreadService(arena: ArenaService = { run: vi.fn() } as unkn
   });
 }
 
-/** Stateful runtime-knob double: merges updates so a PUT is observable through the next GET. */
-export function mockRuntimeKnobs() {
-  let knobs: Record<string, unknown> = { contextWindowMessages: 12 };
+/**
+ * Stateful runtime-knob double over the real knob vocabulary: the current values
+ * are a full RuntimeKnobs (factory defaults) and `fields` serves a real slice of
+ * RUNTIME_KNOB_FIELDS, so the mock cannot drift from the settings wire contract.
+ */
+export function mockRuntimeKnobs(): RuntimeKnobsController {
+  let knobs: RuntimeKnobs = staticDefaultRuntimeKnobs();
   return {
     current: () => knobs,
-    fields: () => [{ key: "contextWindowMessages", group: "context", kind: "number" }],
+    fields: () => RUNTIME_KNOB_FIELDS.filter((field) => field.key === "contextWindowMessages"),
     update: async (raw: unknown) => {
-      knobs = { ...knobs, ...(raw as Record<string, unknown>) };
+      knobs = { ...knobs, ...(raw as Partial<RuntimeKnobs>) };
       return knobs;
     },
-  } as any;
+  };
 }
 
 /**
@@ -60,7 +78,7 @@ export function mockRuntimeKnobs() {
  * mode so the route's persist-failure mapping can be exercised (the real store
  * persists on clear and can reject).
  */
-export function mockMemoryStatus(options: { failClear?: string } = {}) {
+export function mockMemoryStatus(options: { failClear?: string } = {}): MemoryStatusController {
   let episodicCount = 2;
   let semanticCount = 3;
   return {
@@ -75,7 +93,7 @@ export function mockMemoryStatus(options: { failClear?: string } = {}) {
       episodicCount = 0;
       semanticCount = 0;
     },
-  } as any;
+  };
 }
 
 /**
@@ -83,7 +101,7 @@ export function mockMemoryStatus(options: { failClear?: string } = {}) {
  * "bundled skills are read-only" (409) and "already exists" (409) sentinels,
  * everything else a plain defect (400).
  */
-export function mockSkills() {
+export function mockSkills(): SkillsController {
   const skills: Array<{ name: string; description: string; source: string; enabled: boolean }> = [
     { name: "bundled-a", description: "bundled", source: "bundled", enabled: true },
     { name: "user-a", description: "user", source: "user", enabled: true },
@@ -115,12 +133,12 @@ export function mockSkills() {
       if (skill === undefined) throw new Error(`unknown user skill ${JSON.stringify(name)}`);
       skill.enabled = enabled;
     },
-  } as any;
+  };
 }
 
-/** Stateful MCP double: full-list replace with parser-shaped validation. */
-export function mockMcp() {
-  let servers: Array<Record<string, unknown>> = [{ command: "npx", args: ["-y", "demo"], enabled: true }];
+/** Stateful MCP double over the contract view: full-list replace with parser-shaped validation. */
+export function mockMcp(): McpController {
+  let servers: McpServerConfigView[] = [{ command: "npx", args: ["-y", "demo"], enabled: true }];
   return {
     list: () => servers.map((server) => ({ ...server })),
     replace: (input: unknown) => {
@@ -134,10 +152,10 @@ export function mockMcp() {
           throw invalid("MCP_SERVERS[0].command must be a non-empty string");
         }
       }
-      servers = input.map((entry) => ({ ...(entry as Record<string, unknown>) }));
+      servers = input.map((entry) => ({ ...(entry as McpServerConfigView) }));
       return servers.map((server) => ({ ...server }));
     },
-  } as any;
+  };
 }
 
 /** Minimal mock deps covering every route under test. */

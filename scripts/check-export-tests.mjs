@@ -41,7 +41,7 @@ const PENDING = {
   "@agentprism/context-mentions": ["renderMentionBlock", "resolveMention"],
   "@agentprism/contracts": [
     "JudgeRequestSchema", "bannerPrefixForFramework", "countActionEvents", "fillWorkspaceNames",
-    "isAssistantMessage", "isToolMessage", "isUnlimitedSteps", "staticDefaultRuntimeKnobs",
+    "isAssistantMessage", "isToolMessage", "isUnlimitedSteps",
     "systemErrorEvent", "systemReportEvent", "tokenUpdateEvent",
   ],
   "@agentprism/dimensions": ["REASONING_OPTIONS", "currentEndpointLabel"],
