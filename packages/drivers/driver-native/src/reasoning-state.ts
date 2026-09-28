@@ -28,7 +28,6 @@ export interface ReasoningState {
   /** ToT branch scores, parallel to plans (unparsable replies score 0). */
   scores: number[];
   selectedPlan: string;
-  reflections: string[];
   cotDone: boolean;
   /** Index of the ToT branch currently being generated/scored (0-based). */
   totRound: number;
@@ -42,7 +41,7 @@ export interface ReasoningState {
  *
  * @param mode Reasoning strategy selecting the initial phase and tool gating.
  * @param options Optional overrides; totWidth clamps to at least 1 branch.
- * @returns Fresh state with empty plans, scores, and reflections.
+ * @returns Fresh state with empty plans and scores.
  */
 export function createReasoningState(mode: ReasoningMode, options?: { totWidth?: number }): ReasoningState {
   const initialPhase = mode === "cot_tool" || mode === "tot" ? "think" : "act";
@@ -52,7 +51,6 @@ export function createReasoningState(mode: ReasoningMode, options?: { totWidth?:
     plans: [],
     scores: [],
     selectedPlan: "",
-    reflections: [],
     cotDone: false,
     totRound: 0,
     totWidth: Math.max(1, options?.totWidth ?? TOT_WIDTH_DEFAULT),
@@ -130,7 +128,8 @@ export function afterLlm(
     return state;
   }
   if (state.mode === "reflexion" && state.phase === "reflect" && !hadToolCalls) {
-    state.reflections.push(content.slice(0, 500));
+    // The critique itself is already in the message history (the reflect turn's
+    // assistant reply was pushed), so the retry turn sees it without extra state.
     const needRetry = REFLEXION_RETRY_KEYWORDS.some((keyword) => content.includes(keyword));
     if (needRetry && state.reflexionRound < state.maxReflexion) {
       state.reflexionRound += 1;
