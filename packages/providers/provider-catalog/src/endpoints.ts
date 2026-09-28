@@ -50,7 +50,11 @@ export function normalizeBaseUrl(rawUrl: string): string {
     const parsed = new URL(trimmed);
     return `${parsed.protocol}//${parsed.host}${parsed.pathname}${parsed.search}${parsed.hash}`.replace(/\/+$/, "");
   } catch {
-    return trimmed.toLowerCase();
+    // Unparseable input: keep the fingerprint deterministic without violating
+    // the path case-sensitivity contract — lowercase only the scheme+authority
+    // head (everything before the first "/", "?" or "#"), leave the rest as-is.
+    const authorityEnd = /^[^/?#]*/.exec(trimmed)?.[0].length ?? 0;
+    return `${trimmed.slice(0, authorityEnd).toLowerCase()}${trimmed.slice(authorityEnd)}`;
   }
 }
 

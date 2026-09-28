@@ -49,8 +49,9 @@ describe("normalizeBaseUrl equivalence contract (mirrored by connKey in apps/web
     expect(normalizeBaseUrl("  https://api.example.com/v1///  ")).toBe("https://api.example.com/v1");
   });
 
-  it("unparseable input falls back to fully lowercased trim", () => {
-    expect(normalizeBaseUrl("  NOT-A-URL/Path  ")).toBe("not-a-url/path");
+  it("unparseable input lowercases only the scheme+authority head, keeping path case", () => {
+    expect(normalizeBaseUrl("  NOT-A-URL/Path  ")).toBe("not-a-url/Path");
+    expect(normalizeBaseUrl("  NOT-A-URL/Path  ")).not.toBe(normalizeBaseUrl("  NOT-A-URL/path  "));
   });
 
   it("connectionFingerprint appends the api format", () => {

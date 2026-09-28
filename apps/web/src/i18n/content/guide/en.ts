@@ -125,7 +125,7 @@ const MULTI_TURN_DOC = {
     "Request body: `question` (this turn) + `messages[]` (the prior alternating user/assistant history, up to 24 entries).",
     "Every comparison column receives the same `messages` and `question`; only the PipelineConfig differs on the comparison dimension.",
     "Drivers assemble the prompt via `buildInitialMessages(system, user, history)`: System → history → this turn's Human.",
-    "SSE events carry `turn` (1-based): the backend derives it as `Math.floor(messages.length / 2) + 1` so the frontend can render turns in segments.",
+    "SSE events carry `turn` (1-based): the backend derives it as the replayed history's user-message count plus one, so the frontend can render turns in segments.",
   ],
   limits: [
     "A single message is capped at 4000 characters; total history is capped at 24000 characters (request validation fails beyond that).",

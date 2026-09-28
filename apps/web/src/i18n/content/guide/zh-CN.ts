@@ -124,7 +124,7 @@ const MULTI_TURN_DOC = {
     "请求体：`question`（本轮）+ `messages[]`（此前 user/assistant 交替历史，最多 24 条）。",
     "各对比列接收相同 `messages` 与 `question`，仅 PipelineConfig 在对比维上不同。",
     "驱动经 `buildInitialMessages(system, user, history)` 组装：System → 历史 → 本轮 Human。",
-    "SSE 事件携带 `turn`（1-based）：后端按 `Math.floor(messages.length / 2) + 1` 派生，供前端按轮分段展示。",
+    "SSE 事件携带 `turn`（1-based）：后端按重放历史中的 user 消息数加一派生，供前端按轮分段展示。",
   ],
   limits: [
     "单条消息最长 4000 字符；历史总字符上限 24000（超出则请求校验失败）。",

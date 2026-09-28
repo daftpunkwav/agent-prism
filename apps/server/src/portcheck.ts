@@ -39,7 +39,12 @@ export class PortInUseError extends Error {
   }
 }
 
-/** Port-occupancy check: a hit on either the bind test or the connect test counts as in use. */
+/**
+ * Port-occupancy check: a hit on either the bind test or the connect test counts as in use.
+ * Advisory only — the probe cannot close the race where another process binds
+ * between this check and the real listen; that window is owned by the caller
+ * (server.ts treats a post-probe EADDRINUSE listener error as the authority).
+ */
 export function portInUse(host: string, port: number, timeoutMs = 500): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false;

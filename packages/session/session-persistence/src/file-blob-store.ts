@@ -12,12 +12,31 @@
  * null so a missing blob degrades to the inline preview, never an error.
  */
 
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { SessionBlobStore } from "@agentprism/contracts";
 
 /** Blob filename suffix (session blobs share one directory per store). */
 export const BLOB_FILE_SUFFIX = ".blob.txt";
+
+/**
+ * FNV-1a of the raw session id, base-36: distinct ids whose sanitized forms
+ * collide ("session/1" and "session_1" both sanitize to "session_1") still get
+ * distinct filename prefixes, so blobs can never cross-talk between sessions.
+ */
+function sessionIdHash(sessionId: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < sessionId.length; i += 1) {
+    hash ^= sessionId.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/** Sanitized session-id infix shared by the filename and the purge prefix. */
+function safeInfix(sessionId: string): string {
+  return `${sessionId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64) || "session"}.${sessionIdHash(sessionId)}`;
+}
 
 /** Filesystem blob sidecar rooted at one directory (created on demand). */
 export class FileBlobStore implements SessionBlobStore {
@@ -29,13 +48,17 @@ export class FileBlobStore implements SessionBlobStore {
 
   /** Blob filename infix for one key (operator-safe, bounded, sequence-scoped). */
   static fileName(sessionId: string, seq: number): string {
-    const safe = sessionId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64) || "session";
-    return `${safe}.${seq}${BLOB_FILE_SUFFIX}`;
+    return `${safeInfix(sessionId)}.${seq}${BLOB_FILE_SUFFIX}`;
   }
 
   async saveBlob(sessionId: string, seq: number, text: string): Promise<void> {
     mkdirSync(this.dir, { recursive: true });
-    writeFileSync(path.join(this.dir, FileBlobStore.fileName(sessionId, seq)), text, "utf-8");
+    const target = path.join(this.dir, FileBlobStore.fileName(sessionId, seq));
+    // Torn-write containment: a crash mid-write must never leave a partial blob
+    // that reads back as truncated ledger text. Same-volume rename is atomic.
+    const tmp = `${target}.tmp`;
+    writeFileSync(tmp, text, "utf-8");
+    renameSync(tmp, target);
   }
 
   async loadBlob(sessionId: string, seq: number): Promise<string | null> {
@@ -53,10 +76,13 @@ export class FileBlobStore implements SessionBlobStore {
     } catch {
       return false;
     }
-    const safe = sessionId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64) || "session";
+    const prefix = `${safeInfix(sessionId)}.`;
     let removed = false;
     for (const entry of entries) {
-      if (entry.startsWith(`${safe}.`) && entry.endsWith(BLOB_FILE_SUFFIX)) {
+      // The .tmp twin of an atomic write (crash between write and rename) is
+      // purged alongside the blob, so a torn write never leaks disk.
+      const isBlob = entry.endsWith(BLOB_FILE_SUFFIX) || entry.endsWith(`${BLOB_FILE_SUFFIX}.tmp`);
+      if (entry.startsWith(prefix) && isBlob) {
         try {
           rmSync(path.join(this.dir, entry));
           removed = true;

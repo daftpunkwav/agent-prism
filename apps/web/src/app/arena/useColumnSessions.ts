@@ -65,12 +65,17 @@ function clipAnswer(text: string): string {
 }
 
 /**
- * Single source of turn derivation (aligned with the backend formula
- * ``len(messages)//2 + 1``). A module-level pure function shared by session
- * transcripts and useArenaStream's run stripping, avoiding dual-source drift.
+ * Single source of turn derivation (aligned with the backend: one user message
+ * opens one turn, so the next turn is the user-message count plus one). A
+ * module-level pure function shared by session transcripts and useArenaStream's
+ * run stripping, avoiding dual-source drift.
  */
 export function deriveTurn(messages: ChatMessage[]): number {
-  return Math.floor(messages.length / 2) + 1;
+  let userMessages = 0;
+  for (const message of messages) {
+    if (message.role === "user") userMessages += 1;
+  }
+  return userMessages + 1;
 }
 
 /** Independent per-column sessions for Arena follow-ups. */

@@ -23,11 +23,12 @@ function renderSessions() {
 }
 
 describe("deriveTurn", () => {
-  it("derives the backend formula len//2 + 1", () => {
+  it("derives the backend rule: one user message per turn, next turn = count + 1", () => {
     expect(deriveTurn([])).toBe(1);
-    expect(deriveTurn([{ role: "user", content: "q" }])).toBe(1);
     expect(deriveTurn([{ role: "user", content: "q" }, { role: "assistant", content: "a" }])).toBe(2);
-    expect(deriveTurn(new Array(5).fill({ role: "user", content: "x" }))).toBe(3);
+    expect(deriveTurn(new Array(5).fill({ role: "user", content: "x" }))).toBe(6);
+    // An unanswered trailing question has opened its turn already.
+    expect(deriveTurn([{ role: "user", content: "q" }])).toBe(2);
   });
 });
 

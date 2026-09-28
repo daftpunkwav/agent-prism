@@ -26,7 +26,7 @@ import type { SessionService } from "./session-service.js";
 /** Workspace name prefix for thread-owned workspaces: `t-<thread id>` (ids are 12-hex). */
 const THREAD_WORKSPACE_PREFIX = "t-";
 
-/** Event tail kept for answer extraction (answers arrive late; the head is never needed). */
+/** Event tail kept for answer extraction, counted in events (answers arrive late; the head is never needed). */
 const ANSWER_EVENT_TAIL = 2_000;
 
 /** Narrow workspace seam the service needs (satisfied by WorkspaceRegistry). */
@@ -49,7 +49,7 @@ export interface ThreadServiceDeps {
   /** Execution ledger: thread turns land here as agent sessions (absent = no agent ledger). */
   sessions?: SessionService;
   /** Event tail retained for answer extraction, in events (default 2000). */
-  answerTailChars?: number;
+  answerTailEvents?: number;
 }
 
 export class ThreadService {
@@ -58,7 +58,7 @@ export class ThreadService {
 
   constructor(deps: ThreadServiceDeps) {
     this.deps = deps;
-    this.answerTail = deps.answerTailChars ?? ANSWER_EVENT_TAIL;
+    this.answerTail = deps.answerTailEvents ?? ANSWER_EVENT_TAIL;
   }
 
   /** Creates a root thread with a pinned config (empty title gets a generated one). */

@@ -599,7 +599,9 @@ export async function assemble(): Promise<RuntimeComponents> {
     workspaceRegistry,
     clock,
     sessions,
-    answerTailChars: settings.threadAnswerTailChars,
+    // Field name says "events" (the unit actually kept); the env knob keeps its
+    // documented THREAD_ANSWER_TAIL_CHARS name for config compatibility.
+    answerTailEvents: settings.threadAnswerTailChars,
   });
   const providers = new ProviderService({ providerStore, providerCommand, idGenerator });
   const workspaces = new WorkspaceFileService({ workspaceRegistry });

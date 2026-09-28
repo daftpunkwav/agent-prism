@@ -41,7 +41,19 @@ describe("FileBlobStore", () => {
     // Same (sanitized) key must read back regardless of the raw id spelling.
     await expect(store.loadBlob("../evil id/x", 1)).resolves.toBe("payload");
     expect(FileBlobStore.fileName("../evil id/x", 1)).toMatch(/\.1\.blob\.txt$/);
-    expect(FileBlobStore.fileName("", 1)).toContain("session.1");
+    expect(FileBlobStore.fileName("", 1)).toMatch(/^session\.[a-z0-9]+\.1\.blob\.txt$/);
+  });
+
+  it("keeps distinct ids with equal sanitized forms from sharing blob files", async () => {
+    // "session/1" and "session_1" both sanitize to "session_1"; the raw-id hash
+    // in the filename is what keeps their blobs from cross-talking.
+    await store.saveBlob("session/1", 1, "from slash id");
+    await store.saveBlob("session_1", 1, "from underscore id");
+    await expect(store.loadBlob("session/1", 1)).resolves.toBe("from slash id");
+    await expect(store.loadBlob("session_1", 1)).resolves.toBe("from underscore id");
+    await store.deleteSessionBlobs("session/1");
+    await expect(store.loadBlob("session/1", 1)).resolves.toBeNull();
+    await expect(store.loadBlob("session_1", 1)).resolves.toBe("from underscore id");
   });
 
   it("purges one session's blobs and reports whether anything was removed", async () => {

@@ -31,11 +31,16 @@ export function loadEnvFile(filePath: string = ENV_FILE): Record<string, string>
     // Shell-style `export KEY=value` files are common; the prefix is not part of the key.
     const key = line.slice(0, eq).trim().replace(/^export\s+/i, "");
     let value = line.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
+    const first = value[0];
+    const balancedQuote =
+      (first === '"' && value.endsWith('"')) || (first === "'" && value.endsWith("'"));
+    if (balancedQuote && value.length >= 2) {
       value = value.slice(1, -1);
+    } else if ((first === '"' || first === "'") && value.length >= 2) {
+      // An unbalanced quote stays in the value verbatim (no silent rewriting of
+      // operator data), but the likely-mistyped quoting is called out loudly:
+      // a quote inside an API key surfaces as a mysterious auth failure later.
+      console.warn(`[config] .env value for "${key}" starts with an unmatched quote; keeping it verbatim`);
     }
     if (key !== "") values[key] = value;
   }

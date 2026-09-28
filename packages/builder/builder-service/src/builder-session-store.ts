@@ -306,14 +306,14 @@ export class BuilderSessionStore {
     return queue ?? [];
   }
 
-  /** Client-facing view. */
+  /** Client-facing view. Nested objects are cloned: a view handed across the HTTP boundary must not alias live store state. */
   view(record: BuilderSessionRecord): BuilderSessionView {
     return {
       id: record.id,
       name: record.name,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
-      composition: record.composition,
+      composition: structuredClone(record.composition),
       history: [...record.history],
       running: record.running,
       turn_count: record.turnCount,

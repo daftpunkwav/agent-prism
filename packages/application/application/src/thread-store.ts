@@ -295,7 +295,7 @@ export class FileThreadStore {
     this.scheduleFlush();
   }
 
-  /** Wire view without the transcript. */
+  /** Wire view without the transcript. The pinned config is cloned: a view handed across the HTTP boundary must not alias live store state. */
   view(record: ThreadRecord): ThreadView {
     return {
       id: record.id,
@@ -306,7 +306,7 @@ export class FileThreadStore {
       turn_count: record.turnCount,
       workspace: record.workspace,
       fork_of: record.forkOf,
-      config: record.config,
+      config: structuredClone(record.config),
     };
   }
 
