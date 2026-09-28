@@ -146,6 +146,26 @@ describe("runAutogenFrameworkBridge", () => {
     ).toBe(true);
   });
 
+  it("sends the unlimited budget as the -1 wire sentinel, never Infinity", async () => {
+    const context = contextWith(
+      { invoke: async () => ({ text: "ok", toolCalls: [] }), async *stream() {} },
+    );
+    context.config = PipelineConfigSchema.parse({ label: "col", harness: "bare", max_steps: -1 });
+    const events: ArenaEvent[] = [];
+    for await (const event of runAutogenFrameworkBridge({
+      context,
+      interpreter: process.execPath,
+      bootstrapPath: FAKE_BOOTSTRAP,
+    })) {
+      events.push(event);
+    }
+    // JSON.stringify(Infinity) is `null`, which crashed the Python bootstrap's
+    // int() parse: the handshake must carry the -1 sentinel instead. The echo
+    // rides the reviewer reflect channel, so it carries the speaker prefix.
+    const echo = events.find((event) => event.type === "reflect" && event.content.includes("budget:"));
+    expect(echo?.content.endsWith("budget:-1")).toBe(true);
+  });
+
   it("feeds the drift guard the transcript's prior tool calls", async () => {
     vi.stubEnv("FAKE_SCENARIO", "drift");
     try {

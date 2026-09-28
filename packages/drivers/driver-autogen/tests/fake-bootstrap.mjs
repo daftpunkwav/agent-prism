@@ -25,8 +25,11 @@ function runSession(lines) {
         content: `catalog:${message.tools.map((tool) => tool.name).join(",")}`,
       });
       // Reviewer speech rides the reflect channel: the handshake task text becomes
-      // observable there without touching the coder/answer channel.
+      // observable there without touching the coder/answer channel. The wire
+      // budget echo exposes the handshake's maxSteps verbatim (tests pin the -1
+      // unlimited sentinel against an Infinity-serialize-to-null regression).
       send({ type: "event", kind: "assistant", speaker: "reviewer", content: `task:${message.question}` });
+      send({ type: "event", kind: "assistant", speaker: "reviewer", content: `budget:${message.maxSteps}` });
       send({
         type: "llm_request",
         id: "llm-1",

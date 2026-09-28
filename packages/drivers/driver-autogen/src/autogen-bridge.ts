@@ -71,7 +71,6 @@ export async function* runAutogenFrameworkBridge(options: AutogenBridgeOptions):
   const started = context.clock.now();
   const stats = { step: 0, turns: 0, toolCalls: 0 };
   const maxSteps = stepBudgetFor(config.max_steps);
-
   // Same prompt assembly every in-process column runs on (system + rendered
   // history + this turn's user part). The user part becomes the group chat's
   // task; the system part is merged into the child's role copy per completion.
@@ -190,7 +189,10 @@ export async function* runAutogenFrameworkBridge(options: AutogenBridgeOptions):
         description: definition.description,
         parameters: (definition.jsonSchema ?? { type: "object", properties: {} }) as Record<string, unknown>,
       })),
-      maxSteps,
+      // Infinity (the unlimited budget) is not JSON-representable and would reach
+      // the child as null: the wire carries the -1 sentinel instead, which the
+      // bootstrap maps onto a generous finite chat bound.
+      maxSteps: Number.isFinite(maxSteps) ? maxSteps : -1,
     },
     handlers,
     onEvent: (message) => {

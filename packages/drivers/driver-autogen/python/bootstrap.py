@@ -357,10 +357,20 @@ async def main() -> None:
         ),
         model_client=client,
     )
+    # The wire budget is a finite number; -1 is the arena's unlimited sentinel
+    # (JSON cannot carry Infinity). The host honors unlimited on its own llm
+    # handler, so the child only needs a generous finite chat bound as the
+    # backstop when the reviewer never says TERMINATE.
+    try:
+        budget_steps = int(start.get("maxSteps", 8))
+    except (TypeError, ValueError):
+        budget_steps = 8
+    if budget_steps < 0:
+        budget_steps = 500
     team = RoundRobinGroupChat(
         [coder, reviewer],
         termination_condition=TextMentionTermination(TERMINATE)
-        | MaxMessageTermination(max_messages=int(start.get("maxSteps", 8)) * 2 + 2),
+        | MaxMessageTermination(max_messages=budget_steps * 2 + 2),
     )
 
     last_coder = ""

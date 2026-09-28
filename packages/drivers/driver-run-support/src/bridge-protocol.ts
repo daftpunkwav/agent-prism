@@ -27,9 +27,13 @@ export interface BridgeStart {
   question: string;
   /** Tools the child may request, with the schema the framework advertises to its agents. */
   tools: Array<{ name: string; description: string; parameters: Record<string, unknown> }>;
-  /** Step budget. autogen maps it onto MaxMessageTermination; the crewai
-      bootstrap is structurally bounded and the host enforces the budget on
-      its llm_request handler instead. */
+  /**
+   * Step budget. autogen maps it onto MaxMessageTermination; the crewai
+   * bootstrap is structurally bounded and the host enforces the budget on
+   * its llm_request handler instead. Wire-legal values are finite numbers;
+   * -1 is the unlimited sentinel (JSON cannot carry Infinity, so a host must
+   * translate the in-memory Infinity budget before writing the handshake).
+   */
   maxSteps: number;
 }
 
