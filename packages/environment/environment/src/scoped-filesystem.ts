@@ -304,7 +304,7 @@ export class ScopedFileSystem {
     filePath: string,
     maxBytes: number,
     startByte = 0,
-  ): { text: string; truncated: boolean; bytesRead: number } {
+  ): { text: string; truncated: boolean; bytesConsumed: number } {
     const target = this.canonicalize(filePath);
     if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`);
     const real = this.safeReadPath(target);
@@ -323,13 +323,14 @@ export class ScopedFileSystem {
       return {
         text: buffer.subarray(0, end).toString("utf8"),
         // "More content follows" counts from the window's start, so a caller reading
-        // successive windows can stop exactly at the last one. `bytesRead` is the
-        // distance to the next window: it stops at the last complete character, so a
-        // character the window cut is re-read whole by the next window instead of
-        // coming back as a replacement character (end === 0 means not even one
-        // character fit — advance by `read` so the caller cannot spin in place).
+        // successive windows can stop exactly at the last one. `bytesConsumed` is the
+        // distance to the next window, not the raw byte count read: it stops at the
+        // last complete character, so a character the window cut is re-read whole by
+        // the next window instead of coming back as a replacement character (when not
+        // even one character fits, the whole read is consumed so the caller cannot
+        // spin in place).
         truncated: from + read < size,
-        bytesRead: end === 0 ? read : end,
+        bytesConsumed: end === 0 ? read : end,
       };
     } catch {
       throw new WorkspaceError(`Error: file not found: ${filePath}`);

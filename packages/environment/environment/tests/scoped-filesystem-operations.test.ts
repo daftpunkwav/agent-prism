@@ -95,7 +95,7 @@ describe("ScopedFileSystem readFileHead", () => {
       fs.writeFile("log.txt", "0123456789");
       const first = fs.readFileHead("log.txt", 4);
       expect(first.text).toBe("0123");
-      expect(first.bytesRead).toBe(4);
+      expect(first.bytesConsumed).toBe(4);
       expect(first.truncated).toBe(true);
 
       const second = fs.readFileHead("log.txt", 4, 4);

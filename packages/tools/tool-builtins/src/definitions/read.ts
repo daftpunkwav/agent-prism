@@ -45,7 +45,7 @@ function toLines(text: string): string[] {
  */
 function readFromOffset(
   fs: {
-    readFileHead(path: string, maxBytes: number, startByte?: number): { text: string; truncated: boolean; bytesRead: number };
+    readFileHead(path: string, maxBytes: number, startByte?: number): { text: string; truncated: boolean; bytesConsumed: number };
   },
   filePath: string,
   offset: number,
@@ -64,7 +64,7 @@ function readFromOffset(
     const window = fs.readFileHead(filePath, READ_WINDOW_BYTES, position);
     // Advance by the bytes the window consumed: the decoded text can be shorter when a
     // character was cut at the cap, and advancing by the text would re-read a fragment.
-    position += window.bytesRead;
+    position += window.bytesConsumed;
     moreContent = window.truncated;
     const lines = toLines(window.text);
     // A window that stops mid-line ends with a fragment: it is not a line until the
