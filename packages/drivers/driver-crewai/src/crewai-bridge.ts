@@ -185,7 +185,12 @@ export async function* runCrewaiFrameworkBridge(options: CrewaiBridgeOptions): A
         description: definition.description,
         parameters: (definition.jsonSchema ?? { type: "object", properties: {} }) as Record<string, unknown>,
       })),
-      maxSteps,
+      // Infinity (the unlimited budget) is not JSON-representable and would reach
+      // the child as null, violating the wire contract (finite numbers; the -1
+      // sentinel means unlimited — see bridge-protocol.ts). The autogen bridge
+      // already translates it; the crewai bootstrap ignores this field today
+      // (the budget is enforced host-side), but the handshake stays wire-legal.
+      maxSteps: Number.isFinite(maxSteps) ? maxSteps : -1,
     },
     handlers,
     onEvent: (message) => {
