@@ -152,6 +152,10 @@ export function buildPipelineBase(
     model_id: endpoint.model,
     thinking_capable: endpoint.thinking_capable,
     thinking_level: effectiveThinkingLevel(endpoint, String(base.thinking_level ?? "off")),
+    // Overwritten below once the effective thinking mode is known; the budget
+    // seed rides the catalog default (a pair level name in budget mode, 0 otherwise).
+    thinking_budget: base.thinking_budget ?? 0,
+    thinking_max_tokens: 0,
     temperature: Number(base.temperature ?? snapToOptions(provider.temperature, TEMPERATURE_OPTIONS)),
     top_p: Number(base.top_p ?? snapToOptions(provider.top_p, TOP_P_OPTIONS)),
     frequency_penalty: Number(base.frequency_penalty ?? snapToOptions(provider.frequency_penalty, PENALTY_OPTIONS)),
@@ -182,7 +186,11 @@ export function buildPipelineBase(
       data.thinking_capable = matched.thinking_capable;
       continue;
     }
-    if (key === "thinking_level") {
+    if (key === "thinking_level" || key === "thinking_budget" || key === "thinking_mode") {
+      // All three resolve together after the loop: the mode routes which of the
+      // two intensity fields applies, against the endpoint this column actually
+      // runs on (the catalog options were synced from the default endpoint and
+      // may not match it).
       continue;
     }
     // Synthetic custom fields collect into the nested record PipelineConfig carries.
@@ -194,12 +202,69 @@ export function buildPipelineBase(
     data[key] = coerceFieldValue(key, value);
   }
 
-  const requestedLevel = String(overrides.thinking_level ?? data.thinking_level ?? "off");
-  if (endpoint !== undefined) {
-    data.thinking_capable = endpoint.thinking_capable;
-    data.thinking_level = effectiveThinkingLevel(endpoint, requestedLevel);
-  }
+  applyThinkingFields(data, endpoint, overrides);
   return toPipelineConfig(data);
+}
+
+/**
+ * Applies the mutually exclusive thinking fields against the column's endpoint.
+ * The mode comes from the baseline override when given, else the endpoint's own
+ * configuration; the two intensity fields can never both apply:
+ * - level mode: the requested level resolves through effectiveThinkingLevel
+ *   (illegal levels fail closed to off); any budget override is rejected loud —
+ *   the catalog would normally have refused it already, but the endpoint may
+ *   have switched modes after the options were synced.
+ * - budget mode (anthropic endpoints with budget pairs): the budget token is a
+ *   pair level name resolved to its numeric pair; a non-off level override is
+ *   rejected loud for the same reason.
+ */
+function applyThinkingFields(
+  data: Record<string, unknown>,
+  endpoint: LlmEndpoint,
+  overrides: Record<string, unknown>,
+): void {
+  const baselineMode = overrides.thinking_mode === "budget" || overrides.thinking_mode === "levels"
+    ? overrides.thinking_mode
+    : undefined;
+  const mode = baselineMode ?? endpoint.thinking_mode;
+  data.thinking_mode = mode;
+  const requestedLevel =
+    overrides.thinking_level !== undefined ? String(overrides.thinking_level) : String(data.thinking_level ?? "off");
+  const requestedBudget =
+    overrides.thinking_budget !== undefined ? String(overrides.thinking_budget) : String(data.thinking_budget ?? 0);
+
+  const budgetApplicable =
+    endpoint.thinking_capable && endpoint.api_format === "anthropic_messages" && (endpoint.thinking_budget_pairs ?? []).length > 0;
+  if (mode === "budget" && budgetApplicable) {
+    if (overrides.thinking_level !== undefined && requestedLevel !== "off") {
+      throw new Error(
+        `Baseline thinking_level "${requestedLevel}" is not applicable in budget mode: unset it or switch the thinking mode`,
+      );
+    }
+    const pair = (endpoint.thinking_budget_pairs ?? []).find((candidate) => candidate.level === requestedBudget);
+    if (requestedBudget === "" || requestedBudget === "0") {
+      data.thinking_level = "off";
+      data.thinking_budget = 0;
+      data.thinking_max_tokens = 0;
+      return;
+    }
+    if (pair === undefined) {
+      throw new Error(`Baseline thinking_budget "${requestedBudget}" matches no budget pair on endpoint "${endpoint.id}"`);
+    }
+    data.thinking_level = "off";
+    data.thinking_budget = pair.budget_tokens;
+    data.thinking_max_tokens = pair.max_tokens;
+    return;
+  }
+
+  if (overrides.thinking_budget !== undefined && requestedBudget !== "" && requestedBudget !== "0") {
+    throw new Error(
+      `Baseline thinking_budget "${requestedBudget}" is not applicable in level mode: unset it or switch the thinking mode`,
+    );
+  }
+  data.thinking_level = effectiveThinkingLevel(endpoint, requestedLevel);
+  data.thinking_budget = 0;
+  data.thinking_max_tokens = 0;
 }
 
 /**
@@ -223,6 +288,8 @@ function toPipelineConfig(data: Record<string, unknown>): PipelineConfig {
     max_output_tokens: data.max_output_tokens as PipelineConfig["max_output_tokens"],
     thinking_level: data.thinking_level as PipelineConfig["thinking_level"],
     thinking_budget: Number(data.thinking_budget ?? 0),
+    thinking_max_tokens: Number(data.thinking_max_tokens ?? 0),
+    thinking_mode: data.thinking_mode === "budget" ? "budget" : "levels",
     thinking_capable: data.thinking_capable as PipelineConfig["thinking_capable"],
     max_steps: data.max_steps as PipelineConfig["max_steps"],
     toolset: data.toolset as PipelineConfig["toolset"],

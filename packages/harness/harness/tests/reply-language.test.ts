@@ -30,6 +30,8 @@ function context(language: string | undefined, override = ""): AgentExecutionCon
       max_output_tokens: 96_000,
       thinking_level: "off",
       thinking_budget: 0,
+      thinking_max_tokens: 0,
+      thinking_mode: "levels",
       thinking_capable: false,
       max_steps: 5,
       toolset: "read_only",

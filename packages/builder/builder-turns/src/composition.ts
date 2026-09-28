@@ -128,6 +128,8 @@ export function compositionToPipelineConfig(
     // Builder compositions select a level, not a token budget: 0 follows the
     // level mapping (and the endpoint budget pair when configured).
     thinking_budget: 0,
+    thinking_max_tokens: 0,
+    thinking_mode: "levels",
     thinking_capable: options.thinkingCapable,
     max_steps: composition.max_steps,
     toolset: baseToolsetFor(composition.tools),

@@ -24,6 +24,10 @@ export type ModelSlot = {
   thinking_level: string;
   /** Vendor-defined thinking levels; empty means the standard low/medium/high set. */
   thinking_levels: string[];
+  /** Which thinking configuration applies: level mapping or the budget pair table. Absent on rows imported from older JSON drafts. */
+  thinking_mode?: "levels" | "budget";
+  /** Budget-mode rows (level name → budget/output pair); anthropic messages format only. Absent on older rows. */
+  thinking_budget_pairs?: Array<{ level: string; budget_tokens: number; max_tokens: number }>;
   /** Anthropic thinking budget in tokens (0 = unset: the level mapping applies). */
   thinking_budget_tokens: number;
   /** Total output cap accompanying the budget (0 = unset: auto-raised). Must exceed the budget. */
@@ -98,6 +102,8 @@ export function blankModel(): ModelSlot {
     thinking_capable: false,
     thinking_level: "off",
     thinking_levels: [],
+    thinking_mode: "levels",
+    thinking_budget_pairs: [],
     thinking_budget_tokens: 0,
     thinking_max_tokens: 0,
     image_input: false,
@@ -144,6 +150,8 @@ export function groupEndpoints(cfg: ProviderConfig): ConnectionGroup[] {
         thinking_capable: false,
         thinking_level: "off",
         thinking_levels: [],
+        thinking_mode: "levels",
+        thinking_budget_pairs: [],
         thinking_budget_tokens: 0,
         thinking_max_tokens: 0,
         image_input: false,
@@ -193,6 +201,13 @@ export function groupEndpoints(cfg: ProviderConfig): ConnectionGroup[] {
       // The public view is a string; illegal values are rejected by the backend zod — pass through, storage clamps
       thinking_level: ep.thinking_level || "off",
       thinking_levels: Array.isArray(ep.thinking_levels) ? ep.thinking_levels.filter((l): l is string => typeof l === "string") : [],
+      thinking_mode: ep.thinking_mode === "budget" ? "budget" : "levels",
+      thinking_budget_pairs: Array.isArray(ep.thinking_budget_pairs)
+        ? ep.thinking_budget_pairs
+          .filter((pair): pair is { level: string; budget_tokens: number; max_tokens: number } =>
+            typeof pair?.level === "string" && typeof pair?.budget_tokens === "number" && typeof pair?.max_tokens === "number")
+          .map((pair) => ({ level: pair.level, budget_tokens: pair.budget_tokens, max_tokens: pair.max_tokens }))
+        : [],
       thinking_budget_tokens: typeof ep.thinking_budget_tokens === "number" ? ep.thinking_budget_tokens : 0,
       thinking_max_tokens: typeof ep.thinking_max_tokens === "number" ? ep.thinking_max_tokens : 0,
     });
@@ -231,6 +246,8 @@ export function flattenConnections(connections: ConnectionGroup[]): LlmEndpointU
         video_input: m.video_input,
         thinking_level: m.thinking_capable ? m.thinking_level : "off",
         thinking_levels: m.thinking_levels.filter((l) => l.trim() !== ""),
+        thinking_mode: m.thinking_mode === "budget" && c.api_format === "anthropic_messages" ? "budget" : "levels",
+        thinking_budget_pairs: m.thinking_budget_pairs ?? [],
         thinking_budget_tokens: m.thinking_budget_tokens,
         thinking_max_tokens: m.thinking_max_tokens,
         enabled: m.enabled !== false,

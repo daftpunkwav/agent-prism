@@ -112,3 +112,72 @@ describe("model dimension option label uniqueness (pipeline aggregate-key contra
     expect(ep2?.label).toBe("gpt-x (ep-2) (ep-2)");
   });
 });
+
+describe("mutually exclusive thinking axes follow the default endpoint's mode", () => {
+  it("level mode: the thinking axis mirrors the endpoint level set and the budget axis empties", () => {
+    const sync = makeSync([
+      makeEndpoint("ep-1", {
+        thinking_capable: true,
+        thinking_level: "max",
+        thinking_levels: ["max", "mid"],
+        thinking_mode: "levels",
+        thinking_budget_pairs: [{ level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 }],
+      }),
+    ], "ep-1");
+    sync.syncModelOptionsFromProvider();
+    const catalog = sync.catalog;
+    expect(catalog.dimensionOptions("thinking_level").map((o) => o.value)).toEqual(["off", "max", "mid"]);
+    expect(catalog.defaultBaseValue("thinking_level")).toBe("max");
+    expect(catalog.dimensionOptions("thinking_budget")).toEqual([]);
+    expect(catalog.defaultBaseValue("thinking_budget")).toBe(0);
+    expect(catalog.defaultBaseValue("thinking_mode")).toBe("levels");
+  });
+
+  it("standard level sets apply when the endpoint has no custom list", () => {
+    const sync = makeSync([
+      makeEndpoint("ep-1", { thinking_capable: true, thinking_level: "high" }),
+    ], "ep-1");
+    sync.syncModelOptionsFromProvider();
+    expect(sync.catalog.dimensionOptions("thinking_level").map((o) => o.value)).toEqual(["off", "low", "medium", "high"]);
+  });
+
+  it("budget mode: the budget axis carries the pair table and the level axis empties", () => {
+    const sync = makeSync([
+      makeEndpoint("ep-1", {
+        api_format: "anthropic_messages",
+        thinking_capable: true,
+        thinking_level: "super",
+        thinking_mode: "budget",
+        thinking_budget_pairs: [
+          { level: "low", budget_tokens: 1000, max_tokens: 1200 },
+          { level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 },
+        ],
+      }),
+    ], "ep-1");
+    sync.syncModelOptionsFromProvider();
+    const catalog = sync.catalog;
+    expect(catalog.dimensionOptions("thinking_level")).toEqual([]);
+    expect(catalog.defaultBaseValue("thinking_level")).toBe("off");
+    const budget = catalog.dimensionOptions("thinking_budget");
+    expect(budget.map((o) => o.value)).toEqual(["0", "low", "super"]);
+    expect(budget[2]?.label).toContain("500000");
+    expect(catalog.defaultBaseValue("thinking_budget")).toBe("super");
+    expect(catalog.defaultBaseValue("thinking_mode")).toBe("budget");
+  });
+
+  it("budget mode with no pairs degrades to level-mode axes (never both empty)", () => {
+    const sync = makeSync([
+      makeEndpoint("ep-1", {
+        api_format: "anthropic_messages",
+        thinking_capable: true,
+        thinking_level: "high",
+        thinking_mode: "budget",
+        thinking_budget_pairs: [],
+      }),
+    ], "ep-1");
+    sync.syncModelOptionsFromProvider();
+    expect(sync.catalog.dimensionOptions("thinking_level").map((o) => o.value)).toEqual(["off", "low", "medium", "high"]);
+    expect(sync.catalog.dimensionOptions("thinking_budget")).toEqual([]);
+    expect(sync.catalog.defaultBaseValue("thinking_mode")).toBe("levels");
+  });
+});

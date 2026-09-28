@@ -210,6 +210,125 @@ describe("resolveBaselineOverrides endpoint/model resolution", () => {
     expect(config.endpoint_id).toBe("ep-1"); // default_endpoint_id wins via lookup
   });
 
+
+describe("mutually exclusive thinking modes", () => {
+  /** Anthropic endpoint configured for budget mode with two pair rows. */
+  function makeBudgetDeps() {
+    const provider = {
+      endpoints: [
+        {
+          id: "ep-budget",
+          label: "",
+          model: "thinker-x",
+          base_url: "https://budget.example.com/v1",
+          api_format: "anthropic_messages",
+          api_key: "",
+          use_full_url: false,
+          thinking_capable: true,
+          thinking_level: "super",
+          thinking_levels: [],
+          thinking_mode: "budget",
+          thinking_budget_pairs: [
+            { level: "low", budget_tokens: 1000, max_tokens: 1200 },
+            { level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 },
+          ],
+          context_window: 128000,
+          max_input_tokens: 120000,
+          max_output_tokens: 4096,
+        },
+      ],
+      default_endpoint_id: "ep-budget",
+      temperature: 0.7,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      max_output_tokens: 2048,
+    } as unknown as ProviderConfig;
+    const lookup: ProviderLookup = {
+      load: () => provider,
+      syncEndpointCatalog: () => {},
+      lookupEndpoint: (id: string) => provider.endpoints.find((endpoint) => endpoint.id === id),
+      listEndpoints: () => provider.endpoints,
+    };
+    const sync = new ProviderDimensionSync({ dimensionCatalog: new DimensionCatalog(), providerLookup: lookup });
+    sync.syncModelOptionsFromProvider();
+    return { provider, lookup, catalog: sync.catalog };
+  }
+
+  it("resolves a budget pair level to its numeric pair and pins the level off", () => {
+    const { provider, lookup, catalog } = makeBudgetDeps();
+    const config = buildPipelineBase(
+      { provider, providerLookup: lookup, dimensionCatalog: catalog },
+      { thinking_budget: "super" },
+    );
+    expect(config.thinking_mode).toBe("budget");
+    expect(config.thinking_level).toBe("off");
+    expect(config.thinking_budget).toBe(500_000);
+    expect(config.thinking_max_tokens).toBe(1_000_000);
+  });
+
+  it("rejects a level override in budget mode (fail loud, never silently dropped)", () => {
+    const { provider, lookup, catalog } = makeBudgetDeps();
+    expect(() =>
+      buildPipelineBase(
+        { provider, providerLookup: lookup, dimensionCatalog: catalog },
+        { thinking_budget: "super", thinking_level: "high" },
+      ),
+    ).toThrow("not applicable in budget mode");
+  });
+
+  it("rejects an unknown budget level loudly", () => {
+    const { provider, lookup, catalog } = makeBudgetDeps();
+    expect(() =>
+      buildPipelineBase(
+        { provider, providerLookup: lookup, dimensionCatalog: catalog },
+        { thinking_budget: "ghost" },
+      ),
+    ).toThrow('Baseline thinking_budget "ghost" matches no budget pair');
+  });
+
+  it("rejects a budget override on a level-mode endpoint", () => {
+    const { provider, lookup, catalog } = makeDeps();
+    expect(() =>
+      buildPipelineBase(
+        { provider, providerLookup: lookup, dimensionCatalog: catalog },
+        { thinking_budget: "2048" },
+      ),
+    ).toThrow("not applicable in level mode");
+  });
+
+  it("rejects a budget level the catalog never offered (levels-mode sync leaves the axis empty)", () => {
+    const { provider, lookup, catalog } = makeBudgetDeps();
+    expect(() =>
+      resolveBaselineOverrides("prompt", { thinking_budget: "2048" }, { provider, providerLookup: lookup, dimensionCatalog: catalog }),
+    ).toThrow('Baseline field "thinking_budget" has unsupported value');
+  });
+
+  it("keeps level mode working when the baseline pins the mode explicitly", () => {
+    const { provider, lookup, catalog } = makeBudgetDeps();
+    const config = buildPipelineBase(
+      { provider, providerLookup: lookup, dimensionCatalog: catalog },
+      { thinking_mode: "levels", thinking_level: "low" },
+    );
+    expect(config.thinking_mode).toBe("levels");
+    expect(config.thinking_level).toBe("low");
+    expect(config.thinking_budget).toBe(0);
+    expect(config.thinking_max_tokens).toBe(0);
+  });
+
+  it("follows the endpoint mode when the baseline omits thinking_mode", () => {
+    const { provider, lookup, catalog } = makeBudgetDeps();
+    const config = buildPipelineBase(
+      { provider, providerLookup: lookup, dimensionCatalog: catalog },
+      {},
+    );
+    expect(config.thinking_mode).toBe("budget");
+    // The endpoint default pair level ("super") seeds the catalog default.
+    expect(config.thinking_budget).toBe(500_000);
+    expect(config.thinking_max_tokens).toBe(1_000_000);
+  });
+});
+
   it("fails loud when no endpoints are configured at all", () => {
     const provider = { endpoints: [], temperature: 0.7 } as unknown as ProviderConfig;
     const lookup: ProviderLookup = {

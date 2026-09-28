@@ -273,7 +273,11 @@ describe("ThreadService.create", () => {
     // stops being pinned, and a listed field the wire dropped fails every run.
     const pinned = new Set<string>(THREAD_BASELINE_FIELDS);
     // model_id derives from endpoint resolution; label is the per-run identity pin.
-    const derived = Object.keys(BaselineOverridesSchema.shape).filter((key) => key !== "model_id" && key !== "label");
+    // thinking_budget/thinking_mode are deliberate non-pins: the wire carries a
+    // pair level name the pinned config cannot reconstruct (it only holds the
+    // resolved numbers), so those threads follow the endpoint's current mode.
+    const unpinned = new Set(["model_id", "label", "thinking_budget", "thinking_mode"]);
+    const derived = Object.keys(BaselineOverridesSchema.shape).filter((key) => !unpinned.has(key));
     expect([...pinned].sort()).toEqual([...derived].sort());
   });
 

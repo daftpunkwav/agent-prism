@@ -24,7 +24,7 @@ import {
   ReasoningModeSchema,
   SandboxModeSchema,
   SkillPolicySchema,
-  ThinkingLevelSchema,
+  ThinkingModeSchema,
   ToolsetIdSchema,
 } from "./enums.js";
 import { PipelineMetricsSchema, TokenStatsSchema } from "./events.js";
@@ -60,9 +60,18 @@ export const PipelineConfigSchema = z.object({
   frequency_penalty: z.number().default(0.0),
   presence_penalty: z.number().default(0.0),
   max_output_tokens: z.number().int().min(64).max(128_000).default(96000),
-  thinking_level: ThinkingLevelSchema.default("off"),
-  // Anthropic budget_tokens override (tokens); 0 = follow the thinking level.
+  // Plain string, not the four-level enum: level mode carries vendor-defined
+  // level names from the endpoint config, budget mode pins "off" (the budget
+  // pair rides the two numeric fields below). Legality is enforced at pipeline
+  // assembly via effectiveThinkingLevel, never by this schema.
+  thinking_level: z.string().default("off"),
+  // Budget-mode fields: budget_tokens override (tokens; 0 = none) and the
+  // paired output cap (0 = auto-raised to budget + 1024).
   thinking_budget: z.number().int().min(0).max(1_000_000).default(0),
+  thinking_max_tokens: z.number().int().min(0).max(1_000_000).default(0),
+  // Which thinking configuration the column ran under (baseline pin / endpoint
+  // default); report and replay consumers read it, model construction does not.
+  thinking_mode: ThinkingModeSchema.default("levels"),
   thinking_capable: z.boolean().default(false),
   // -1 (UNLIMITED_STEPS) means "no step budget": the loop runs until the model
   // stops calling tools or the run is aborted.
@@ -113,8 +122,14 @@ export const BaselineOverridesSchema = z.object({
   temperature: z.string().nullish(),
   endpoint_id: z.string().nullish(),
   model_id: z.string().nullish(),
-  thinking_level: ThinkingLevelSchema.nullish(),
+  // Plain strings, not enums: level mode carries vendor-defined level names
+  // synced from the endpoint config, and the mode token routes which of the
+  // two thinking fields applies. resolveBaselineOverrides validates both
+  // against the synced option set / the endpoint's budget pair table
+  // (fail loud, never a silently ignored pin).
+  thinking_level: z.string().nullish(),
   thinking_budget: z.string().nullish(),
+  thinking_mode: ThinkingModeSchema.nullish(),
   top_p: z.string().nullish(),
   frequency_penalty: z.string().nullish(),
   presence_penalty: z.string().nullish(),

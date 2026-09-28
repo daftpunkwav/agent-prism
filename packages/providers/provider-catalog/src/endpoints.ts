@@ -8,7 +8,7 @@
  * - Compute connection fingerprints for key inheritance
  */
 
-import type { IdGenerator, LlmEndpoint } from "@agentprism/contracts";
+import type { IdGenerator, LlmEndpoint, ThinkingBudgetPair, ThinkingMode } from "@agentprism/contracts";
 import { DEFAULT_LLM_BASE_URL, DEFAULT_MODEL_ID } from "@agentprism/contracts";
 
 /**
@@ -88,6 +88,36 @@ export function normalizeThinkingLevels(levels: unknown): string[] {
     seen.add(trimmed);
     result.push(trimmed);
     if (result.length >= 16) break;
+  }
+  return result;
+}
+
+/** Legal thinking_mode tokens; anything else falls back to "levels". */
+function parseThinkingMode(raw: unknown): ThinkingMode {
+  return raw === "budget" ? "budget" : "levels";
+}
+
+/**
+ * Budget-mode pair hygiene: level names dedupe like thinking_levels (first wins),
+ * token counts clamp to the schema range, and a violating output cap (≤ budget)
+ * drops to 0 so the runtime auto-raise applies — same rule as the flat pair.
+ */
+export function normalizeThinkingBudgetPairs(raw: unknown): ThinkingBudgetPair[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const result: ThinkingBudgetPair[] = [];
+  for (const item of raw) {
+    if (result.length >= 16) break;
+    const source = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+    const level = typeof source.level === "string" ? source.level.trim().slice(0, 32) : "";
+    if (level === "" || seen.has(level)) continue;
+    const budget = clampInt(source.budget_tokens, { min: 0, max: 10_000_000, fallback: 0 });
+    let max = clampInt(source.max_tokens, { min: 0, max: 10_000_000, fallback: 0 });
+    if (budget > 0 && max > 0 && max <= budget) {
+      max = 0;
+    }
+    seen.add(level);
+    result.push({ level, budget_tokens: budget, max_tokens: max });
   }
   return result;
 }
@@ -174,6 +204,8 @@ export function parseLlmEndpoint(raw: unknown, ids: IdGenerator): LlmEndpoint {
     // never ends up "UI echoes the raw value while thinking params are silently absent".
     thinking_level: thinkingLevel === "off" || allowedLevels.includes(thinkingLevel) ? thinkingLevel : "off",
     thinking_levels: thinkingLevels,
+    thinking_mode: parseThinkingMode(source.thinking_mode),
+    thinking_budget_pairs: normalizeThinkingBudgetPairs(source.thinking_budget_pairs),
     thinking_budget_tokens: thinkingBudgetTokens,
     thinking_max_tokens: thinkingMaxTokens,
   };

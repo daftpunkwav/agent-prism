@@ -27,8 +27,10 @@ import { HISTORY_MODE_OPTIONS } from "./dimensions/history-mode.js";
  *  Capability dims (prompt/reasoning/context/harness/toolset) start empty and are
  *  filled at startup by the capability sync (the arena option projection, applied
  *  through setDimensionOptions) from the registered capability ids.
- *  Framework/model are overwritten by provider/driver sync; temperature/thinking/
- *  max_steps stay static (no runtime registry).
+ *  Framework/model/thinking are overwritten by provider/driver sync; temperature/
+ *  max_steps stay static (no runtime registry). thinking_budget's options are
+ *  provider-synced too (budget pair levels or empty); the static list below is
+ *  only the pre-sync fallback.
  */
 const STATIC_DIMENSION_OPTIONS: Record<DimensionId, DimensionOptionTriple[]> = {
   framework: FRAMEWORK_OPTIONS,
@@ -66,6 +68,7 @@ const STATIC_DEFAULT_BASE: Record<string, string | number> = {
   orchestration: "direct",
   memory: "none",
   thinking_budget: 0,
+  thinking_mode: "levels",
   history_mode: "minimal",
 };
 

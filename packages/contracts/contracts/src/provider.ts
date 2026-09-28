@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import { DECODE_FIELD_RANGES } from "./decode-options.js";
+import { ThinkingModeSchema } from "./enums.js";
 import { validateLlmBaseUrl, validateWebsiteUrl } from "./url-validation.js";
 
 /**
@@ -28,6 +29,16 @@ export const DEFAULT_WEBSITE_URL = "https://platform.stepfun.com/step-plan";
  * endpoints per provider stay small; larger fleets belong in multiple configs).
  */
 export const MAX_ENDPOINTS = 12;
+
+/** One budget-mode row: a vendor-named level mapped to its anthropic budget/output pair. */
+export const ThinkingBudgetPairSchema = z.object({
+  level: z.string().trim().min(1).max(32),
+  budget_tokens: z.number().int().min(0).max(10_000_000).default(0),
+  max_tokens: z.number().int().min(0).max(10_000_000).default(0),
+});
+export type ThinkingBudgetPair = z.infer<typeof ThinkingBudgetPairSchema>;
+/** Input side: fields may be omitted and take their defaults. */
+export type ThinkingBudgetPairInput = z.input<typeof ThinkingBudgetPairSchema>;
 
 /** Public endpoint view (API keys only return a sanitized preview). */
 export const LlmEndpointPublicSchema = z.object({
@@ -48,6 +59,8 @@ export const LlmEndpointPublicSchema = z.object({
   thinking_capable: z.boolean().default(false),
   thinking_level: z.string().default("off"),
   thinking_levels: z.array(z.string()).default([]),
+  thinking_mode: ThinkingModeSchema.default("levels"),
+  thinking_budget_pairs: z.array(ThinkingBudgetPairSchema).default([]),
   thinking_budget_tokens: z.number().int().min(0).max(10_000_000).default(0),
   thinking_max_tokens: z.number().int().min(0).max(10_000_000).default(0),
   image_input: z.boolean().default(false),
@@ -100,6 +113,8 @@ export const LlmEndpointUpdateSchema = z.object({
   thinking_capable: z.boolean().default(false),
   thinking_level: z.string().trim().max(32).default("off"),
   thinking_levels: z.array(z.string().trim().min(1).max(32)).max(16).default([]),
+  thinking_mode: ThinkingModeSchema.default("levels"),
+  thinking_budget_pairs: z.array(ThinkingBudgetPairSchema).max(16).default([]),
   thinking_budget_tokens: z.number().int().min(0).max(10_000_000).default(0),
   thinking_max_tokens: z.number().int().min(0).max(10_000_000).default(0),
   image_input: z.boolean().default(false),

@@ -8,7 +8,9 @@
  */
 
 const FLOAT_FIELDS = new Set(["temperature", "top_p", "frequency_penalty", "presence_penalty"]);
-const INT_FIELDS = new Set(["max_steps", "max_output_tokens", "thinking_budget"]);
+// thinking_budget is deliberately absent: in budget mode its token is a budget
+// pair's level name (resolved to numbers at pipeline assembly), not a raw int.
+const INT_FIELDS = new Set(["max_steps", "max_output_tokens"]);
 
 /** Baseline token for "no step budget" (max_steps only); coerces to the -1 sentinel. */
 const UNLIMITED_TOKEN = "unlimited";

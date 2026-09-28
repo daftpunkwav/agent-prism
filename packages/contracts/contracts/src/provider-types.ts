@@ -7,6 +7,9 @@
  * - Define the effective thinking-level rule (endpoint overrides top-level)
  */
 
+import type { ThinkingBudgetPair } from "./provider.js";
+import type { ThinkingMode } from "./enums.js";
+
 /** Endpoint entity (pure data contract, no IO). */
 export interface LlmEndpoint {
   id: string;
@@ -30,6 +33,10 @@ export interface LlmEndpoint {
   thinking_level: string;
   /** Vendor-defined thinking levels offered by this model; empty means the standard low/medium/high set. */
   thinking_levels: string[];
+  /** Which thinking configuration applies: named-level mapping or the budget pair table (anthropic only). */
+  thinking_mode: ThinkingMode;
+  /** Budget-mode rows (level name → budget/output token pair); only consulted when thinking_mode is "budget". */
+  thinking_budget_pairs: ThinkingBudgetPair[];
   /** Anthropic thinking budget in tokens (0 = unset: the level mapping applies). */
   thinking_budget_tokens: number;
   /** Total output cap that accompanies the budget (0 = unset: auto-raised to budget + 1024). Must exceed the budget. */
@@ -63,20 +70,27 @@ export interface ProviderConfig {
 
 /**
  * Thinking level actually in effect for an endpoint: unsupported capability or
- * illegal levels resolve to off. Custom levels (endpoint.thinking_levels)
- * replace the standard set for every format — openai passes the string
- * verbatim, anthropic maps numeric levels to budget_tokens and rides vendor
- * thinking modes through thinking.type. The result is a plain string because
- * custom levels are vendor-defined.
+ * illegal levels resolve to off. The allowed set follows the endpoint's thinking
+ * mode: budget mode consults the budget pair table's level names, level mode
+ * uses the custom list (endpoint.thinking_levels) or the standard low/medium/high
+ * set. The result is a plain string because custom levels are vendor-defined.
  */
 export function effectiveThinkingLevel(
-  endpoint: Pick<LlmEndpoint, "thinking_capable" | "thinking_level" | "thinking_levels" | "api_format">,
+  endpoint: Pick<
+    LlmEndpoint,
+    "thinking_capable" | "thinking_level" | "thinking_levels" | "thinking_mode" | "thinking_budget_pairs"
+  >,
   requested?: string | null,
 ): string {
   if (!endpoint.thinking_capable) return "off";
   const level = requested ?? endpoint.thinking_level;
   if (level === "off") return "off";
   const custom = endpoint.thinking_levels ?? [];
-  const allowed = custom.length > 0 ? custom : ["low", "medium", "high"];
+  const allowed =
+    endpoint.thinking_mode === "budget"
+      ? (endpoint.thinking_budget_pairs ?? []).map((pair) => pair.level)
+      : custom.length > 0
+        ? custom
+        : ["low", "medium", "high"];
   return allowed.includes(level) ? level : "off";
 }

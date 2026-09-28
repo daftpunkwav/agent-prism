@@ -37,6 +37,8 @@ export interface ModelOverrides {
   thinkingLevel?: string;
   /** Run-level Anthropic budget_tokens (0/absent = follow the level mapping). */
   thinkingBudget?: number;
+  /** Output cap paired with the run-level budget (0/absent = auto-raised to budget + 1024). */
+  thinkingMax?: number;
 }
 
 export interface CreateChatModelOptions {
@@ -102,14 +104,22 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
   const thinkingLevel =
     overrides.thinkingLevel ?? (endpoint ? effectiveThinkingLevel(endpoint, endpoint.thinking_level) : "off");
   const baseMaxTokens = overrides.maxTokens ?? provider.max_output_tokens;
-  // Independent budget selection (anthropic): the run-level budget wins, then
-  // the endpoint default pair; without either the level mapping applies.
+  // Independent budget selection (anthropic): the run-level pair wins (budget
+  // from the run, its cap only when it exceeds the budget), then the endpoint
+  // default pair; without either the level mapping applies.
   const runBudget = overrides.thinkingBudget ?? 0;
+  const runMax = overrides.thinkingMax ?? 0;
   const endpointBudget = endpoint?.thinking_budget_tokens ?? 0;
   const budgetTokens = runBudget > 0 ? runBudget : endpointBudget;
   const budgetOverride =
     budgetTokens > 0
-      ? { budgetTokens, maxTokens: endpoint?.thinking_max_tokens ?? 0 }
+      ? {
+          budgetTokens,
+          maxTokens:
+            runBudget > 0 && runMax > budgetTokens
+              ? runMax
+              : (endpoint?.thinking_max_tokens ?? 0),
+        }
       : undefined;
 
   const thinking = buildThinkingClientOptions(apiFormat, thinkingLevel, thinkingCapable, baseMaxTokens, budgetOverride);
@@ -211,6 +221,7 @@ export function createColumnModel(
       thinkingCapable: config.thinking_capable,
       thinkingLevel: config.thinking_level,
       thinkingBudget: config.thinking_budget,
+      thinkingMax: config.thinking_max_tokens,
     },
   });
   return {

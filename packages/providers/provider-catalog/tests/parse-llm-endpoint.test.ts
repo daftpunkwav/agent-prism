@@ -9,7 +9,12 @@
 
 import { describe, expect, it } from "vitest";
 import type { IdGenerator } from "@agentprism/contracts";
-import { normalizeModelIds, normalizeThinkingLevels, parseLlmEndpoint } from "@agentprism/provider-catalog";
+import {
+  normalizeModelIds,
+  normalizeThinkingBudgetPairs,
+  normalizeThinkingLevels,
+  parseLlmEndpoint,
+} from "@agentprism/provider-catalog";
 
 const ids: IdGenerator = { next: () => "gen-1" };
 
@@ -111,6 +116,36 @@ describe("parseLlmEndpoint", () => {
     expect(unset.thinking_max_tokens).toBe(0);
   });
 
+
+  it("normalizes the budget pair table: dedupe, clamp, cap-violation drop, count ceiling", () => {
+    const endpoint = parseLlmEndpoint(
+      {
+        thinking_mode: "budget",
+        thinking_budget_pairs: [
+          { level: " low ", budget_tokens: 1000, max_tokens: 1200 },
+          { level: "low", budget_tokens: 9999, max_tokens: 9999 },
+          { level: "super", budget_tokens: 500_000, max_tokens: 500_000 },
+          { level: "", budget_tokens: 1, max_tokens: 2 },
+          { level: "ghost" },
+          "not-an-object",
+        ],
+      },
+      ids,
+    );
+    expect(endpoint.thinking_mode).toBe("budget");
+    // First wins on duplicate levels; a violating cap drops to 0 (auto-raise);
+    // empty names and non-objects are skipped; a missing count parses as 0.
+    expect(endpoint.thinking_budget_pairs).toEqual([
+      { level: "low", budget_tokens: 1000, max_tokens: 1200 },
+      { level: "super", budget_tokens: 500_000, max_tokens: 0 },
+      { level: "ghost", budget_tokens: 0, max_tokens: 0 },
+    ]);
+    // An absent or unknown mode falls back to levels.
+    expect(parseLlmEndpoint({}, ids).thinking_mode).toBe("levels");
+    expect(parseLlmEndpoint({ thinking_mode: "bogus" }, ids).thinking_mode).toBe("levels");
+    expect(parseLlmEndpoint({}, ids).thinking_budget_pairs).toEqual([]);
+  });
+
   it("preserves the openai_responses format instead of coercing it", () => {
     expect(parseLlmEndpoint({ api_format: "openai_responses" }, ids).api_format).toBe("openai_responses");
     expect(parseLlmEndpoint({ api_format: "openai_chat" }, ids).api_format).toBe("openai_chat");
@@ -143,6 +178,38 @@ describe("parseLlmEndpoint", () => {
     );
     // An absent flag (hand-written config files) falls to the stripping fallback.
     expect(parseLlmEndpoint({ base_url: "https://api.acme.com/v1/messages" }, ids).base_url).toBe("https://api.acme.com/v1");
+  });
+});
+
+
+describe("normalizeThinkingBudgetPairs", () => {
+  it("trims, drops empty/non-object rows, dedupes first-wins, and caps the count", () => {
+    expect(
+      normalizeThinkingBudgetPairs([
+        { level: " a ", budget_tokens: 1, max_tokens: 2 },
+        { level: "a", budget_tokens: 3, max_tokens: 4 },
+        null,
+        { level: "b" },
+        "nope",
+      ]),
+    ).toEqual([
+      { level: "a", budget_tokens: 1, max_tokens: 2 },
+      { level: "b", budget_tokens: 0, max_tokens: 0 },
+    ]);
+    expect(normalizeThinkingBudgetPairs("nope")).toEqual([]);
+    expect(normalizeThinkingBudgetPairs(undefined)).toEqual([]);
+    expect(
+      normalizeThinkingBudgetPairs(Array.from({ length: 20 }, (_, i) => ({ level: `l${i}` }))),
+    ).toHaveLength(16);
+  });
+
+  it("drops a violating output cap to 0 so the runtime auto-raise applies", () => {
+    expect(normalizeThinkingBudgetPairs([{ level: "x", budget_tokens: 4096, max_tokens: 4096 }])).toEqual([
+      { level: "x", budget_tokens: 4096, max_tokens: 0 },
+    ]);
+    expect(normalizeThinkingBudgetPairs([{ level: "x", budget_tokens: 4096, max_tokens: 8192 }])).toEqual([
+      { level: "x", budget_tokens: 4096, max_tokens: 8192 },
+    ]);
   });
 });
 

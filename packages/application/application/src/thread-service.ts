@@ -286,6 +286,11 @@ export class ThreadService {
  * Exported for the coverage test that locks this list against
  * `BaselineOverridesSchema` — a baseline field missing here would silently
  * stop being pinned.
+ *
+ * The budget fields are deliberately absent: on the wire a budget override is
+ * a pair level name (resolved to numbers at assembly), while the pinned config
+ * only carries the resolved numbers — replaying them would fail baseline
+ * legality. Budget-mode threads follow the endpoint's current budget default.
  */
 export const THREAD_BASELINE_FIELDS = [
   "framework",
@@ -296,7 +301,6 @@ export const THREAD_BASELINE_FIELDS = [
   "temperature",
   "endpoint_id",
   "thinking_level",
-  "thinking_budget",
   "top_p",
   "frequency_penalty",
   "presence_penalty",
@@ -326,6 +330,10 @@ function baselineOverridesOf(config: PipelineConfig): Record<string, unknown> {
     // fail baseline legality instead of taking the default endpoint the run path
     // resolves for an absent value.
     if (value === "") continue;
+    // "off" is the schema-default thinking level ("no pin"): replaying it as an
+    // override would fail baseline legality in budget mode (the thinking axis
+    // exposes no options there) instead of following the endpoint's mode.
+    if (field === "thinking_level" && value === "off") continue;
     // The custom record is passed by value: an empty one carries no pin and would
     // only make the baseline look non-default.
     if (field === "custom") {

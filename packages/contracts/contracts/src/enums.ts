@@ -46,6 +46,15 @@ const DIMENSION_ID_SET: ReadonlySet<string> = new Set<string>(DimensionIdSchema.
 export const ThinkingLevelSchema = z.enum(["off", "low", "medium", "high"]);
 export type ThinkingLevel = z.infer<typeof ThinkingLevelSchema>;
 
+/**
+ * Which thinking configuration a model applies: "levels" maps named levels
+ * (standard or vendor-defined) through the per-format mapping; "budget" looks
+ * the selected level up in the endpoint's budget pair table (anthropic only).
+ * The two are mutually exclusive by design.
+ */
+export const ThinkingModeSchema = z.enum(["levels", "budget"]);
+export type ThinkingMode = z.infer<typeof ThinkingModeSchema>;
+
 /** Prompt template profiles. */
 export const PromptProfileSchema = z.enum(["zero_shot", "few_shot", "cot_prompt", "structured", "terse"]);
 export type PromptProfile = z.infer<typeof PromptProfileSchema>;

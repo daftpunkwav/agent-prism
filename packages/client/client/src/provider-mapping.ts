@@ -33,6 +33,10 @@ export function endpointUpdateFromPublic(endpoint: LlmEndpointPublic): LlmEndpoi
     // The public view is a string; storage clamps unlisted selections to off — a single-point assertion narrows it here
     thinking_level: endpoint.thinking_level as LlmEndpointUpdate["thinking_level"],
     thinking_levels: Array.isArray(endpoint.thinking_levels) ? [...endpoint.thinking_levels] : [],
+    thinking_mode: endpoint.thinking_mode,
+    thinking_budget_pairs: Array.isArray(endpoint.thinking_budget_pairs)
+      ? endpoint.thinking_budget_pairs.map((pair) => ({ ...pair }))
+      : [],
     // Round-trip the budget pair verbatim: an omitted field parses as 0 on the
     // server and would wipe a stored non-zero budget on save.
     thinking_budget_tokens: endpoint.thinking_budget_tokens,
