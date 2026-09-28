@@ -67,6 +67,20 @@ function copyAskUserQuestion(question: AskUserQuestion): AskUserQuestion {
   return { ...question, options: [...question.options] };
 }
 
+/**
+ * Turn number from replayed history: one user message opens one turn.
+ * Pair-counting (floor(length / 2) + 1) drifts whenever messages are not
+ * strictly alternating (consecutive same-role entries, odd lengths), so count
+ * the questions instead.
+ */
+function turnFromHistory(messages: ReadonlyArray<{ role: unknown }>): number {
+  let userMessages = 0;
+  for (const message of messages) {
+    if (message.role === "user") userMessages += 1;
+  }
+  return userMessages + 1;
+}
+
 /** One ask_user batch awaiting the human, keyed by agent id (one live turn per column). */
 interface PendingAsk {
   questions: AskUserQuestion[];
@@ -307,6 +321,13 @@ export class ArenaRunner {
           });
       };
       await bounded(Promise.all(workers.map((worker) => worker.finished)));
+      // Observability for the teardown path: a worker still running past the
+      // grace window has had its abort signal fired and is left to the driver's
+      // own cancellation, but the leak risk must be visible instead of silent.
+      const unfinished = workers.filter((worker) => !worker.done).length;
+      if (unfinished > 0) {
+        console.warn(`[arena-runner] ${unfinished} column worker(s) still running after the disconnect grace`);
+      }
       // Drain in-flight log appends before the stream settles: the logs page
       // stops polling at settle and a process exit right after the run would
       // otherwise drop the tail rows. flush() never rejects (fail-open appends
@@ -442,7 +463,7 @@ export class ArenaRunner {
         const driver = this.deps.registry.get(config.framework);
         const session = request.column_sessions?.[config.label];
         const history = session !== undefined ? [...session.messages] : [...request.messages];
-        const turn = Math.floor(history.length / 2) + 1;
+        const turn = turnFromHistory(history);
         // Wire tracer rides on the column model (both the LlmAdapter and the vendor
         // instance share one BaseChatModel), so native, the LangChain family and the
         // OpenAI Agents bridge are all observed.
@@ -544,7 +565,7 @@ export class ArenaRunner {
     message: string,
   ): void {
     const session = request.column_sessions?.[config.label];
-    const turn = Math.floor((session?.messages ?? request.messages).length / 2) + 1;
+    const turn = turnFromHistory(session?.messages ?? request.messages);
     channel.push(
       arenaErrorEvent({
         pipeline: config.label,

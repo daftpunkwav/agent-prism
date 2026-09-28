@@ -238,9 +238,10 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
       try {
         // `sawText` gates the whole-message fallback (assistant text blocks would
         // duplicate deltas already delivered); `sawAnswerText` is the wider claim
-        // "answer text reached the thought channel", which the result summary must
-        // not duplicate either. A deployment that delivers whole assistant messages
-        // with no partial events needs the two tracked apart.
+        // "the latest content reached the thought channel as text", which the
+        // result summary must not duplicate. A tool block after the last text
+        // resets it: a turn that ended on pure tool use has its answer only in
+        // the result summary, which must then fill the thought channel.
         let sawText = false;
         let sawAnswerText = false;
         for await (const raw of session) {
@@ -317,6 +318,7 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
                   });
                 }
                 if (block.type === "tool_use") {
+                  sawAnswerText = false;
                   yield this.thoughtEnd(state);
                   state.step += 1;
                   yield eventOf({
@@ -337,6 +339,7 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
             case "user": {
               for (const block of contentBlocks(message.message?.content)) {
                 if (block.type !== "tool_result") continue;
+                sawAnswerText = false;
                 const text = toolResultText(block);
                 state.step += 1;
                 yield eventOf({

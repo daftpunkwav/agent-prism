@@ -107,4 +107,24 @@ describe("runChildBridge", () => {
       clearTimeout(timer);
     }
   }, 15_000);
+
+  it("reports the abort, not a concurrently-arrived final, when abort lands first", async () => {
+    const controller = new AbortController();
+    // The child writes its final and then hangs; the host aborts before the
+    // child dies. The close must settle through the abort reason — a cancelled
+    // session never surfaces as a successful answer.
+    const timer = setTimeout(() => controller.abort(new Error("stopped after final")), 150);
+    try {
+      const outcome: ChildBridgeOutcome = await runChildBridge({
+        ...baseOptions({ scenario: "final-then-hang" }),
+        signal: controller.signal,
+      });
+      expect(outcome.ok).toBe(false);
+      if (!outcome.ok) {
+        expect(outcome.message).toContain("stopped after final");
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  }, 15_000);
 });

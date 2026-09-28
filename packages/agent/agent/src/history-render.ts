@@ -54,7 +54,13 @@ export function renderHistoryForMode(history: ChatMessage[], mode: HistoryMode):
       rounds.forEach((round, i) => {
         out.push({ role: "tool", content: round.result, toolCallId: calls[i]?.id ?? "", name: round.tool });
       });
-      out.push({ role: "assistant", content: message.content });
+      // An empty answer is not rendered as a trailing `{content: ""}` assistant
+      // message: strict providers reject empty non-tool-call assistant content
+      // with a 400. The assistant(tool_calls) → tool sequence above is complete
+      // and legal on its own; the next user message opens the new turn.
+      if (message.content !== "") {
+        out.push({ role: "assistant", content: message.content });
+      }
       continue;
     }
     const appendix = renderToolActivity(rounds, mode);

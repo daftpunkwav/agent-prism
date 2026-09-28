@@ -44,6 +44,20 @@ describe("emitToolOutcomeEvents", () => {
     expect(events.every((event) => event.type === "tool_progress")).toBe(true);
     expect(events.map((event) => event.content).join("")).toBe("x".repeat(900));
   });
+
+  it("caps the progress chunk count with a loud truncation marker", () => {
+    const events = emitToolOutcomeEvents("col", "ws", 1, "bash", { result: "y".repeat(60_000), fileDiff: null });
+    // 80 full chunks + 1 truncation marker, never an unbounded fan-out.
+    expect(events).toHaveLength(81);
+    const joined = events.map((event) => event.content).join("");
+    expect(joined.startsWith("y".repeat(32_000))).toBe(true);
+    const marker = events[events.length - 1];
+    expect(marker?.content).toContain("truncated at 32000 of 60000");
+  });
+
+  it("emits no progress events for empty bash output", () => {
+    expect(emitToolOutcomeEvents("col", "ws", 1, "bash", { result: "", fileDiff: null })).toEqual([]);
+  });
 });
 
 describe("on_tool_end output serialization", () => {

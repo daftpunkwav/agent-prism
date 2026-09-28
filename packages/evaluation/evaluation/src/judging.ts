@@ -140,6 +140,72 @@ function checkExclude(answer: string, spec: JudgeSpec): JudgeResult {
   return result(true, "No excluded patterns found", []);
 }
 
+/**
+ * Detects nested-quantifier shapes — a quantified group whose content carries a
+ * quantifier, e.g. `(a+)+`, `(.*)*`, `(a|b+){2,}` — the catastrophic-backtracking
+ * class a synchronous `RegExp.test` cannot bound (no native timeout exists).
+ * Escaped characters and `[...]` char classes are skipped so their quantifier
+ * lookalikes never trigger a false rejection. A rejected pattern fails closed
+ * with an explicit reason instead of pinning the event loop mid-judgement.
+ */
+function hasNestedQuantifier(pattern: string): boolean {
+  // Whether a quantifier appeared directly inside each open group frame.
+  const groupHasQuantifier: boolean[] = [];
+  let depth = 0;
+  for (let i = 0; i < pattern.length; i += 1) {
+    const char = pattern[i];
+    if (char === "\\") {
+      i += 1;
+      continue;
+    }
+    if (char === "[") {
+      // Char class: quantifier characters inside are literals (a `]` right after
+      // `[` or `[^` is a literal member, per the same rule regex itself applies).
+      if (pattern[i + 1] === "^") i += 1;
+      if (pattern[i + 1] === "]") i += 1;
+      while (i < pattern.length && pattern[i] !== "]") {
+        if (pattern[i] === "\\") i += 1;
+        i += 1;
+      }
+      continue;
+    }
+    if (char === "(") {
+      depth += 1;
+      groupHasQuantifier[depth] = false;
+      // Skip the group prefix (`?:`, `?=`, `?!`, lookbehinds, `?<name>`) so its
+      // `?` never registers as a quantifier inside the fresh frame — `(?:ab)+`
+      // must stay legal while `(a+)+` does not.
+      if (pattern[i + 1] === "?") {
+        if (pattern[i + 2] === "<" && pattern[i + 3] !== "=" && pattern[i + 3] !== "!") {
+          const close = pattern.indexOf(">", i + 3);
+          if (close !== -1) i = close;
+        } else {
+          i += 1;
+        }
+      }
+      continue;
+    }
+    if (char === ")") {
+      const inner = groupHasQuantifier[depth] === true;
+      depth -= 1;
+      if (inner && isQuantifierAt(pattern, i + 1)) return true;
+      continue;
+    }
+    if (isQuantifierAt(pattern, i)) {
+      groupHasQuantifier[depth] = true;
+    }
+  }
+  return false;
+}
+
+/** Whether the position starts a quantifier token (`*`, `+`, `?`, `{n[,m]}`). */
+function isQuantifierAt(pattern: string, index: number): boolean {
+  const char = pattern[index];
+  if (char === "*" || char === "+" || char === "?") return true;
+  if (char === "{" && /^\{\d+(,\d*)?\}/.exec(pattern.slice(index)) !== null) return true;
+  return false;
+}
+
 function checkRegex(answer: string, spec: JudgeSpec): JudgeResult {
   if (spec.pattern === "") {
     return result(false, "Regex not configured", []);
@@ -147,7 +213,10 @@ function checkRegex(answer: string, spec: JudgeSpec): JudgeResult {
   if (spec.pattern.length > 500) {
     return result(false, "Regex too long; rejected", []);
   }
-  // ReDoS defense: truncate over-long input (nested-quantifier backtracking risk remains; templates are internal config)
+  if (hasNestedQuantifier(spec.pattern)) {
+    return result(false, "Regex rejected: nested quantifier (catastrophic backtracking risk)", []);
+  }
+  // ReDoS defense: truncate over-long input (nested-quantifier patterns are rejected above)
   const safeAnswer = answer.slice(0, 2000);
   let ok: boolean;
   try {

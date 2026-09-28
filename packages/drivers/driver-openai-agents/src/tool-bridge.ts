@@ -73,7 +73,13 @@ export function bindRegistryToolsForAgents(tools: ToolAccess, options: AgentTool
           priorToolNames,
           options.harness,
         );
-        if (blocked !== null) return blocked;
+        if (blocked !== null) {
+          // A blocked invocation still counts as prior, matching LangChain where
+          // the call rides the transcript: the drift guard must behave identically
+          // across backends, or repeat-blocking diverges per framework.
+          priorToolNames.push(definition.name);
+          return blocked;
+        }
         priorToolNames.push(definition.name);
         let outcome: ToolExecutionResult;
         try {

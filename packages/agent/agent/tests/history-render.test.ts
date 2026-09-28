@@ -78,6 +78,25 @@ describe("renderHistoryForMode", () => {
     expect(rendered[6]).toEqual({ role: "assistant", content: "output: hello" });
   });
 
+  it("full omits the closing assistant message when the answer is empty", () => {
+    // An empty answer must not render as a trailing {content: ""} assistant
+    // message: strict providers reject that with a 400. The
+    // assistant(tool_calls) → tool sequence is complete and legal on its own.
+    const rendered = renderHistoryForMode(
+      [
+        { role: "user", content: "go" },
+        {
+          role: "assistant",
+          content: "",
+          tool_rounds: [{ tool: "run", args: { command: "ls" }, result: "a.txt" }],
+        },
+      ],
+      "full",
+    );
+    expect(rendered.map((m) => m.role)).toEqual(["user", "assistant", "tool"]);
+    expect(rendered.some((m) => m.role === "assistant" && !m.toolCalls && m.content === "")).toBe(false);
+  });
+
   it("never mutates the input list", () => {
     const snapshot = JSON.stringify(history);
     renderHistoryForMode(history, "full");

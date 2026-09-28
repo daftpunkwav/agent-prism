@@ -175,6 +175,14 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
         clearTimeout(forceKillTimer);
         forceKillTimer = null;
       }
+      // An abort wins over a concurrently-arrived final: the session was
+      // cancelled, so reporting success would surface a killed run as an answer
+      // (the abort listener has already written the reason into errorMessage).
+      // A pre-aborted signal never fired that listener, so fall through there.
+      if (options.signal?.aborted === true && errorMessage !== null) {
+        finish({ ok: false, message: errorMessage });
+        return;
+      }
       if (finalAnswer !== null) {
         finish({ ok: true, answer: finalAnswer });
         return;

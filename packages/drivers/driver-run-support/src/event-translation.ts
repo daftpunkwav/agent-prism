@@ -126,6 +126,14 @@ export function eventOf(partial: Partial<ArenaEvent> & { type: ArenaEvent["type"
 }
 
 /**
+ * Chunk-count ceiling for the bash tool_progress stream. The builtin bash tool
+ * already bounds its result (~32 KB), so ordinary calls stay far below this;
+ * the cap keeps a non-bounded producer (e.g. an MCP tool named "bash") from
+ * fanning out an unbounded number of events into the channel and the client.
+ */
+const MAX_TOOL_PROGRESS_CHUNKS = 80;
+
+/**
  * file_diff / tool_progress after a tool execute — shared by Native, LangChain, and LangGraph.
  * Caller is responsible for the action/observation pair around these.
  */
@@ -139,13 +147,27 @@ export function emitToolOutcomeEvents(
   const events: ArenaEvent[] = [];
   if (toolName === "bash") {
     const result = outcome.result;
-    for (let i = 0; i < result.length; i += 400) {
+    const chunkCount = Math.ceil(result.length / 400);
+    const emitted = Math.min(chunkCount, MAX_TOOL_PROGRESS_CHUNKS);
+    for (let i = 0; i < emitted; i += 1) {
       events.push(
         eventOf({
           type: "tool_progress",
           pipeline,
           step,
-          content: result.slice(i, i + 400),
+          content: result.slice(i * 400, (i + 1) * 400),
+          workspace: workspaceName,
+        }),
+      );
+    }
+    if (emitted < chunkCount) {
+      // Loud truncation: the dropped tail is reported, never silently swallowed.
+      events.push(
+        eventOf({
+          type: "tool_progress",
+          pipeline,
+          step,
+          content: `…(stream preview truncated at ${emitted * 400} of ${result.length} chars; full output in the observation)`,
           workspace: workspaceName,
         }),
       );

@@ -47,52 +47,69 @@ async function* drainGraphStream(
   let streamedText = "";
   let lastModelText = "";
   const tick = () => new Promise<null>((resolve) => setTimeout(() => resolve(null), 100));
-  while (!streamDone) {
-    pending ??= stream.next();
-    const next = await Promise.race([pending, tick()]);
+  try {
+    while (!streamDone) {
+      pending ??= stream.next();
+      const next = await Promise.race([pending, tick()]);
+      for (const queued of extra.splice(0)) yield queued;
+      if (next === null) {
+        if (aborted()) throw new DOMException("Aborted", "AbortError");
+        continue;
+      }
+      pending = null;
+      if (next.done === true) {
+        streamDone = true;
+        continue;
+      }
+      const raw = next.value;
+      const rawNodeName =
+        raw !== null && typeof raw === "object" ? String((raw as Record<string, unknown>).name ?? "") : "";
+      const modelText = modelOutputText(raw);
+      if (modelText !== "") lastModelText = modelText;
+      for (const event of emitStreamEvent(state, raw, {
+        nodeName: rawNodeName,
+        nodeStartExcluded: NODE_START_EXCLUDED,
+      })) {
+        if (event.type === "thought_delta" && typeof event.content === "string") streamedText += event.content;
+        yield event;
+      }
+    }
     for (const queued of extra.splice(0)) yield queued;
-    if (next === null) {
-      if (aborted()) throw new DOMException("Aborted", "AbortError");
-      continue;
-    }
-    pending = null;
-    if (next.done === true) {
-      streamDone = true;
-      continue;
-    }
-    const raw = next.value;
-    const rawNodeName =
-      raw !== null && typeof raw === "object" ? String((raw as Record<string, unknown>).name ?? "") : "";
-    const modelText = modelOutputText(raw);
-    if (modelText !== "") lastModelText = modelText;
-    for (const event of emitStreamEvent(state, raw, {
-      nodeName: rawNodeName,
-      nodeStartExcluded: NODE_START_EXCLUDED,
-    })) {
-      if (event.type === "thought_delta" && typeof event.content === "string") streamedText += event.content;
-      yield event;
-    }
-  }
-  for (const queued of extra.splice(0)) yield queued;
 
-  // The closing thought block: when the last model output never reached the
-  // thought channel, that output is emitted here — otherwise the column would
-  // end without an answer at all (answer extraction reads the thought channel).
-  if (lastModelText !== "" && !streamedText.includes(lastModelText)) {
-    yield eventOf({
-      type: "thought_delta",
-      pipeline: state.label,
-      step: state.streamingStep ?? state.step,
-      content: lastModelText,
-      workspace: state.workspaceName,
-    });
-    yield eventOf({
-      type: "thought_end",
-      pipeline: state.label,
-      step: state.streamingStep ?? state.step,
-      content: "",
-      workspace: state.workspaceName,
-    });
+    // The closing thought block: when the last model output never reached the
+    // thought channel, that output is emitted here — otherwise the column would
+    // end without an answer at all (answer extraction reads the thought channel).
+    if (lastModelText !== "" && !streamedText.includes(lastModelText)) {
+      yield eventOf({
+        type: "thought_delta",
+        pipeline: state.label,
+        step: state.streamingStep ?? state.step,
+        content: lastModelText,
+        workspace: state.workspaceName,
+      });
+      yield eventOf({
+        type: "thought_end",
+        pipeline: state.label,
+        step: state.streamingStep ?? state.step,
+        content: "",
+        workspace: state.workspaceName,
+      });
+    }
+  } finally {
+    // An abort throw (or the consumer abandoning this generator) leaves the loop
+    // with an unresolved next() and the graph iterator open: without .return()
+    // the underlying run keeps pulling work nobody consumes. Settled streams are
+    // left alone; the close itself is best-effort, never masking the abort.
+    if (!streamDone) {
+      // The in-flight pull may still reject after the close (stream torn down
+      // under us); handle it so it cannot surface as an unhandled rejection.
+      pending?.catch(() => {});
+      try {
+        await stream.return?.(undefined);
+      } catch {
+        // The iterator may already be settling through the same abort; closing is best-effort.
+      }
+    }
   }
 }
 

@@ -193,7 +193,8 @@ describe("ArenaRunner run logs wiring", () => {
     );
     const { runner, workspaces } = makeHarness(driver, create);
 
-    // One prior exchange in the shared history: the column's wire rows carry turn 2.
+    // Two prior user questions in the shared history (turns are counted per user
+    // message, not per message pair): the column's wire rows carry turn 3.
     const history: ChatMessage[] = [
       { role: "user", content: "write snake" },
       { role: "assistant", content: "created snake.py" },
@@ -214,7 +215,7 @@ describe("ArenaRunner run logs wiring", () => {
     expect(rows).toHaveLength(1);
     const entry = JSON.parse(rows[0]!) as { seq: number; ts: number; turn: number; record: LlmWireRecord };
     expect(entry.seq).toBe(0);
-    expect(entry.turn).toBe(2);
+    expect(entry.turn).toBe(3);
     expect(entry.record.kind).toBe("llm_request");
     // The other column's wire log exists separately (per-label attribution).
     expect(readFileSync(join(workspaces.traceDir(runId!), wireLogFileName("LangChain")), "utf-8")).toContain(

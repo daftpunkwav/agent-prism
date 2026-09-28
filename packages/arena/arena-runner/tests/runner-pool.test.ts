@@ -107,6 +107,24 @@ async function drain(runner: ArenaRunner, req: ArenaRunRequest): Promise<ArenaEv
 }
 
 describe("ArenaRunner.streamParallel", () => {
+  it("derives the turn from user-message count, not strict pair counting", async () => {
+    runMock.mockImplementation(async function* () {
+      yield { type: "complete", pipeline: "col-a", metrics: METRICS, turn: 3 };
+    } as never);
+    const runner = makeRunner();
+    // Not strictly alternating (two user messages, odd length): pair-counting
+    // would say turn 2, but two questions have been asked, so the run is turn 3.
+    const messages = [
+      { role: "user", content: "first" },
+      { role: "user", content: "second" },
+      { role: "assistant", content: "late reply" },
+    ];
+    await drain(runner, request({ messages } as never));
+    const spec = runMock.mock.calls[0]?.[1] as { turn: number; history: unknown };
+    expect(spec.turn).toBe(3);
+    expect(spec.history).toEqual(messages);
+  });
+
   it("merges column events and ends without a report when the publisher yields null", async () => {
     runMock.mockImplementation(async function* () {
       yield { type: "step_start", pipeline: "col-a", turn: 1, step: 1 };

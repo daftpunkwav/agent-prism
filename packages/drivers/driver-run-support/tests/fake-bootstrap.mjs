@@ -44,5 +44,10 @@ if (scenario === "happy") {
   // interval holds the process open until the kill arrives.
   emit({ type: "llm_request", id: "llm-1", messages: [{ role: "user", content: "q?" }] });
   setInterval(() => {}, 1_000);
+} else if (scenario === "final-then-hang") {
+  // Writes the final answer but never exits: the host's abort must win the
+  // settlement race — a cancelled session reports the abort, not the answer.
+  emit({ type: "final", answer: "bridge answer" });
+  setInterval(() => {}, 1_000);
 }
 // scenario "silent": exit with no protocol lines at all.

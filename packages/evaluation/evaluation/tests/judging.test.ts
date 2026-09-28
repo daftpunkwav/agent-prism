@@ -50,6 +50,30 @@ describe("regex judging", () => {
     const spec = { type: "regex", pattern: "a".repeat(501) } as unknown as JudgeSpec;
     expect(judge("answer", spec).passed).toBe(false);
   });
+
+  it("rejects nested-quantifier patterns instead of risking catastrophic backtracking", () => {
+    const catastrophic = ["(a+)+", "(.*)*", "((a|aa)+)+", "(a+){2,}", "(?:\\w+)+b"];
+    for (const pattern of catastrophic) {
+      const spec = { type: "regex", pattern } as unknown as JudgeSpec;
+      const result = judge("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!", spec);
+      expect(result.passed, pattern).toBe(false);
+      expect(result.reason, pattern).toContain("nested quantifier");
+    }
+  });
+
+  it("still judges safe quantified patterns normally", () => {
+    const safe: Array<[string, string, boolean]> = [
+      ["(?:ab)+", "ababab", true],
+      ["(a|b)+c", "ababc", true],
+      ["\\d{3}-\\d{4}", "call 555-1234567", true],
+      ["^done$", "not done", false],
+      ["[a-z*+?]+x", "*+?x", true],
+    ];
+    for (const [pattern, answer, expected] of safe) {
+      const spec = { type: "regex", pattern } as unknown as JudgeSpec;
+      expect(judge(answer, spec).passed, pattern).toBe(expected);
+    }
+  });
 });
 
 describe("json judging own-property check", () => {
