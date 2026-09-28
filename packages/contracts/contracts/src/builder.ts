@@ -190,6 +190,14 @@ export const LlmWireResponseSchema = z.object({
 });
 export type LlmWireResponse = z.infer<typeof LlmWireResponseSchema>;
 
+/**
+ * Data payload of an `llm_response` trace entry as the wire tracer emits it:
+ * the LlmWireResponse shape plus the tracer-only first-token latency (null when
+ * the call never streamed a token). Persisted entries may predate the field, so
+ * consumers must keep treating it as optional when reading stored traces.
+ */
+export type LlmWireResponseTrace = LlmWireResponse & { first_token_ms: number | null };
+
 /** Data payload of an `llm_error` trace entry. */
 export const LlmWireErrorSchema = z.object({
   model: z.string().default(""),

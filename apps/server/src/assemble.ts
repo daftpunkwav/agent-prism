@@ -653,9 +653,11 @@ export async function assemble(): Promise<RuntimeComponents> {
       setEnabled: (name, enabled) => setSkillEnabled(name, enabled),
     },
     mcp: {
-      list: () => mcpServersStore.list() as unknown as ReadonlyArray<Record<string, unknown>>,
+      list: () => mcpServersStore.list(),
       replace: (input: unknown) =>
-        mcpServersStore.replace(input as McpServerConfig[]) as unknown as ReadonlyArray<Record<string, unknown>>,
+        // The store re-validates the whole payload through the shared env parser
+        // (McpStoreError on defects), so this raw-body cast is the seam's contract.
+        mcpServersStore.replace(input as McpServerConfig[]),
     },
   });
 

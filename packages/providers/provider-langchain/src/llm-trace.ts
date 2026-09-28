@@ -20,7 +20,7 @@ import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import type { Serialized } from "@langchain/core/load/serializable";
 import type { BaseMessage } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
-import type { LlmWireMessage, LlmWireResponse, LlmWireSink, LlmWireToolCall, ModelCallOutcome } from "@agentprism/contracts";
+import type { LlmWireMessage, LlmWireResponse, LlmWireResponseTrace, LlmWireSink, LlmWireToolCall, ModelCallOutcome } from "@agentprism/contracts";
 
 /** Maximum concurrent runs tracked for latency bookkeeping (leak guard). */
 const MAX_TRACKED_RUNS = 256;
@@ -372,10 +372,13 @@ export function createLlmWireTraceHandler(options: LlmWireTraceHandlerOptions): 
           finished !== null && finished.timing.firstTokenAt !== null
             ? Math.max(0, finished.timing.firstTokenAt - finished.timing.startedAt)
             : null;
+        // LlmWireResponseTrace is the named wire contract for this payload
+        // (LlmWireResponse plus the first-token latency), shared with consumers.
+        const trace: LlmWireResponseTrace = { ...response, first_token_ms: firstTokenMs };
         options.sink({
           kind: "llm_response",
           title: `LLM response ← ${model} (${response.tool_calls.length} tool calls)`,
-          data: { ...response, first_token_ms: firstTokenMs } as unknown as Record<string, unknown>,
+          data: { ...trace },
           durationMs: finished?.durationMs ?? null,
         });
       } catch (error) {

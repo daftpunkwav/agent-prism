@@ -37,6 +37,9 @@ export const MAX_HISTORY_CHARS = 24_000;
 /** Per-session message cap (one shared source: backend zod caps and the frontend trimmer must stay identical). */
 export const MAX_COLUMN_SESSION_MESSAGES = 24;
 
+/** Per-question text cap on the wire (one shared source: arena run and thread run request schemas). */
+export const QUESTION_MAX_CHARS = 4_000;
+
 /** Minimum number of selected options per comparison (one shared source for route validation and the meta contract). Single-column runs are allowed for debugging; the UI may also sit at zero selections (empty state, run disabled). */
 export const ARENA_MIN_SELECT = 1;
 
@@ -313,7 +316,7 @@ export type RunAttachment = z.infer<typeof RunAttachmentSchema>;
 /** Starts one comparison experiment run. */
 export const ArenaRunRequestSchema = z
   .object({
-    question: z.string().min(1).max(4000),
+    question: z.string().min(1).max(QUESTION_MAX_CHARS),
     // Open string, not the builtin enum: registered custom dimensions are legal
     // comparison axes. Unknown ids still fail loudly, one layer down in the
     // dimension router (422), which is the only place that knows the registry.

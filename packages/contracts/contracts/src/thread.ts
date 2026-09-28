@@ -11,7 +11,7 @@
  */
 
 import { z } from "zod";
-import { PipelineConfigSchema } from "./arena.js";
+import { PipelineConfigSchema, QUESTION_MAX_CHARS } from "./arena.js";
 import { ToolRoundSchema } from "./history-mode.js";
 
 /** Display title ceiling (matches the ledger's title cap). */
@@ -67,6 +67,6 @@ export type ThreadForkRequest = z.infer<typeof ThreadForkRequestSchema>;
 
 /** Runs one more turn on the thread (the resume path: history and workspace come from the store). */
 export const ThreadRunRequestSchema = z.object({
-  question: z.string().min(1).max(4000),
+  question: z.string().min(1).max(QUESTION_MAX_CHARS),
 });
 export type ThreadRunRequest = z.infer<typeof ThreadRunRequestSchema>;

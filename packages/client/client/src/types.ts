@@ -79,6 +79,7 @@ export type {
   LlmWireMessage,
   LlmWireRequest,
   LlmWireResponse,
+  LlmWireResponseTrace,
   LlmWireToolCall,
 } from "@agentprism/contracts";
 export type { ProviderConfigPublic as ProviderConfig } from "@agentprism/contracts";

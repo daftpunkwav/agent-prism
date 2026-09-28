@@ -16,6 +16,7 @@ import { pumpSSEBlocks } from "./sse.js";
 import type {
   ConnectionTestResult,
   LlmEndpointUpdateInput,
+  McpServerConfigView,
   ProviderConfigUpdateInput,
   RunAttachment,
   RuntimeKnobFieldMeta,
@@ -536,16 +537,8 @@ export async function setSkillEnabled(name: string, enabled: boolean): Promise<v
   if (!res.ok) throw new ApiError(await responseDetail(res, "Failed to update skill state"), "http", res.status);
 }
 
-/** One managed MCP server row (shape mirrors the backend McpServerConfig). */
-export interface McpServerEntry {
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
-  timeoutMs?: number;
-  tools?: string[];
-  name?: string;
-  enabled?: boolean;
-}
+/** One managed MCP server row (contracts single source: McpServerConfigView). */
+export type McpServerEntry = McpServerConfigView;
 
 /** Loads the managed MCP server list. */
 export async function fetchMcpServers(options?: { signal?: AbortSignal }): Promise<McpServerEntry[]> {

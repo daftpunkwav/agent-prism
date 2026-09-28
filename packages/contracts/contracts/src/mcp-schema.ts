@@ -55,3 +55,27 @@ export const McpPromptSchema = z.object({
   arguments: z.array(McpPromptArgumentSchema).default([]),
 });
 export type McpPrompt = z.infer<typeof McpPromptSchema>;
+
+/**
+ * Wire row of the managed MCP server list (`servers` entries of
+ * GET/PUT /api/settings/mcp). Read-only projection of the runtime server
+ * config: the transport controller seam and the browser client bind this
+ * shape, while the store keeps its own (structurally identical) type —
+ * contracts stays the shared vocabulary so neither side can drift.
+ */
+export interface McpServerConfigView {
+  /** Spawn command (non-empty; identity fallback when no explicit name is set). */
+  command: string;
+  /** argv for the spawned server process. */
+  readonly args?: readonly string[];
+  /** Baseline-env additions for the child process (string-to-string only). */
+  readonly env?: Readonly<Record<string, string>>;
+  /** Per-request timeout in ms (default 30s). */
+  readonly timeoutMs?: number;
+  /** Allowlisted remote tool names (default: all). */
+  readonly tools?: readonly string[];
+  /** Settings-view display name (defaults to the command basename). */
+  readonly name?: string;
+  /** Disabled servers persist but never attach to runs (default true). */
+  readonly enabled?: boolean;
+}

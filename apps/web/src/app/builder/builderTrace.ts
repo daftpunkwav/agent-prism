@@ -10,7 +10,7 @@
  * Pure and React-free: Display helpers delegating to arena-view/mergeEvents (single source of SSE display semantics).
  */
 
-import type { ArenaEvent, BuilderChatMessage, BuilderTraceEntry, BuilderTraceRecord, LlmWireRequest, LlmWireResponse } from "@agentprism/client";
+import type { ArenaEvent, BuilderChatMessage, BuilderTraceEntry, BuilderTraceRecord, LlmWireRequest, LlmWireResponse, LlmWireResponseTrace } from "@agentprism/client";
 import { mergeEvents, type DisplaySegment } from "@agentprism/arena-view";
 import type { ChatEntry } from "./ChatPanel";
 
@@ -174,13 +174,14 @@ export function asRequest(entry: BuilderTraceEntry): LlmWireRequest {
 
 /** Typed view of a wire-response payload (`truncated` normalized to false when absent). */
 export function asResponse(entry: BuilderTraceEntry): LlmWireResponse {
-  const data = entry.data as Partial<LlmWireResponse> & { first_token_ms?: number | null };
+  // Partial: persisted entries may predate fields the tracer emits today.
+  const data = entry.data as Partial<LlmWireResponseTrace>;
   return { ...data, truncated: data.truncated ?? false } as LlmWireResponse;
 }
 
 /** First-token latency from a wire entry, or null when unrecorded. */
 export function firstTokenMs(entry: BuilderTraceEntry): number | null {
-  const value = (entry.data as { first_token_ms?: number | null }).first_token_ms;
+  const value = (entry.data as Partial<LlmWireResponseTrace>).first_token_ms;
   return typeof value === "number" ? value : null;
 }
 

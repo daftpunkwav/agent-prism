@@ -17,7 +17,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import type { Context, MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
-import type { Clock } from "@agentprism/contracts";
+import type { Clock, McpServerConfigView } from "@agentprism/contracts";
 import { sanitizeErrorMessage } from "@agentprism/contracts";
 import { buildCorsOriginList, type RuntimeKnobFieldMeta, type RuntimeKnobs, type Settings } from "@agentprism/config";
 import { AppError, type ArenaLogsService, type ArenaService, type MatrixService, type ProviderService, type ProjectStore, type SessionService, type ThreadService, type WorkspaceFileService } from "@agentprism/application";
@@ -43,9 +43,9 @@ export interface SkillsController {
 
 /** Managed MCP server list controller backing the settings/mcp routes. */
 export interface McpController {
-  list(): ReadonlyArray<Record<string, unknown>>;
+  list(): ReadonlyArray<McpServerConfigView>;
   /** Full-list replace; throws McpStoreError-shaped Errors on invalid input. */
-  replace(input: unknown): ReadonlyArray<Record<string, unknown>>;
+  replace(input: unknown): ReadonlyArray<McpServerConfigView>;
 }
 
 /** Memory store status snapshot + maintenance action. */
