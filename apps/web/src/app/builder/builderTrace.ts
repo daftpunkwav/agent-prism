@@ -12,7 +12,7 @@
 
 import type { ArenaEvent, BuilderChatMessage, BuilderTraceEntry, BuilderTraceRecord, LlmWireRequest, LlmWireResponse, LlmWireResponseTrace } from "@agentprism/client";
 import { mergeEvents, type DisplaySegment } from "@agentprism/arena-view";
-import type { ChatEntry } from "./ChatPanel";
+import type { ChatEntry } from "./chatEntry";
 
 /** Accent spectrum variable per trace kind (lane color conventions). */
 export function traceAccent(kind: BuilderTraceEntry["kind"]): string {

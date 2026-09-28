@@ -14,7 +14,9 @@
  */
 
 import type { SessionBlobStore } from "@agentprism/contracts";
-import { MAX_ENTRY_CONTENT_CHARS } from "./in-memory-session-store.js";
+
+/** Ledger inline budget per entry (chars); larger bodies spill to the blob sidecar. Owned here so the spill thresholds and the cap they compare against share one module. */
+export const MAX_ENTRY_CONTENT_CHARS = 8_000;
 
 /** Per-blob cap in chars; larger bodies are capped loudly inside the blob. */
 export const LEDGER_BLOB_MAX_CHARS = 128 * 1024;

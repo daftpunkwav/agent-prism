@@ -25,11 +25,11 @@ import {
 } from "@agentprism/contracts";
 import { InMemoryBlobStore, spillOversizedEntry } from "./blob-store.js";
 
-/** Defensive caps shared with the file backend (see session-persistence). */
+/** Defensive caps shared with the file backend (see session-persistence). The entry content cap lives in blob-store (the spill domain owns it) and is re-exported for API stability. */
 export const MAX_SESSION_TITLE_CHARS = 120;
 export const MAX_SESSIONS_PER_STORE = 200;
 export const MAX_ENTRIES_PER_SESSION = 500;
-export const MAX_ENTRY_CONTENT_CHARS = 8_000;
+export { MAX_ENTRY_CONTENT_CHARS } from "./blob-store.js";
 export const MAX_SUMMARY_CHARS = 2_000;
 
 /** In-memory SessionStore: no IO, same validation as durable backends. */

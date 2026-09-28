@@ -120,13 +120,6 @@ import type {
 } from "@agentprism/contracts";
 import { harnessRetryCaps, isLoopbackHost } from "@agentprism/contracts";
 
-// Custom-dimension subpackages: each registered dimension becomes an Arena
-// comparison axis, a Builder block, and a pinnable baseline field.
-// ARENA_CUSTOM_DIMENSIONS=off disables every one of them.
-if (process.env.ARENA_CUSTOM_DIMENSIONS !== "off") {
-  registerCustomDimensions([summaryBudgetDimension, memoryTopNDimension, toolReplayDimension]);
-}
-
 export interface RuntimeComponents {
   settings: Settings;
   app: HttpApp;
@@ -170,6 +163,15 @@ export function buildColumnCallbacks(
  * @throws Error on non-loopback hosts without API_TOKEN, or on missing seams/drivers.
  */
 export async function assemble(): Promise<RuntimeComponents> {
+  // Custom-dimension subpackages: each registered dimension becomes an Arena
+  // comparison axis, a Builder block, and a pinnable baseline field. Registered
+  // here (not at module load) so importing this module stays side-effect free.
+  // ARENA_CUSTOM_DIMENSIONS=off disables every one of them. Registration is
+  // idempotent per descriptor identity, so a repeated assemble() is safe.
+  if (process.env.ARENA_CUSTOM_DIMENSIONS !== "off") {
+    registerCustomDimensions([summaryBudgetDimension, memoryTopNDimension, toolReplayDimension]);
+  }
+
   const settings = loadSettings();
 
   // Non-loopback listening requires an API token; refuse to start otherwise.

@@ -31,17 +31,11 @@ import { useFollowScroll } from "@/hooks/useFollowScroll";
 import type { DisplaySegment } from "@agentprism/arena-view";
 import { MarkdownBlock } from "@/components/MarkdownBlock";
 import { useT } from "@/i18n/useT";
+import type { ChatEntry } from "./chatEntry";
 
-/**
- * One chat entry: server history carries role/content only; the client attaches
- * the turn's display segments so the bubble keeps its thinking/steps collapsed
- * after the run settles (instead of vanishing with the live view).
- */
-export interface ChatEntry {
-  role: "user" | "assistant";
-  content: string;
-  segments?: DisplaySegment[];
-}
+// Re-exported for the existing `from "./ChatPanel"` import sites (type moved to
+// chatEntry so pure display modules do not depend on this component).
+export type { ChatEntry };
 
 export interface ChatPanelProps {
   history: ChatEntry[];
