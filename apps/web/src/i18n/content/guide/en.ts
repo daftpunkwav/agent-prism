@@ -652,7 +652,7 @@ const dimensions: DimDoc[] = [
     label: "Thinking",
     reality: "full",
     summary:
-      "Compares the off / low / medium / high thinking tiers. The model must be marked as thinking-capable in Settings; Anthropic maps budget_tokens, OpenAI-compatible maps reasoning_effort. The thinking stream is displayed on a separate track from the final answer.",
+      "Compares the endpoint's own thinking level set (off plus its configured or vendor levels) in level mode. The model must be marked as thinking-capable in Settings; Anthropic maps budget_tokens, OpenAI-compatible passes reasoning_effort verbatim. The axis is mutually exclusive with the budget axis, which serves budget-mode endpoints.",
     controls:
       "PipelineConfig.thinking_level + endpoint.thinking_capable → createChatModel injects the thinking parameters.",
     options: [
@@ -686,20 +686,16 @@ const dimensions: DimDoc[] = [
     label: "Thinking budget",
     reality: "full",
     summary:
-      "Sets the Anthropic budget_tokens (thinking token budget) independently from the thinking level. Numeric values outrank the level mapping; 0 follows the level. Applies to Anthropic Messages endpoints only.",
+      "Budget-mode thinking (anthropic messages only): the axis lists the endpoint's budget pair table (level name → budget_tokens/max_tokens), and the two thinking modes are mutually exclusive with the level mapping. Off means no thinking.",
     controls:
-      "PipelineConfig.thinking_budget + endpoint.thinking_budget_tokens/thinking_max_tokens → buildThinkingClientOptions budget override.",
+      "Baseline thinking_mode=budget + pair level → buildPipelineBase resolves the pair to PipelineConfig.thinking_budget/thinking_max_tokens → model-factory budget override.",
     options: [
-      { value: "0", label: "0 (follow level)", effect: "Uses the fixed budget mapped from the level." },
-      { value: "2048", label: "2048", effect: "budget_tokens=2048." },
-      { value: "8192", label: "8192", effect: "budget_tokens=8192." },
-      { value: "16384", label: "16384", effect: "budget_tokens=16384." },
-      { value: "32768", label: "32768", effect: "budget_tokens=32768." },
-      { value: "65536", label: "65536", effect: "budget_tokens=65536; the baseline accepts any in-range number." },
+      { value: "0", label: "Off", effect: "No thinking: the column runs with thinking disabled." },
+      { value: "<pair levels>", label: "<endpoint pair levels>", effect: "Resolves the pair's level name to its configured budget_tokens/max_tokens pair." },
     ],
     path: [
-      "Provider config: thinking_budget_tokens + thinking_max_tokens stored on LlmEndpoint (output must exceed budget).",
-      "A run-level thinking_budget > 0 wins; otherwise the endpoint default pair applies.",
+      "Provider config: thinking_budget_pairs (level → budget_tokens/max_tokens) stored on LlmEndpoint; the default budget level rides thinking_level.",
+      "resolveBaselineOverrides validates the token against the synced pair options; buildPipelineBase resolves the level name to its numeric pair (fail loud on unknown names).",
       "max_tokens below budget + 1024 is auto-raised (the Anthropic protocol requires budget < max_tokens).",
     ],
     langChain: "createChatModel injects the thinking block through the buildThinkingClientOptions override.",

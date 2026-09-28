@@ -34,7 +34,7 @@ const FIELD_TO_DIMENSION: Record<string, string> = {
 };
 
 /** Baseline-only fields (no dimension id) with translatable option labels. */
-const BASELINE_ONLY_OPTION_FIELDS = new Set(["approval_mode", "sandbox_mode"]);
+const BASELINE_ONLY_OPTION_FIELDS = new Set(["thinking_mode", "approval_mode", "sandbox_mode"]);
 
 /** English canonical suffix emitted by packages/dimensions currentEndpointLabel. */
 export const CANONICAL_CURRENT_SUFFIX = " (current)";

@@ -241,6 +241,17 @@ export function ConnectionsSection({
                   ? level
                   : "off",
               thinking_levels: levels,
+              thinking_mode: m.thinking_mode === "budget" ? "budget" : base.thinking_mode,
+              thinking_budget_pairs: Array.isArray(m.thinking_budget_pairs)
+                ? (m.thinking_budget_pairs as Record<string, unknown>[])
+                  .filter(
+                    (pair): pair is Record<string, unknown> & { level: string; budget_tokens: number; max_tokens: number } =>
+                      typeof pair.level === "string" &&
+                      typeof pair.budget_tokens === "number" &&
+                      typeof pair.max_tokens === "number",
+                  )
+                  .map((pair) => ({ level: pair.level, budget_tokens: pair.budget_tokens, max_tokens: pair.max_tokens }))
+                : base.thinking_budget_pairs,
               thinking_budget_tokens: typeof m.thinking_budget_tokens === "number" ? m.thinking_budget_tokens : base.thinking_budget_tokens,
               thinking_max_tokens: typeof m.thinking_max_tokens === "number" ? m.thinking_max_tokens : base.thinking_max_tokens,
               image_input: m.image_input === true,
@@ -673,6 +684,7 @@ export function ConnectionsSection({
                   <ModelModal
                     initial={modelModal.draft}
                     isNew={modelModal.isNew}
+                    apiFormat={connections.find((c) => c.key === modelModal.connKey)?.api_format ?? "anthropic_messages"}
                     defaultEndpointId={defaultEndpointId}
                     onSetDefault={onSetDefault}
                     onClose={() => setModelModal(null)}

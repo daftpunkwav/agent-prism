@@ -56,6 +56,7 @@ export const arena = {
     baselineToggleTitle: "展开或收起控制变量基线",
     baselineHint: "非对比维可改 · 当前维锁定 · 分组展示",
     lockedFieldTitle: "当前对比维，由参与列子项决定",
+    modeLockedTitle: "当前思考模式下不可设置",
     lockedSuffix: " · 对比维",
     baselineFieldAria: "基线 {label}",
     baselineNumberInvalid: "请输入 {min}–{max} 之间的数字",

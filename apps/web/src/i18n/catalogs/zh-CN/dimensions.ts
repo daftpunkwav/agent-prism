@@ -36,9 +36,9 @@ export const dimensions = {
     harness: "维度列固定 Native：bare 单次运行；verify/reflect/self_evolve 经共享 VerificationPolicy 真实重试",
     temperature: "真实写入 LLM temperature（采样随机性）",
     model: "切换 Settings 接入点（跨厂或同连接多 model）；解码参数由基线钉死",
-    thinking: "off/low/medium/high；模型须在 Settings 勾选「支持思考」才真正启用",
+    thinking: "按端点自身档位集对比（档位模式）；模型须在 Settings 勾选「支持思考」才真正启用",
     max_steps: "8/10 框架按 LLM 轮次真实硬预算；LangChain 与 Deep Agents 仅由图递归上限近似约束",
-    thinking_budget: "Anthropic budget_tokens（0 = 跟随档位）；数值优先于档位映射，仅 Anthropic 端点可用",
+    thinking_budget: "端点预算档位表的档位对比（关闭 = 不思考）；仅预算模式的 Anthropic 端点可用",
     toolset: "真实过滤各框架实际绑定的工具列表（bind_tools / create_agent / MCP allowlist / 桥接工具目录）",
     mcp: "把 MCP filesystem/fetch 服务器桥接进工具列表；off / fs / full 决定模型可调用的工具",
     skill: "off 禁用 skill 工具；on-demand 经 skill 工具按需加载；preloaded 注入 runbook 到 prompt",
@@ -57,6 +57,7 @@ export const dimensions = {
     model_id: "模型",
     thinking_level: "思考强度",
     thinking_budget: "思考预算",
+    thinking_mode: "思考模式",
     max_steps: "最大步数",
     toolset: "工具集",
     top_p: "Top P",
@@ -124,7 +125,7 @@ export const dimensions = {
       high: "高",
     },
     thinking_budget: {
-      "0": "0（跟随档位）",
+      "0": "关闭",
       "2048": "2048",
       "8192": "8192",
       "16384": "16384",
@@ -171,6 +172,10 @@ export const dimensions = {
     },
   },
   baselineOpt: {
+    thinking_mode: {
+      levels: "档位映射",
+      budget: "预算档位表",
+    },
     approval_mode: {
       auto: "自动（仅拒绝灾难性命令）",
       unless_trusted: "仅已知安全命令",

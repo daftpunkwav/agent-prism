@@ -65,14 +65,25 @@ export const settings = {
     modalCloseAria: "Close model dialog",
     enabledLabel: "Enabled",
     customLevels: "Custom thinking levels",
-    customLevelsHint:
-      "Vendor-defined levels, one per row (e.g. low, mid, high, max, 8192). OpenAI-compatible formats send them verbatim as reasoning effort; on Anthropic numeric levels (≥1024) pass through as thinking budget tokens and named levels map to the fixed budget table.",
     customLevelPlaceholder: "Level name (e.g. xhigh)",
     customLevelAria: "Custom level {index}",
     customLevelAdd: "Add level",
-    thinkingBudgetTokens: "Thinking budget tokens (budget_tokens)",
-    thinkingOutputTokens: "Thinking output tokens (max_tokens)",
-    thinkingBudgetError: "Thinking output tokens must exceed the thinking budget tokens",
+    thinkingTabLevels: "Thinking levels",
+    thinkingTabBudget: "Thinking budget",
+    openaiFormatHint:
+      "OpenAI-compatible formats express thinking intensity as named levels sent as reasoning_effort; budget tokens are an Anthropic Messages concept and are never sent on these formats.",
+    defaultBudgetLevel: "Default budget level",
+    budgetPairs: "Budget pairs (level → budget / output tokens)",
+    budgetPairLevel: "Level",
+    budgetPairBudget: "budget_tokens",
+    budgetPairMax: "max_tokens",
+    budgetPairLevelPlaceholder: "Level name (e.g. low)",
+    budgetPairLevelAria: "Budget level {index} name",
+    budgetPairRemoveAria: "Remove budget level {index}",
+    budgetPairAdd: "Add budget level",
+    budgetPairError: "For every pair the output tokens (max_tokens) must exceed the budget tokens",
+    budgetPairLowWarning:
+      "A budget below {floor} tokens sits under the Anthropic protocol floor: those requests would silently run without thinking.",
     modalGuideHint: "See the Guide tab in Settings for the full explanation of every option.",
     customLevelRemoveAria: "Remove custom level {index}",
     labelPlaceholder: "Display name",
@@ -100,10 +111,6 @@ export const settings = {
     chipImage: "Image",
     chipThinking: "Thinking",
     unnamed: "Unnamed model",
-    thinkingHint:
-      "The Anthropic path maps to thinking.budget_tokens; OpenAI-compatible paths try reasoning_effort. For comparison runs, the generation cap still follows the Arena baseline.",
-    thinkingBudgetHint:
-      "The thinking budget applies to the Anthropic Messages format only: when set it outranks the level mapping. The paired output tokens cap the whole response; 0 auto-raises to budget + 1024 and must exceed the budget.",
   },
   decode: {
     title: "Shared Decode Defaults (Arena baseline seed)",

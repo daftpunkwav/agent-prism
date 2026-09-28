@@ -36,9 +36,9 @@ export const dimensions = {
     harness: "Columns pin Native: bare runs once; verify/reflect/self_evolve retry for real through the shared VerificationPolicy",
     temperature: "Writes the real LLM temperature (sampling randomness)",
     model: "Switches Settings endpoints (cross-provider or multi-model on one connection); decode params stay pinned",
-    thinking: "off/low/medium/high; the model must have \"supports thinking\" checked in Settings to enable",
+    thinking: "Compares the endpoint's own level set (level mode) — the model must have \"supports thinking\" checked in Settings to enable",
     max_steps: "8 of 10 frameworks enforce the LLM-turn budget for real; LangChain and Deep Agents bound it only through the graph recursion limit",
-    thinking_budget: "Anthropic budget_tokens (0 = follow the level); numeric overrides the level mapping; Anthropic endpoints only",
+    thinking_budget: "Budget-pair levels from the endpoint's budget table (Off = no thinking); budget-mode Anthropic endpoints only",
     toolset: "Really filters the tool list each framework binds (bind_tools / create_agent / MCP allowlist / bridge catalogs)",
     mcp: "Bridges MCP filesystem/fetch servers into the tool list; off / fs / full changes what the model can call",
     skill: "Off disables the skill tool; on-demand loads via the skill tool; preloaded injects runbooks into the prompt",
@@ -57,6 +57,7 @@ export const dimensions = {
     model_id: "Model",
     thinking_level: "Thinking",
     thinking_budget: "Thinking budget",
+    thinking_mode: "Thinking mode",
     max_steps: "Max steps",
     toolset: "Toolset",
     top_p: "Top P",
@@ -124,7 +125,7 @@ export const dimensions = {
       high: "High",
     },
     thinking_budget: {
-      "0": "0 (follow level)",
+      "0": "Off",
       "2048": "2048",
       "8192": "8192",
       "16384": "16384",
@@ -171,6 +172,10 @@ export const dimensions = {
     },
   },
   baselineOpt: {
+    thinking_mode: {
+      levels: "Level mapping",
+      budget: "Budget pairs",
+    },
     approval_mode: {
       auto: "Auto (deny catastrophic commands only)",
       unless_trusted: "Known-safe commands only",

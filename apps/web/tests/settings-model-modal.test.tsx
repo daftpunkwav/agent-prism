@@ -22,6 +22,7 @@ function renderModal(overrides: Partial<Parameters<typeof ModelModal>[0]> = {}) 
   const merged: Parameters<typeof ModelModal>[0] = {
     initial,
     isNew: false,
+    apiFormat: "anthropic_messages",
     defaultEndpointId: "",
     onSetDefault,
     onClose,
@@ -115,14 +116,24 @@ describe("ModelModal set-default control", () => {
 });
 
 describe("ModelModal thinking cluster", () => {
-  it("keeps the level control disabled and the budget pair hidden until thinking is on", () => {
+  it("keeps the mode tabs disabled and the level control hidden until thinking is on", () => {
     renderModal();
     expect(thinkingToggle().checked).toBe(false);
-    expect(screen.queryByText(en().thinkingBudgetTokens)).toBeNull();
+    expect(screen.queryByText(en().customLevels)).toBeNull();
+    const budgetTab = screen.getByRole("tab", { name: en().thinkingTabBudget }) as HTMLButtonElement;
+    expect(budgetTab.disabled).toBe(true);
 
     fireEvent.click(thinkingToggle());
-    expect(screen.getByText(en().thinkingBudgetTokens)).toBeTruthy();
-    expect(screen.getByText(en().thinkingOutputTokens)).toBeTruthy();
+    // Level mode is the default tab; the level editor is visible once thinking is on.
+    expect(screen.getByText(en().customLevels)).toBeTruthy();
+    expect(budgetTab.disabled).toBe(false);
+  });
+
+  it("hides the budget editor entirely on OpenAI-compatible formats", () => {
+    renderModal({ apiFormat: "openai_chat", initial: { ...blankModel(), model: "saved-model", id: "ep_1", thinking_capable: true } });
+    expect(screen.queryByRole("tab", { name: en().thinkingTabBudget })).toBeNull();
+    expect(screen.getByText(en().openaiFormatHint)).toBeTruthy();
+    fireEvent.click(saveButton());
   });
 
   it("raises the level to a usable default when capability is picked", () => {
@@ -149,33 +160,122 @@ describe("ModelModal thinking cluster", () => {
     expect((onSave.mock.calls[0]?.[0] as ModelSlot).thinking_level).toBe("off");
   });
 
-  it("flags an output budget that does not exceed the thinking budget and blocks save", () => {
+  it("switching to the budget tab applies budget mode and resets a level it cannot represent", () => {
     const initial: ModelSlot = {
       ...blankModel(),
       model: "m",
       thinking_capable: true,
+      thinking_level: "high",
+      thinking_budget_pairs: [{ level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 }],
+    };
+    const { onSave } = renderModal({ initial });
+    fireEvent.click(screen.getByRole("tab", { name: en().thinkingTabBudget }));
+    expect(screen.getByText(en().budgetPairs)).toBeTruthy();
+    fireEvent.click(saveButton());
+    const saved = onSave.mock.calls[0]?.[0] as ModelSlot;
+    expect(saved.thinking_mode).toBe("budget");
+    // "high" is not a budget pair level: the default resets to off.
+    expect(saved.thinking_level).toBe("off");
+  });
+
+  it("budget mode pins the default to a pair level and keeps the level tab value separate", () => {
+    const initial: ModelSlot = {
+      ...blankModel(),
+      model: "m",
+      thinking_capable: true,
+      thinking_mode: "budget",
+      thinking_level: "super",
+      thinking_budget_pairs: [{ level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 }],
+    };
+    const { onSave } = renderModal({ initial });
+    expect(screen.getByRole("tab", { name: en().thinkingTabBudget }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(saveButton());
+    const saved = onSave.mock.calls[0]?.[0] as ModelSlot;
+    expect(saved.thinking_mode).toBe("budget");
+    expect(saved.thinking_level).toBe("super");
+    expect(saved.thinking_budget_pairs).toEqual([{ level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 }]);
+  });
+
+  it("flags a budget pair whose output cap does not exceed its budget and blocks save", () => {
+    const initial: ModelSlot = {
+      ...blankModel(),
+      model: "m",
+      thinking_capable: true,
+      thinking_mode: "budget",
       thinking_level: "low",
-      thinking_budget_tokens: 4096,
-      thinking_max_tokens: 4096,
+      thinking_budget_pairs: [{ level: "low", budget_tokens: 4096, max_tokens: 4096 }],
     };
     renderModal({ initial });
-    expect(screen.getByText(en().thinkingBudgetError)).toBeTruthy();
+    expect(screen.getByText(en().budgetPairError)).toBeTruthy();
     expect(saveButton().disabled).toBe(true);
   });
 
-  it("accepts an output budget above the thinking budget", () => {
+  it("accepts a budget pair whose output cap exceeds its budget", () => {
     const initial: ModelSlot = {
       ...blankModel(),
       model: "m",
       thinking_capable: true,
+      thinking_mode: "budget",
       thinking_level: "low",
-      thinking_budget_tokens: 4096,
-      thinking_max_tokens: 8192,
+      thinking_budget_pairs: [{ level: "low", budget_tokens: 4096, max_tokens: 8192 }],
     };
     const { onSave } = renderModal({ initial });
-    expect(screen.queryByText(en().thinkingBudgetError)).toBeNull();
+    expect(screen.queryByText(en().budgetPairError)).toBeNull();
     fireEvent.click(saveButton());
     expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds, edits, and removes budget pairs, and trims/dedupes them on save", () => {
+    const initial: ModelSlot = {
+      ...blankModel(),
+      model: "m",
+      thinking_capable: true,
+      thinking_mode: "budget",
+      thinking_level: "fast",
+      thinking_budget_pairs: [{ level: "fast", budget_tokens: 1000, max_tokens: 1200 }],
+    };
+    const { onSave } = renderModal({ initial });
+
+    fireEvent.click(screen.getByRole("button", { name: en().budgetPairAdd }));
+    fireEvent.change(screen.getByLabelText(en().budgetPairLevelAria.replace("{index}", "2")), { target: { value: " slow " } });
+    // The default budget level stays on its row while the new row is empty.
+    expect(screen.getByRole("tab", { name: en().thinkingTabLevels })).toBeTruthy();
+
+    // Removing the selected pair's row drops the default level to off.
+    fireEvent.click(screen.getByRole("button", { name: en().budgetPairRemoveAria.replace("{index}", "1") }));
+    fireEvent.click(saveButton());
+    const saved = onSave.mock.calls[0]?.[0] as ModelSlot;
+    expect(saved.thinking_budget_pairs).toEqual([{ level: "slow", budget_tokens: 0, max_tokens: 0 }]);
+    expect(saved.thinking_level).toBe("off");
+  });
+
+  it("keeps a level-mode draft's stored budget pairs verbatim on save", () => {
+    const initial: ModelSlot = {
+      ...blankModel(),
+      model: "m",
+      thinking_capable: true,
+      thinking_level: "high",
+      thinking_budget_pairs: [{ level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 }],
+    };
+    const { onSave } = renderModal({ initial });
+    fireEvent.click(saveButton());
+    const saved = onSave.mock.calls[0]?.[0] as ModelSlot;
+    expect(saved.thinking_mode).toBe("levels");
+    expect(saved.thinking_budget_pairs).toEqual([{ level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 }]);
+  });
+
+  it("forces level mode back on OpenAI-compatible formats even for a budget-mode draft", () => {
+    const initial: ModelSlot = {
+      ...blankModel(),
+      model: "m",
+      thinking_capable: true,
+      thinking_mode: "budget",
+      thinking_budget_pairs: [{ level: "low", budget_tokens: 4096, max_tokens: 8192 }],
+    };
+    const { onSave } = renderModal({ apiFormat: "openai_responses", initial });
+    fireEvent.click(saveButton());
+    const saved = onSave.mock.calls[0]?.[0] as ModelSlot;
+    expect(saved.thinking_mode).toBe("levels");
   });
 
   it("uses vendor-defined levels in place of the standard set", () => {

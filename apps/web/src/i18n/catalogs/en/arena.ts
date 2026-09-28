@@ -56,6 +56,7 @@ export const arena = {
     baselineToggleTitle: "Expand or collapse the controlled-variable baseline",
     baselineHint: "Editable off-dimension · locked on current dimension · grouped",
     lockedFieldTitle: "Current comparison dimension; decided by the participant items",
+    modeLockedTitle: "Not editable in the current thinking mode",
     lockedSuffix: " · dimension",
     baselineFieldAria: "Baseline {label}",
     baselineNumberInvalid: "Enter a number between {min} and {max}",

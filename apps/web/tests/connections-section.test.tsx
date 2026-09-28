@@ -8,25 +8,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
-import type { ConnectionGroup, ModelSlot } from "../src/app/settings/settingsConnectionModel.js";
+import { blankModel, type ConnectionGroup, type ModelSlot } from "../src/app/settings/settingsConnectionModel.js";
 import { ConnectionsSection } from "../src/app/settings/ConnectionsSection.js";
 
 function slot(overrides?: Partial<ModelSlot>): ModelSlot {
   return {
+    ...blankModel(),
     id: "ep-1",
     label: "Main",
     model: "glm-5.3",
     thinking_level: "off",
-    thinking_levels: [],
-    thinking_capable: false,
     context_window: 128000,
     max_input_tokens: 120000,
     max_output_tokens: 32000,
-    image_input: false,
-    video_input: false,
     enabled: true,
     ...overrides,
-  } as ModelSlot;
+  };
 }
 
 function conn(key: string, overrides?: Partial<ConnectionGroup>): ConnectionGroup {

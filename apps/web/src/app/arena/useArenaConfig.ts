@@ -182,11 +182,17 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
     const allowed = new Set(
       (meta?.baseline_fields ?? []).map((f) => f.field).filter(Boolean),
     );
+    // Mutually exclusive thinking modes: only the active mode's intensity field
+    // travels on the wire — the inactive side's stale value must never reach the
+    // server, where it would fail the mode legality check.
+    const thinkingMode = baseline["thinking_mode"] ?? meta?.baseline_defaults?.["thinking_mode"] ?? "levels";
     const out: BaselineOverrides = {};
     const custom: Record<string, string> = {};
     Object.keys(baseline).forEach((key) => {
       if (key === activeField || key === "model_id") return;
       if (allowed.size > 0 && !allowed.has(key)) return;
+      if (key === "thinking_budget" && thinkingMode !== "budget") return;
+      if (key === "thinking_level" && thinkingMode === "budget") return;
       const val: unknown = baseline[key];
       // Stored preferences are untrusted JSON: re-guard the value, not just its type.
       if (typeof val !== "string" || val === "") return;

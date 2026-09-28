@@ -295,12 +295,19 @@ export function BaselineModal({
                   {BASELINE_GROUP_ORDER.map((g) => {
                     const items = meta.baseline_fields!.filter((f) => (f.group || "pipeline") === g);
                     if (items.length === 0) return null;
+                    // Mutually exclusive thinking modes: the mode token routes which
+                    // of the two intensity fields is editable; the inactive side
+                    // renders disabled while keeping its value for switching back.
+                    const thinkingMode = baseline["thinking_mode"] ?? meta.baseline_defaults?.["thinking_mode"] ?? "levels";
                     return (
                       <div key={g} className="baseline-group" data-group={g}>
                         <p className="baseline-group-title">{t(`arena.group.${g}`)}</p>
                         <div className="baseline-pick">
                           {items.map((field) => {
                             const locked = field.dimension === dimension;
+                            const modeDisabled =
+                              (field.field === "thinking_level" && thinkingMode === "budget") ||
+                              (field.field === "thinking_budget" && thinkingMode !== "budget");
                             const value = baseline[field.field] ?? field.default;
                             const fieldLab = baselineFieldLabel(t, field.field, field.label);
                             // Numeric editor only for unlocked number-kind fields with a
@@ -319,7 +326,7 @@ export function BaselineModal({
                               fieldLabel: fieldLab,
                               min: field.min as number,
                               max: field.max as number,
-                              disabled: running,
+                              disabled: running || modeDisabled,
                               ariaLabel: t("arena.setup.baselineFieldAria", { label: fieldLab }),
                               invalidMessage: t("arena.setup.baselineNumberInvalid", {
                                 min: String(field.min),
@@ -332,7 +339,7 @@ export function BaselineModal({
                                 key={field.field}
                                 className="baseline-field"
                                 data-locked={locked}
-                                title={locked ? t("arena.setup.lockedFieldTitle") : undefined}
+                                title={locked ? t("arena.setup.lockedFieldTitle") : modeDisabled ? t("arena.setup.modeLockedTitle") : undefined}
                               >
                                 <span className="baseline-field-label">
                                   {fieldLab}
@@ -347,7 +354,7 @@ export function BaselineModal({
                                 ) : (
                                   <UiSelect
                                     className="ui-select-sm w-full"
-                                    disabled={locked || running}
+                                    disabled={locked || running || modeDisabled}
                                     value={value}
                                     onChange={(next) => onBaselineFieldChange(field.field, next)}
                                     ariaLabel={t("arena.setup.baselineFieldAria", { label: fieldLab })}
