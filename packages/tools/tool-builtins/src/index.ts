@@ -19,7 +19,7 @@ export { globTool, globToRegExp } from "./definitions/glob.js";
 export { readInt } from "./definitions/caps.js";
 export { safeFetchText, resolveCharset, readBodyCapped, CHARSET_SNIFF_BYTES } from "./definitions/safe-fetch.js";
 export { boundText, utf8Bytes, SPILL_DIR, SPILL_THRESHOLD_BYTES, MAX_SPILL_FILES } from "./definitions/spill.js";
-export { grepTool } from "./definitions/grep.js";
+export { grepTool, hasNestedQuantifier } from "./definitions/grep.js";
 export { webFetchTool, htmlToText, extractHtmlTitle } from "./definitions/web-fetch.js";
 export { todoTool, TODO_JSON_SCHEMA, TODO_STORE_FILE } from "./definitions/todo.js";
 export {

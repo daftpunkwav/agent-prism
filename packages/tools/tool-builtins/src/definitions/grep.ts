@@ -37,12 +37,106 @@ const MAX_GREP_FILE_BYTES = 2 * 1024 * 1024;
 /** Total bytes scanned per call; the walk stops (loudly) once it is spent. */
 const MAX_GREP_TOTAL_BYTES = 32 * 1024 * 1024;
 
+/**
+ * Conservative pre-screen for catastrophic-backtracking regex shapes: an
+ * UNBOUNDED quantifier (`*`, `+`, `{n,}`) applied to a group whose body carries
+ * another quantifier can backtrack exponentially (`(a+)+`, `(\\d{1,3})*$`),
+ * and adjacent quantifiers (`a++`) repeat the same hazard. A bounded outer
+ * quantifier (`{n,m}`) keeps the search tree finite and passes. Heuristic by
+ * design — exotic alternation-overlap bombs are not caught — but the common
+ * model-emitted forms are rejected before they can pin the event loop
+ * (regex.test is synchronous; no timeout can interrupt it).
+ */
+export function hasNestedQuantifier(pattern: string): boolean {
+  /** Per open group: does its body contain a quantifier? */
+  const groupStack: boolean[] = [];
+  let bodyHasQuantifier = false;
+  let index = 0;
+  const quantifierSpec = (start: number): { spec: string; end: number } | null => {
+    const close = pattern.indexOf("}", start);
+    if (close === -1) return null;
+    const spec = pattern.slice(start + 1, close);
+    return /^\d+(,\d*)?$/.test(spec) ? { spec, end: close } : null;
+  };
+  while (index < pattern.length) {
+    const char = pattern[index];
+    if (char === "\\") {
+      index += 2;
+      continue;
+    }
+    if (char === "[") {
+      // Character class: quantifier characters inside are literals.
+      index += 1;
+      if (pattern[index] === "^") index += 1;
+      if (pattern[index] === "]") index += 1;
+      while (index < pattern.length && pattern[index] !== "]") {
+        if (pattern[index] === "\\") index += 1;
+        index += 1;
+      }
+      index += 1;
+      continue;
+    }
+    if (char === "(") {
+      groupStack.push(bodyHasQuantifier);
+      bodyHasQuantifier = false;
+      index += 1;
+      continue;
+    }
+    if (char === ")") {
+      index += 1;
+      const bodyHad: boolean = bodyHasQuantifier;
+      if (bodyHad) {
+        // Unbounded quantifier directly over a group whose body carries a
+        // quantifier: the exponential shape. Bounded {n,m} passes.
+        const next = pattern[index];
+        if (next === "*" || next === "+") return true;
+        if (next === "{") {
+          const spec = quantifierSpec(index);
+          if (spec !== null && spec.spec.endsWith(",")) return true;
+        }
+      }
+      // A group whose subtree carried a quantifier makes the enclosing body
+      // quantifier-bearing too (e.g. ((a?)b)* must flag).
+      bodyHasQuantifier = bodyHad || (groupStack.pop() ?? false);
+      continue;
+    }
+    if (char === "*" || char === "+") {
+      bodyHasQuantifier = true;
+      index += 1;
+      continue;
+    }
+    if (char === "{") {
+      const spec = quantifierSpec(index);
+      if (spec !== null) {
+        bodyHasQuantifier = true;
+        index = spec.end + 1;
+        continue;
+      }
+      index += 1;
+      continue;
+    }
+    index += 1;
+  }
+  return false;
+}
+
 async function executeGrep(workspace: ToolWorkspace, args: ToolArgs): Promise<ToolExecutionResult> {
   try {
     const view = asWorkspaceView(workspace);
     const pattern = String(args.pattern ?? "");
     if (pattern === "") {
       return { result: "Error: pattern must not be empty", fileDiff: null, ok: false, code: "workspace_error" };
+    }
+    if (hasNestedQuantifier(pattern)) {
+      // Rejected before compile: regex.test below is synchronous, so a
+      // catastrophic-backtracking pattern would freeze the whole server, not
+      // just this tool call (no timeout can interrupt a running RegExp).
+      return {
+        result: `Error: pattern rejected: nested quantifier risks exponential backtracking; rewrite with a bounded group (e.g. {1,3}): ${pattern}`,
+        fileDiff: null,
+        ok: false,
+        code: "workspace_error",
+      };
     }
     let regex: RegExp;
     try {

@@ -218,6 +218,33 @@ describe("assemble() route wiring", () => {
     },
   );
 
+  it(
+    "keeps operator files when deleting a user skill directory",
+    { timeout: COMPOSITION_TIMEOUT },
+    async () => {
+      const { assemble } = await import("../src/assemble.js");
+      const { app } = await assemble();
+
+      const created = await app.request("/api/settings/skills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "keeper-probe", description: "probe", body: "probe body" }),
+      });
+      expect(created.status).toBe(201);
+
+      // An operator file parked beside SKILL.md must survive the skill delete:
+      // only the skill file goes, never the directory's other contents.
+      const skillDir = path.join(dataRoot, "skills", "keeper-probe");
+      const operatorFile = path.join(skillDir, "NOTES.txt");
+      fs.writeFileSync(operatorFile, "operator data", "utf-8");
+
+      const removed = await app.request("/api/settings/skills/keeper-probe", { method: "DELETE" });
+      expect(removed.status).toBe(200);
+      expect(fs.existsSync(path.join(skillDir, "SKILL.md"))).toBe(false);
+      expect(fs.readFileSync(operatorFile, "utf-8")).toBe("operator data");
+    },
+  );
+
   afterAll(() => {
     // The stores live in the suite's scratch data dir; discard it wholesale.
     fs.rmSync(dataRoot, { recursive: true, force: true });

@@ -10,7 +10,7 @@
  */
 
 import path from "node:path";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import {
   ArenaLogsService,
@@ -489,12 +489,13 @@ export async function assemble(): Promise<RuntimeComponents> {
       },
       deleteFile: (path) => {
         rmSync(path, { force: true });
-        // Also drop the now-empty skill folder so listings stay clean.
+        // Drop the skill folder only when nothing else remains: a recursive
+        // removal would silently delete operator files placed beside SKILL.md.
         const dir = dirname(path);
         try {
-          rmSync(dir, { recursive: true, force: true });
+          rmdirSync(dir);
         } catch {
-          // A non-empty dir means the operator keeps other files there; leave it.
+          // Non-empty (or already vanished) directories stay untouched.
         }
       },
       listDir: (dir) => {
