@@ -8,14 +8,14 @@
  * - Cancel runs when the client disconnects
  */
 
-import type { ArenaEvent, ArenaRunRequest, AskUserReply, AskUserQuestion, Clock, ColumnRuntimeFactory, ComparisonReport, DriverLookup, HarnessLevel, IdGenerator, MemoryServicePort, ModelCallOutcome, PipelineConfig, PipelineMetrics, ReportPublisher } from "@agentprism/contracts";
-import { arenaErrorEvent, completeEvent, DEFAULT_ASK_USER_WAIT_MS, DriverReservedError, sanitizeErrorMessage, systemErrorEvent, systemReportEvent } from "@agentprism/contracts";
+import type { ArenaEvent, ArenaRunRequest, AskUserQuestion, Clock, ColumnRuntimeFactory, ComparisonReport, DriverLookup, HarnessLevel, IdGenerator, MemoryServicePort, ModelCallOutcome, PipelineConfig, PipelineMetrics, ReportPublisher } from "@agentprism/contracts";
+import { arenaErrorEvent, completeEvent, DriverReservedError, sanitizeErrorMessage, systemErrorEvent, systemReportEvent } from "@agentprism/contracts";
 import { runAgentExecution, type AgentToolTuning } from "@agentprism/agent";
 import type { McpServerConfig } from "@agentprism/tool-mcp";
 // ContextTuning is a contracts type: read it from its owner, not through the
 // harness re-export (this package never imports harness otherwise).
 import type { ContextTuning, SessionQueryPort } from "@agentprism/contracts";
-import { BreakerRegistry, EventChannel, Semaphore, WorkspaceRegistry } from "@agentprism/runtime";
+import { AskUserChannel, BreakerRegistry, EventChannel, Semaphore, WorkspaceRegistry } from "@agentprism/runtime";
 import type { DimensionRouter } from "@agentprism/arena-dimensions";
 import { RunTraceLogs } from "./column-logs.js";
 
@@ -62,11 +62,6 @@ interface WorkerHandle {
   finished: Promise<void>;
 }
 
-/** Defensive copy: transport serializes these, but in-process callers must not mutate live batches. */
-function copyAskUserQuestion(question: AskUserQuestion): AskUserQuestion {
-  return { ...question, options: [...question.options] };
-}
-
 /**
  * Turn number from replayed history: one user message opens one turn.
  * Pair-counting (floor(length / 2) + 1) drifts whenever messages are not
@@ -79,14 +74,6 @@ function turnFromHistory(messages: ReadonlyArray<{ role: unknown }>): number {
     if (message.role === "user") userMessages += 1;
   }
   return userMessages + 1;
-}
-
-/** One ask_user batch awaiting the human, keyed by agent id (one live turn per column). */
-interface PendingAsk {
-  questions: AskUserQuestion[];
-  answers: Map<string, string>;
-  settle: (reply: AskUserReply) => void;
-  settled: boolean;
 }
 
 /** Default human-channel wait (single source: contracts; re-exported for compat). */
@@ -112,7 +99,7 @@ export class ArenaRunner {
   /** Per-endpoint circuit breakers behind a capped registry (no unbounded growth). */
   private readonly breakers: BreakerRegistry;
   /** In-flight ask_user batches keyed by agent id (set only while a column waits on the human). */
-  private readonly pendingAsks = new Map<string, PendingAsk>();
+  private readonly askChannel: AskUserChannel;
   /** Per-column abort controllers keyed by agent id: powers independent per-column stop (global abort still cancels all). */
   private readonly columnAborts = new Map<string, AbortController>();
   /** Terminal message for a user-initiated per-column stop (frontend matches this to render a paused badge, not an error). */
@@ -127,6 +114,7 @@ export class ArenaRunner {
 
   constructor(deps: ArenaRunnerDeps) {
     this.deps = deps;
+    this.askChannel = new AskUserChannel({ waitMs: deps.askUserWaitMs });
     this.eventRetention = deps.eventRetention ?? MAX_PIPELINE_EVENTS;
     this.disconnectGraceMs = deps.disconnectGraceMs ?? 5_000;
     this.runSlots = new Semaphore(Math.max(1, deps.maxConcurrentRuns));
@@ -149,26 +137,14 @@ export class ArenaRunner {
     return this.columnSlots.queueDepth;
   }
 
-  /** Configured human-channel wait (finite positive, else the default). */
-  private askUserWaitMs(): number {
-    const raw = this.deps.askUserWaitMs ?? DEFAULT_ASK_USER_WAIT_MS;
-    return Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : DEFAULT_ASK_USER_WAIT_MS;
-  }
-
   /** Pending ask_user questions for one column (copies; empty when none waiting). */
   pendingAsk(agentId: string): AskUserQuestion[] {
-    const pending = this.pendingAsks.get(agentId);
-    if (pending === undefined || pending.settled) return [];
-    return pending.questions.map(copyAskUserQuestion);
+    return this.askChannel.pendingQuestions(agentId);
   }
 
   /** All columns currently waiting on the human (agent id + questions). */
   listPendingAsks(): Array<{ agentId: string; questions: AskUserQuestion[] }> {
-    const out: Array<{ agentId: string; questions: AskUserQuestion[] }> = [];
-    for (const [agentId, pending] of this.pendingAsks) {
-      if (!pending.settled) out.push({ agentId, questions: pending.questions.map(copyAskUserQuestion) });
-    }
-    return out;
+    return this.askChannel.listPending().map(({ key, questions }) => ({ agentId: key, questions }));
   }
 
   get registry(): DriverLookup {
@@ -361,48 +337,7 @@ export class ArenaRunner {
    * @returns Whether a live column was waiting on that question id.
    */
   answerQuestion(agentId: string, questionId: string, answer: string): boolean {
-    const pending = this.pendingAsks.get(agentId);
-    if (pending === undefined || pending.settled) return false;
-    if (!pending.questions.some((question) => question.id === questionId)) return false;
-    pending.answers.set(questionId, answer);
-    if (pending.answers.size >= pending.questions.length) {
-      // settle owns the settled flag: pre-setting it here would trip the
-      // idempotency guard and leave the tool's promise unresolved forever.
-      pending.settle({ answered: true, answers: [...pending.answers].map(([qid, text]) => ({ id: qid, answer: text })) });
-    }
-    return true;
-  }
-
-  /** Ask-side of the human channel for one column (same settle semantics as the builder). */
-  private awaitUserAnswers(agentId: string, questions: readonly AskUserQuestion[], signal?: AbortSignal): Promise<AskUserReply> {
-    this.pendingAsks.delete(agentId);
-    return new Promise<AskUserReply>((resolve) => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const pending: PendingAsk = {
-        questions: [...questions],
-        answers: new Map(),
-        settled: false,
-        settle: (reply) => {
-          if (pending.settled) return;
-          pending.settled = true;
-          if (timer !== undefined) clearTimeout(timer);
-          signal?.removeEventListener("abort", onAbort);
-          // agentId keys are unique per run; a defensive-path settle must not
-          // evict a successor batch anyway.
-          if (this.pendingAsks.get(agentId) === pending) this.pendingAsks.delete(agentId);
-          resolve(reply);
-        },
-      };
-      const onAbort = () => pending.settle({ answered: false, answers: [] });
-      this.pendingAsks.set(agentId, pending);
-      signal?.addEventListener("abort", onAbort, { once: true });
-      if (signal?.aborted) {
-        onAbort();
-        return;
-      }
-      timer = setTimeout(() => pending.settle({ answered: false, answers: [] }), this.askUserWaitMs());
-      timer.unref?.();
-    });
+    return this.askChannel.answer(agentId, questionId, answer);
   }
 
   private getBreaker(endpointId: string) {
@@ -515,7 +450,7 @@ export class ArenaRunner {
             harnessMaxRetries: this.deps.harnessMaxRetries,
             maxDelegationDepth: this.deps.maxDelegationDepth,
             askUser: interactive
-              ? (questions, askSignal) => this.awaitUserAnswers(agentId, questions, askSignal)
+              ? (questions, askSignal) => this.askChannel.awaitAnswers(agentId, questions, askSignal)
               : undefined,
             // Same sink the model callbacks report to: a driver with its own transport
             // (Claude Agent SDK CLI) is otherwise invisible to the breaker.

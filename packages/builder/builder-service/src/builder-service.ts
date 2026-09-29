@@ -13,7 +13,6 @@
  */
 
 import type {
-  AskUserReply,
   AskUserRespond,
   AskUserQuestion,
   BuilderCatalog,
@@ -38,8 +37,8 @@ import type {
   ToolDefinition,
   ArenaEvent,
 } from "@agentprism/contracts";
-import { BUILDER_MESSAGE_MAX_CHARS, DEFAULT_ASK_USER_WAIT_MS, clampToolRoundsForWire, extractToolRounds, sanitizeErrorMessage } from "@agentprism/contracts";
-import { WorkspaceRegistry } from "@agentprism/runtime";
+import { BUILDER_MESSAGE_MAX_CHARS, clampToolRoundsForWire, extractToolRounds, sanitizeErrorMessage } from "@agentprism/contracts";
+import { AskUserChannel, WorkspaceRegistry } from "@agentprism/runtime";
 import type {
   BuilderContextTuning,
   BuilderMcpServerConfig,
@@ -122,20 +121,6 @@ interface RunHandle {
   controller: AbortController;
 }
 
-/**
- * One ask_user batch awaiting the human: answers collect per question id and the
- * tool's promise settles once every question of the batch has one (or on skip-all /
- * timeout / abort). Keyed by session id; one in-flight turn per session is guaranteed
- * by the turn guard, so a session's pending batch is unambiguous.
- */
-interface PendingAsk {
-  questions: AskUserQuestion[];
-  answers: Map<string, string>;
-  /** Resolves the whole batch; invoked once, by whichever terminal path wins. */
-  settle: (reply: AskUserReply) => void;
-  settled: boolean;
-}
-
 /** Default human-channel wait (single source: contracts; re-exported for compat). */
 export { DEFAULT_ASK_USER_WAIT_MS } from "@agentprism/contracts";
 
@@ -144,8 +129,8 @@ export class BuilderService {
   private readonly deps: BuilderServiceDeps;
   private readonly runs = new Map<string, RunHandle>();
   private readonly traces = new Map<string, TraceLog>();
-  /** In-flight ask_user batch per session (set only while a turn waits on the human). */
-  private readonly pendingAsks = new Map<string, PendingAsk>();
+  /** In-flight ask_user batches keyed by session id (set only while a turn waits on the human). */
+  private readonly askChannel: AskUserChannel;
 
   /**
    * Ledger writes are best-effort: a sick ledger (full disk, store cap) must
@@ -164,12 +149,7 @@ export class BuilderService {
 
   constructor(deps: BuilderServiceDeps) {
     this.deps = deps;
-  }
-
-  /** Configured human-channel wait (finite positive, else the default). */
-  private askUserWaitMs(): number {
-    const raw = this.deps.askUserWaitMs ?? DEFAULT_ASK_USER_WAIT_MS;
-    return Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : DEFAULT_ASK_USER_WAIT_MS;
+    this.askChannel = new AskUserChannel({ waitMs: deps.askUserWaitMs });
   }
 
   /** The block palette (frameworks, endpoints, tools, capability blocks). */
@@ -272,10 +252,9 @@ export class BuilderService {
    * @throws BuilderError 404 on unknown sessions (matches the detail route).
    */
   pendingAsk(id: string): AskUserQuestion[] {
+    // 404 on unknown sessions (matches the detail route) before the channel lookup.
     this.deps.store.get(id);
-    const pending = this.pendingAsks.get(id);
-    if (pending === undefined || pending.settled) return [];
-    return pending.questions.map((question) => ({ ...question, options: [...question.options] }));
+    return this.askChannel.pendingQuestions(id);
   }
 
   /** Delivers one human answer to the session's pending ask_user batch.
@@ -283,55 +262,7 @@ export class BuilderService {
    * @returns Whether a pending question with that id was waiting.
    */
   answerQuestion(id: string, questionId: string, answer: string): boolean {
-    const pending = this.pendingAsks.get(id);
-    if (pending === undefined || pending.settled) return false;
-    if (!pending.questions.some((question) => question.id === questionId)) return false;
-    pending.answers.set(questionId, answer);
-    if (pending.answers.size >= pending.questions.length) {
-      // settle owns the settled flag: pre-setting it here would trip the
-      // idempotency guard and leave the tool's promise unresolved forever.
-      pending.settle({ answered: true, answers: [...pending.answers].map(([qid, text]) => ({ id: qid, answer: text })) });
-    }
-    return true;
-  }
-
-  /**
-   * Ask-side of the human channel: registers the batch, waits for every answer
-   * (or the deadline / abort), and always settles. A deadline or abort settles
-   * unanswered, which the tool turns into the headless defer text.
-   */
-  private awaitUserAnswers(id: string, questions: readonly AskUserQuestion[], signal?: AbortSignal): Promise<AskUserReply> {
-    // A previous batch that never settled (defensive: turn guard means this is
-    // an invariant violation) is dropped in favor of the newest one.
-    this.pendingAsks.delete(id);
-    return new Promise<AskUserReply>((resolve) => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const pending: PendingAsk = {
-        questions: [...questions],
-        answers: new Map(),
-        settled: false,
-        settle: (reply) => {
-          if (pending.settled) return;
-          pending.settled = true;
-          if (timer !== undefined) clearTimeout(timer);
-          signal?.removeEventListener("abort", onAbort);
-          // A superseded batch (defensive path) must not evict its successor.
-          if (this.pendingAsks.get(id) === pending) this.pendingAsks.delete(id);
-          resolve(reply);
-        },
-      };
-      const onAbort = () => pending.settle({ answered: false, answers: [] });
-      this.pendingAsks.set(id, pending);
-      signal?.addEventListener("abort", onAbort, { once: true });
-      if (signal?.aborted) {
-        onAbort();
-        return;
-      }
-      const waitMs = this.askUserWaitMs();
-      timer = setTimeout(() => pending.settle({ answered: false, answers: [] }), waitMs);
-      // Unrefed: a pending question must never keep the process alive on shutdown.
-      timer.unref?.();
-    });
+    return this.askChannel.answer(id, questionId, answer);
   }
 
   /**
@@ -550,7 +481,7 @@ export class BuilderService {
           workspaceName: record.workspaceName,
           thinkingCapable: this.deps.resolveThinkingCapable(composition.endpoint_id),
           notices,
-          askUser: (questions, signal) => this.awaitUserAnswers(id, questions, signal),
+          askUser: (questions, signal) => this.askChannel.awaitAnswers(id, questions, signal),
           attachments: options.attachments,
           signal: controller.signal,
         },

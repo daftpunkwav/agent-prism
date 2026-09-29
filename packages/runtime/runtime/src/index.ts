@@ -3,10 +3,11 @@
  * @description Public exports for the runtime package.
  *
  * Responsibilities:
- * - Re-export workspaces, semaphore, breaker, event channel, clock, and ids
+ * - Re-export workspaces, ask-user channel, semaphore, breaker, event channel, clock, and ids
  */
 
 export * from "./workspace.js";
+export * from "./ask-user-channel.js";
 export * from "./event-channel.js";
 export * from "./semaphore.js";
 export * from "./circuit-breaker.js";
