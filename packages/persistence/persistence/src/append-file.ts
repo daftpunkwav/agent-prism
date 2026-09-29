@@ -31,6 +31,20 @@ function enqueue(path: string, task: () => Promise<void>): Promise<void> {
   const tail = queues.get(path) ?? Promise.resolve();
   const next = tail.then(task, task);
   queues.set(path, next);
+  // Forget the entry once nothing queues behind it: paths are per-session/trace
+  // files, so the map would otherwise keep one promise per file for the process
+  // lifetime (json-store's writeQueues and SerialQueue self-clean the same way).
+  // Both settle handlers guard the check: a task already chained before the
+  // cleanup keeps its entry, and a rejection here must not surface as an
+  // unhandled one.
+  void next.then(
+    () => {
+      if (queues.get(path) === next) queues.delete(path);
+    },
+    () => {
+      if (queues.get(path) === next) queues.delete(path);
+    },
+  );
   return next;
 }
 

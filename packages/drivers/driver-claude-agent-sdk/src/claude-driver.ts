@@ -169,6 +169,10 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
       context.onModelCall(outcome);
     };
 
+    // Declared outside the try so the outer finally (which removes the abort
+    // forwarder on every exit path) can see them.
+    const abort = new AbortController();
+    const forwardAbort = () => abort.abort();
     try {
       const transport = resolveClaudeTransport(context.llmVendor, config.model_id);
       const extra: ArenaEvent[] = [];
@@ -183,8 +187,6 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
       });
       const cliPath = resolveClaudeCodePath();
       const turnBudget = stepBudgetFor(config.max_steps);
-      const abort = new AbortController();
-      const forwardAbort = () => abort.abort();
       context.signal?.addEventListener("abort", forwardAbort, { once: true });
       // A run cancelled while this column was still starting up (the driver is
       // suspended at its first yield until the consumer pulls) has already
@@ -235,7 +237,7 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
         },
       });
 
-      try {
+      {
         // `sawText` gates the whole-message fallback (assistant text blocks would
         // duplicate deltas already delivered); `sawAnswerText` is the wider claim
         // "the latest content reached the thought channel as text", which the
@@ -386,8 +388,6 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
               break;
           }
         }
-      } finally {
-        context.signal?.removeEventListener("abort", forwardAbort);
       }
       for (const queued of extra.splice(0)) yield queued;
 
@@ -411,6 +411,12 @@ export class ClaudeAgentSdkDriver implements AgentDriver {
         agentId: context.identity.agentId,
       });
       yield finishEvent(state, false);
+    } finally {
+      // Outer finally, not the message loop's: `query()` itself, the banner
+      // yield, and a consumer closing the generator early all throw or return
+      // before the inner loop, which used to leak the abort forwarder on the
+      // shared run signal.
+      context.signal?.removeEventListener("abort", forwardAbort);
     }
   }
 

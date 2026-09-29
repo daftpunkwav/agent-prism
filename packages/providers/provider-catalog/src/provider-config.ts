@@ -250,7 +250,17 @@ export function mergeEndpointKeys<T extends { id: string; base_url: string; api_
   existing: LlmEndpoint[],
 ): T[] {
   const byId = new Map(existing.map((endpoint) => [endpoint.id, endpoint]));
-  const byFingerprint = new Map(existing.map((endpoint) => [connectionFingerprint(endpoint), endpoint]));
+  // Last-write-wins would hide a keyed endpoint behind a keyless twin on the
+  // same connection: build the map preferring the endpoint that holds a key so
+  // fingerprint inheritance stays possible.
+  const byFingerprint = new Map<string, LlmEndpoint>();
+  for (const endpoint of existing) {
+    const fingerprint = connectionFingerprint(endpoint);
+    const current = byFingerprint.get(fingerprint);
+    if (current === undefined || (current.api_key === "" && endpoint.api_key !== "")) {
+      byFingerprint.set(fingerprint, endpoint);
+    }
+  }
   return incoming.map((endpoint) => {
     if (endpoint.api_key !== "") return endpoint;
     const sameId = byId.get(endpoint.id);

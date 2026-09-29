@@ -519,7 +519,10 @@ export class BuilderService {
           await this.safeLedger("fail", () => this.deps.sessions.failSession(ledger.id, "builder turn failed"));
         }
       } else {
-        const answer = result.answer.slice(0, BUILDER_MESSAGE_MAX_CHARS) || "(no reply)";
+        // Whitespace-only answers are truthy: trim before the emptiness check so
+        // a blank reply lands as the placeholder, never as stored whitespace.
+        const clamped = result.answer.slice(0, BUILDER_MESSAGE_MAX_CHARS);
+        const answer = clamped.trim() === "" ? "(no reply)" : clamped;
         // Same clamp as the client capture path: a stored turn can never outgrow
         // the wire budget, whichever mode renders it later.
         this.deps.store.appendTurn(id, message, answer, result.workspaceName, turn, clampToolRoundsForWire(extractToolRounds(toolEvents)));

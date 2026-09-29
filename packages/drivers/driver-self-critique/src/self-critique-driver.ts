@@ -77,9 +77,12 @@ function criticDeclaresDone(note: string): boolean {
 
 /** Parses `SCORE: <0-10>` plus a trailing note from the critic reply; null when malformed. */
 export function parseCriticVerdict(text: string): CriticVerdict | null {
-  const match = text.match(/SCORE:\s*(10|[0-9])/i);
+  // Full number capture, not a fixed-width prefix: `(10|[0-9])` read "SCORE: 100"
+  // as a perfect 10 and ended the run on a malformed verdict.
+  const match = text.match(/SCORE:\s*(\d+)/i);
   if (match === null) return null;
   const score = Number(match[1]);
+  if (score > 10) return null;
   const note = text
     .split("\n")
     .map((line) => line.trim())
