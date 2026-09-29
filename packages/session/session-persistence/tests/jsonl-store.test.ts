@@ -9,7 +9,9 @@ import path from "node:path";
 import { NodeAppendFile } from "@agentprism/persistence";
 import { AtomicJsonFile } from "@agentprism/persistence";
 import { RandomIdGenerator, SystemClock } from "@agentprism/runtime";
+import { InMemoryBlobStore } from "@agentprism/session";
 import { JsonlSessionStore } from "../src/jsonl-session-store.js";
+import { runSessionStoreParityTests } from "./session-store-parity.harness.js";
 
 function backend() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-jsonl-"));
@@ -25,6 +27,28 @@ function backend() {
     cleanup: () => fs.rmSync(dir, { recursive: true, force: true }),
   };
 }
+
+// Mutation semantics mirror FileSessionStore exactly (see the class header);
+// the shared suite is that mirror's guard, next to the doc backend's copy.
+runSessionStoreParityTests("JsonlSessionStore", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-parity-"));
+  // One blob sidecar shared across reopens: the sidecar is durable in
+  // production, so spilled entries must survive an instance swap.
+  const blobs = new InMemoryBlobStore();
+  let seq = 0;
+  let now = 1_700_000_000_000;
+  return {
+    open: () =>
+      new JsonlSessionStore({
+        log: new NodeAppendFile(path.join(dir, "sessions.jsonl")),
+        snapshot: new AtomicJsonFile(path.join(dir, "snapshot.json")),
+        idGenerator: { next: () => `parity-${++seq}` },
+        clock: { now: () => (now += 1) },
+        blobs,
+      }),
+    dispose: () => fs.rmSync(dir, { recursive: true, force: true }),
+  };
+});
 
 describe("JsonlSessionStore", () => {
   it("runs the full lifecycle and survives reload via replay", async () => {
