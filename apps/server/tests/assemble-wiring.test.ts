@@ -14,7 +14,24 @@
  * route that only answers 404s.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+// ---------------------------------------------------------------------------
+// Data-dir isolation anchor
+// ---------------------------------------------------------------------------
+// This suite mutates durable stores through the API (builder session lifecycle).
+// Without an anchor it would read and write the operator's real data/ directory,
+// and on a fresh checkout (CI) provider_config.json does not exist, so every
+// store load re-seeds in memory with fresh random endpoint ids and the provider
+// round-trip pin can never hold. Setting ARENA_DATA_DIR before the dynamic
+// assemble import (which loads the @agentprism/config path constants) relocates
+// every data path to a private scratch copy. Plain module statement on purpose:
+// it must run before any import that evaluates the config path chain.
+const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "assemble-wiring-"));
+process.env.ARENA_DATA_DIR = dataRoot;
 
 const SCRUBBED = ["BACKEND_HOST", "API_TOKEN", "MCP_SERVERS"] as const;
 const saved: Record<string, string | undefined> = {};
@@ -140,6 +157,34 @@ describe("assemble() route wiring", () => {
       const { assemble } = await import("../src/assemble.js");
       const { app } = await assemble();
 
+      // An absent provider file re-seeds on every load with fresh random
+      // endpoint ids, so a stored config must exist before the untouched-store
+      // pin can hold. Persist the in-memory seed once through a legal PUT;
+      // the endpoint id survives the round trip and both reads below agree.
+      const seededView = (await (await app.request("/api/settings/provider")).json()) as {
+        endpoints: Array<Record<string, unknown>>;
+      };
+      const seedFirst = seededView.endpoints[0];
+      expect(seedFirst).toBeDefined();
+      const seeded = await app.request("/api/settings/provider", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoints: [
+            {
+              id: String(seedFirst?.["id"] ?? ""),
+              label: String(seedFirst?.["label"] ?? ""),
+              provider_name: String(seedFirst?.["provider_name"] ?? ""),
+              api_key: "",
+              base_url: String(seedFirst?.["base_url"] ?? "https://seed.example.com/v1"),
+              api_format: String(seedFirst?.["api_format"] ?? "anthropic_messages"),
+              model: String(seedFirst?.["model"] ?? ""),
+            },
+          ],
+        }),
+      });
+      expect(seeded.status).toBe(200);
+
       const before = (await (await app.request("/api/settings/provider")).json()) as {
         endpoints: Array<Record<string, unknown>>;
       };
@@ -172,4 +217,10 @@ describe("assemble() route wiring", () => {
       expect(after.endpoints[0]).toEqual(first);
     },
   );
+
+  afterAll(() => {
+    // The stores live in the suite's scratch data dir; discard it wholesale.
+    fs.rmSync(dataRoot, { recursive: true, force: true });
+    delete process.env.ARENA_DATA_DIR;
+  });
 });
