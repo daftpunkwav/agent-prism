@@ -287,7 +287,12 @@ describe("installCrashHandlers", () => {
    * handlers, and an emit would trip them alongside the one under test.
    */
   const fireCrash = (event: "uncaughtException" | "unhandledRejection", error: unknown): void => {
-    const handlers = process.listeners(event);
+    // @types/node only declares per-event literal overloads for listeners(),
+    // so branch on the literal instead of passing the union through.
+    const handlers =
+      event === "uncaughtException"
+        ? process.listeners("uncaughtException")
+        : process.listeners("unhandledRejection");
     const handler = handlers[handlers.length - 1];
     if (handler === undefined) throw new Error(`no ${event} listener installed`);
     (handler as (error: unknown, origin: string) => void)(error, event);
@@ -332,7 +337,9 @@ describe("installCrashHandlers", () => {
 
   it("runs the flush only once when a second fault lands mid-crash", async () => {
     const { installCrashHandlers } = await loadFresh();
-    let releaseFlush: (() => void) | null = null;
+    // Declared always-callable: control-flow analysis cannot see the closure
+    // assignment below and would otherwise narrow this to `never`.
+    let releaseFlush: () => void = () => undefined;
     const flush = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
       releaseFlush = resolve;
     }));
@@ -341,7 +348,7 @@ describe("installCrashHandlers", () => {
     fireCrash("uncaughtException", new Error("first"));
     await Promise.resolve();
     fireCrash("unhandledRejection", new Error("second"));
-    releaseFlush?.();
+    releaseFlush();
     await drain();
 
     expect(flush).toHaveBeenCalledOnce();

@@ -30,8 +30,8 @@ describe("staticDefaultRuntimeKnobs", () => {
     const knobs = staticDefaultRuntimeKnobs();
     for (const field of RUNTIME_KNOB_FIELDS) {
       const parts = field.key.split(".");
-      let value: unknown = knobs as unknown as Record<string, unknown>;
-      for (const part of parts) value = value[part];
+      let value: unknown = knobs;
+      for (const part of parts) value = (value as Record<string, unknown>)[part];
       expect(value, `static default for ${field.key}`).toBe(field.default);
     }
   });

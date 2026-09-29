@@ -125,7 +125,7 @@ describe("JsonlSessionStore", () => {
       await first.appendEntry(record.id, { kind: "note", content: "barrier" });
       const lines = fs.readFileSync(logPath, "utf-8").split("\n").filter(Boolean);
       expect(lines).toHaveLength(1);
-      expect((JSON.parse(lines[0]) as { op: string }).op).toBe("entry");
+      expect((JSON.parse(lines[0] ?? "") as { op: string }).op).toBe("entry");
 
       // Drain the second auto-checkpoint (queued by the entry's own bytes) and
       // confirm the state survived into the snapshot.
