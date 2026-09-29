@@ -263,6 +263,14 @@ function applyThinkingFields(
     if (pair === undefined) {
       throw new Error(`Baseline thinking_budget "${requestedBudget}" matches no budget pair on endpoint "${endpoint.id}"`);
     }
+    if (pair.budget_tokens < 1024) {
+      // Fail here, not at model construction: thinking.ts drops overrides below
+      // the 1024 protocol floor, which would silently run the column without
+      // thinking while its config claims a budget.
+      throw new Error(
+        `Baseline thinking_budget "${requestedBudget}" has budget_tokens ${pair.budget_tokens}, below the protocol floor of 1024, on endpoint "${endpoint.id}"`,
+      );
+    }
     data.thinking_level = "off";
     data.thinking_budget = pair.budget_tokens;
     data.thinking_max_tokens = pair.max_tokens;

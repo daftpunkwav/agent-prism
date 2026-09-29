@@ -171,7 +171,10 @@ export class DimensionRouter {
 
   /** Normalizes a raw selection token so numeric dimensions dedupe alternate spellings of one value. */
   private normalizeSelectionToken(dimension: string, raw: string): string {
-    if (dimension === "max_steps" || dimension === "temperature") {
+    // max_output_tokens joins its INT_FIELDS siblings: without normalization an
+    // equivalent spelling ("4096.0") misses the option value and fails as an
+    // unsupported option instead of resolving to the same column.
+    if (dimension === "max_steps" || dimension === "temperature" || dimension === "max_output_tokens") {
       return normalizeOptionToken(dimensionFieldName(dimension), raw);
     }
     return raw;

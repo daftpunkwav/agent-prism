@@ -91,6 +91,14 @@ export class MatrixService {
     }
     const dimension = cell.dimension ?? template.suggested_dimension;
     const selections = cell.selections.length > 0 ? [...cell.selections] : [...template.suggested_selections];
+    if (selections.length === 0) {
+      // Fail here with the cause, not downstream where the router reports the
+      // opaque "requires at least 1 selections, got 0" (quick templates ship an
+      // empty suggested_selections on purpose; they are smoke tasks, not matrix axes).
+      throw new Error(
+        `Template "${template.id}" pins no selections and suggests none; a matrix cell needs at least one selection`,
+      );
+    }
     const events: ArenaEvent[] = [];
     for await (const event of this.deps.arena.run(
       {

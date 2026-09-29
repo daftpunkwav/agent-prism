@@ -503,9 +503,13 @@ export class ArenaRunner {
   ): void {
     const session = request.column_sessions?.[config.label];
     const turn = turnFromHistory(session?.messages ?? request.messages);
+    // A pinned column has a real workspace on disk; echoing it keeps the client
+    // workspace panel usable for the failed column instead of a blank name.
+    const workspace = session?.workspace ?? "";
     channel.push(
       arenaErrorEvent({
         pipeline: config.label,
+        workspace,
         message,
         turn,
         runId,
@@ -515,6 +519,7 @@ export class ArenaRunner {
     channel.push(
       completeEvent({
         pipeline: config.label,
+        workspace,
         metrics: {
           success: false,
           duration_ms: 0,
