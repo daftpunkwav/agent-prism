@@ -8,11 +8,28 @@
  * mis-wired store shows up here as a wrong response instead of a working route
  * that silently mutates nothing.
  *
- * The suite writes only through the API and restores every touched value.
+ * The suite mutates only a private scratch data dir (anchor below); the
+ * operator's real data/ directory is never touched.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+// ---------------------------------------------------------------------------
+// Data-dir isolation anchor
+// ---------------------------------------------------------------------------
+// This suite writes durable stores through the API. Running it against the real
+// data/ directory races every parallel composition suite: concurrent atomic
+// writes share one `.tmp` path across processes, and another suite's boot-time
+// orphan sweep deletes this suite's in-flight temp files (rename → ENOENT →
+// spurious 500s). Setting ARENA_DATA_DIR before the dynamic assemble import
+// (which loads the @agentprism/config path constants) relocates every data path
+// to a private scratch copy. Plain module statement on purpose: it must run
+// before any import that evaluates the config path chain.
+const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "assemble-settings-"));
+process.env.ARENA_DATA_DIR = dataRoot;
 
 const SCRUBBED = ["BACKEND_HOST", "API_TOKEN", "MCP_SERVERS"] as const;
 const saved: Record<string, string | undefined> = {};
@@ -48,8 +65,6 @@ describe("assemble() settings writes", () => {
   let flushDurableStores: () => Promise<void>;
   let checkpointStores: () => Promise<void>;
   let originalKnobs: Record<string, unknown> | null = null;
-  let skillName: string | null = null;
-  let originalMcpServers: unknown[] | null = null;
 
   beforeAll(async () => {
     const { assemble } = await import("../src/assemble.js");
@@ -57,17 +72,14 @@ describe("assemble() settings writes", () => {
   }, COMPOSITION_TIMEOUT);
 
   afterAll(async () => {
-    // Leave the operator's local stores as they were found.
+    // The stores live in the suite's scratch data dir: flush, then discard the
+    // directory instead of restoring the operator's local values.
     if (originalKnobs !== null) {
       await app.request("/api/settings/knobs", json(originalKnobs, "PUT"));
     }
-    if (skillName !== null) {
-      await app.request(`/api/settings/skills/${skillName}`, { method: "DELETE" });
-    }
-    if (originalMcpServers !== null) {
-      await app.request("/api/settings/mcp", json({ servers: originalMcpServers }, "PUT"));
-    }
     await flushDurableStores();
+    fs.rmSync(dataRoot, { recursive: true, force: true });
+    delete process.env.ARENA_DATA_DIR;
   });
 
   it("round-trips a user skill through create, update, toggle, and delete", async () => {
@@ -76,7 +88,7 @@ describe("assemble() settings writes", () => {
       json({ name: "wiring-skill", description: "created by a wiring test", body: "step one" }),
     );
     expect(created.status).toBe(201);
-    skillName = ((await created.json()) as { skill: { name: string } }).skill.name;
+    const skillName = ((await created.json()) as { skill: { name: string } }).skill.name;
     expect(skillName).toBe("wiring-skill");
 
     const listed = (await (await app.request("/api/settings/skills")).json()) as { skills: Array<{ name: string }> };
@@ -92,7 +104,6 @@ describe("assemble() settings writes", () => {
     expect((await app.request(`/api/settings/skills/${skillName}`, { method: "DELETE" })).status).toBe(200);
     // The second delete reports the skill as unknown instead of succeeding silently.
     expect((await app.request(`/api/settings/skills/${skillName}`, { method: "DELETE" })).status).toBeGreaterThanOrEqual(400);
-    skillName = null;
   });
 
   it("rejects a skill toggle that is not a boolean and a create without a name", async () => {
@@ -104,7 +115,7 @@ describe("assemble() settings writes", () => {
 
   it("replaces the managed MCP list through the store", async () => {
     const before = (await (await app.request("/api/settings/mcp")).json()) as { servers: unknown[] };
-    originalMcpServers = before.servers;
+    expect(Array.isArray(before.servers)).toBe(true);
 
     const entry = { command: "node wiring-mcp.js", name: "wiring-mcp", enabled: false, args: ["--stdio"] };
     const replaced = await app.request("/api/settings/mcp", json({ servers: [entry] }, "PUT"));
@@ -117,24 +128,15 @@ describe("assemble() settings writes", () => {
   });
 
   it("clears both memory stores and reports empty counts", async () => {
-    // The clear route writes through to the store files, so the operator's local
-    // memory is read first and put back byte-for-byte afterwards: the test owns
-    // the endpoint contract, not the local data.
-    const memoryFiles = ["data/memory_episodic.json", "data/memory_semantic.json"];
-    const before = new Map(
-      memoryFiles.map((file) => [file, fs.existsSync(file) ? fs.readFileSync(file) : null] as const),
-    );
-    try {
-      const cleared = await app.request("/api/settings/memory/clear", { method: "POST" });
-      expect(cleared.status).toBe(200);
-      const body = (await cleared.json()) as { episodicCount: number; semanticCount: number; episodicPath: string };
-      expect(body).toMatchObject({ episodicCount: 0, semanticCount: 0 });
-      expect(body.episodicPath).toContain("memory_episodic.json");
-    } finally {
-      for (const [file, content] of before) {
-        if (content !== null) fs.writeFileSync(file, content);
-      }
-    }
+    // The stores live in the suite's scratch data dir (anchor above): the clear
+    // lands there, and the reported path must stay inside it — an unanchored run
+    // would point at (and wipe) the operator's real memory files.
+    const cleared = await app.request("/api/settings/memory/clear", { method: "POST" });
+    expect(cleared.status).toBe(200);
+    const body = (await cleared.json()) as { episodicCount: number; semanticCount: number; episodicPath: string };
+    expect(body).toMatchObject({ episodicCount: 0, semanticCount: 0 });
+    expect(body.episodicPath).toContain("memory_episodic.json");
+    expect(body.episodicPath.startsWith(dataRoot)).toBe(true);
   });
 
   it("hot-applies a runtime knob update through the store", async () => {

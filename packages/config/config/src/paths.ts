@@ -16,7 +16,15 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // Leaf depth is fixed by the uniform family layout: packages/<family>/<leaf>/src
 // sits exactly 4 levels below the repo root in both src and dist trees.
 export const REPO_ROOT = path.resolve(here, "..", "..", "..", "..");
-export const DATA_DIR = path.join(REPO_ROOT, "data");
+// Test isolation anchor: a suite that mutates durable stores sets ARENA_DATA_DIR
+// (before the first import of this module) to relocate every data path to a
+// private scratch copy, so parallel suite processes never race on the operator's
+// real data directory. Production never sets it; read exactly once at module load.
+const dataDirOverride = process.env["ARENA_DATA_DIR"];
+export const DATA_DIR =
+  dataDirOverride !== undefined && dataDirOverride !== ""
+    ? path.resolve(dataDirOverride)
+    : path.join(REPO_ROOT, "data");
 export const RUNS_DIR = path.join(DATA_DIR, "runs");
 export const ENV_FILE = path.join(REPO_ROOT, ".env");
 export const PROVIDER_CONFIG_PATH = path.join(DATA_DIR, "provider_config.json");

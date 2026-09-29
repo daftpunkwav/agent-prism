@@ -66,6 +66,9 @@ export default defineConfig({
     env: {
       NODE_ENV: "test",
     },
+    // Runs before each test file in its worker: an anchored suite's ARENA_DATA_DIR
+    // must never leak into an unrelated file reusing the same worker process.
+    setupFiles: ["tests/setup/reset-worker-env.ts"],
     // Tests that spawn real shell children (bash/run_job/spill/sandbox) pay the
     // PowerShell 5.1 cold start; under parallel load that can exceed the 5s default
     // and fail as a false timeout. A genuine hang still fails, just later.
