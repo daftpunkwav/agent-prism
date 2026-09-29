@@ -398,11 +398,15 @@ export type BuilderSessionView = z.infer<typeof BuilderSessionViewSchema>;
 
 /**
  * Session detail: the view plus the session's persisted observability journal
- * (trace entries, arena events, turn markers — the full execution trail).
+ * (trace entries, arena events, turn markers — the execution trail). The journal
+ * accumulates across turns, so the reader serves a tail-capped window: `records`
+ * holds the newest records up to the reader's cap, and `truncated` is true when
+ * older records were dropped from the head (same tail semantics as ColumnLogs).
  */
 export const BuilderSessionDetailSchema = z.object({
   session: BuilderSessionViewSchema,
   records: z.array(BuilderTraceRecordSchema),
+  truncated: z.boolean().default(false),
 });
 export type BuilderSessionDetail = z.infer<typeof BuilderSessionDetailSchema>;
 

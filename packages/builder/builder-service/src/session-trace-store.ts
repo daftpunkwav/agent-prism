@@ -5,8 +5,8 @@
  * Responsibilities:
  * - Append trace records (entries / events / turn markers) to one journal file
  *   per session, coalescing bursts through a debounced flush
- * - Read a session's full journal back (flushing pending lines first, so a
- *   read never misses what append accepted)
+ * - Read a session's journal back (flushing pending lines first, so a read
+ *   never misses what append accepted), tail-capped when the caller passes a cap
  * - Clear the journal with its session
  *
  * Persistence is fail-open: disk failures degrade to warnings, never break the
@@ -60,13 +60,25 @@ export class SessionTraceStore {
     this.scheduleFlush(sessionId);
   }
 
-  /** Flushes pending lines, then returns every record of the session (oldest first). */
-  async read(sessionId: string): Promise<BuilderTraceRecord[]> {
+  /**
+   * Flushes pending lines, then returns the session's records (oldest first),
+   * tail-capped to the newest `cap` records when a cap is passed. The journal
+   * accumulates across turns, so readers bound the parse: lines beyond the cap
+   * are never JSON-parsed or materialized, and `truncated` reports the dropped
+   * head (same tail semantics as the arena ColumnLogs read view). No cap reads
+   * the whole journal.
+   */
+  async read(sessionId: string, cap?: number): Promise<{ records: BuilderTraceRecord[]; truncated: boolean }> {
     await this.flush(sessionId);
     const lines = await this.deps.open(sessionId).readLines();
+    // Drop the parsed-but-dropped head before JSON.parse: only kept lines are
+    // materialized, so a long-lived session costs one split, not one parse, per
+    // record beyond the cap.
+    const kept = cap !== undefined && lines.length > cap ? lines.slice(-cap) : lines;
+    const truncated = cap !== undefined && lines.length > cap;
     const records: BuilderTraceRecord[] = [];
     let dropped = 0;
-    for (const line of lines) {
+    for (const line of kept) {
       try {
         records.push(JSON.parse(line) as BuilderTraceRecord);
       } catch {
@@ -76,7 +88,7 @@ export class SessionTraceStore {
     if (dropped > 0) {
       console.warn(`[builder-trace] journal for ${sessionId} had ${dropped} unreadable line(s), skipped`);
     }
-    return records;
+    return { records, truncated };
   }
 
   /** Awaits the pending flush of one session (turn-end durability). */

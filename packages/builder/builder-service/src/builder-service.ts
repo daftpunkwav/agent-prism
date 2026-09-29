@@ -121,6 +121,14 @@ interface RunHandle {
 /** Default human-channel wait (single source: contracts). */
 export { DEFAULT_ASK_USER_WAIT_MS } from "@agentprism/contracts";
 
+/**
+ * Newest-record cap on the detail view's journal tail (BuilderSessionDetail.records).
+ * The journal accumulates across turns, so the detail read bounds its parse and
+ * reports a dropped head via `truncated` — ordinary sessions (hundreds of records
+ * per turn) stay far below this and never see truncation.
+ */
+const BUILDER_DETAIL_RECORD_CAP = 20_000;
+
 /** Agent Builder use cases: sessions, hot-swaps, chat turns, and the execution ledger. */
 export class BuilderService {
   private readonly deps: BuilderServiceDeps;
@@ -176,12 +184,14 @@ export class BuilderService {
     return this.deps.store.list().map((record) => this.deps.store.view(record));
   }
 
-  /** Session view plus its persisted observability journal. */
+  /** Session view plus its persisted observability journal (tail-capped; see BUILDER_DETAIL_RECORD_CAP). */
   async getSessionDetail(id: string): Promise<BuilderSessionDetail> {
     const record = this.deps.store.get(id);
+    const tail = await this.deps.traceStore.read(id, BUILDER_DETAIL_RECORD_CAP);
     return {
       session: this.deps.store.view(record),
-      records: await this.deps.traceStore.read(id),
+      records: tail.records,
+      truncated: tail.truncated,
     };
   }
 

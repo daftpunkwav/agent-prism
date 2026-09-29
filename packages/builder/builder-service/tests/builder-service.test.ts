@@ -286,6 +286,8 @@ describe("BuilderService.chatTurn", () => {
     // The journal records the turn marker, the streamed arena events, and trace entries.
     expect(detail.records.some((record) => record.kind === "turn" && record.user === "hello")).toBe(true);
     expect(detail.records.some((record) => record.kind === "event")).toBe(true);
+    // An ordinary session sits far below the detail tail cap: no truncation flag.
+    expect(detail.truncated).toBe(false);
     const kinds = detail.records.filter((record) => record.kind === "trace").map((record) => record.entry.kind);
     expect(kinds).toContain("session");
   });

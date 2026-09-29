@@ -42,8 +42,9 @@ describe("SessionTraceStore", () => {
     // Debounce has not fired (long window): disk still empty.
     expect(file.lines).toHaveLength(0);
     // read flushes first, so a reader never misses accepted records.
-    const records = await store.read("s1");
+    const { records, truncated } = await store.read("s1");
     expect(records).toHaveLength(2);
+    expect(truncated).toBe(false);
     expect(records[0]).toMatchObject({ kind: "turn", user: "hi" });
     expect(file.lines).toHaveLength(2);
   });
@@ -53,15 +54,31 @@ describe("SessionTraceStore", () => {
     store.append("s1", turnRecord());
     await store.flush("s1");
     file.lines.push("{corrupted");
-    const records = await store.read("s1");
+    const { records } = await store.read("s1");
     expect(records).toHaveLength(1);
+  });
+
+  it("tail-caps reads and reports the dropped head as truncated", async () => {
+    const { store } = makeStore();
+    for (let turn = 1; turn <= 5; turn += 1) {
+      store.append("s1", turnRecord(turn));
+    }
+    await store.flush("s1");
+    const { records, truncated } = await store.read("s1", 3);
+    expect(truncated).toBe(true);
+    // The newest records survive; the oldest two are dropped from the head.
+    expect(records.map((record) => (record.kind === "turn" ? record.turn : 0))).toEqual([3, 4, 5]);
+    // A cap at or above the line count never truncates.
+    const whole = await store.read("s1", 5);
+    expect(whole.truncated).toBe(false);
+    expect(whole.records).toHaveLength(5);
   });
 
   it("delete clears the journal and pending buffer", async () => {
     const { store, file } = makeStore();
     store.append("s1", turnRecord());
     await store.delete("s1");
-    expect(await store.read("s1")).toEqual([]);
+    expect(await store.read("s1")).toEqual({ records: [], truncated: false });
     expect(file.lines).toEqual([]);
   });
 });
