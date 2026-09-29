@@ -63,6 +63,7 @@ describe("main() entry", () => {
     mockInstallSignalHandlers.mockClear();
     mockInstallCrashHandlers.mockClear();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   async function importMain(): Promise<void> {
@@ -94,6 +95,54 @@ describe("main() entry", () => {
     expect(mockInstallSignalHandlers).toHaveBeenCalledOnce();
     // Crash handlers wrap the same flush so a fatal error saves the durable tail.
     expect(mockInstallCrashHandlers).toHaveBeenCalledOnce();
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Crash wiring: the flush main() injects into installCrashHandlers must be
+   * the host's durable flush — a wired-in wrong callback would silently drop
+   * the debounced tail exactly when the crash path runs.
+   */
+  it("hands the crash handler a flush that saves the durable stores", async () => {
+    const flushDurableStores = vi.fn().mockResolvedValue(undefined);
+    mockAssemble.mockResolvedValue({
+      flushDurableStores,
+      checkpointStores: vi.fn().mockResolvedValue(undefined),
+      settings: { serverShutdownGraceMs: 5_000 },
+    });
+    mockStartServer.mockResolvedValue(vi.fn().mockResolvedValue(undefined));
+
+    await importMain();
+
+    expect(mockInstallCrashHandlers).toHaveBeenCalledOnce();
+    const crashFlush = mockInstallCrashHandlers.mock.calls[0]?.[0] as () => Promise<void>;
+    await crashFlush();
+    expect(flushDurableStores).toHaveBeenCalledOnce();
+  });
+
+  /**
+   * Periodic compaction: the 30-minute interval checkpoints the session log
+   * (bounded log growth), and a checkpoint failure is contained — warned and
+   * swallowed, never a process exit from a hygiene timer.
+   */
+  it("checkpoints on the compaction interval and contains its failures", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const checkpointStores = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("disk gone"));
+    mockAssemble.mockResolvedValue({
+      flushDurableStores: vi.fn().mockResolvedValue(undefined),
+      checkpointStores,
+      settings: { serverShutdownGraceMs: 5_000 },
+    });
+    mockStartServer.mockResolvedValue(vi.fn().mockResolvedValue(undefined));
+
+    await importMain();
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+    expect(checkpointStores).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+    expect(checkpointStores).toHaveBeenCalledTimes(2);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("checkpoint failed"));
     expect(exitSpy).not.toHaveBeenCalled();
   });
 

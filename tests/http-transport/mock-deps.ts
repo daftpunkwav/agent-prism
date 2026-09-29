@@ -169,6 +169,9 @@ export function mockDeps(overrides: Partial<HttpApplicationDeps> = {}): HttpAppl
       backendHost: "127.0.0.1",
       backendPort: 8281,
       maxConcurrentRuns: 2,
+      // SSE heartbeat cadence; without it the streaming routes would setInterval
+      // at 0ms and spam ping writes for the whole awaited stream.
+      sseHeartbeatMs: 60_000,
     } as any,
     arena: {
       getMeta: vi.fn().mockResolvedValue({ dimensions: [], frameworks: [], baseline_defaults: {}, baseline_fields: [], model_compare_ready: false }),
