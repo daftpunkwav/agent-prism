@@ -22,7 +22,7 @@ import { registerCustomDimensions, type AgentExecutionContext } from "@agentpris
 import { BuilderCreateRequestSchema, BuilderPatchRequestSchema, completeEvent } from "@agentprism/contracts";
 import { WorkspaceRegistry } from "@agentprism/runtime";
 import { BuilderService } from "../src/builder-service.js";
-import { SessionTraceStore } from "../src/trace-store.js";
+import { SessionTraceStore } from "../src/session-trace-store.js";
 import type { AppendFile } from "@agentprism/persistence";
 import { SessionService } from "@agentprism/application";
 import { InMemorySessionStore } from "@agentprism/session";

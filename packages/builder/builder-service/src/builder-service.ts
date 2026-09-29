@@ -13,7 +13,6 @@
  */
 
 import type {
-  AskUserRespond,
   AskUserQuestion,
   BuilderCatalog,
   BuilderComposition,
@@ -25,6 +24,7 @@ import type {
   BuilderStreamChunk,
   BuilderSwapResult,
   Clock,
+  ContextTuning,
   DriverLookup,
   HarnessLevel,
   IdGenerator,
@@ -39,10 +39,7 @@ import type {
 } from "@agentprism/contracts";
 import { BUILDER_MESSAGE_MAX_CHARS, clampToolRoundsForWire, extractToolRounds, sanitizeErrorMessage } from "@agentprism/contracts";
 import { AskUserChannel, WorkspaceRegistry } from "@agentprism/runtime";
-import type {
-  BuilderContextTuning,
-  BuilderMcpServerConfig,
-} from "@agentprism/builder-turns";
+import type { BuilderMcpServerConfig } from "@agentprism/builder-turns";
 import { buildBuilderCatalog, type BuilderCatalogSources, type BuilderCustomBlock } from "@agentprism/builder-turns";
 import {
   buildNoToolsNotice,
@@ -53,9 +50,9 @@ import {
 } from "@agentprism/builder-turns";
 import { BuilderError } from "@agentprism/builder-turns";
 import { BuilderSessionStore, type BuilderSessionRecord } from "./builder-session-store.js";
-import { TraceLog } from "@agentprism/builder-turns";
+import { SessionTraceLog } from "@agentprism/builder-turns";
 import { COMPACT_HANDOFF_SYSTEM } from "./prompts.js";
-import { SessionTraceStore } from "./trace-store.js";
+import { SessionTraceStore } from "./session-trace-store.js";
 import {
   BUILDER_PIPELINE_LABEL,
   compositionToPipelineConfig,
@@ -106,7 +103,7 @@ export interface BuilderServiceDeps {
   /** Human-channel wait in ms before ask_user degrades to headless defer (default 5min). */
   askUserWaitMs?: number;
   /** Hot runtime knobs shared with the arena runner (absent = built-in defaults). */
-  contextTuning?: BuilderContextTuning;
+  contextTuning?: ContextTuning;
   toolTuning?: { subagentMaxSteps: number; ralphMaxRounds: number; mcpFetchTimeoutMs: number };
   /** Harness retry caps keyed by level token (see contracts' harnessRetryCaps). */
   harnessMaxRetries?: Partial<Record<HarnessLevel, number>>;
@@ -128,7 +125,7 @@ export { DEFAULT_ASK_USER_WAIT_MS } from "@agentprism/contracts";
 export class BuilderService {
   private readonly deps: BuilderServiceDeps;
   private readonly runs = new Map<string, RunHandle>();
-  private readonly traces = new Map<string, TraceLog>();
+  private readonly traces = new Map<string, SessionTraceLog>();
   /** In-flight ask_user batches keyed by session id (set only while a turn waits on the human). */
   private readonly askChannel: AskUserChannel;
 
@@ -596,10 +593,10 @@ export class BuilderService {
   }
 
   /** Trace log registry: one entry factory per session, journal-backed via onAppend. */
-  private traceLogFor(id: string): TraceLog {
+  private traceLogFor(id: string): SessionTraceLog {
     let trace = this.traces.get(id);
     if (trace === undefined) {
-      trace = new TraceLog({
+      trace = new SessionTraceLog({
         idGenerator: this.deps.idGenerator,
         clock: this.deps.clock,
         onAppend: (entry) => this.deps.traceStore.append(id, { kind: "trace", entry }),

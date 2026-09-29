@@ -1,5 +1,5 @@
 /**
- * @file trace-store tests
+ * @file session-trace-store tests
  * @description Covers journal append/read/delete and flush durability semantics.
  *
  * Responsibilities:
@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import type { AppendFile } from "@agentprism/persistence";
 import type { BuilderTraceRecord } from "@agentprism/contracts";
-import { SessionTraceStore } from "../src/trace-store.js";
+import { SessionTraceStore } from "../src/session-trace-store.js";
 
 /** In-memory append-only line file standing in for NodeAppendFile. */
 class MemoryAppendFile implements AppendFile {

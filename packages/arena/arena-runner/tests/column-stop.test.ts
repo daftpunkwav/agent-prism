@@ -130,7 +130,7 @@ function makeRunner(options: { maxConcurrentColumns?: number } = {}): Harness {
   ]);
   const route = { columns: [config("col-a", "stub-hang"), config("col-b", "stub-done")] };
   const runner = new ArenaRunner({
-    registry: {
+    drivers: {
       get: (id: string) => byFramework.get(id) ?? hangDriver(id),
       names: new Set(),
     } as unknown as DriverLookup,
@@ -138,7 +138,7 @@ function makeRunner(options: { maxConcurrentColumns?: number } = {}): Harness {
     router: { route: () => route.columns } as never,
     workspaceRegistry,
     reportPublisher: { publish: async () => null },
-    modelFactory: {
+    modelRuntime: {
       create: () =>
         ({
           llm: { invoke: async () => ({}) },

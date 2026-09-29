@@ -8,4 +8,4 @@
  */
 
 export * from "./runner.js";
-export * from "./column-logs.js";
+export * from "./run-trace-logs.js";

@@ -254,7 +254,7 @@ export async function assemble(): Promise<RuntimeComponents> {
       ),
   };
 
-  const modelFactory: ColumnRuntimeFactory = {
+  const modelRuntime: ColumnRuntimeFactory = {
     create(config: PipelineConfig, options) {
       // Same wire tracer as builder sessions: arena run logs capture every column's
       // LLM request/response without driver changes (native included — the adapter
@@ -562,11 +562,11 @@ export async function assemble(): Promise<RuntimeComponents> {
 
   const runnerFactory = async (): Promise<ArenaRunner> =>
     new ArenaRunner({
-      registry,
+      drivers: registry,
       router,
       workspaceRegistry,
       reportPublisher,
-      modelFactory,
+      modelRuntime,
       idGenerator,
       clock,
       maxConcurrentRuns: settings.maxConcurrentRuns,

@@ -89,14 +89,6 @@ export interface BuilderModelRuntimeFactory {
   ): ColumnRuntime;
 }
 
-/**
- * Builder-facing name for the per-run context budgets. The field list is
- * single-sourced in contracts (see ContextTuning), so the builder and the harness
- * cannot drift apart; every field is optional, so the bag stays assignable to the
- * tuning type the run path expects.
- */
-export type BuilderContextTuning = ContextTuning;
-
 /** Structural MCP server config (tool-mcp dep deliberately avoided here). */
 export interface BuilderMcpServerConfig {
   command: string;
@@ -115,7 +107,7 @@ export interface BuilderTurnDeps {
   /** Read-only session query port for the session_query tool (absent = placeholder). */
   sessionsQuery?: SessionQueryPort;
   /** Hot runtime knobs shared with the arena runner (absent = built-in defaults). */
-  contextTuning?: BuilderContextTuning;
+  contextTuning?: ContextTuning;
   toolTuning?: { subagentMaxSteps: number; ralphMaxRounds: number; mcpFetchTimeoutMs: number };
   /** Harness retry caps keyed by level token (see contracts' harnessRetryCaps). */
   harnessMaxRetries?: Partial<Record<HarnessLevel, number>>;

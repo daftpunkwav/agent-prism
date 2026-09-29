@@ -115,7 +115,7 @@ describe("ArenaRunner independent column sessions", () => {
       clock: { now: () => 0 },
     });
     const runner = new ArenaRunner({
-      registry,
+      drivers: registry,
       router: {
         route: (): PipelineConfig[] =>
           [
@@ -125,7 +125,7 @@ describe("ArenaRunner independent column sessions", () => {
       } as never,
       workspaceRegistry: workspaces,
       reportPublisher: { publish: async () => null },
-      modelFactory: {
+      modelRuntime: {
         create: () => ({
           llm: { invoke: async () => ({ text: "", toolCalls: [] }), stream: async function* () {} },
           llmVendor: {},

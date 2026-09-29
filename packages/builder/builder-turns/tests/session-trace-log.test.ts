@@ -1,6 +1,6 @@
 /**
- * @file trace-log.test
- * @description Unit tests for the trace-entry factory.
+ * @file session-trace-log.test
+ * @description Unit tests for the per-session trace-entry factory.
  *
  * Responsibilities:
  * - Pin monotonic sequencing, timestamps, and the uncut persistence hook
@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { BuilderTraceEntry, Clock, IdGenerator } from "@agentprism/contracts";
-import { TraceLog } from "../src/trace-log.js";
+import { SessionTraceLog } from "../src/session-trace-log.js";
 
 const clock: Clock = { now: () => 1_000 };
 const idGenerator: IdGenerator = { next: (() => {
@@ -16,9 +16,9 @@ const idGenerator: IdGenerator = { next: (() => {
   return () => `id-${(n += 1)}`;
 })() };
 
-describe("TraceLog", () => {
+describe("SessionTraceLog", () => {
   it("assigns monotonic sequence numbers and timestamps", () => {
-    const log = new TraceLog({ idGenerator, clock });
+    const log = new SessionTraceLog({ idGenerator, clock });
     const first = log.append("session", "a", {});
     const second = log.append("llm_request", "b", {});
     expect(second.seq).toBe(first.seq + 1);
@@ -28,7 +28,7 @@ describe("TraceLog", () => {
 
   it("forwards every entry uncut to the persistence hook", () => {
     const appended: BuilderTraceEntry[] = [];
-    const log = new TraceLog({ idGenerator, clock, onAppend: (entry) => appended.push(entry) });
+    const log = new SessionTraceLog({ idGenerator, clock, onAppend: (entry) => appended.push(entry) });
     const huge = "x".repeat(80_000);
     const entry = log.append("llm_request", "big", { messages: huge });
     expect(appended).toEqual([entry]);
@@ -37,7 +37,7 @@ describe("TraceLog", () => {
   });
 
   it("carries turn and duration fields", () => {
-    const log = new TraceLog({ idGenerator, clock });
+    const log = new SessionTraceLog({ idGenerator, clock });
     const entry = log.append("llm_response", "r", {}, { turn: 2, durationMs: 42 });
     expect(entry.turn).toBe(2);
     expect(entry.durationMs).toBe(42);

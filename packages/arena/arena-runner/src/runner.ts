@@ -17,15 +17,17 @@ import type { McpServerConfig } from "@agentprism/tool-mcp";
 import type { ContextTuning, SessionQueryPort } from "@agentprism/contracts";
 import { AskUserChannel, BreakerRegistry, EventChannel, Semaphore, WorkspaceRegistry } from "@agentprism/runtime";
 import type { DimensionRouter } from "@agentprism/arena-dimensions";
-import { RunTraceLogs } from "./column-logs.js";
+import { RunTraceLogs } from "./run-trace-logs.js";
 
 /** Parallel run dependencies (injected at the composition root). */
 export interface ArenaRunnerDeps {
-  registry: DriverLookup;
+  /** Resolves the agent driver per framework id (the run's execution backends). */
+  drivers: DriverLookup;
   router: DimensionRouter;
   workspaceRegistry: WorkspaceRegistry;
   reportPublisher: ReportPublisher;
-  modelFactory: ColumnRuntimeFactory;
+  /** Builds the model runtime of one column (wire capture attaches at construction). */
+  modelRuntime: ColumnRuntimeFactory;
   idGenerator: IdGenerator;
   clock: Clock;
   maxConcurrentRuns: number;
@@ -147,8 +149,8 @@ export class ArenaRunner {
     return this.askChannel.listPending().map(({ key, questions }) => ({ agentId: key, questions }));
   }
 
-  get registry(): DriverLookup {
-    return this.deps.registry;
+  get drivers(): DriverLookup {
+    return this.deps.drivers;
   }
 
   /** Resolves per-column configs; for non-temperature dimensions the request-level temperature overrides all columns. */
@@ -395,7 +397,7 @@ export class ArenaRunner {
           return;
         }
 
-        const driver = this.deps.registry.get(config.framework);
+        const driver = this.deps.drivers.get(config.framework);
         const session = request.column_sessions?.[config.label];
         const history = session !== undefined ? [...session.messages] : [...request.messages];
         const turn = turnFromHistory(history);
@@ -418,7 +420,7 @@ export class ArenaRunner {
           if (outcome.ok) breaker.recordSuccess();
           else breaker.recordFailure();
         };
-        const runtime = this.deps.modelFactory.create(config, {
+        const runtime = this.deps.modelRuntime.create(config, {
           wireSink: (record) => logs?.appendWire(config.label, turn, record),
           onModelCall: reportModelCall,
         });

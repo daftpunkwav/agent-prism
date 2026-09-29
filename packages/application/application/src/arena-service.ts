@@ -123,7 +123,7 @@ export class ArenaService {
       .filter((dimension) => dimension.options.length > 0);
     return {
       dimensions,
-      frameworks: [...runner.registry.listAvailable(), ...runner.registry.listReserved()],
+      frameworks: [...runner.drivers.listAvailable(), ...runner.drivers.listReserved()],
       baseline_defaults: this.deps.router.dimensionCatalog.baselineDefaultsPayload(),
       baseline_fields: this.deps.router.listBaselineFields(),
       model_compare_ready: this.deps.router.modelCompareReady(),

@@ -60,9 +60,9 @@ describe("ArenaRunner breaker", () => {
   });
 
   /**
-   * Runner with an instrumented model factory. When `reportFailure` is set the factory
-   * reports a failed model call, exactly like the provider adapter does when the
-   * endpoint itself is down.
+   * Runner with an instrumented model runtime. When `reportFailure` is set the
+   * runtime reports a failed model call, exactly like the provider adapter does
+   * when the endpoint itself is down.
    */
   function makeRunner(
     registry: FrameworkDriverRegistry,
@@ -72,13 +72,13 @@ describe("ArenaRunner breaker", () => {
     let createCount = 0;
     const workspaces = new WorkspaceRegistry({ runsRoot, maxWorkspaces: 8, ttlSeconds: 3600, clock: { now: () => 0 } });
     return new ArenaRunner({
-      registry,
+      drivers: registry,
       router: { route: (): PipelineConfig[] => [makeConfig()] } as never,
       workspaceRegistry: workspaces,
       reportPublisher: {
         publish: async () => null,
       },
-      modelFactory: {
+      modelRuntime: {
         create: (_config, options) => {
           createCount += 1;
           observeCount(createCount);

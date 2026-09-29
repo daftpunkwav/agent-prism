@@ -10,7 +10,7 @@
 
 export * from "./builder-service.js";
 export * from "./builder-session-store.js";
-export * from "./trace-store.js";
+export * from "./session-trace-store.js";
 // Domain error owned by builder-turns; re-exported here because the service
 // surface (and its consumers) raise and match on it.
 export { BuilderError } from "@agentprism/builder-turns";

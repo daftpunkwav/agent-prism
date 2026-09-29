@@ -9,5 +9,5 @@
 export * from "./turn-runner.js";
 export * from "./composition.js";
 export * from "./blocks.js";
-export * from "./trace-log.js";
+export * from "./session-trace-log.js";
 export * from "./errors.js";

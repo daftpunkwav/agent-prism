@@ -54,7 +54,7 @@ function makeRunner(overrides?: {
   harnessMaxRetries?: Partial<Record<"verify" | "reflect" | "self_evolve", number>>;
 }): ArenaRunner {
   return new ArenaRunner({
-    registry: { get: () => ({}), names: new Set() } as unknown as DriverLookup,
+    drivers: { get: () => ({}), names: new Set() } as unknown as DriverLookup,
     router: { route: () => [config("col-a")] },
     workspaceRegistry: {
       traceDir: () => {
@@ -62,7 +62,7 @@ function makeRunner(overrides?: {
       },
     },
     reportPublisher: overrides?.reportPublisher ?? { publish: async () => null },
-    modelFactory: {
+    modelRuntime: {
       create: (_config: unknown, options?: { onModelCall?: (outcome: { ok: boolean; error?: unknown }) => void }) => {
         if (overrides?.reportModelFailure === true) options?.onModelCall?.({ ok: false, error: new Error("llm timeout") });
         return {};

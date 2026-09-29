@@ -1,5 +1,5 @@
 /**
- * @file trace-store
+ * @file session-trace-store
  * @description Per-session observability journal (JSONL) for the builder.
  *
  * Responsibilities:
@@ -12,6 +12,10 @@
  * Persistence is fail-open: disk failures degrade to warnings, never break the
  * turn producing the records. A malformed line (crash mid-append) is skipped
  * loudly — journal reads never fabricate records.
+ *
+ * Naming family: this is the Builder's per-SESSION JSONL journal; entries are
+ * produced by SessionTraceLog (builder-turns). Arena runs use the per-RUN
+ * on-disk RunTraceLogs (arena-runner) instead.
  */
 
 import type { AppendFile } from "@agentprism/persistence";

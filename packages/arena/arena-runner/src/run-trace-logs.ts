@@ -1,5 +1,5 @@
 /**
- * @file column-logs
+ * @file run-trace-logs
  * @description Per-run on-disk observability logs: the raw event stream and captured
  * LLM wire records, appended as JSONL beside the run's workspaces.
  *
@@ -9,6 +9,11 @@
  * - Fail open: append failures degrade to a single warning, never break the run
  *
  * Pure append-only sinks: readers (route layer) parse the same files back.
+ *
+ * Naming family: this is the ARENA side, per-RUN on-disk logs (one JSONL pair
+ * per column label). The Builder instead keeps a per-SESSION in-memory
+ * SessionTraceLog (builder-turns) persisted through SessionTraceStore
+ * (builder-service); the three share the "trace" idea but differ in scope.
  */
 
 import { mkdirSync } from "node:fs";

@@ -26,7 +26,7 @@ export interface MockRouter {
 
 /** Loose runner double: slots and streams the run tests reprogram. */
 export interface MockRunner {
-  registry: {
+  drivers: {
     listAvailable: Mock;
     listReserved: Mock;
   };
@@ -59,7 +59,7 @@ export function mockRouter(overrides: Record<string, any> = {}): MockRouter {
 
 export function mockRunner(): MockRunner {
   return {
-    registry: {
+    drivers: {
       listAvailable: vi.fn().mockReturnValue([{ id: "native", name: "Native" }]),
       listReserved: vi.fn().mockReturnValue([]),
     },

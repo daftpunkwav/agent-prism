@@ -93,7 +93,7 @@ interface Harness {
 
 const RUNS_ROOT = join(tmpdir(), `aprism-run-logs-${randomUUID()}`);
 
-function makeHarness(driver: AgentDriver, modelFactoryCreate?: Harness["create"]): Harness {
+function makeHarness(driver: AgentDriver, modelRuntimeCreate?: Harness["create"]): Harness {
   const registry = new FrameworkDriverRegistry();
   registry.register(driver);
   const workspaces = new WorkspaceRegistry({
@@ -103,7 +103,7 @@ function makeHarness(driver: AgentDriver, modelFactoryCreate?: Harness["create"]
     clock: { now: () => 0 },
   });
   const create =
-    modelFactoryCreate ??
+    modelRuntimeCreate ??
     vi.fn(() => ({
       llm: { invoke: async () => ({ text: "", toolCalls: [] }), stream: async function* () {} },
       llmVendor: {},
@@ -111,7 +111,7 @@ function makeHarness(driver: AgentDriver, modelFactoryCreate?: Harness["create"]
       maxInputTokens: 120_000,
     }));
   const runner = new ArenaRunner({
-    registry,
+    drivers: registry,
     router: {
       route: (): PipelineConfig[] =>
         [
@@ -121,7 +121,7 @@ function makeHarness(driver: AgentDriver, modelFactoryCreate?: Harness["create"]
     } as never,
     workspaceRegistry: workspaces,
     reportPublisher: { publish: async () => null },
-    modelFactory: { create } as never,
+    modelRuntime: { create } as never,
     idGenerator: { next: () => randomUUID().slice(0, 8) },
     clock: { now: () => 0 },
     maxConcurrentRuns: 2,

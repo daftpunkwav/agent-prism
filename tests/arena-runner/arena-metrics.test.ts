@@ -76,7 +76,7 @@ function makeConfig(label = "metrics-column"): PipelineConfig {
 function makeRunner(registry: DriverLookup, runsRoot: string, label: string): ArenaRunner {
   const workspaces = new WorkspaceRegistry({ runsRoot, maxWorkspaces: 8, ttlSeconds: 3600, clock: { now: () => 0 } });
   return new ArenaRunner({
-    registry,
+    drivers: registry,
     router: { route: (): PipelineConfig[] => [makeConfig(label)] } as never,
     workspaceRegistry: workspaces,
     // Test publisher: projects hard metrics only; does not depend on evaluation
@@ -101,7 +101,7 @@ function makeRunner(registry: DriverLookup, runsRoot: string, label: string): Ar
         };
       },
     },
-    modelFactory: {
+    modelRuntime: {
       create: () => ({
         llm: { invoke: async () => ({ text: "", toolCalls: [] }), stream: async function* () {} },
         llmVendor: {},
