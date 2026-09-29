@@ -117,6 +117,18 @@ describe("DimensionRouter.route guardrails", () => {
     expect(() => router.route("framework", [])).toThrow(/at least 1/);
   });
 
+  it("keeps a baseline label pin verbatim instead of the option label (thread resume identity)", () => {
+    const router = routerWith({
+      dimensionOptions: () => [{ field: "framework", value: "native", label: "Native Agent" }],
+      modelCompareReady: () => true,
+    });
+    const [pinned] = router.route("framework", ["native"], { label: "t-abc123" });
+    expect(pinned?.label).toBe("t-abc123");
+    // Unpinned baselines keep the option's display label (catalog behavior).
+    const [unpinned] = router.route("framework", ["native"]);
+    expect(unpinned?.label).toBe("Native Agent");
+  });
+
 });
 
 describe("DimensionRouter.route custom numeric values", () => {

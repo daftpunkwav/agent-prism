@@ -111,6 +111,16 @@ export class DimensionRouter {
 
     const byValue = new Map(options.map((option) => [option.value, option]));
     const configs: PipelineConfig[] = [];
+    // Column label precedence: a baseline label is an identity pin (thread
+    // resume keys column_sessions and turn commit on it), so it must survive
+    // routing verbatim; only an unpinned baseline falls back to the option's
+    // display label. Spreading `label` after the overrides used to overwrite
+    // the pin, which broke thread history replay, workspace reuse, and turn
+    // commit (the runner looks sessions up by the pinned label).
+    const withLabel = (overrides: Record<string, unknown>, label: string): Record<string, unknown> => {
+      if (overrides.label !== undefined) return overrides;
+      return { ...overrides, label };
+    };
     for (const value of chosen) {
       const option = byValue.get(value);
       if (option === undefined) {
@@ -125,7 +135,10 @@ export class DimensionRouter {
               providerLookup: this.sync.providerLookup,
               dimensionCatalog: this.dimensionCatalog,
             },
-            { ...baseOverrides, [custom.field]: coerceFieldValue(custom.field, custom.token), label: custom.label },
+            withLabel(
+              { ...baseOverrides, [custom.field]: coerceFieldValue(custom.field, custom.token) },
+              custom.label,
+            ),
           ),
         );
         continue;
@@ -137,7 +150,10 @@ export class DimensionRouter {
             providerLookup: this.sync.providerLookup,
             dimensionCatalog: this.dimensionCatalog,
           },
-          { ...baseOverrides, [option.field]: coerceFieldValue(option.field, value), label: option.label },
+          withLabel(
+            { ...baseOverrides, [option.field]: coerceFieldValue(option.field, value) },
+            option.label,
+          ),
         ),
       );
     }
