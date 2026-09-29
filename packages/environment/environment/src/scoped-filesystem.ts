@@ -48,11 +48,23 @@ function completeUtf8End(buffer: Buffer, length: number): number {
   return needed <= continuation + 1 ? length : index - 1;
 }
 
+/**
+ * Machine-readable defect classes of a WorkspaceError. Callers mapping errors
+ * onto protocol status codes (e.g. the workspace HTTP service) branch on `kind`
+ * instead of sniffing the message text; untyped errors keep `kind === undefined`
+ * and map to bad-request semantics.
+ */
+export type WorkspaceErrorKind = "not_found";
+
 /** Workspace/directory operation error. */
 export class WorkspaceError extends Error {
-  constructor(message: string) {
+  /** Machine-readable defect class; undefined when the throw site has no classified kind. */
+  readonly kind?: WorkspaceErrorKind;
+
+  constructor(message: string, kind?: WorkspaceErrorKind) {
     super(message);
     this.name = "WorkspaceError";
+    this.kind = kind;
   }
 }
 
@@ -283,12 +295,12 @@ export class ScopedFileSystem {
 
   readFile(filePath: string): string {
     const target = this.canonicalize(filePath);
-    if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`);
+    if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`, "not_found");
     const real = this.safeReadPath(target);
     try {
       return readFileSync(real, "utf-8");
     } catch {
-      throw new WorkspaceError(`Error: file not found: ${filePath}`);
+      throw new WorkspaceError(`Error: file not found: ${filePath}`, "not_found");
     }
   }
 
@@ -306,7 +318,7 @@ export class ScopedFileSystem {
     startByte = 0,
   ): { text: string; truncated: boolean; bytesConsumed: number } {
     const target = this.canonicalize(filePath);
-    if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`);
+    if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`, "not_found");
     const real = this.safeReadPath(target);
     let fd: number | null = null;
     try {
@@ -333,7 +345,7 @@ export class ScopedFileSystem {
         bytesConsumed: end === 0 ? read : end,
       };
     } catch {
-      throw new WorkspaceError(`Error: file not found: ${filePath}`);
+      throw new WorkspaceError(`Error: file not found: ${filePath}`, "not_found");
     } finally {
       if (fd !== null) {
         try {
@@ -365,7 +377,7 @@ export class ScopedFileSystem {
 
   editFile(filePath: string, oldText: string, newText: string): string {
     const target = this.canonicalize(filePath);
-    if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`);
+    if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`, "not_found");
     // Empty oldText matches everywhere (String.includes("")): without this guard an empty
     // replacement silently prepends instead of replacing, corrupting the file.
     if (oldText === "") throw new WorkspaceError("Error: old_text must not be empty");
@@ -374,7 +386,7 @@ export class ScopedFileSystem {
     try {
       current = readFileSync(real, "utf-8");
     } catch {
-      throw new WorkspaceError(`Error: file not found: ${filePath}`);
+      throw new WorkspaceError(`Error: file not found: ${filePath}`, "not_found");
     }
     if (!current.includes(oldText)) {
       throw new WorkspaceError(`Error: text to replace not found: ${oldText.slice(0, 80)}`);
@@ -386,13 +398,13 @@ export class ScopedFileSystem {
 
   deleteFile(filePath: string): string {
     const target = this.canonicalize(filePath);
-    if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`);
+    if (target === null) throw new WorkspaceError(`Error: file not found: ${filePath}`, "not_found");
     // The same symlink assertion as read/write/edit: when a parent contains link segments, unlink would resolve through them outside the root
     this.assertWithinRootThroughLinks(target);
     try {
       unlinkSync(target);
     } catch {
-      throw new WorkspaceError(`Error: file not found: ${filePath}`);
+      throw new WorkspaceError(`Error: file not found: ${filePath}`, "not_found");
     }
     return `Deleted: ${filePath}`;
   }

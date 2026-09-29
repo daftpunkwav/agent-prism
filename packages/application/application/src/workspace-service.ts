@@ -25,8 +25,17 @@ function requireWorkspace(deps: WorkspaceFileServiceDeps, name: string) {
   return workspace;
 }
 
-function toBadRequest(error: unknown): never {
+/**
+ * Maps a workspace-layer defect onto the unified HTTP contract: a classified
+ * not-found answers 404 (read and delete address the same files, so both report
+ * a missing path identically); every other WorkspaceError (path escapes root,
+ * invalid path, already exists) is the caller's fault and answers 400.
+ */
+function toWorkspaceHttpError(error: unknown): never {
   if (error instanceof WorkspaceError) {
+    if (error.kind === "not_found") {
+      throw AppError.notFound(error.message);
+    }
     throw AppError.badRequest(error.message);
   }
   throw error as Error;
@@ -53,10 +62,7 @@ export class WorkspaceFileService {
     try {
       return { path, content: workspace.fs.readFile(path) };
     } catch (error) {
-      if (error instanceof WorkspaceError) {
-        throw AppError.notFound(error.message);
-      }
-      throw error;
+      toWorkspaceHttpError(error);
     }
   }
 
@@ -71,7 +77,7 @@ export class WorkspaceFileService {
         : workspace.fs.writeFile(body.path, body.content);
       return { path: body.path, message };
     } catch (error) {
-      toBadRequest(error);
+      toWorkspaceHttpError(error);
     }
   }
 
@@ -80,7 +86,7 @@ export class WorkspaceFileService {
     try {
       return { path, message: workspace.fs.deleteFile(path) };
     } catch (error) {
-      toBadRequest(error);
+      toWorkspaceHttpError(error);
     }
   }
 }

@@ -75,10 +75,10 @@ describe("WorkspaceFileService", () => {
     }
   });
 
-  it("maps WorkspaceError from reads to 404 and from writes/deletes to 400", () => {
+  it("maps WorkspaceError uniformly: not-found 404, other defects 400", async () => {
     const { service, cleanup } = setup();
     try {
-      // Missing file read: environment raises WorkspaceError → AppError.notFound.
+      // Missing file read: classified not_found → AppError.notFound.
       try {
         service.readFile("ws1", "ghost.txt");
         expect.unreachable("expected a 404 AppError");
@@ -86,7 +86,7 @@ describe("WorkspaceFileService", () => {
         expect(error).toBeInstanceOf(AppError);
         expect((error as AppError).status).toBe(404);
       }
-      // create_only on an existing file: WorkspaceError → badRequest.
+      // create_only on an existing file: untyped defect → badRequest.
       service.writeFile("ws1", { path: "c.txt", content: "x", create_only: true });
       try {
         service.writeFile("ws1", { path: "c.txt", content: "y", create_only: true });
@@ -95,13 +95,14 @@ describe("WorkspaceFileService", () => {
         expect(error).toBeInstanceOf(AppError);
         expect((error as AppError).status).toBe(400);
       }
-      // Deleting a missing file maps through the same badRequest translation.
+      // Deleting a missing file addresses the same not-found defect as reading:
+      // both map to 404 (unified with the read path's not-found contract).
       try {
         service.deleteFile("ws1", "ghost.txt");
-        expect.unreachable("expected a 400 AppError");
+        expect.unreachable("expected a 404 AppError");
       } catch (error) {
         expect(error).toBeInstanceOf(AppError);
-        expect((error as AppError).status).toBe(400);
+        expect((error as AppError).status).toBe(404);
       }
     } finally {
       cleanup();

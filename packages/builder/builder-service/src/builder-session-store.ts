@@ -57,6 +57,9 @@ export interface BuilderSessionRecord {
 }
 
 const PersistedSessionSchema = z.object({
+  // Deliberately wider than the generator's runtime format (12 hex chars): the
+  // persisted schema must keep loading sessions written by any IdGenerator the
+  // host ever injected — tightening here would silently drop stored sessions.
   id: z.string().min(1),
   name: z.string().max(60),
   createdAt: z.number().int(),
@@ -184,7 +187,10 @@ export class BuilderSessionStore {
   get(id: string): BuilderSessionRecord {
     const record = this.sessions.get(id);
     if (record === undefined) {
-      throw BuilderError.notFound(`Builder session "${id}" does not exist`);
+      // The id arrives from an unvalidated route param, so the 404 detail bounds
+      // the echo instead of reflecting an arbitrarily long input back.
+      const echo = id.length > 96 ? `${id.slice(0, 96)}…` : id;
+      throw BuilderError.notFound(`Builder session "${echo}" does not exist`);
     }
     return record;
   }

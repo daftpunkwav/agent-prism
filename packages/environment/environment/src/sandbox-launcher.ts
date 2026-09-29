@@ -21,20 +21,20 @@
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { ToolSandboxHint } from "@agentprism/contracts";
 import { WorkspaceError } from "./scoped-filesystem.js";
 import { SANDBOX_SETUP_SENTINEL, WIN_SANDBOX_HELPER_CS, WIN_SANDBOX_HELPER_PS1 } from "./win-sandbox-helper.js";
 
 export { SANDBOX_SETUP_SENTINEL };
 
-/** Write-containment request attached to a spawn: the child may write only inside this root. */
-export interface ProcessSandboxRequest {
-  /**
-   * The single directory root the child may write; every other path stays read-only
-   * (reads are unrestricted). Multi-root requests are refused by the transform
-   * rather than silently narrowed to the first root.
-   */
-  readonly writableRoots: readonly string[];
-}
+/**
+ * Write-containment request attached to a spawn: the child may write only inside
+ * these roots. Compile-time alias of the workspace layer's ToolSandboxHint (the
+ * runtime Workspace passes its `sandbox` hint straight through), so the two
+ * shapes can never drift; the single-root refusal below is a runtime invariant
+ * the shared structural type cannot express.
+ */
+export type ProcessSandboxRequest = ToolSandboxHint;
 
 /** Rewrites argv for a sandboxed spawn. Throws WorkspaceError when the request is unenforceable. */
 export type SandboxSpawnTransform = (

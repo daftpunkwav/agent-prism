@@ -14,6 +14,19 @@
  * 409; unknown names and invalid input answer 400 (see skillErrorStatus).
  * MCP replace failures parse as 400 with the parser's message; a persistence
  * failure propagates to the shell's 5xx mapping instead.
+ *
+ * Error-code contract (deliberately different from the schema-validated route
+ * families): every settings endpoint validates by hand and answers 400 with a
+ * `{detail}` body, while the arena/builder/threads families parse through zod
+ * (parseJsonBody) and answer 422 for schema mismatches. Malformed JSON is 400
+ * everywhere. The split is historical, not accidental drift: settings payloads
+ * are operator state patches where a field-level 400 reads better than a 422;
+ * keep new settings endpoints in the 400 family.
+ *
+ * Knobs PUT always answers 200: invalid or out-of-range fields silently clamp
+ * or fall back to the current value (normalize semantics), and the response's
+ * `knobs` carries the effective values — clients detect a fallback by diffing
+ * the request against the response.
  */
 
 import type { HttpApplicationDeps } from "@agentprism/http-runtime";
