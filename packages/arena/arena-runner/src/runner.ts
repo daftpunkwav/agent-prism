@@ -78,7 +78,7 @@ function turnFromHistory(messages: ReadonlyArray<{ role: unknown }>): number {
   return userMessages + 1;
 }
 
-/** Default human-channel wait (single source: contracts; re-exported for compat). */
+/** Default human-channel wait (single source: contracts). */
 export { DEFAULT_ASK_USER_WAIT_MS } from "@agentprism/contracts";
 
 /** Per-pipeline retained events for the comparison report (bounds multi-column memory). */

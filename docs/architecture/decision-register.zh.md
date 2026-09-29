@@ -17,7 +17,7 @@
 | 账本隔离 | 账本病态只告警，绝不打断被观察的 run | application 中的 `safeSession` 包裹 |
 | 客户端 abort 记为 `cancelled` | Cancel 语义与 failure 不同 | contracts `SessionStatus`、route abort 装配 |
 | 超大产物先持久化再修剪 | 超预算产物完整 dump 到磁盘并带 locator 与预览，而非静默丢失 | `tool-builtins/definitions/spill.ts`、`session/blob-store.ts` |
-| `ask_user` 记录但绝不阻塞 | 不存在同步人工通道，阻塞或伪造答案会产生误导 | `tool-builtins/definitions/ask-user.ts` |
+| `ask_user` 有界等待人工，超时降级 defer | interactive 运行把问题批次交给共享 `AskUserChannel`（默认等待 5 分钟）；超时、abort 或人工跳过后按未回答结算，落入与 headless 模式相同的 defer 文本，因此列永远不会无限阻塞，也绝不伪造答案 | `tool-builtins/definitions/ask-user.ts`、`runtime/src/ask-user-channel.ts` |
 | `subagent` 深度上限 1，toolset 继承减去自身 | 防止无界递归与权限升级 | `agent/agent-execution` 实体 body |
 | 凭证引用 `${env:NAME}` | 存储配置保持引用；已解析密钥绝不写回 | `provider-catalog/src/endpoints.ts` `resolveCredentialReference` |
 | MCP、skill、orchestration 作为 dimensions | 每次 run 隔离一个变量，使对比保持单变量 | `DIMENSION_FIELD`、`DimensionCatalog` |

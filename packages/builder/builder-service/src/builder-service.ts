@@ -118,7 +118,7 @@ interface RunHandle {
   controller: AbortController;
 }
 
-/** Default human-channel wait (single source: contracts; re-exported for compat). */
+/** Default human-channel wait (single source: contracts). */
 export { DEFAULT_ASK_USER_WAIT_MS } from "@agentprism/contracts";
 
 /** Agent Builder use cases: sessions, hot-swaps, chat turns, and the execution ledger. */

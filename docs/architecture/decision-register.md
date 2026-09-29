@@ -16,7 +16,7 @@ rationale, and the code that enforces it.
 | Ledger isolation | Ledger pathologies warn and never interrupt the observed run | `safeSession` wrapping in application |
 | Client abort maps to `cancelled` | Cancel semantics are distinct from failure | contracts `SessionStatus`, route abort wiring |
 | Persist-then-prune for oversized artifacts | Over-budget artifacts are dumped in full to disk with a locator and preview rather than silently lost | `tool-builtins/definitions/spill.ts`, `session/blob-store.ts` |
-| `ask_user` records but never blocks | No synchronous human channel exists, so blocking or faking an answer would be misleading | `tool-builtins/definitions/ask-user.ts` |
+| `ask_user` waits on the human for a bounded time, then defers | Interactive runs hand the batch to the human through the shared `AskUserChannel` (default 5-minute wait); on timeout, abort, or skip the tool settles the batch unanswered into the same defer text headless mode returns, so a column can never block indefinitely and no answer is ever faked | `tool-builtins/definitions/ask-user.ts`, `runtime/src/ask-user-channel.ts` |
 | `subagent` depth caps at 1 by default (runtime knob 0 to 3) and inherits the toolset minus itself | Prevents unbounded recursion and privilege escalation | `agent/agent-execution` live body |
 | Credential references `${env:NAME}` | Stored config keeps references; resolved secrets are never written back | `provider-catalog/src/endpoints.ts` `resolveCredentialReference` |
 | MCP, skill, and orchestration as dimensions | Each run isolates one variable so comparisons stay single-variable | `DIMENSION_FIELD`, `DimensionCatalog` |

@@ -100,7 +100,9 @@ ArenaRunner.
    dump degrades to a truncated result with a warning rather than an error.
 6. Enforcement boundaries. Static shell analysis is a guardrail, not a security boundary.
    The `sandbox_mode: os` setting adds OS-level write containment on Windows but does not
-   control reads or network access. `ask_user` never blocks. Placeholders fail closed.
+   control reads or network access. `ask_user` waits on the human only for a bounded time
+   (default 5 minutes in interactive runs) and then degrades to the headless defer.
+   Placeholders fail closed.
    See [sandbox-layers.md](sandbox-layers.md).
 
 ## Where to read next

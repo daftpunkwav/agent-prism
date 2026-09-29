@@ -96,7 +96,8 @@ prompt、reasoning mode、model 与 tool policy 下并排运行，对产生的�
    截断而非错误。
 6. 边界。静态 shell 分析是护栏，不是安全边界。`sandbox_mode: os`
    在 Windows 上增加 OS 级写入 containment，但不控制读取与网络。
-   `ask_user` 绝不阻塞。占位符失败关闭。见 [sandbox-layers.zh.md](sandbox-layers.zh.md)。
+   `ask_user` 只在 interactive 运行中有界等待人工（默认 5 分钟），超时后降级为
+   headless defer。占位符失败关闭。见 [sandbox-layers.zh.md](sandbox-layers.zh.md)。
 
 ## 接下来读什么
 
