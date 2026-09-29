@@ -18,7 +18,7 @@ import { createPortal } from "react-dom";
 import { HelpCircle, RotateCcw, X } from "lucide-react";
 import type { ArenaMeta, DimensionId } from "@agentprism/client";
 import { UiSelect } from "@agentprism/ui";
-import { BASELINE_GROUP_ORDER, type BaselineDraft } from "./arenaConstants";
+import { BASELINE_GROUP_ORDER, effectiveThinkingMode, type BaselineDraft } from "./arenaConstants";
 import { useT } from "@/i18n/useT";
 import { baselineFieldLabel, baselineOptionLabel } from "./dimensionLabels";
 
@@ -298,7 +298,10 @@ export function BaselineModal({
                     // Mutually exclusive thinking modes: the mode token routes which
                     // of the two intensity fields is editable; the inactive side
                     // renders disabled while keeping its value for switching back.
-                    const thinkingMode = baseline["thinking_mode"] ?? meta.baseline_defaults?.["thinking_mode"] ?? "levels";
+                    // The mode is normalized against the served options — a draft
+                    // kept from an endpoint that offered budget pairs must not
+                    // disable the level field here when the current one doesn't.
+                    const thinkingMode = effectiveThinkingMode(meta, baseline);
                     return (
                       <div key={g} className="baseline-group" data-group={g}>
                         <p className="baseline-group-title">{t(`arena.group.${g}`)}</p>
@@ -354,8 +357,15 @@ export function BaselineModal({
                                 ) : (
                                   <UiSelect
                                     className="ui-select-sm w-full"
-                                    disabled={locked || running || modeDisabled}
-                                    value={value}
+                                    // An unsynced axis (e.g. budget pairs on an
+                                    // endpoint that has none) renders as an empty
+                                    // dropdown: disabled, never clickable-with-nothing-to-pick.
+                                    disabled={locked || running || modeDisabled || field.options.length === 0}
+                                    // The mode select shows the normalized mode: a stale
+                                    // draft token the server no longer serves must not
+                                    // render as a dead raw value (UiSelect falls back to
+                                    // echoing an unknown value verbatim).
+                                    value={field.field === "thinking_mode" ? thinkingMode : value}
                                     onChange={(next) => onBaselineFieldChange(field.field, next)}
                                     ariaLabel={t("arena.setup.baselineFieldAria", { label: fieldLab })}
                                     options={field.options.map((opt) => ({

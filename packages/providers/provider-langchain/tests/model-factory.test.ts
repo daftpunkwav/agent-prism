@@ -247,4 +247,47 @@ describe("createChatModel budget-mode thinking", () => {
     // budgeted thinking rides along.
     expect((model as unknown as { thinking?: { type: string; budget_tokens?: number } }).thinking?.budget_tokens).toBeUndefined();
   });
+
+  it("runs without thinking when the endpoint's default pair sits below the protocol floor", () => {
+    // The endpoint's default level "low" resolves through the pair table, but its
+    // budget_tokens (1000) sit below the 1024 protocol floor: budget-mode level
+    // names are pair-table keys, so the column runs without thinking instead of
+    // the level name falling back to the mapping budget (2048) on the wire.
+    // (A level matching no pair row never reaches this branch: effectiveThinkingLevel
+    // already coerces it to off.)
+    const provider = {
+      ...fixture("anthropic_messages"),
+      endpoints: [
+        {
+          id: "ep-budget",
+          label: "",
+          provider_name: "",
+          api_key: "k",
+          base_url: "https://budget.example.com/v1",
+          use_full_url: false,
+          api_format: "anthropic_messages",
+          auth_field: "",
+          model: "m",
+          context_window: 128000,
+          max_input_tokens: 120000,
+          max_output_tokens: 4096,
+          website_url: "",
+          enabled: true,
+          thinking_capable: true,
+          thinking_level: "low",
+          thinking_levels: [],
+          thinking_mode: "budget",
+          thinking_budget_pairs: pairs,
+          image_input: false,
+          video_input: false,
+        },
+      ],
+      default_endpoint_id: "ep-budget",
+    } as unknown as ProviderConfig;
+    const model = createChatModel({ provider });
+    const thinking = (model as unknown as { thinking?: { type: string; budget_tokens?: number } }).thinking;
+    // Without the off-guard the level mapping would ride in as budget_tokens 2048.
+    expect(thinking?.budget_tokens).toBeUndefined();
+    expect((model as unknown as { maxTokens?: number }).maxTokens).toBe(2048);
+  });
 });

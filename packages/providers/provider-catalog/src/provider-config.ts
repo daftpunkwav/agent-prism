@@ -41,6 +41,14 @@ function legacyEndpointsFromTopLevel(raw: Record<string, unknown>, seed: LlmEnvS
     website_url: raw.website_url ?? "",
     thinking_capable: raw.thinking_capable === true,
     thinking_level: raw.thinking_level ?? "off",
+    // Legacy flat rows predate the budget-pair fields by design, but a
+    // hand-migrated row may already carry them; parseLlmEndpoint normalizes
+    // whichever arrive, so pass them through instead of silently resetting.
+    thinking_levels: raw.thinking_levels,
+    thinking_mode: raw.thinking_mode,
+    thinking_budget_pairs: raw.thinking_budget_pairs,
+    thinking_budget_tokens: raw.thinking_budget_tokens,
+    thinking_max_tokens: raw.thinking_max_tokens,
     },
     ids,
   );

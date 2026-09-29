@@ -20,7 +20,7 @@ import type {
   DimensionId,
   TaskTemplate,
 } from "@agentprism/client";
-import { DIMENSION_IDS, type BaselineDraft } from "./arenaConstants";
+import { DIMENSION_IDS, effectiveThinkingMode, type BaselineDraft } from "./arenaConstants";
 import { templateQuestion } from "./templateLabels";
 import { useT } from "@/i18n/useT";
 
@@ -184,8 +184,10 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
     );
     // Mutually exclusive thinking modes: only the active mode's intensity field
     // travels on the wire — the inactive side's stale value must never reach the
-    // server, where it would fail the mode legality check.
-    const thinkingMode = baseline["thinking_mode"] ?? meta?.baseline_defaults?.["thinking_mode"] ?? "levels";
+    // server, where it would fail the mode legality check. The mode itself is
+    // normalized against the served options: a stored draft from an endpoint
+    // that no longer offers budget pairs falls back to level mapping.
+    const thinkingMode = effectiveThinkingMode(meta, baseline);
     const out: BaselineOverrides = {};
     const custom: Record<string, string> = {};
     Object.keys(baseline).forEach((key) => {
@@ -193,6 +195,12 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
       if (allowed.size > 0 && !allowed.has(key)) return;
       if (key === "thinking_budget" && thinkingMode !== "budget") return;
       if (key === "thinking_level" && thinkingMode === "budget") return;
+      if (key === "thinking_mode") {
+        // Ship the normalized mode: a stale draft value the server no longer
+        // offers must not travel on the wire (the backend now rejects it).
+        Object.assign(out, { [key]: thinkingMode });
+        return;
+      }
       const val: unknown = baseline[key];
       // Stored preferences are untrusted JSON: re-guard the value, not just its type.
       if (typeof val !== "string" || val === "") return;

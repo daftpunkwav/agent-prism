@@ -180,4 +180,69 @@ describe("BaselineModal", () => {
     fireEvent.click(screen.getByRole("button", { name: en().dismissBannerAria }));
     expect(onDismissPromptBanner).toHaveBeenCalledOnce();
   });
+
+  it("shows the normalized thinking mode when the draft carries a mode the server no longer serves", () => {
+    // Levels-only served options + a stale draft "budget" pin (kept from an
+    // earlier budget-capable endpoint): the mode select must display the served
+    // mapping mode, the level field stays editable, and the dead budget axis
+    // renders disabled — never a raw "budget" token in the trigger.
+    const meta = {
+      model_compare_ready: false,
+      baseline_fields: [
+        {
+          field: "thinking_mode",
+          label: "Thinking mode",
+          group: "decode",
+          dimension: null,
+          input: "select",
+          default: "levels",
+          options: [{ value: "levels", label: "Level mapping" }],
+        },
+        {
+          field: "thinking_level",
+          label: "Thinking",
+          group: "decode",
+          dimension: null,
+          input: "select",
+          default: "high",
+          options: [
+            { value: "off", label: "Off" },
+            { value: "high", label: "high" },
+          ],
+        },
+        {
+          field: "thinking_budget",
+          label: "Thinking budget",
+          group: "decode",
+          dimension: null,
+          input: "select",
+          default: "0",
+          options: [],
+        },
+      ],
+    } as unknown as ArenaMeta;
+    render(
+      <I18nProvider initialLocale="en">
+        <BaselineModal
+          open
+          onClose={vi.fn()}
+          running={false}
+          meta={meta}
+          dimension="framework"
+          baseline={{ thinking_mode: "budget", thinking_budget: "super" }}
+          onBaselineFieldChange={vi.fn()}
+          onResetBaseline={vi.fn()}
+          showPromptBanner={false}
+          onDismissPromptBanner={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+    const modeTrigger = screen.getByLabelText("Baseline Thinking mode") as HTMLButtonElement;
+    expect(modeTrigger.textContent).toContain("Level mapping");
+    expect(modeTrigger.textContent).not.toContain("budget");
+    const levelTrigger = screen.getByLabelText("Baseline Thinking") as HTMLButtonElement;
+    expect(levelTrigger.disabled).toBe(false);
+    const budgetTrigger = screen.getByLabelText("Baseline Thinking budget") as HTMLButtonElement;
+    expect(budgetTrigger.disabled).toBe(true);
+  });
 });

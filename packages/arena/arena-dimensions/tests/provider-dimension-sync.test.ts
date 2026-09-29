@@ -181,3 +181,33 @@ describe("mutually exclusive thinking axes follow the default endpoint's mode", 
     expect(sync.catalog.defaultBaseValue("thinking_mode")).toBe("levels");
   });
 });
+
+describe("thinking_mode baseline option convergence", () => {
+  it("a non-budget-capable endpoint serves levels only (no dead budget tab)", () => {
+    const sync = makeSync([
+      makeEndpoint("ep-1", { thinking_capable: true, thinking_level: "high" }),
+    ], "ep-1");
+    sync.syncModelOptionsFromProvider();
+    const modes = sync.catalog.baselineOnlyOptions()["thinking_mode"]?.map(([value]) => value);
+    expect(modes).toEqual(["levels"]);
+    expect(sync.catalog.isLegalFieldValue("thinking_mode", "budget")).toBe(false);
+    expect(sync.catalog.isLegalFieldValue("thinking_mode", "levels")).toBe(true);
+  });
+
+  it("a budget-capable endpoint serves both modes and keeps budget pairs legal", () => {
+    const sync = makeSync([
+      makeEndpoint("ep-1", {
+        api_format: "anthropic_messages",
+        thinking_capable: true,
+        thinking_level: "super",
+        thinking_mode: "budget",
+        thinking_budget_pairs: [{ level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 }],
+      }),
+    ], "ep-1");
+    sync.syncModelOptionsFromProvider();
+    const modes = sync.catalog.baselineOnlyOptions()["thinking_mode"]?.map(([value]) => value);
+    expect(modes).toEqual(["levels", "budget"]);
+    expect(sync.catalog.isLegalFieldValue("thinking_mode", "budget")).toBe(true);
+    expect(sync.catalog.isLegalFieldValue("thinking_budget", "super")).toBe(true);
+  });
+});

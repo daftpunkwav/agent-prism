@@ -237,6 +237,16 @@ function applyThinkingFields(
 
   const budgetApplicable =
     endpoint.thinking_capable && endpoint.api_format === "anthropic_messages" && (endpoint.thinking_budget_pairs ?? []).length > 0;
+  // An explicitly pinned mode is caller intent: asking for budget semantics on
+  // an endpoint that cannot serve them must fail loud, never silently run as
+  // level mode while the column config claims "budget". (The endpoint's own
+  // mismatched default still degrades below — that is config auto-healing, not
+  // a caller request.)
+  if (overrides.thinking_mode === "budget" && !budgetApplicable) {
+    throw new Error(
+      `Baseline thinking_mode "budget" is not applicable on endpoint "${endpoint.id}" (${endpoint.api_format}${endpoint.thinking_capable ? ", no budget pairs configured" : ", thinking not capable"}); use level mapping or switch the endpoint`,
+    );
+  }
   if (mode === "budget" && budgetApplicable) {
     if (overrides.thinking_level !== undefined && requestedLevel !== "off") {
       throw new Error(

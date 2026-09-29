@@ -375,6 +375,73 @@ describe("mutually exclusive thinking modes", () => {
     expect(config.thinking_budget).toBe(500_000);
     expect(config.thinking_max_tokens).toBe(1_000_000);
   });
+
+  it("rejects an explicitly pinned budget mode the synced catalog does not offer", () => {
+    // The default sync here serves an openai endpoint with thinking disabled:
+    // budget pairs never appear in the option set, so the pin is illegal at
+    // the validation layer already.
+    const { provider, lookup, catalog } = makeDeps();
+    expect(() =>
+      resolveBaselineOverrides("prompt", { thinking_mode: "budget" }, { provider, providerLookup: lookup, dimensionCatalog: catalog }),
+    ).toThrow('Baseline field "thinking_mode" has unsupported value: budget');
+  });
+
+  it("rejects a pinned budget mode on a thinking-incapable endpoint at assembly", () => {
+    // Direct assembly bypass (old client / internal caller): the mode cannot
+    // apply, and the column must fail loud instead of running level semantics
+    // while carrying a "budget" label.
+    const { provider, lookup, catalog } = makeDeps();
+    expect(() =>
+      buildPipelineBase(
+        { provider, providerLookup: lookup, dimensionCatalog: catalog },
+        { thinking_mode: "budget" },
+      ),
+    ).toThrow('thinking_mode "budget" is not applicable on endpoint "ep-1"');
+  });
+
+  it("rejects a pinned budget mode on an anthropic endpoint without pair rows", () => {
+    const provider = {
+      endpoints: [
+        {
+          id: "ep-anthropic",
+          label: "",
+          model: "anthropic-no-pairs",
+          base_url: "https://anthropic.example.com/v1",
+          api_format: "anthropic_messages",
+          api_key: "",
+          use_full_url: false,
+          thinking_capable: true,
+          thinking_level: "high",
+          thinking_levels: [],
+          thinking_mode: "levels",
+          thinking_budget_pairs: [],
+          context_window: 128000,
+          max_input_tokens: 120000,
+          max_output_tokens: 4096,
+        },
+      ],
+      default_endpoint_id: "ep-anthropic",
+      temperature: 0.7,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      max_output_tokens: 2048,
+    } as unknown as ProviderConfig;
+    const lookup: ProviderLookup = {
+      load: () => provider,
+      syncEndpointCatalog: () => {},
+      lookupEndpoint: (id: string) => provider.endpoints.find((endpoint) => endpoint.id === id),
+      listEndpoints: () => provider.endpoints,
+    };
+    const sync = new ProviderDimensionSync({ dimensionCatalog: new DimensionCatalog(), providerLookup: lookup });
+    sync.syncModelOptionsFromProvider();
+    expect(() =>
+      buildPipelineBase(
+        { provider, providerLookup: lookup, dimensionCatalog: sync.catalog },
+        { thinking_mode: "budget" },
+      ),
+    ).toThrow("no budget pairs configured");
+  });
 });
 
   it("fails loud when no endpoints are configured at all", () => {

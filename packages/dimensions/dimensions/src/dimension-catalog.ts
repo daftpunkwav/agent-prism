@@ -76,6 +76,7 @@ const STATIC_DEFAULT_BASE: Record<string, string | number> = {
 export class DimensionCatalog {
   private defaultBase: Record<string, string | number>;
   private readonly options = new Map<string, DimensionOptionTriple[]>();
+  private readonly baselineFieldOptions = new Map<string, DimensionOptionTriple[]>();
   private baselineOptionValues = new Map<string, Set<string>>();
 
   constructor() {
@@ -122,11 +123,24 @@ export class DimensionCatalog {
     return (this.options.get("model") ?? []).length >= 2;
   }
 
+  /**
+   * Overrides a baseline-only field's option table (sync entry point). The
+   * override wins over the static BASELINE_ONLY_OPTIONS table everywhere the
+   * field surfaces: meta payload, legality validation, and option listing.
+   */
+  setBaselineFieldOptions(field: string, triples: DimensionOptionTriple[]): void {
+    this.baselineFieldOptions.set(field, triples.map((t) => ({ ...t })));
+    this.refreshBaselineOptionValues();
+  }
+
   /** Option table for baseline-only control variables. */
   baselineOnlyOptions(): Record<string, Array<[string, string]>> {
     const out: Record<string, Array<[string, string]>> = {};
     for (const [field, options] of Object.entries(BASELINE_ONLY_OPTIONS)) {
       out[field] = options.map((o) => [o[0], o[1]]);
+    }
+    for (const [field, triples] of this.baselineFieldOptions) {
+      out[field] = triples.map((t) => [t.value, t.label]);
     }
     return out;
   }
@@ -161,6 +175,12 @@ export class DimensionCatalog {
     }
     for (const [field, optionPairs] of Object.entries(BASELINE_ONLY_OPTIONS)) {
       values.set(field, new Set(optionPairs.map(([v]) => v)));
+    }
+    // Runtime overrides express endpoint-dependent legality (e.g. budget pairs
+    // only exist on anthropic_messages endpoints) and must win over the static
+    // table, or a pin the UI never offered would still pass validation.
+    for (const [field, triples] of this.baselineFieldOptions) {
+      values.set(field, new Set(triples.map((t) => t.value)));
     }
     this.baselineOptionValues = values;
   }

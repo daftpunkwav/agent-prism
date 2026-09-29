@@ -51,4 +51,34 @@ describe("parseProviderConfig", () => {
       parseProviderConfig({ endpoints: [endpoint, { ...endpoint, id: "b" }] }, seed(), ids),
     ).toThrow(/Duplicate model/);
   });
+
+  it("legacy flat rows carry thinking-mode fields through migration instead of resetting", () => {
+    const migrated = parseProviderConfig(
+      {
+        provider_name: "legacy",
+        base_url: "https://legacy.example.com/v1",
+        api_format: "anthropic_messages",
+        model: "legacy-model",
+        thinking_capable: true,
+        thinking_level: "super",
+        thinking_levels: ["low", "super"],
+        thinking_mode: "budget",
+        thinking_budget_pairs: [{ level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 }],
+        thinking_budget_tokens: 4096,
+        thinking_max_tokens: 8192,
+      },
+      seed(),
+      ids,
+    );
+    const endpoint = migrated.endpoints[0];
+    expect(endpoint?.thinking_capable).toBe(true);
+    expect(endpoint?.thinking_level).toBe("super");
+    expect(endpoint?.thinking_levels).toEqual(["low", "super"]);
+    expect(endpoint?.thinking_mode).toBe("budget");
+    expect(endpoint?.thinking_budget_pairs).toEqual([
+      { level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 },
+    ]);
+    expect(endpoint?.thinking_budget_tokens).toBe(4096);
+    expect(endpoint?.thinking_max_tokens).toBe(8192);
+  });
 });

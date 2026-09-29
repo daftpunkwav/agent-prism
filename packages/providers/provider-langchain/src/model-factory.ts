@@ -101,7 +101,7 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
   const temperature = overrides.temperature ?? provider.temperature;
 
   const thinkingCapable = overrides.thinkingCapable ?? (endpoint?.thinking_capable ?? false);
-  const thinkingLevel =
+  let thinkingLevel =
     overrides.thinkingLevel ?? (endpoint ? effectiveThinkingLevel(endpoint, endpoint.thinking_level) : "off");
   const baseMaxTokens = overrides.maxTokens ?? provider.max_output_tokens;
   // Independent budget selection (anthropic): the run-level pair wins (budget
@@ -122,6 +122,10 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
       if (pair !== undefined && pair.budget_tokens >= 1024) {
         return { budgetTokens: pair.budget_tokens, maxTokens: pair.max_tokens };
       }
+      // Budget-mode level names are pair-table keys, not vendor thinking modes:
+      // without a usable pair the column runs without thinking instead of the
+      // level name masquerading as a vendor thinking type on the wire.
+      thinkingLevel = "off";
       return undefined;
     }
     const endpointBudget = endpoint?.thinking_budget_tokens ?? 0;

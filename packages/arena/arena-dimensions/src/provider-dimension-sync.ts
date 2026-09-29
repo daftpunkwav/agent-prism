@@ -151,6 +151,10 @@ export class ProviderDimensionSync {
         ]);
         this.dimensionCatalog.setDefaultBase("thinking_budget", budgetDefault);
         this.dimensionCatalog.setDefaultBase("thinking_mode", "budget");
+        this.dimensionCatalog.setBaselineFieldOptions("thinking_mode", [
+          { field: "thinking_mode", value: "levels", label: "Level mapping" },
+          { field: "thinking_mode", value: "budget", label: "Budget pairs" },
+        ]);
       } else {
         const customLevels = defaultEndpoint.thinking_levels ?? [];
         const levels = defaultEndpoint.thinking_capable
@@ -167,6 +171,12 @@ export class ProviderDimensionSync {
         this.dimensionCatalog.setDimensionOptions("thinking_budget", []);
         this.dimensionCatalog.setDefaultBase("thinking_budget", 0);
         this.dimensionCatalog.setDefaultBase("thinking_mode", "levels");
+        // Budget pairs only exist on anthropic_messages endpoints: on any other
+        // endpoint the budget tab is a dead end (no pair options to pick, the
+        // mode silently degrades server-side), so it must not be offered here.
+        this.dimensionCatalog.setBaselineFieldOptions("thinking_mode", [
+          { field: "thinking_mode", value: "levels", label: "Level mapping" },
+        ]);
       }
     }
     this.dimensionCatalog.setDefaultBase("temperature", snapToOptions(provider.temperature, TEMPERATURE_OPTIONS));
