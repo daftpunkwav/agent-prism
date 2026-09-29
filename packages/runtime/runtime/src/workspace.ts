@@ -6,6 +6,8 @@
  * - Own one root directory per Workspace bound to a single run
  * - Evict idle workspaces under TTL and LRU bounds
  * - Protect in-run workspaces from eviction
+ * - Resolve the per-run observability directories (`<runsRoot>/<runId>/_traces`)
+ *   beside the run's workspaces (traceDir / traceDirsForWorkspace / associateTrace)
  */
 
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";

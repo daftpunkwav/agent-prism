@@ -64,7 +64,10 @@ export type PipelineMetrics = z.infer<typeof PipelineMetricsSchema>;
 /**
  * Common fields of run events.
  * `pipeline` is both the display column label and the aggregation key for events
- * and reports (producers must keep it unique within a run turn);
+ * and reports (producers must keep it unique within a run turn). Wire-name alias:
+ * the field carries `PipelineConfig.label` — the value is one comparison column's
+ * label (the web UI renders it as a "column"); the `pipeline` field name is a
+ * frozen wire contract and must not be renamed.
  * `agentId` is a stable identity field for cross-system tracing of one generation
  * and is deliberately not an aggregation key.
  */

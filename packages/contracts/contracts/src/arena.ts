@@ -95,7 +95,7 @@ export const PipelineConfigSchema = z.object({
   /** Cross-turn history replay mode; minimal keeps the legacy bare Q/A transcript. */
   history_mode: HistoryModeSchema.default("minimal"),
   prompt_version: z.string().default("v1.0.0"),
-  /** Column display label; display plus per-turn aggregation key, not a stable cross-system identity (use agentId/runId). */
+  /** Column display label; display plus per-turn aggregation key, not a stable cross-system identity (use agentId/runId). Carried by the wire event field named `pipeline` (frozen name; see ArenaEventBase). */
   label: z.string().default(""),
   /**
    * Custom-dimension values for this column (`{ [dimensionId]: optionValue }`).
