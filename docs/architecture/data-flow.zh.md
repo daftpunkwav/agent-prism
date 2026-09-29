@@ -117,6 +117,8 @@ extraction 读取最后一条 thought，否则最后一条 observation。`apps/w
 | `data/memory_episodic.json` 与 `data/memory_semantic.json` | 跨 session 记忆 store | `EpisodicMemory`、`SemanticMemory` |
 | `data/runtime_knobs.json` | 文件级 runtime knob 覆盖 | `RuntimeKnobsStore` |
 | `data/runs/<runId>/<workspace>/` | 每列临时 workspace，重启后重水化 | `WorkspaceRegistry` |
+| `data/runs/<runId>/_traces/` | 每 run 可观测日志，每列一对 JSONL（`<label>.events.jsonl`、`<label>.wire.jsonl`）及 `<workspace>.ws` 标记；仅追加且 fail-open | `RunTraceLogs`（arena-runner），由 `ArenaLogsService` 读回 |
 | `…/.spills/` | 超大 tool 结果与 job 输出 dump | `tool-builtins` spill helper |
 
-所有写入经 `@agentprism/persistence` 原子化：`.tmp` 文件、rename、`.bak` 恢复。
+文档型 store 经 `@agentprism/persistence` 原子写：`.tmp` 文件、rename、`.bak` 恢复。
+session op 日志（`data/sessions.jsonl`）改为追加；重放时跳过并计数截断或损坏的行。

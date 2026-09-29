@@ -157,6 +157,41 @@ them at startup and hot-applies updates through `GET` and `PUT /api/settings/kno
 settings save takes effect without a restart. An absent file keeps the environment
 defaults.
 
+Field metadata (key, range, default) is single-sourced in
+`contracts/src/runtime-knobs.ts` (`RUNTIME_KNOB_FIELDS`). Every accepted write and every
+stored-file load clamps to these ranges; an out-of-range or malformed field falls back to
+the current value instead of failing. The Default column is the static fallback; fields
+with a matching env variable above start from that variable's effective value instead,
+while `selfConsistencyN`, `totWidth`, `crewaiProcess`, and `harnessRetries.*` have no env
+source and always start from the static default. These ranges govern the settings API and
+are checked independently of the env-load ranges in `settings.ts` (for example the
+`agentMaxDelegationDepth` knob accepts 0 while `AGENT_MAX_DELEGATION_DEPTH` requires 1
+or more).
+
+| Field | Group | Range / options | Default |
+|---|---|---|---|
+| `contextWindowMessages` | context | 1–200 | 12 |
+| `contextCharsPerToken` | context | 1–16 | 4 |
+| `contextSummaryMaxChars` | context | 500–100 000 | 4 000 |
+| `contextTokenBudgetChars` | context | 1 000–1 000 000 | 24 000 |
+| `contextTokenBudgetKeepTurns` | context | 0–100 | 6 |
+| `contextToolTailBudgetChars` | context | 500–100 000 | 4 000 |
+| `contextToolTailKeepChars` | context | 100–50 000 | 1 200 |
+| `contextBudgetTokens` | context | 500–200 000 | 6 000 |
+| `contextCheckpointTargetTokens` | context | 200–100 000 | 2 000 |
+| `selfConsistencyN` | reasoning | 2–9 | 5 |
+| `totWidth` | reasoning | 2–5 | 3 |
+| `crewaiProcess` | reasoning | `sequential` \| `hierarchical` | `sequential` |
+| `harnessRetries.verify` | harness | 1–5 | 2 |
+| `harnessRetries.reflect` | harness | 1–5 | 2 |
+| `harnessRetries.selfEvolve` | harness | 1–5 | 2 |
+| `subagentMaxSteps` | tools | 1–100 | 10 |
+| `ralphMaxRounds` | tools | 1–64 | 8 |
+| `mcpFetchTimeoutMs` | tools | 5 000–300 000 | 15 000 |
+| `agentMaxDelegationDepth` | tools | 0–3 | 1 |
+| `llmTimeoutMs` | llm | 10 000–600 000 | 120 000 |
+| `llmMaxRetries` | llm | 0–5 | 2 |
+
 ## Skill and MCP management
 
 The settings page also exposes two managed stores, both hot-applied without a restart.
@@ -184,7 +219,8 @@ Paths are defined in `config/src/paths.ts`.
 | Path | Content | Recovery behavior |
 |---|---|---|
 | `data/provider_config.json` and `.bak` | provider endpoints and settings | a corrupt main file recovers from `.bak`; if still unusable, the `LLM_*` env seed applies |
-| `data/sessions.json` and `.bak` | session ledger `{version:1, sessions:[…]}` | a corrupt main file recovers from `.bak`; stale `active` rows flip to `failed` on load |
+| `data/sessions.json` and `.bak` | session ledger snapshot `{version:1, sessions:[…]}`, compacted from the op log | a corrupt main file recovers from `.bak`; stale `active` rows flip to `failed` on load |
+| `data/sessions.jsonl` | append-only session op log replayed on boot (corrupt lines are skipped and counted) | compacted into the snapshot by `checkpoint()`: on the 30-minute host cadence, on shutdown, and once the log passes its 32 MB size budget |
 | `data/sessions.json.blobs/` | oversized ledger entry texts named `<sessionId>.<seq>.blob.txt`, each at most 128 K characters | per-session purge on delete |
 | `data/builder_sessions.json` and `.bak` | builder session store | atomic-write `.bak` recovery |
 | `data/threads.json` and `.bak` | durable agent threads `{version:1, threads:[…]}` with transcript, pinned config, and workspace link | atomic-write `.bak` recovery, per-item corruption containment, and stale `running` reset to idle on load |
@@ -196,11 +232,13 @@ Paths are defined in `config/src/paths.ts`.
 | `data/skill_settings.json` | disabled skill names (settings API) | read failure degrades to "all skills enabled" |
 | `data/skills/<name>/SKILL.md` | operator-created user skills | deleted skills drop their folder; malformed files are skipped during discovery |
 | `data/runs/<runId>/<workspace>/` | per-column scratch workspaces | rehydrated after restart with `MAX_WORKSPACES` as the cap, `WORKSPACE_TTL_SECONDS` as the TTL, and LRU eviction with in-run protection |
+| `data/runs/<runId>/_traces/` | per-run observability logs, one JSONL pair per column: `<label>.events.jsonl` (raw run events) and `<label>.wire.jsonl` (captured LLM wire records), plus `<workspace>.ws` workspace-run markers | append-only and fail-open: the first append failure warns once and the run continues; read back by the column-logs endpoint |
 | `data/runs/…/.spills/` | tool-result and job output dumps named `spill-*.txt` and `NNNNNN-<jobId>.log` | 20-file rotation |
 
-All JSON writes are atomic through `@agentprism/persistence`, using `.tmp` files,
-renames, a per-path write queue, and a `.bak` copy. A corrupted single session record is
-contained rather than losing the store.
+Writes go through `@agentprism/persistence`. Document stores write atomically: a `.tmp`
+file, a rename, a per-path write queue, and a `.bak` copy. Line-oriented files (the
+session op log) append through a per-path queue instead, and a torn or corrupt line is
+skipped and counted on load rather than losing the store.
 
 ## Frontend configuration
 

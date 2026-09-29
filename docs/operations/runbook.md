@@ -45,9 +45,10 @@ tokens, tools, and per-column verdicts. Cells spend real model calls.
 The full layout table is in [../reference/configuration.md](../reference/configuration.md).
 Operational notes:
 
-- All state is crash-safe by construction: atomic writes with `.tmp` files and renames in
-  a per-path queue, plus `.bak` recovery. A corrupt provider file falls back to the `.env`
-  seed. A corrupt session record is contained rather than fatal.
+- All state is crash-safe by construction: document stores write atomically (`.tmp` file,
+  rename, per-path queue, `.bak` recovery), and the session op log `data/sessions.jsonl`
+  appends with corrupt-line containment on replay. A corrupt provider file falls back to
+  the `.env` seed. A corrupt session record is contained rather than fatal.
 - Sessions left `active` by a killed process flip to `failed` on the next load.
 - Oversized ledger entries live in `data/sessions.json.blobs/`. Deleting a session purges
   its blobs.
@@ -69,6 +70,7 @@ Operational notes:
 | Capability dimension with zero options | startup fails fast for `prompt`, `reasoning`, `context`, `harness`, or `toolset` |
 | Unconfigured `web_search` | the tool fails closed with setup guidance |
 | Ledger write pathology, such as a full disk or a reached cap | warns, and the observed run continues |
+| Uncaught exception or unhandled rejection | the crash handler logs the fault with its stack, runs one bounded emergency flush (2 s watchdog), then exits 1 — crash semantics are preserved, only the durable tail is saved first |
 | SSE through the Next proxy | requires `compress: false`, already set in `next.config.ts`; without it streams buffer until completion |
 
 ## Debugging aids

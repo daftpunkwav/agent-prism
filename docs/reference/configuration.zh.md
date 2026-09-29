@@ -151,6 +151,38 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 `GET` 与 `PUT /api/settings/knobs` 热应用更新，因此保存 settings 无需重启即可生效。
 文件缺失则保留 env 默认值。
 
+字段元数据（key、范围、默认值）单源于 `contracts/src/runtime-knobs.ts`
+（`RUNTIME_KNOB_FIELDS`）。每次被接受的写入与每次存储文件加载都按这些范围钳制；
+越界或畸形字段回退到当前值而非报错。默认列是静态回退值；上方有对应 env 变量的字段
+以该变量的生效值作为起点，而 `selfConsistencyN`、`totWidth`、`crewaiProcess` 与
+`harnessRetries.*` 没有 env 来源，始终以静态默认值起步。此处的范围约束作用于
+settings API，与 `settings.ts` 的 env 加载范围相互独立（例如 `agentMaxDelegationDepth`
+knob 允许 0，而 `AGENT_MAX_DELEGATION_DEPTH` 要求 ≥1）。
+
+| 字段 | 分组 | 范围 / 选项 | 默认 |
+|---|---|---|---|
+| `contextWindowMessages` | context | 1–200 | 12 |
+| `contextCharsPerToken` | context | 1–16 | 4 |
+| `contextSummaryMaxChars` | context | 500–100 000 | 4 000 |
+| `contextTokenBudgetChars` | context | 1 000–1 000 000 | 24 000 |
+| `contextTokenBudgetKeepTurns` | context | 0–100 | 6 |
+| `contextToolTailBudgetChars` | context | 500–100 000 | 4 000 |
+| `contextToolTailKeepChars` | context | 100–50 000 | 1 200 |
+| `contextBudgetTokens` | context | 500–200 000 | 6 000 |
+| `contextCheckpointTargetTokens` | context | 200–100 000 | 2 000 |
+| `selfConsistencyN` | reasoning | 2–9 | 5 |
+| `totWidth` | reasoning | 2–5 | 3 |
+| `crewaiProcess` | reasoning | `sequential` \| `hierarchical` | `sequential` |
+| `harnessRetries.verify` | harness | 1–5 | 2 |
+| `harnessRetries.reflect` | harness | 1–5 | 2 |
+| `harnessRetries.selfEvolve` | harness | 1–5 | 2 |
+| `subagentMaxSteps` | tools | 1–100 | 10 |
+| `ralphMaxRounds` | tools | 1–64 | 8 |
+| `mcpFetchTimeoutMs` | tools | 5 000–300 000 | 15 000 |
+| `agentMaxDelegationDepth` | tools | 0–3 | 1 |
+| `llmTimeoutMs` | llm | 10 000–600 000 | 120 000 |
+| `llmMaxRetries` | llm | 0–5 | 2 |
+
 ## 技能与 MCP 管理
 
 设置页另有两个托管 store，均无需重启即热应用。
@@ -175,7 +207,8 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 | 路径 | 内容 | 恢复行为 |
 |---|---|---|
 | `data/provider_config.json` 与 `.bak` | provider endpoints 与 settings | 主文件损坏则从 `.bak` 恢复；仍不可用则应用 `LLM_*` env 播种 |
-| `data/sessions.json` 与 `.bak` | session 账本 `{version:1, sessions:[…]}` | 主文件损坏则从 `.bak` 恢复；陈旧的 `active` 行在加载时翻转为 `failed` |
+| `data/sessions.json` 与 `.bak` | session 账本快照 `{version:1, sessions:[…]}`，由 op 日志压缩而来 | 主文件损坏则从 `.bak` 恢复；陈旧的 `active` 行在加载时翻转为 `failed` |
+| `data/sessions.jsonl` | 追加式 session op 日志，启动时重放（损坏行跳过并计数） | 由 `checkpoint()` 压缩进快照：每 30 分钟的宿主节奏、关机时，以及日志超过 32 MB 大小预算时 |
 | `data/sessions.json.blobs/` | 超大账本条目文本，命名为 `<sessionId>.<seq>.blob.txt`，每个至多 128 K 字符 | 删除时按 session 清除 |
 | `data/builder_sessions.json` 与 `.bak` | builder session store | 原子写 `.bak` 恢复 |
 | `data/threads.json` 与 `.bak` | 持久 agent threads `{version:1, threads:[…]}`，含 transcript、pinned config、workspace 链接 | 原子写 `.bak` 恢复，逐项损坏遏制，陈旧的 `running` 在加载时重置为 idle |
@@ -187,10 +220,12 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 | `data/skill_settings.json` | 停用技能名单（settings API） | 读取失败降级为“全部技能启用” |
 | `data/skills/<name>/SKILL.md` | 运维创建的自定义技能 | 删除技能时同时清理目录；损坏文件在发现时跳过 |
 | `data/runs/<runId>/<workspace>/` | 每列临时 workspace | 重启后重水化，上限 `MAX_WORKSPACES`，TTL 为 `WORKSPACE_TTL_SECONDS`，带 run 中保护的 LRU 淘汰 |
+| `data/runs/<runId>/_traces/` | 每 run 可观测日志，每列一对 JSONL：`<label>.events.jsonl`（原始 run 事件）与 `<label>.wire.jsonl`（捕获的 LLM wire 记录），另含 `<workspace>.ws` workspace-run 标记 | 仅追加且 fail-open：首次追加失败告警一次，run 继续；由 column-logs 端点读回 |
 | `data/runs/…/.spills/` | tool 结果与 job 输出 dump，命名为 `spill-*.txt` 与 `NNNNNN-<jobId>.log` | 20 文件轮转 |
 
-所有 JSON 写入经 `@agentprism/persistence` 原子化，使用 `.tmp` 文件、rename、
-per-path 写队列与 `.bak` 副本。损坏的单条 session 记录被遏制，而非丢失整个 store。
+写入统一经 `@agentprism/persistence`。文档型 store 原子写：`.tmp` 文件、rename、
+per-path 写队列与 `.bak` 副本。行式文件（session op 日志）经 per-path 队列追加，
+加载时跳过并计数截断或损坏的行，而非丢失整个 store。
 
 ## 前端配置
 

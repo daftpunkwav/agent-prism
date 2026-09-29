@@ -46,8 +46,9 @@ tools 与每列 verdict。cell 会消耗真实模型调用。
 完整布局表见 [../reference/configuration.zh.md](../reference/configuration.zh.md)。
 运维备注：
 
-- 所有状态在构造上即 crash-safe：原子写入，使用 `.tmp` 文件与 rename，配 per-path
-  队列，外加 `.bak` 恢复。损坏的 provider 文件回退到 `.env` 播种。损坏的 session
+- 所有状态在构造上即 crash-safe：文档型 store 原子写入（`.tmp` 文件、rename、
+  per-path 队列、`.bak` 恢复），session op 日志 `data/sessions.jsonl` 以追加写入，
+  重放时遏制损坏行。损坏的 provider 文件回退到 `.env` 播种。损坏的 session
   记录被遏制，而非致命。
 - 被杀死进程遗留为 `active` 的 session 在下次加载时翻转为 `failed`。
 - 超大账本条目位于 `data/sessions.json.blobs/`。删除一个 session 会清除其 blob。
@@ -69,6 +70,7 @@ tools 与每列 verdict。cell 会消耗真实模型调用。
 | 能力 dimension 零选项 | 对 `prompt`、`reasoning`、`context`、`harness`、`toolset` 启动快速失败 |
 | 未配置 `web_search` | tool 失败关闭并给出设置指引 |
 | 账本写入病态，如磁盘满或达上限 | 告警，被观察的 run 继续 |
+| uncaught exception 或 unhandled rejection | 崩溃处理器记录故障与堆栈，执行一次有界紧急 flush（2 秒看门狗），随后 exit 1——保留崩溃语义，仅先保存持久化尾部 |
 | 经 Next proxy 的 SSE | 需要 `compress: false`，已在 `next.config.ts` 设置；否则流会缓冲到完成 |
 
 ## 调试辅助

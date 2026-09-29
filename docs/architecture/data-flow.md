@@ -116,7 +116,9 @@ completes.
 | `data/memory_episodic.json` and `data/memory_semantic.json` | cross-session memory stores | `EpisodicMemory`, `SemanticMemory` |
 | `data/runtime_knobs.json` | file-backed runtime knob overrides | `RuntimeKnobsStore` |
 | `data/runs/<runId>/<workspace>/` | per-column scratch workspaces, rehydrated after restart | `WorkspaceRegistry` |
+| `data/runs/<runId>/_traces/` | per-run observability logs, one JSONL pair per column (`<label>.events.jsonl`, `<label>.wire.jsonl`) plus `<workspace>.ws` markers; append-only and fail-open | `RunTraceLogs` (arena-runner), read back by `ArenaLogsService` |
 | `…/.spills/` | oversized tool-result and job output dumps | `tool-builtins` spill helper |
 
-All writes are atomic through `@agentprism/persistence`: a `.tmp` file, a rename, and
-`.bak` recovery.
+Document stores write atomically through `@agentprism/persistence`: a `.tmp` file, a
+rename, and `.bak` recovery. The session op log (`data/sessions.jsonl`) appends instead;
+its replay skips and counts a torn or corrupt line.
