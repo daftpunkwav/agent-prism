@@ -40,6 +40,19 @@ export class Workspace {
 export const DEFAULT_MAX_WORKSPACES = 32;
 export const DEFAULT_TTL_SECONDS = 3600;
 
+/**
+ * Whether target escapes root. path.relative compares case-insensitively on
+ * win32, so a case-variant spelling of the root (drive letter, directory case)
+ * cannot drift past a raw string-prefix check; "." and ".."-leading relatives
+ * and absolute relatives (sibling on another drive) all count as escapes.
+ * Target EQUAL to root is an escape too: workspace directories must sit
+ * strictly inside the runs root, never on it.
+ */
+function escapesRunsRoot(root: string, target: string): boolean {
+  const rel = path.relative(path.resolve(root), path.resolve(target));
+  return rel === "" || rel.startsWith("..") || path.isAbsolute(rel);
+}
+
 /** Workspace lifecycle management: TTL + LRU eviction + in-run protection. */
 export class WorkspaceRegistry {
   private readonly workspaces = new Map<string, Workspace>();
@@ -144,9 +157,7 @@ export class WorkspaceRegistry {
     const root = path.join(this.runsRoot, runId || "default", name);
     // Containment check is the enforcement here (names are not separately sanitized in create); assert the target stays inside runsRoot (also covers runId escapes).
     // Validate before any eviction: a rejected create must never delete live workspaces.
-    const resolvedRoot = path.resolve(root);
-    const resolvedRunsRoot = path.resolve(this.runsRoot);
-    if (!resolvedRoot.startsWith(resolvedRunsRoot + path.sep)) {
+    if (escapesRunsRoot(this.runsRoot, root)) {
       throw new Error(`Workspace path escapes runs root: ${name}`);
     }
     this.evictExpired();
@@ -188,8 +199,7 @@ export class WorkspaceRegistry {
     const workspace = this.workspaces.get(name);
     if (workspace === undefined) return null;
     const parent = path.dirname(path.resolve(workspace.root));
-    const resolvedRunsRoot = path.resolve(this.runsRoot);
-    if (!parent.startsWith(resolvedRunsRoot + path.sep)) return null;
+    if (escapesRunsRoot(this.runsRoot, parent)) return null;
     return path.basename(parent);
   }
 
@@ -201,9 +211,7 @@ export class WorkspaceRegistry {
   traceDir(runId: string): string {
     if (!isSafeWorkspaceSegment(runId)) throw new Error(`Invalid run id for trace dir: ${runId}`);
     const dir = path.join(this.runsRoot, runId, "_traces");
-    const resolvedDir = path.resolve(dir);
-    const resolvedRunsRoot = path.resolve(this.runsRoot);
-    if (!resolvedDir.startsWith(resolvedRunsRoot + path.sep)) {
+    if (escapesRunsRoot(this.runsRoot, dir)) {
       throw new Error(`Trace dir escapes runs root: ${runId}`);
     }
     mkdirSync(dir, { recursive: true });
@@ -278,12 +286,11 @@ export class WorkspaceRegistry {
     } catch {
       return undefined;
     }
-    const resolvedRunsRoot = path.resolve(this.runsRoot);
     for (const runId of runIds) {
       if (!isSafeWorkspaceSegment(runId)) continue;
       const root = path.join(this.runsRoot, runId, name);
+      if (escapesRunsRoot(this.runsRoot, root)) continue;
       const resolvedRoot = path.resolve(root);
-      if (!resolvedRoot.startsWith(resolvedRunsRoot + path.sep)) continue;
       if (!existsSync(resolvedRoot)) continue;
       try {
         if (!statSync(resolvedRoot).isDirectory()) continue;
@@ -326,11 +333,10 @@ export class WorkspaceRegistry {
     if (source === undefined) {
       throw new Error(`Source workspace does not exist: ${sourceName}`);
     }
-    const resolvedRunsRoot = path.resolve(this.runsRoot);
     // The clone lands beside its source (same run-id grouping); the containment
     // check mirrors create() so a crafted name cannot escape the runs root.
     const cloneRoot = path.join(path.dirname(path.resolve(source.root)), newName);
-    if (!cloneRoot.startsWith(resolvedRunsRoot + path.sep)) {
+    if (escapesRunsRoot(this.runsRoot, cloneRoot)) {
       throw new Error(`Workspace path escapes runs root: ${newName}`);
     }
     if (this.workspaces.has(newName) || existsSync(cloneRoot)) {

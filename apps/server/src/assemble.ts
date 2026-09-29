@@ -118,7 +118,7 @@ import type {
   ProviderCommand,
   ReportPublisher,
 } from "@agentprism/contracts";
-import { harnessRetryCaps, isLoopbackHost } from "@agentprism/contracts";
+import { harnessRetryCaps, isLoopbackHost, isSafeWorkspaceSegment } from "@agentprism/contracts";
 
 export interface RuntimeComponents {
   settings: Settings;
@@ -345,8 +345,17 @@ export async function assemble(): Promise<RuntimeComponents> {
     flushDebounceMs: settings.fileFlushDebounceMs,
   });
   // Per-session observability journal (JSONL): full execution trail on disk.
+  // The open callback re-checks the id as a single path-safe segment: journal
+  // routes only reach existing ids, but the persisted store schema admits any
+  // non-empty string, so a hand-crafted sessions file must not turn a session
+  // id into a path traversal under the traces directory (fail closed, loudly).
   const builderTraceStore = new SessionTraceStore({
-    open: (sessionId) => new NodeAppendFile(path.join(BUILDER_TRACES_DIR, `${sessionId}.jsonl`)),
+    open: (sessionId) => {
+      if (!isSafeWorkspaceSegment(sessionId)) {
+        throw new Error(`builder trace id is not a safe path segment: ${JSON.stringify(sessionId)}`);
+      }
+      return new NodeAppendFile(path.join(BUILDER_TRACES_DIR, `${sessionId}.jsonl`));
+    },
     flushDebounceMs: settings.fileFlushDebounceMs,
   });
   // Append-only backend: each mutation appends a line instead of rewriting the whole
