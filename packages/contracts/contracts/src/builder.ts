@@ -116,10 +116,14 @@ export const BuilderCompositionSchema = z.object({
    * Custom-dimension values (`{ [dimensionId]: optionValue }`), one block per
    * registered dimension. Persisted with the session and carried into the run's
    * PipelineConfig; validation against the live registry happens at configure
-   * time (builder service) and again at run assembly. Bounds are the descriptor
-   * bounds, so a registered dimension's values always fit.
+   * time (builder service) and again at run assembly. Keys carry the same grammar
+   * the registry enforces at registration time (CUSTOM_DIMENSION_ID_RE), matching
+   * the `custom:<id>` block refs above. Bounds are the descriptor bounds, so a
+   * registered dimension's values always fit.
    */
-  custom: z.record(z.string().max(CUSTOM_DIMENSION_ID_MAX), z.string().max(CUSTOM_DIMENSION_VALUE_MAX)).default({}),
+  custom: z
+    .record(z.string().max(CUSTOM_DIMENSION_ID_MAX).regex(CUSTOM_DIMENSION_ID_RE), z.string().max(CUSTOM_DIMENSION_VALUE_MAX))
+    .default({}),
 });
 export type BuilderComposition = z.infer<typeof BuilderCompositionSchema>;
 export type BuilderCompositionInput = z.input<typeof BuilderCompositionSchema>;

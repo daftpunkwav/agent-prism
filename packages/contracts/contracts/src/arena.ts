@@ -28,7 +28,7 @@ import {
   ToolsetIdSchema,
 } from "./enums.js";
 import { PipelineMetricsSchema, TokenStatsSchema } from "./events.js";
-import { CUSTOM_DIMENSION_ID_MAX, CUSTOM_DIMENSION_VALUE_MAX } from "./custom-dimension.js";
+import { CUSTOM_DIMENSION_ID_MAX, CUSTOM_DIMENSION_ID_RE, CUSTOM_DIMENSION_VALUE_MAX } from "./custom-dimension.js";
 import { ToolRoundSchema, type ToolRound } from "./history-mode.js";
 
 /** Total character budget over chat history plus the current question (one shared source for backend validation and frontend trimming). */
@@ -101,10 +101,15 @@ export const PipelineConfigSchema = z.object({
    * Custom-dimension values for this column (`{ [dimensionId]: optionValue }`).
    * Written by the routing/baseline path and by Builder compositions; consumed by
    * run assembly, which activates each registered dimension's hooks. An id with no
-   * registered dimension fails loud there — never a silently inert column. Bounds
-   * are the descriptor bounds, so a registered dimension's values always fit.
+   * registered dimension fails loud there — never a silently inert column. Keys
+   * carry the same grammar the registry enforces at registration time
+   * (CUSTOM_DIMENSION_ID_RE), so a record a legal producer could not have written
+   * is rejected here at the boundary instead of mid-run. Bounds are the descriptor
+   * bounds, so a registered dimension's values always fit.
    */
-  custom: z.record(z.string().max(CUSTOM_DIMENSION_ID_MAX), z.string().max(CUSTOM_DIMENSION_VALUE_MAX)).default({}),
+  custom: z
+    .record(z.string().max(CUSTOM_DIMENSION_ID_MAX).regex(CUSTOM_DIMENSION_ID_RE), z.string().max(CUSTOM_DIMENSION_VALUE_MAX))
+    .default({}),
 });
 export type PipelineConfig = z.infer<typeof PipelineConfigSchema>;
 
@@ -152,9 +157,13 @@ export const BaselineOverridesSchema = z.object({
    * Custom-dimension values pinned for this baseline (`{ [dimensionId]: value }`).
    * The baseline panel exposes each registered dimension as a `custom.<id>` field;
    * resolveBaselineOverrides validates the ids/values against the live registry and
-   * rejects unknown ones loudly. Bounds are the descriptor bounds.
+   * rejects unknown ones loudly. Keys carry the registry's id grammar
+   * (CUSTOM_DIMENSION_ID_RE), so a record no registered dimension could produce is
+   * rejected at the request boundary. Bounds are the descriptor bounds.
    */
-  custom: z.record(z.string().max(CUSTOM_DIMENSION_ID_MAX), z.string().max(CUSTOM_DIMENSION_VALUE_MAX)).nullish(),
+  custom: z
+    .record(z.string().max(CUSTOM_DIMENSION_ID_MAX).regex(CUSTOM_DIMENSION_ID_RE), z.string().max(CUSTOM_DIMENSION_VALUE_MAX))
+    .nullish(),
 });
 export type BaselineOverridesInput = z.input<typeof BaselineOverridesSchema>;
 export type BaselineOverrides = z.infer<typeof BaselineOverridesSchema>;
