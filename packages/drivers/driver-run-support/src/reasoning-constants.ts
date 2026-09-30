@@ -8,7 +8,15 @@
  *
  * Shared by the native state machine and the langgraph graph: keyword list is
  * shared; round caps differ (native caps reflexion rounds at 2, langgraph caps by max_steps).
+ *
+ * The reasoning-width defaults are single-sourced in contracts (runtime-knobs)
+ * and re-exported here under the driver-side name, so the settings-UI knob
+ * default and the env fallback below cannot drift.
  */
+
+import { SELF_CONSISTENCY_N_DEFAULT, TOT_WIDTH_DEFAULT } from "@agentprism/contracts";
+
+export { TOT_WIDTH_DEFAULT, SELF_CONSISTENCY_N_DEFAULT as SELF_CONSISTENCY_ATTEMPTS_DEFAULT };
 
 export const REFLEXION_RETRY_KEYWORDS: readonly string[] = [
   "insufficient",
@@ -18,12 +26,6 @@ export const REFLEXION_RETRY_KEYWORDS: readonly string[] = [
   "error",
   "redo",
 ];
-
-/** Default ToT branching width: candidate plans generated and scored per expansion. */
-export const TOT_WIDTH_DEFAULT = 3;
-
-/** Default self-consistency attempt count (each attempt is a full react loop). */
-export const SELF_CONSISTENCY_ATTEMPTS_DEFAULT = 5;
 
 /** Reads an integer env knob; non-numeric or absent values fall back, out-of-range clamps. */
 function intKnob(
@@ -52,7 +54,7 @@ export function totWidth(env: NodeJS.ProcessEnv = process.env): number {
  * default 5). Model calls scale with the attempt count.
  */
 export function selfConsistencyAttempts(env: NodeJS.ProcessEnv = process.env): number {
-  return intKnob(env, "ARENA_SELF_CONSISTENCY_N", SELF_CONSISTENCY_ATTEMPTS_DEFAULT, 2, 9);
+  return intKnob(env, "ARENA_SELF_CONSISTENCY_N", SELF_CONSISTENCY_N_DEFAULT, 2, 9);
 }
 
 /**

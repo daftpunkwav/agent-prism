@@ -6,12 +6,20 @@
  * - Define the RuntimeKnobs shape (context budgets, reasoning widths, harness retries)
  * - Provide the settings-UI field metadata (group/kind/range/options/defaults)
  *
- * Defaults must stay in sync with the driver-side fallbacks (driver-run-support
- * reasoning-constants) and the harness strategy fallbacks; env-derived defaults
- * live in config (defaultRuntimeKnobs over the Settings reads).
+ * Reasoning-width defaults are exported here and reused by the driver-side
+ * fallbacks (driver-run-support reasoning-constants), so knob reset and driver
+ * fallback cannot drift. The remaining defaults must stay in sync with the
+ * harness strategy fallbacks; env-derived defaults live in config
+ * (defaultRuntimeKnobs over the Settings reads).
  */
 
 import type { HarnessLevel } from "./enums.js";
+
+/** Default ToT branching width: one source for the settings-UI default and the driver-side env fallback. */
+export const TOT_WIDTH_DEFAULT = 3;
+
+/** Default self-consistency attempt count (each attempt is a full react loop). */
+export const SELF_CONSISTENCY_N_DEFAULT = 5;
 
 /** Retry caps per harness level (overrides HARNESS_MAX_RETRIES when present). */
 export interface HarnessRetriesKnobs {
@@ -81,8 +89,8 @@ export const RUNTIME_KNOB_FIELDS: readonly RuntimeKnobFieldMeta[] = [
   { key: "contextToolTailKeepChars", group: "context", kind: "number", min: 100, max: 50_000, step: 50, default: 1200 },
   { key: "contextBudgetTokens", group: "context", kind: "number", min: 500, max: 200_000, step: 100, default: 6000 },
   { key: "contextCheckpointTargetTokens", group: "context", kind: "number", min: 200, max: 100_000, step: 100, default: 2000 },
-  { key: "selfConsistencyN", group: "reasoning", kind: "number", min: 2, max: 9, step: 1, default: 5 },
-  { key: "totWidth", group: "reasoning", kind: "number", min: 2, max: 5, step: 1, default: 3 },
+  { key: "selfConsistencyN", group: "reasoning", kind: "number", min: 2, max: 9, step: 1, default: SELF_CONSISTENCY_N_DEFAULT },
+  { key: "totWidth", group: "reasoning", kind: "number", min: 2, max: 5, step: 1, default: TOT_WIDTH_DEFAULT },
   { key: "crewaiProcess", group: "reasoning", kind: "select", options: ["sequential", "hierarchical"], default: "sequential" },
   { key: "harnessRetries.verify", group: "harness", kind: "number", min: HARNESS_RETRIES_MIN, max: HARNESS_RETRIES_MAX, step: 1, default: HARNESS_RETRIES_DEFAULT },
   { key: "harnessRetries.reflect", group: "harness", kind: "number", min: HARNESS_RETRIES_MIN, max: HARNESS_RETRIES_MAX, step: 1, default: HARNESS_RETRIES_DEFAULT },
@@ -113,8 +121,8 @@ export function staticDefaultRuntimeKnobs(): RuntimeKnobs {
     contextToolTailKeepChars: 1200,
     contextBudgetTokens: 6000,
     contextCheckpointTargetTokens: 2000,
-    selfConsistencyN: 5,
-    totWidth: 3,
+    selfConsistencyN: SELF_CONSISTENCY_N_DEFAULT,
+    totWidth: TOT_WIDTH_DEFAULT,
     crewaiProcess: "sequential",
     harnessRetries: {
       verify: HARNESS_RETRIES_DEFAULT,

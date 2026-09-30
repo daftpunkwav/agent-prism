@@ -26,7 +26,7 @@ import {
 } from "@agentprism/contracts";
 import { getTemplate, listCustomDimensionRows, listTemplates, type CustomDimensionRow, type DimensionRouter } from "@agentprism/arena-dimensions";
 import { outlineDigest, outlineTurns } from "@agentprism/session-outline";
-import type { ArenaRunner } from "@agentprism/arena-runner";
+import { MAX_PIPELINE_EVENTS, type ArenaRunner } from "@agentprism/arena-runner";
 import { AppError } from "./errors.js";
 import type { SessionService } from "./session-service.js";
 
@@ -45,11 +45,12 @@ const OUTLINE_TEXT_CAP = 1000;
 /**
  * How many events the outline fold keeps per run. The outline only needs the
  * per-turn draft (head + newest tail) and the verdicts, so a long run must not
- * hold its whole stream in memory for a digest. Retention matches the runner's
- * per-pipeline bucket default so both ends of the run agree on what survives;
- * anything dropped is counted and reported in the digest.
+ * hold its whole stream in memory for a digest. Value single-sourced from the
+ * runner's per-pipeline bucket default (MAX_PIPELINE_EVENTS) so both ends of
+ * the run agree on what survives; anything dropped is counted and reported in
+ * the digest.
  */
-const OUTLINE_EVENT_RETENTION = 5_000;
+const OUTLINE_EVENT_RETENTION = MAX_PIPELINE_EVENTS;
 
 /**
  * Bounded shallow copy for outline folding: caps the text fields the outline
