@@ -46,6 +46,41 @@ describe("ProviderConfigStore.load", () => {
       warn.mockRestore();
     }
   });
+
+  it("retries once when a read fails transiently and uses the recovered file", () => {
+    let calls = 0;
+    const store = storeWith({
+      read: <T>() => {
+        calls += 1;
+        // First attempt fails (AV lock / rename-in-flight), retry sees a healthy file.
+        if (calls === 1) throw new Error("sharing violation");
+        return { provider_name: "file-provider", model: "file-model" } as T;
+      },
+      write: async () => {},
+    });
+    const config = store.load();
+    expect(calls).toBe(2);
+    expect(config.provider_name).toBe("file-provider");
+    expect(config.model).toBe("file-model");
+  });
+
+  it("reads the file exactly twice before falling back to the seed", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      let calls = 0;
+      const store = storeWith({
+        read: () => {
+          calls += 1;
+          throw new Error("disk gone");
+        },
+        write: async () => {},
+      });
+      expect(store.load().provider_name).toBe("seed-provider");
+      expect(calls).toBe(2);
+    } finally {
+      warn.mockRestore();
+    }
+  });
 });
 
 describe("ProviderConfigStore.save", () => {

@@ -22,6 +22,24 @@ export interface ProviderStoreOptions {
 }
 
 type ChangeListener = () => void;
+
+/** Delay before the single read retry: AV scan locks and a save's rename-in-flight release a Windows file within tens of ms. */
+const READ_RETRY_DELAY_MS = 50;
+
+/**
+ * Blocking nap before the sync read retry (server-side Node only; load() is a
+ * synchronous API so the wait cannot be awaited). Atomics.wait is legal on the
+ * Node main thread; an environment that forbids blocking waits skips the nap
+ * and the retry below runs immediately instead.
+ */
+function napBeforeRetry(ms: number): void {
+  try {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  } catch {
+    // Blocking wait unavailable: retry immediately rather than skipping it.
+  }
+}
+
 /** Provider config repository: file load with .env-seed fallback, atomic saves, change events. */
 export class ProviderConfigStore {
   private readonly file: JsonFile;
@@ -35,14 +53,30 @@ export class ProviderConfigStore {
     this.idGenerator = options.idGenerator;
   }
 
-  /** Loads from disk; falls back to the .env seed config when the file is missing/corrupted/structurally illegal. */
+  /**
+   * Loads from disk; falls back to the .env seed config when the file is missing/corrupted/structurally illegal.
+   *
+   * Two failure classes stay distinguishable: a missing file folds into null
+   * (seed fallback is the documented first-boot path), while a thrown read gets
+   * exactly one bounded retry before the fallback — on Windows most read faults
+   * here are transient (AV scan lock, the rename of a concurrent save), and
+   * falling back on a healthy file would swap every persisted endpoint id out
+   * from under saved compositions, which then all surface as "unknown block"
+   * with no visible cause. A self-healed retry stays silent: logging it would
+   * spam the server log once per request in AV-heavy environments, and the
+   * caller-visible config is already correct.
+   */
   load(): ProviderConfig {
     let raw: unknown = null;
     try {
-      // JsonFile.read already folds a missing file into null; other read/parse errors propagate — leave a trace then fall back
-      raw = this.file.read<unknown>();
+      try {
+        raw = this.file.read<unknown>();
+      } catch {
+        napBeforeRetry(READ_RETRY_DELAY_MS);
+        raw = this.file.read<unknown>();
+      }
     } catch (error) {
-      console.warn(`[providers] Config file read failed; falling back to seed: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(`[providers] Config file read failed (retry exhausted); falling back to seed: ${error instanceof Error ? error.message : String(error)}`);
       raw = null;
     }
     if (raw === null || raw === undefined) {
