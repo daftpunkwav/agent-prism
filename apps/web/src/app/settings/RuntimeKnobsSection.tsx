@@ -170,6 +170,7 @@ export function RuntimeKnobsSection({ onFlash }: { onFlash(message: string): voi
                           min={meta.min}
                           max={meta.max}
                           value={Number(draft[meta.key] ?? meta.default)}
+                          invalidMessage={t("settings.runtime.invalidNumber")}
                           onChange={(value) => setDraft((d) => ({ ...d, [meta.key]: value }))}
                         />
                         <button

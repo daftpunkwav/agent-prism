@@ -93,6 +93,7 @@ export const settings = {
     contextWindow: "上下文窗口",
     maxInput: "最大输入",
     maxOutput: "最大输出（能力）",
+    invalidNumber: "请输入有效且在允许范围内的数字",
     thinkingCapable: "支持思考（extended thinking / reasoning）",
     imageInput: "支持图片输入",
     videoInput: "支持视频输入",
@@ -111,6 +112,7 @@ export const settings = {
     title: "共享解码默认（Arena 基线种子）",
     desc: "对比多模型时各列温度 / Top P / 生成上限与 Arena 基线一致；此处仅作默认种子。",
     maxOutput: "基线最大输出",
+    invalidNumber: "请输入有效且在允许范围内的数字",
     notes: "全局备注（可选）",
     notesPlaceholder: "例如：多厂实验台备忘",
   },
@@ -208,6 +210,7 @@ export const settings = {
     saved: "运行参数已保存并生效",
     saveFailed: "运行参数保存失败",
     resetTitle: "恢复默认值",
+    invalidNumber: "请输入有效且在允许范围内的数字",
     fields: {
       contextWindowMessages: "滑动窗口保留消息条数",
       contextCharsPerToken: "每 Token 字符估算",

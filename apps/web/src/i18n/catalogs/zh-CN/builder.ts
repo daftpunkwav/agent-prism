@@ -57,6 +57,7 @@ export const builder = {
   endpointDefault: "默认接入点",
   reserved: "预留",
   claudeSdkNeedsAnthropic: "Claude Agent SDK 直连端点,仅支持 anthropic_messages 格式的接入点;请切换接入点",
+  invalidNumber: "请输入有效且在允许范围内的数字",
   // chat
   chatPlaceholder: "给 Agent 下达任务…（/compact 压缩历史）",
   attach: {
