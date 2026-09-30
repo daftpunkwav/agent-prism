@@ -106,6 +106,34 @@ describe("resolveBaselineOverrides endpoint/model resolution", () => {
     expect(config.thinking_capable).toBe(false);
   });
 
+  it("unpinned fallback resolves the first enabled endpoint, never a disabled one", () => {
+    // No synced baseline default (raw catalog): the unpinned column follows the
+    // shared default-endpoint rule (contracts) instead of raw endpoints[0].
+    const provider = {
+      endpoints: [makeEndpoint("ep-1", "gpt-x"), makeEndpoint("ep-2", "standby-model")].map(
+        (endpoint, index) => ({ ...endpoint, enabled: index !== 0 }),
+      ),
+      default_endpoint_id: "ep-1",
+      temperature: 0.7,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      max_output_tokens: 2048,
+    } as unknown as ProviderConfig;
+    const lookup: ProviderLookup = {
+      load: () => provider,
+      syncEndpointCatalog: () => {},
+      lookupEndpoint: (id: string) => provider.endpoints.find((endpoint) => endpoint.id === id),
+      listEndpoints: () => provider.endpoints,
+    };
+    const config = buildPipelineBase(
+      { provider, providerLookup: lookup, dimensionCatalog: new DimensionCatalog() },
+      {},
+    );
+    expect(config.endpoint_id).toBe("ep-2");
+    expect(config.model_id).toBe("standby-model");
+  });
+
   it("accepts approval_mode as a baseline-only control field", () => {
     const { provider, lookup, catalog } = makeDeps();
     const resolved = resolveBaselineOverrides("prompt", { approval_mode: "unless_trusted" }, { provider, providerLookup: lookup, dimensionCatalog: catalog });

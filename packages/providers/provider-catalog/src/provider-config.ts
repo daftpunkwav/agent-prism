@@ -5,13 +5,19 @@
  * Responsibilities:
  * - Parse and normalize stored provider config
  * - Mask API keys in the public view
- * - Resolve the default endpoint and inherit empty keys by id or fingerprint
+ * - Inherit empty keys by id or fingerprint (the default-endpoint rule itself
+ *   lives in contracts/provider-types and is re-exported here)
  */
 
 import type { LlmEnvSeed } from "@agentprism/config";
 import type { IdGenerator, LlmEndpoint, LlmEndpointUpdateInput, ProviderConfig, ProviderConfigPublic } from "@agentprism/contracts";
 import { DEFAULT_WEBSITE_URL, DECODE_FIELD_RANGES, MAX_ENDPOINTS } from "@agentprism/contracts";
 import { CREDENTIAL_REFERENCE_PATTERN, connectionFingerprint, normalizeModelIds, parseLlmEndpoint } from "./endpoints.js";
+
+// The default-endpoint rule is single-sourced in contracts (provider-types) so the
+// palette marker, the arena baseline projection, and runtime model resolution share
+// one semantic; this barrel keeps the established provider-catalog import path.
+export { resolveDefaultEndpoint } from "@agentprism/contracts";
 
 function clampDecodeValue(value: unknown, min: number, max: number, fallback: number): number {
   // An empty string is a missing value, not zero (Number("") === 0 would otherwise
@@ -232,13 +238,6 @@ export function toPublicProviderConfig(config: ProviderConfig): ProviderConfigPu
     context_window: config.context_window,
     max_input_tokens: config.max_input_tokens,
   };
-}
-
-/** Finds the default endpoint; falls back to the first one. */
-export function resolveDefaultEndpoint(config: ProviderConfig): LlmEndpoint | undefined {
-  return (
-    config.endpoints.find((endpoint) => endpoint.id === config.default_endpoint_id) ?? config.endpoints[0]
-  );
 }
 
 /**

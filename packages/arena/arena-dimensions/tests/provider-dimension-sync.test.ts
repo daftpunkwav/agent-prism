@@ -80,6 +80,22 @@ describe("model dimension option label uniqueness (pipeline aggregate-key contra
     expect(values).not.toContain("ep-2");
   });
 
+  it("a disabled stored default moves the default marker and baseline default to the first enabled endpoint", () => {
+    // The shared default-endpoint rule (contracts): labelling or defaulting the
+    // model dimension to a disabled endpoint would pin every unpinned arena run
+    // to an endpoint model construction refuses.
+    const sync = makeSync([
+      makeEndpoint("ep-1", { label: "primary", enabled: false }),
+      makeEndpoint("ep-2", { label: "standby" }),
+    ], "ep-1");
+    sync.syncModelOptionsFromProvider();
+    const options = sync.catalog.dimensionOptions("model");
+    expect(options.find((option) => option.value === "ep-2")?.label).toContain("current");
+    expect(options.find((option) => option.value === "ep-1")).toBeUndefined();
+    expect(sync.catalog.defaultBaseValue("endpoint_id")).toBe("ep-2");
+    expect(sync.catalog.defaultBaseValue("model_id")).toBe("gpt-x");
+  });
+
   it("same-name empty-label endpoints outside the default are disambiguated (locks the true-duplicate case)", () => {
     // Old impl (no disambiguation) projected two identical "gpt-x" here; events/reports silently merged by label —
     // the default item's "(current)" suffix alone cannot lock this regression; use non-default duplicates.

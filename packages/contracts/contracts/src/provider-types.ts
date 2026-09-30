@@ -1,9 +1,10 @@
 /**
  * @file provider-types
- * @description Provider data contracts: endpoints, config, thinking-level resolution.
+ * @description Provider data contracts: endpoints, config, resolution rules.
  *
  * Responsibilities:
  * - Define endpoint entities and provider config with decode defaults
+ * - Define the effective default-endpoint rule (enabled endpoints only)
  * - Define the effective thinking-level rule (endpoint overrides top-level)
  */
 
@@ -66,6 +67,23 @@ export interface ProviderConfig {
   models: string[];
   context_window: number;
   max_input_tokens: number;
+}
+
+/**
+ * The endpoint an empty endpoint_id resolves to: the stored default while it is
+ * still enabled, else the first enabled endpoint. Disabled endpoints are a
+ * settings-side off switch, so they neither anchor the default nor receive
+ * fallback traffic — every surface that names a default (palette marker, arena
+ * baseline defaults, runtime model resolution) must call this one function so
+ * display and execution cannot disagree. When nothing is enabled the stored
+ * default returns (possibly disabled), keeping the pinned-endpoint fail-loud
+ * path at model construction intact.
+ */
+export function resolveDefaultEndpoint(config: ProviderConfig): LlmEndpoint | undefined {
+  const enabled = config.endpoints.filter((endpoint) => endpoint.enabled !== false);
+  return (
+    enabled.find((endpoint) => endpoint.id === config.default_endpoint_id) ?? enabled[0] ?? config.endpoints[0]
+  );
 }
 
 /**

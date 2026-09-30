@@ -11,7 +11,7 @@
  */
 
 import type { EndpointThinkingAxes, LlmEndpoint, ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { customFieldKey, MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, TEMPERATURE_OPTIONS, TOP_P_OPTIONS } from "@agentprism/contracts";
+import { customFieldKey, MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, resolveDefaultEndpoint, TEMPERATURE_OPTIONS, TOP_P_OPTIONS } from "@agentprism/contracts";
 import { customDimension, customDimensionDefault } from "@agentprism/harness";
 import { currentEndpointLabel, DimensionCatalog, type DimensionOptionTriple } from "@agentprism/dimensions";
 import { snapIntToOptions, snapToOptions } from "./field-values.js";
@@ -148,9 +148,12 @@ export class ProviderDimensionSync {
     this.providerLookup.syncEndpointCatalog(provider);
     // Disabled endpoints are a settings-side off switch: they disappear from the
     // model dimension options while their ids keep resolving (a run pinning one
-    // fails loud at model construction, not silently here).
+    // fails loud at model construction, not silently here). The default follows
+    // the shared default-endpoint rule (contracts): a disabled stored default
+    // must not leave the catalog defaulting to (and labelling around) an
+    // endpoint every run would refuse.
     const endpoints = provider.endpoints.filter((endpoint) => endpoint.enabled !== false);
-    const defaultId = provider.default_endpoint_id || endpoints[0]?.id || "";
+    const defaultId = resolveDefaultEndpoint(provider)?.id ?? "";
     // Column display labels are the pipeline aggregation key (the events contract requires
     // producers to keep them unique): a non-default endpoint's label defaults to its model
     // name, so same-named models/labels would produce duplicate labels and silently merge

@@ -9,7 +9,7 @@
  */
 
 import type { BaselineOverrides, LlmEndpoint, PipelineConfig, ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { dimensionFieldName, customFieldDimension } from "@agentprism/contracts";
+import { dimensionFieldName, customFieldDimension, resolveDefaultEndpoint } from "@agentprism/contracts";
 import {
   effectiveThinkingLevel,
   MAX_OUTPUT_TOKENS_OPTIONS,
@@ -200,7 +200,10 @@ export function buildPipelineBase(
     if (requestedEndpointId !== undefined && requestedEndpointId !== "") {
       throw new Error(`Baseline endpoint_id "${requestedEndpointId}" has no matching endpoint`);
     }
-    endpoint = provider.endpoints[0];
+    // Unpinned column with no synced baseline default: fall back to the shared
+    // default-endpoint rule (contracts) so a disabled endpoint never receives
+    // traffic here either (model construction would refuse it anyway).
+    endpoint = resolveDefaultEndpoint(provider);
   }
   if (endpoint === undefined) {
     throw new Error("No endpoints configured");

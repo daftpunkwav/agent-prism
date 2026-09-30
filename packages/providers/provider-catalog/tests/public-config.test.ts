@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
 import type { LlmEndpoint, ProviderConfig } from "@agentprism/contracts";
 import { resolveDefaultEndpoint, toPublicProviderConfig } from "../src/provider-config.js";
 
-function endpoint(id: string, apiKey: string): LlmEndpoint {
-  return { id, label: id, api_key: apiKey } as LlmEndpoint;
+function endpoint(id: string, apiKey: string, enabled = true): LlmEndpoint {
+  return { id, label: id, api_key: apiKey, enabled } as LlmEndpoint;
 }
 
 function config(): ProviderConfig {
@@ -52,5 +52,20 @@ describe("resolveDefaultEndpoint", () => {
     expect(resolveDefaultEndpoint(full)?.id).toBe("a");
     expect(resolveDefaultEndpoint({ ...full, default_endpoint_id: "ghost" })?.id).toBe("a");
     expect(resolveDefaultEndpoint({ ...full, endpoints: [] })).toBeUndefined();
+  });
+
+  it("a disabled stored default falls back to the first enabled endpoint (shared contracts rule)", () => {
+    const disabledDefault = {
+      ...config(),
+      endpoints: [endpoint("a", "sk-1234567890", false), endpoint("c", "")],
+      default_endpoint_id: "a",
+    };
+    expect(resolveDefaultEndpoint(disabledDefault)?.id).toBe("c");
+    // Nothing enabled keeps the stored default so the pinned fail-loud path stays.
+    const allDisabled = {
+      ...config(),
+      endpoints: [endpoint("a", "sk-1234567890", false), endpoint("b", "", false)],
+    };
+    expect(resolveDefaultEndpoint(allDisabled)?.id).toBe("a");
   });
 });

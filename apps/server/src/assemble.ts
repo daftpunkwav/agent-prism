@@ -332,7 +332,11 @@ export async function assemble(): Promise<RuntimeComponents> {
   };
   const builderEndpoints = (): BuilderEndpointBlock[] => {
     const provider = providerStore.load();
-    const defaultId = provider.default_endpoint_id;
+    // The marker follows the shared default-endpoint rule (contracts): the block
+    // an empty endpoint_id resolves to at runtime. Marking the raw stored id
+    // would leave the palette with no default at all once that endpoint is
+    // disabled in settings, while turns kept resolving (and failing) on it.
+    const defaultId = resolveDefaultEndpoint(provider)?.id;
     // Disabled endpoints are a settings-side off switch (arena parity): the
     // palette must not offer them. A persisted composition pinning one keeps
     // failing loud at model construction ("disabled in settings").
