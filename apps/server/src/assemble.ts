@@ -333,14 +333,19 @@ export async function assemble(): Promise<RuntimeComponents> {
   const builderEndpoints = (): BuilderEndpointBlock[] => {
     const provider = providerStore.load();
     const defaultId = provider.default_endpoint_id;
-    return toPublicProviderConfig(provider).endpoints.map((endpoint) => ({
-      id: endpoint.id,
-      name: endpoint.label !== "" ? endpoint.label : endpoint.provider_name !== "" ? endpoint.provider_name : endpoint.id,
-      model: endpoint.model,
-      api_format: endpoint.api_format,
-      thinking_capable: endpoint.thinking_capable,
-      default: endpoint.id === defaultId,
-    }));
+    // Disabled endpoints are a settings-side off switch (arena parity): the
+    // palette must not offer them. A persisted composition pinning one keeps
+    // failing loud at model construction ("disabled in settings").
+    return toPublicProviderConfig(provider)
+      .endpoints.filter((endpoint) => endpoint.enabled !== false)
+      .map((endpoint) => ({
+        id: endpoint.id,
+        name: endpoint.label !== "" ? endpoint.label : endpoint.provider_name !== "" ? endpoint.provider_name : endpoint.id,
+        model: endpoint.model,
+        api_format: endpoint.api_format,
+        thinking_capable: endpoint.thinking_capable,
+        default: endpoint.id === defaultId,
+      }));
   };
   const builderStore = new BuilderSessionStore({
     file: new AtomicJsonFile(BUILDER_SESSIONS_PATH),

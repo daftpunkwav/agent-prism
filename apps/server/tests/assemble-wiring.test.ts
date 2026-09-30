@@ -219,6 +219,82 @@ describe("assemble() route wiring", () => {
   );
 
   it(
+    "hides disabled endpoints from the builder palette and gates claude sdk server-side",
+    { timeout: COMPOSITION_TIMEOUT },
+    async () => {
+      const { assemble } = await import("../src/assemble.js");
+      const { app } = await assemble();
+
+      const seeded = await app.request("/api/settings/provider", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoints: [
+            {
+              id: "ep-live",
+              label: "Live anthropic",
+              provider_name: "probe",
+              api_key: "",
+              base_url: "https://live.example.com/v1",
+              api_format: "anthropic_messages",
+              model: "probe-model",
+            },
+            {
+              id: "ep-off",
+              label: "Disabled openai",
+              provider_name: "probe",
+              api_key: "",
+              base_url: "https://off.example.com/v1",
+              api_format: "openai_chat",
+              model: "probe-model",
+              enabled: false,
+            },
+            {
+              id: "ep-openai",
+              label: "Live openai",
+              provider_name: "probe",
+              api_key: "",
+              base_url: "https://openai.example.com/v1",
+              api_format: "openai_chat",
+              model: "probe-model",
+            },
+          ],
+        }),
+      });
+      expect(seeded.status).toBe(200);
+
+      // The settings view keeps every endpoint (the operator manages the
+      // disabled one there); the builder palette drops the disabled one.
+      const providerView = (await (await app.request("/api/settings/provider")).json()) as {
+        endpoints: Array<Record<string, unknown>>;
+      };
+      expect(providerView.endpoints.map((endpoint) => endpoint["id"]).sort()).toEqual(["ep-live", "ep-off", "ep-openai"]);
+
+      const catalog = (await (await app.request("/api/builder/catalog")).json()) as {
+        endpoints: Array<Record<string, unknown>>;
+      };
+      expect(catalog.endpoints.map((endpoint) => endpoint["id"]).sort()).toEqual(["ep-live", "ep-openai"]);
+
+      // The claude sdk ↔ anthropic_messages gate rejects at configure time
+      // (422) instead of surfacing as a mid-run driver failure.
+      const create = async (body: Record<string, unknown>) =>
+        app.request("/api/builder/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "gate probe", composition: body }),
+        });
+      expect((await create({ framework: "claude_agent_sdk", endpoint_id: "ep-live" })).status).toBe(200);
+      const offFormat = await create({ framework: "claude_agent_sdk", endpoint_id: "ep-openai" });
+      expect(offFormat.status).toBe(422);
+      expect(((await offFormat.json()) as { detail?: string }).detail).toContain("anthropic_messages");
+      // A disabled endpoint id is rejected at configure time too.
+      const disabled = await create({ framework: "native", endpoint_id: "ep-off" });
+      expect(disabled.status).toBe(422);
+      expect(((await disabled.json()) as { detail?: string }).detail).toContain("ep-off");
+    },
+  );
+
+  it(
     "keeps operator files when deleting a user skill directory",
     { timeout: COMPOSITION_TIMEOUT },
     async () => {

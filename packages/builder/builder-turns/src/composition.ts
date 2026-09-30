@@ -82,7 +82,7 @@ export function validateComposition(composition: BuilderComposition, index: Comp
     index.knownEndpointIds !== undefined &&
     !index.knownEndpointIds.includes(composition.endpoint_id)
   ) {
-    throw BuilderError.invalid(`Unknown endpoint block "${composition.endpoint_id}" (it may have been deleted or renamed)`);
+    throw BuilderError.invalid(`Unknown endpoint block "${composition.endpoint_id}" (it may have been deleted, renamed, or disabled)`);
   }
   // The Claude Code CLI authenticates against the endpoint itself, so a
   // claude_agent_sdk composition must resolve to an anthropic_messages endpoint
