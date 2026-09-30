@@ -1295,6 +1295,9 @@ importers:
 
   packages/transport/route-settings:
     dependencies:
+      '@agentprism/contracts':
+        specifier: workspace:*
+        version: link:../../contracts/contracts
       '@agentprism/http-runtime':
         specifier: workspace:*
         version: link:../http-runtime

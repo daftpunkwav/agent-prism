@@ -79,3 +79,18 @@ export interface McpServerConfigView {
   /** Disabled servers persist but never attach to runs (default true). */
   readonly enabled?: boolean;
 }
+
+/**
+ * Validation error of the managed MCP server store (an invalid server list).
+ * Lives here so the transport leaf that maps it to 400 can use `instanceof`
+ * with no package edge to tool-mcp (same pattern as UrlValidationError); the
+ * name stays "McpStoreError" so logs and operator-facing traces keep their
+ * shape. Persistence failures (disk, permissions) are plain errors and must
+ * not carry this identity — routes rethrow them to the shell's 5xx mapping.
+ */
+export class McpStoreError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "McpStoreError";
+  }
+}

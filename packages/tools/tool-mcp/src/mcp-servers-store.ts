@@ -14,8 +14,12 @@
  * validation never drifts between env and managed sources.
  */
 
+import { McpStoreError } from "@agentprism/contracts";
 import { parseMcpServersEnv } from "./config.js";
 import type { McpServerConfig } from "./client.js";
+
+/** Validation error of the managed server list; the class is single-sourced in contracts. */
+export { McpStoreError };
 
 /** JSON persistence port (AtomicJsonFile-compatible shape). */
 export interface McpStoreFile {
@@ -41,18 +45,6 @@ export interface McpServersStoreOptions {
   /** Env-parsed seed list used only when the store file does not exist yet. */
   seed: readonly McpServerConfig[];
   codec?: McpStoreCodec;
-}
-
-/**
- * Validation error carrying an operator-readable message (routes map to 400).
- * The name is set explicitly so a transport leaf that must not depend on this package
- * can still tell a validation defect (400) from a persistence failure (5xx).
- */
-export class McpStoreError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "McpStoreError";
-  }
 }
 
 /**

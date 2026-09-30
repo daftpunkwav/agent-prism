@@ -44,7 +44,7 @@ export interface SkillsController {
 /** Managed MCP server list controller backing the settings/mcp routes. */
 export interface McpController {
   list(): ReadonlyArray<McpServerConfigView>;
-  /** Full-list replace; throws McpStoreError-shaped Errors on invalid input. */
+  /** Full-list replace; throws the contracts-sourced McpStoreError on invalid input. */
   replace(input: unknown): ReadonlyArray<McpServerConfigView>;
 }
 

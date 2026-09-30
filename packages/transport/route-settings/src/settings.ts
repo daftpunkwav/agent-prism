@@ -31,14 +31,7 @@
 
 import type { HttpApplicationDeps } from "@agentprism/http-runtime";
 import { readJsonRaw, type HttpApp } from "@agentprism/http-runtime";
-
-/**
- * True for the MCP store's own validation errors. Matched by class NAME so this leaf
- * does not have to depend on the tool-mcp package (boundaries forbid that edge).
- */
-function isMcpStoreError(error: unknown): error is Error {
-  return error instanceof Error && error.name === "McpStoreError";
-}
+import { McpStoreError } from "@agentprism/contracts";
 
 /**
  * Skill store errors are plain Errors with operator-readable messages; the two
@@ -134,8 +127,10 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
         return c.json({ servers: mcp.replace(body.servers) });
       } catch (error) {
         // Validation is the request's fault; a write failure (disk full, EACCES) is
-        // ours and must not read as "your request was invalid".
-        if (!isMcpStoreError(error)) throw error;
+        // ours and must not read as "your request was invalid". McpStoreError is
+        // single-sourced in contracts, so this leaf identifies it by instanceof
+        // without a tool-mcp package edge.
+        if (!(error instanceof McpStoreError)) throw error;
         return c.json({ detail: error.message }, 400);
       }
     });

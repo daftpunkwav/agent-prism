@@ -18,6 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@agentprism/contracts": "workspace:*",
     "@agentprism/http-runtime": "workspace:*"
   },
   "devDependencies": {

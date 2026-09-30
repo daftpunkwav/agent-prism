@@ -23,6 +23,7 @@ import {
   type SkillsController,
 } from "@agentprism/http-runtime";
 import {
+  McpStoreError,
   RUNTIME_KNOB_FIELDS,
   staticDefaultRuntimeKnobs,
   type McpServerConfigView,
@@ -142,9 +143,10 @@ export function mockMcp(): McpController {
   return {
     list: () => servers.map((server) => ({ ...server })),
     replace: (input: unknown) => {
-      // Mirrors the real store: validation failures carry McpStoreError's name so the
-      // route can answer 400 while a persistence failure becomes a 5xx.
-      const invalid = (message: string) => Object.assign(new Error(message), { name: "McpStoreError" });
+      // Mirrors the real store: validation failures throw the contracts-sourced
+      // McpStoreError so the route answers 400 while a persistence failure
+      // becomes a 5xx.
+      const invalid = (message: string) => new McpStoreError(message);
       if (!Array.isArray(input)) throw invalid("MCP_SERVERS must be a JSON array of server configs");
       for (const entry of input) {
         const record = entry as Record<string, unknown>;
