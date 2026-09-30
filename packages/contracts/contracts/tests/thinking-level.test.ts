@@ -4,7 +4,18 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { effectiveThinkingLevel } from "@agentprism/contracts";
+import { effectiveThinkingLevel, servableThinkingLevels } from "@agentprism/contracts";
+
+describe("servableThinkingLevels", () => {
+  it("serves nothing for a non-thinking endpoint", () => {
+    expect(servableThinkingLevels({ thinking_capable: false, thinking_levels: ["low"] })).toEqual([]);
+  });
+
+  it("serves the custom list when configured, else the standard set", () => {
+    expect(servableThinkingLevels({ thinking_capable: true, thinking_levels: ["xhigh", "max"] })).toEqual(["xhigh", "max"]);
+    expect(servableThinkingLevels({ thinking_capable: true, thinking_levels: [] })).toEqual(["low", "medium", "high"]);
+  });
+});
 
 describe("effectiveThinkingLevel", () => {
   const std = { thinking_levels: [] as string[], api_format: "openai_chat", thinking_mode: "levels" as const, thinking_budget_pairs: [] };

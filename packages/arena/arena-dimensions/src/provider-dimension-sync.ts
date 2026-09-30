@@ -11,7 +11,7 @@
  */
 
 import type { EndpointThinkingAxes, LlmEndpoint, ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { customFieldKey, MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, resolveDefaultEndpoint, TEMPERATURE_OPTIONS, TOP_P_OPTIONS } from "@agentprism/contracts";
+import { customFieldKey, MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, resolveDefaultEndpoint, servableThinkingLevels, TEMPERATURE_OPTIONS, TOP_P_OPTIONS } from "@agentprism/contracts";
 import { customDimension, customDimensionDefault } from "@agentprism/harness";
 import { currentEndpointLabel, DimensionCatalog, type DimensionOptionTriple } from "@agentprism/dimensions";
 import { snapIntToOptions, snapToOptions } from "./field-values.js";
@@ -52,10 +52,7 @@ export function endpointThinkingAxes(endpoint: LlmEndpoint): EndpointThinkingAxe
       mode_default: "budget",
     };
   }
-  const customLevels = endpoint.thinking_levels ?? [];
-  const levels = endpoint.thinking_capable
-    ? (customLevels.length > 0 ? customLevels : ["low", "medium", "high"])
-    : [];
+  const levels = servableThinkingLevels(endpoint);
   return {
     level_options: [
       { value: "off", label: "Off" },

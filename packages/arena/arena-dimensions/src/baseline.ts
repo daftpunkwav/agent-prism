@@ -9,7 +9,7 @@
  */
 
 import type { BaselineOverrides, LlmEndpoint, PipelineConfig, ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { dimensionFieldName, customFieldDimension, resolveDefaultEndpoint } from "@agentprism/contracts";
+import { dimensionFieldName, customFieldDimension, resolveDefaultEndpoint, servableThinkingLevels } from "@agentprism/contracts";
 import {
   effectiveThinkingLevel,
   MAX_OUTPUT_TOKENS_OPTIONS,
@@ -167,8 +167,7 @@ function assertThinkingPinsLegal(raw: Record<string, unknown>, deps: BaselineRes
     }
     return;
   }
-  const custom = endpoint.thinking_levels ?? [];
-  const allowed = endpoint.thinking_capable ? (custom.length > 0 ? custom : ["low", "medium", "high"]) : [];
+  const allowed = servableThinkingLevels(endpoint);
   if (levelPin !== undefined && levelPin !== "off" && !allowed.includes(String(levelPin))) {
     throw new Error(
       `Baseline thinking_level "${String(levelPin)}" is not served by endpoint "${endpoint.id}" (serves: ${["off", ...allowed].join(", ")})`,

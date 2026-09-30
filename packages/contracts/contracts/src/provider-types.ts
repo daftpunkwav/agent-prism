@@ -5,7 +5,7 @@
  * Responsibilities:
  * - Define endpoint entities and provider config with decode defaults
  * - Define the effective default-endpoint rule (enabled endpoints only)
- * - Define the effective thinking-level rule (endpoint overrides top-level)
+ * - Define the served thinking-level set and the effective thinking-level rule
  */
 
 import type { ThinkingBudgetPair } from "./provider.js";
@@ -87,11 +87,25 @@ export function resolveDefaultEndpoint(config: ProviderConfig): LlmEndpoint | un
 }
 
 /**
+ * Level names a levels-mode endpoint can serve: the custom list when configured,
+ * else the standard low/medium/high set; a non-thinking endpoint serves none.
+ * Single source for every surface that names the served set (level resolution,
+ * baseline pin validation, baseline panel option projection) so they cannot
+ * disagree about what an endpoint offers.
+ */
+export function servableThinkingLevels(
+  endpoint: Pick<LlmEndpoint, "thinking_capable" | "thinking_levels">,
+): string[] {
+  const custom = endpoint.thinking_levels ?? [];
+  return endpoint.thinking_capable ? (custom.length > 0 ? custom : ["low", "medium", "high"]) : [];
+}
+
+/**
  * Thinking level actually in effect for an endpoint: unsupported capability or
  * illegal levels resolve to off. The allowed set follows the endpoint's thinking
  * mode: budget mode consults the budget pair table's level names, level mode
- * uses the custom list (endpoint.thinking_levels) or the standard low/medium/high
- * set. The result is a plain string because custom levels are vendor-defined.
+ * uses the endpoint's served set (servableThinkingLevels). The result is a plain
+ * string because custom levels are vendor-defined.
  */
 export function effectiveThinkingLevel(
   endpoint: Pick<
@@ -103,12 +117,9 @@ export function effectiveThinkingLevel(
   if (!endpoint.thinking_capable) return "off";
   const level = requested ?? endpoint.thinking_level;
   if (level === "off") return "off";
-  const custom = endpoint.thinking_levels ?? [];
   const allowed =
     endpoint.thinking_mode === "budget"
       ? (endpoint.thinking_budget_pairs ?? []).map((pair) => pair.level)
-      : custom.length > 0
-        ? custom
-        : ["low", "medium", "high"];
+      : servableThinkingLevels(endpoint);
   return allowed.includes(level) ? level : "off";
 }
