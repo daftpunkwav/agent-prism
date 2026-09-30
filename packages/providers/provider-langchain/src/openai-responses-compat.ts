@@ -72,6 +72,12 @@ function patchSseLine(line: string): string {
   const terminator = body.endsWith("\r") ? "\r" : "";
   const payload = terminator !== "" ? body.slice(0, -1) : body;
   if (payload === "[DONE]") return line;
+  // Cheap necessary-condition probe: the patch only ever writes an existing
+  // `annotations` key, and JSON serializes key names verbatim, so a payload
+  // without the substring cannot change under patchResponsesEvent. Delta
+  // events (the overwhelming majority of a stream) skip the parse+stringify
+  // roundtrip; re-serializing the untouched rest was pure waste.
+  if (!payload.includes("annotations")) return line;
   try {
     return `${prefix}${JSON.stringify(patchResponsesEvent(JSON.parse(payload)))}${terminator}`;
   } catch {

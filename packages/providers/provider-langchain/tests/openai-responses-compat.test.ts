@@ -98,6 +98,26 @@ describe("createResponsesCompatFetch", () => {
     expect(textNoSpace).not.toContain('"annotations":null');
   });
 
+  it("passes annotation-free delta lines through byte-identical (probe fast path)", async () => {
+    // The bulk of a stream carries no annotations key: the probe must skip the
+    // parse+stringify roundtrip, so the line reaches the SDK exactly as sent
+    // (whitespace included). A payload whose string VALUES mention annotations
+    // still goes through the patch unchanged.
+    const delta = 'data: {"type":"response.output_text.delta","delta":"tok","sequence_number":  7}';
+    const valueMention = 'data: {"type":"response.output_text.delta","delta":"see annotations docs"}';
+    const patchable = 'data: {"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"hi","annotations":null}]}]}}';
+    const inner = vi.fn().mockResolvedValue(
+      sseResponse([delta, valueMention, patchable, "data: [DONE]"]),
+    );
+    const wrapped = createResponsesCompatFetch(inner as unknown as typeof fetch);
+    const res = await wrapped("https://gw.example.com/v1/responses", { method: "POST" });
+    const text = await res.text();
+    expect(text).toContain(delta + "\n");
+    expect(text).toContain(valueMention + "\n");
+    expect(text).toContain('"annotations":[]');
+    expect(text).not.toContain('"annotations":null');
+  });
+
   it("passes non-responses URLs and non-stream JSON of other routes through untouched", async () => {
     const inner = vi.fn().mockResolvedValue(new Response('{"annotations":null}', { headers: { "content-type": "application/json" } }));
     const wrapped = createResponsesCompatFetch(inner as unknown as typeof fetch);
