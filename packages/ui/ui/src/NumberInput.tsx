@@ -9,7 +9,7 @@
  * - Validate on commit: a finite in-range number reports through onChange
  *   (integers truncate); empty, unparseable, or out-of-range text keeps the
  *   user's input visible, flags the field, and shows the caller's message
- *   instead of silently restoring the previous value
+ *   (without a caller message the previous value is restored instead)
  * - Escape restores the last committed value; stay presentation-only: parsing
  *   rules live here, domain validation stays with the caller
  */

@@ -75,9 +75,9 @@ export interface ProviderConfig {
  * settings-side off switch, so they neither anchor the default nor receive
  * fallback traffic — every surface that names a default (palette marker, arena
  * baseline defaults, runtime model resolution) must call this one function so
- * display and execution cannot disagree. When nothing is enabled the stored
- * default returns (possibly disabled), keeping the pinned-endpoint fail-loud
- * path at model construction intact.
+ * display and execution cannot disagree. When nothing is enabled the first
+ * configured endpoint returns (possibly disabled), keeping the pinned-endpoint
+ * fail-loud path at model construction intact.
  */
 export function resolveDefaultEndpoint(config: ProviderConfig): LlmEndpoint | undefined {
   const enabled = config.endpoints.filter((endpoint) => endpoint.enabled !== false);

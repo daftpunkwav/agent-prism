@@ -634,7 +634,7 @@ export class BuilderService {
         .map((framework) => framework.id),
       knownTools: sources.tools().map((definition) => definition.name),
       knownEndpointIds: endpoints.map((endpoint) => endpoint.id),
-      // Format facts back the claude_agent_sdk ↔ anthropic_messages gate (the
+      // Format facts backing the claude_agent_sdk ↔ anthropic_messages gate (the
       // palette disables the chip client-side; this enforces it server-side).
       endpointApiFormats: Object.fromEntries(endpoints.map((endpoint) => [endpoint.id, endpoint.api_format])),
       defaultEndpointId: endpoints.find((endpoint) => endpoint.default)?.id,
