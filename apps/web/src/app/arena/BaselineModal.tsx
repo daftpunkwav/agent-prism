@@ -18,7 +18,7 @@ import { createPortal } from "react-dom";
 import { HelpCircle, RotateCcw, X } from "lucide-react";
 import type { ArenaMeta, DimensionId } from "@agentprism/client";
 import { UiSelect } from "@agentprism/ui";
-import { BASELINE_GROUP_ORDER, effectiveThinkingMode, type BaselineDraft } from "./arenaConstants";
+import { BASELINE_GROUP_ORDER, effectiveThinkingMode, pinnedThinkingAxes, type BaselineDraft } from "./arenaConstants";
 import { useT } from "@/i18n/useT";
 import { baselineFieldLabel, baselineOptionLabel } from "./dimensionLabels";
 
@@ -306,10 +306,9 @@ export function BaselineModal({
                     // not the catalog-wide snapshot (which trails the default
                     // endpoint): a non-default endpoint's own level set / budget
                     // pair table overlays the served field definition.
-                    const pinnedEndpointId = baseline["endpoint_id"] || meta?.baseline_defaults?.["endpoint_id"] || "";
-                    const axes = pinnedEndpointId !== "" ? meta?.thinking_by_endpoint?.[pinnedEndpointId] : undefined;
+                    const axes = pinnedThinkingAxes(meta, baseline);
                     const axesField = (fieldName: string): { options: Array<{ value: string; label: string }>; def: string } | null => {
-                      if (axes === undefined) return null;
+                      if (axes === null) return null;
                       if (fieldName === "thinking_level") return { options: axes.level_options, def: axes.level_default };
                       if (fieldName === "thinking_budget") return { options: axes.budget_options, def: axes.budget_default };
                       if (fieldName === "thinking_mode") return { options: axes.mode_options, def: axes.mode_default };

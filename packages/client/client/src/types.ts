@@ -23,6 +23,7 @@ export type {
   DimensionId,
   DimensionMeta,
   DimensionOption,
+  EndpointThinkingAxes,
   JudgeResult,
   JudgeSpec,
   LlmEndpointPublic,

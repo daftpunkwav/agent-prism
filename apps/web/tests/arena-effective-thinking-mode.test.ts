@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { ArenaMeta } from "@agentprism/client";
-import { effectiveThinkingMode } from "../src/app/arena/arenaConstants.js";
+import { effectiveThinkingMode, pinnedThinkingAxes } from "../src/app/arena/arenaConstants.js";
 
 function metaWithThinkingModeOptions(values: string[]): ArenaMeta {
   return {
@@ -63,5 +63,26 @@ describe("effectiveThinkingMode", () => {
   it("defaults to levels without meta or served options", () => {
     expect(effectiveThinkingMode(null, {})).toBe("levels");
     expect(effectiveThinkingMode(null, { thinking_mode: "budget" })).toBe("levels");
+  });
+});
+
+describe("pinnedThinkingAxes", () => {
+  const meta = {
+    baseline_defaults: { endpoint_id: "ep-default" },
+    thinking_by_endpoint: {
+      "ep-default": { level_options: [], level_default: "off", budget_options: [], budget_default: "0", mode_options: [{ value: "levels", label: "levels" }], mode_default: "levels" },
+      "ep-other": { level_options: [{ value: "xhigh", label: "xhigh" }], level_default: "xhigh", budget_options: [], budget_default: "0", mode_options: [{ value: "levels", label: "levels" }], mode_default: "levels" },
+    },
+  } as unknown as ArenaMeta;
+
+  it("prefers the draft's endpoint over the catalog default", () => {
+    expect(pinnedThinkingAxes(meta, { endpoint_id: "ep-other" })?.level_default).toBe("xhigh");
+    expect(pinnedThinkingAxes(meta, {})).toBe(meta.thinking_by_endpoint["ep-default"]);
+  });
+
+  it("returns null without a resolvable endpoint or projection", () => {
+    expect(pinnedThinkingAxes(meta, { endpoint_id: "ghost" })).toBeNull();
+    expect(pinnedThinkingAxes({ ...meta, thinking_by_endpoint: {} }, {})).toBeNull();
+    expect(pinnedThinkingAxes(null, {})).toBeNull();
   });
 });

@@ -11,7 +11,7 @@
  */
 
 import { DIMENSION_FIELD, DIMENSION_IDS } from "@agentprism/client";
-import type { ArenaMeta } from "@agentprism/client";
+import type { ArenaMeta, EndpointThinkingAxes } from "@agentprism/client";
 
 /** Dimension mapping: contract single source (contracts/dimension-field) consumed via the client outlet; the frontend no longer maintains its own. */
 export { DIMENSION_FIELD, DIMENSION_IDS };
@@ -29,6 +29,18 @@ export const BASELINE_GROUP_ORDER = ["pipeline", "decode", "access"] as const;
 export type BaselineDraft = Record<string, string>;
 
 /**
+ * The thinking axes the baseline currently pins: the draft's endpoint_id, else
+ * the catalog default's. Null when the backend predates the per-endpoint
+ * projection — callers fall back to the catalog-wide baseline_fields snapshot
+ * (which trails the default endpoint only).
+ */
+export function pinnedThinkingAxes(meta: ArenaMeta | null, baseline: BaselineDraft): EndpointThinkingAxes | null {
+  const endpointId = baseline["endpoint_id"] ?? meta?.baseline_defaults?.["endpoint_id"] ?? "";
+  if (endpointId === "") return null;
+  return meta?.thinking_by_endpoint?.[endpointId] ?? null;
+}
+
+/**
  * The thinking mode actually in effect: the stored draft wins, but only when
  * the server still offers it for the endpoint the baseline pins. The option
  * set comes from the per-endpoint thinking projection when present (a pinned
@@ -38,12 +50,11 @@ export type BaselineDraft = Record<string, string>;
  * rendering a dead budget tab and shipping a mode the server would reject.
  */
 export function effectiveThinkingMode(meta: ArenaMeta | null, baseline: BaselineDraft): "levels" | "budget" {
-  const endpointId = baseline["endpoint_id"] ?? meta?.baseline_defaults?.["endpoint_id"] ?? "";
-  const axes = endpointId !== "" ? meta?.thinking_by_endpoint?.[endpointId] : undefined;
+  const axes = pinnedThinkingAxes(meta, baseline);
   // Without a served option set there is nothing to vouch for the draft's
   // budget pin, so level mapping is the only safe answer (meta is always
   // loaded before a run can be assembled).
-  const served = axes !== undefined ? axes.mode_options : meta?.baseline_fields.find((field) => field.field === "thinking_mode")?.options;
+  const served = axes !== null ? axes.mode_options : meta?.baseline_fields.find((field) => field.field === "thinking_mode")?.options;
   if (!served || served.length === 0) return "levels";
   const raw = baseline["thinking_mode"] ?? meta?.baseline_defaults?.["thinking_mode"] ?? "levels";
   if (!served.some((option) => option.value === raw)) return "levels";
