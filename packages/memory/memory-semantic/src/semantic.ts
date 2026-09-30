@@ -54,7 +54,6 @@ export class SemanticMemory {
   private readonly store: MemoryStore<SemanticFact>;
   private readonly now: () => number;
   private readonly maxFacts: number;
-  private idCounter = 0;
 
   constructor(options: SemanticMemoryOptions = {}) {
     this.store = new MemoryStore<SemanticFact>(semanticSearchText, { filePath: options.filePath });
@@ -91,9 +90,17 @@ export class SemanticMemory {
         return this.store.save(merged);
       }
     }
-    // Room for the fact about to be inserted, so the cap holds once this call returns.
-    await this.enforceCapacity(1);
-    const record: SemanticFact = { ...fact, id: this.nextId() };
+    // Room for the fact about to be inserted, so the cap holds once this call
+    // returns. Eviction takes the least valuable facts first: lowest confidence,
+    // then oldest, with the id as a stable tie-break. A fact referenced again is
+    // refreshed in place (the merge branch above), so the cap costs the weakest
+    // long-tail knowledge rather than whatever was written last.
+    await this.store.pruneToCap(
+      this.maxFacts,
+      1,
+      (a, b) => a.confidence - b.confidence || a.validFrom - b.validFrom || a.id.localeCompare(b.id),
+    );
+    const record: SemanticFact = { ...fact, id: this.store.nextId("sem-", this.now) };
     return this.store.save(record);
   }
 
@@ -116,36 +123,11 @@ export class SemanticMemory {
     return above.slice(0, limit).map((h) => h.item);
   }
 
-  /** Allocates a collision-free id (safe across restarts replaying one ms). */
-  private nextId(): string {
-    for (;;) {
-      this.idCounter += 1;
-      const id = `sem-${this.now()}-${this.idCounter}`;
-      if (this.store.get(id) === undefined) return id;
-    }
-  }
-
   /** Removes expired facts; returns the number pruned (one persist for the batch). */
   async pruneExpired(now?: number): Promise<number> {
     const at = now ?? this.now();
     const expired = this.store.list().filter((fact) => !isFactEffective(fact, at)).map((fact) => fact.id);
     return expired.length === 0 ? 0 : this.store.deleteMany(expired);
-  }
-
-  /**
-   * Trims the store down to `maxFacts`, dropping the least valuable facts first:
-   * lowest confidence, then oldest, with the id as a stable tie-break. Facts that
-   * are referenced again get refreshed (see recordFact), so the cap costs the
-   * weakest long-tail knowledge rather than whatever was written last.
-   */
-  private async enforceCapacity(pending: number = 0): Promise<number> {
-    const overflow = this.store.size + pending - this.maxFacts;
-    if (overflow <= 0) return 0;
-    const weakest = [...this.store.list()]
-      .sort((a, b) => a.confidence - b.confidence || a.validFrom - b.validFrom || a.id.localeCompare(b.id))
-      .slice(0, overflow)
-      .map((fact) => fact.id);
-    return this.store.deleteMany(weakest);
   }
 
   /** Lists all facts including expired ones (use recallFacts for effective-only). */

@@ -49,7 +49,6 @@ export class EpisodicMemory {
   private readonly store: MemoryStore<EpisodicMemoryEntry>;
   private readonly now: () => number;
   private readonly maxEntries: number;
-  private idCounter = 0;
 
   constructor(options: EpisodicMemoryOptions = {}) {
     this.store = new MemoryStore<EpisodicMemoryEntry>(episodicSearchText, { filePath: options.filePath });
@@ -81,12 +80,20 @@ export class EpisodicMemory {
         return this.store.save(merged);
       }
     }
-    // Room for the entry about to be inserted, so the cap holds once this call returns.
-    await this.enforceCapacity(1);
+    // Room for the entry about to be inserted, so the cap holds once this call
+    // returns. Eviction takes the stalest experiences first, with the id as a
+    // stable tie-break. An experience referenced again (near-dup record) is
+    // refreshed in place, so the cap costs stale long-tail history rather than
+    // whatever was written last.
+    await this.store.pruneToCap(
+      this.maxEntries,
+      1,
+      (a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id),
+    );
     const record: EpisodicMemoryEntry = {
       ...entry,
       keyActions: [...entry.keyActions],
-      id: this.nextId(),
+      id: this.store.nextId("ep-", this.now),
       timestamp: this.now(),
     };
     return this.store.save(record);
@@ -105,31 +112,6 @@ export class EpisodicMemory {
     const threshold = options.threshold;
     const above = threshold !== undefined ? filtered.filter((h) => h.score >= threshold) : filtered;
     return above.slice(0, limit).map((h) => h.item);
-  }
-
-  /** Allocates a collision-free id (safe across restarts replaying one ms). */
-  private nextId(): string {
-    for (;;) {
-      this.idCounter += 1;
-      const id = `ep-${this.now()}-${this.idCounter}`;
-      if (this.store.get(id) === undefined) return id;
-    }
-  }
-
-  /**
-   * Trims the store down to `maxEntries`, dropping the oldest experiences first
-   * with the id as a stable tie-break. An experience referenced again (near-dup
-   * record) is refreshed in place (see recordExperience), so the cap costs the
-   * stalest long-tail history rather than whatever was written last.
-   */
-  private async enforceCapacity(pending: number = 0): Promise<number> {
-    const overflow = this.store.size + pending - this.maxEntries;
-    if (overflow <= 0) return 0;
-    const oldest = [...this.store.list()]
-      .sort((a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id))
-      .slice(0, overflow)
-      .map((entry) => entry.id);
-    return this.store.deleteMany(oldest);
   }
 
   /** Lists all recorded experiences (insertion order is not guaranteed). */

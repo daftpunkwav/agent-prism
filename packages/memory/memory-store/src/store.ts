@@ -4,6 +4,7 @@
  *
  * Responsibilities:
  * - Load and atomically persist structured collections of memory items
+ * - Allocate collision-free item ids and trim capped collections
  * - Provide multi-language tokenization (CJK + Latin word segmentation)
  * - Provide term-frequency search ranking over text representations
  * - Crash-safe across restarts via AtomicJsonFile (atomic replace + backup recovery)
@@ -47,6 +48,7 @@ export class MemoryStore<T extends { id: string }> {
   private readonly items = new Map<string, MemoryDocument<T>>();
   private readonly file: AtomicJsonFile | null = null;
   private readonly extractSearchText: (item: T) => string;
+  private idCounter = 0;
 
   constructor(
     extractSearchText: (item: T) => string,
@@ -118,6 +120,34 @@ export class MemoryStore<T extends { id: string }> {
   /** Retrieves an item by its unique ID. */
   get(id: string): T | undefined {
     return this.items.get(id)?.item;
+  }
+
+  /**
+   * Allocates a collision-free `<prefix><timestamp>-<counter>` id. The counter is
+   * per store instance and each candidate is rechecked against live contents, so
+   * restarts that replay the same millisecond still get fresh ids.
+   */
+  nextId(prefix: string, now: () => number): string {
+    for (;;) {
+      this.idCounter += 1;
+      const id = `${prefix}${now()}-${this.idCounter}`;
+      if (!this.items.has(id)) return id;
+    }
+  }
+
+  /**
+   * Trims the store down to `cap`, counting `reserved` items the caller is about
+   * to insert so the cap holds once their write lands. Victims go in `compare`
+   * order (the caller owns the eviction policy); deletion is one batched persist.
+   */
+  async pruneToCap(cap: number, reserved: number, compare: (a: T, b: T) => number): Promise<number> {
+    const overflow = this.items.size + reserved - cap;
+    if (overflow <= 0) return 0;
+    const victims = [...this.list()]
+      .sort(compare)
+      .slice(0, overflow)
+      .map((item) => item.id);
+    return this.deleteMany(victims);
   }
 
   /** Lists all items currently in the store. */
