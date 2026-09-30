@@ -7,7 +7,7 @@
  * - Lock loud skipping of unreadable lines and delete-clears-journal semantics
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AppendFile } from "@agentprism/persistence";
 import type { BuilderTraceRecord } from "@agentprism/contracts";
 import { SessionTraceStore } from "../src/session-trace-store.js";
@@ -80,5 +80,21 @@ describe("SessionTraceStore", () => {
     await store.delete("s1");
     expect(await store.read("s1")).toEqual({ records: [], truncated: false });
     expect(file.lines).toEqual([]);
+  });
+
+  it("delete degrades an open failure to a warning instead of rejecting", async () => {
+    // deleteSession fires this void: a throw from open (e.g. the composition
+    // root's path-safety guard refusing an unsafe id) must never surface as an
+    // unhandled rejection — fail closed, loudly, without crashing the turn.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const store = new SessionTraceStore({
+      open: () => {
+        throw new Error("builder trace id is not a safe path segment");
+      },
+      flushDebounceMs: 30_000,
+    });
+    await expect(store.delete("bad/id")).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("journal clear failed"));
+    warn.mockRestore();
   });
 });

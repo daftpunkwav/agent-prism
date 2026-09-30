@@ -116,7 +116,15 @@ export class SessionTraceStore {
       this.timers.delete(sessionId);
     }
     this.pending.delete(sessionId);
-    await this.deps.open(sessionId).rewrite([]);
+    try {
+      await this.deps.open(sessionId).rewrite([]);
+    } catch (error) {
+      // Callers fire this void (session deletion must not hinge on journal
+      // cleanup): an open/rewrite failure — including the composition root's
+      // path-safety guard refusing an unsafe id — degrades to a warning, never
+      // an unhandled rejection.
+      console.warn(`[builder-trace] journal clear failed for ${sessionId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private scheduleFlush(sessionId: string): void {
