@@ -34,7 +34,7 @@ function termFrequencies(tokens: string[]): Map<string, number> {
 
 /** BM25 scorer bound to a fixed corpus (idf fitted at construction). */
 export class Bm25 {
-  private readonly docTokens: string[][];
+  private readonly docTfs: Map<string, number>[];
   private readonly docLengths: number[];
   private readonly avgLength: number;
   private readonly idf = new Map<string, number>();
@@ -44,14 +44,18 @@ export class Bm25 {
   constructor(documents: Bm25Document[], options: { k1?: number; b?: number } = {}) {
     this.k1 = options.k1 ?? BM25_K1;
     this.b = options.b ?? BM25_B;
-    this.docTokens = documents.map((doc) => tokenize(doc.text));
-    this.docLengths = this.docTokens.map((tokens) => tokens.length);
+    // Term frequencies are query-invariant: tokenize and count once here, so
+    // score() is a per-query-term lookup instead of re-counting the whole
+    // corpus on every call (queries run per LLM call; the corpus does not change).
+    const tokenized = documents.map((doc) => tokenize(doc.text));
+    this.docTfs = tokenized.map((tokens) => termFrequencies(tokens));
+    this.docLengths = tokenized.map((tokens) => tokens.length);
     const total = this.docLengths.reduce((sum, len) => sum + len, 0);
-    this.avgLength = this.docTokens.length === 0 ? 1 : total / this.docTokens.length || 1;
-    const docCount = this.docTokens.length;
+    this.avgLength = this.docTfs.length === 0 ? 1 : total / this.docTfs.length || 1;
+    const docCount = this.docTfs.length;
     const df = new Map<string, number>();
-    for (const tokens of this.docTokens) {
-      for (const token of new Set(tokens)) df.set(token, (df.get(token) ?? 0) + 1);
+    for (const tf of this.docTfs) {
+      for (const token of tf.keys()) df.set(token, (df.get(token) ?? 0) + 1);
     }
     for (const [token, freq] of df) {
       this.idf.set(token, Math.log(1 + (docCount - freq + 0.5) / (freq + 0.5)));
@@ -61,8 +65,7 @@ export class Bm25 {
   /** Scores every corpus document against the query (index-aligned). */
   score(query: string): number[] {
     const queryTerms = termFrequencies(tokenize(query));
-    return this.docTokens.map((tokens, index) => {
-      const tf = termFrequencies(tokens);
+    return this.docTfs.map((tf, index) => {
       const length = this.docLengths[index] ?? 1;
       let total = 0;
       for (const [term, queryCount] of queryTerms) {
@@ -80,6 +83,6 @@ export class Bm25 {
 
   /** Corpus size (number of indexed documents). */
   get size(): number {
-    return this.docTokens.length;
+    return this.docTfs.length;
   }
 }
