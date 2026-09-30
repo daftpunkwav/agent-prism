@@ -618,7 +618,7 @@ const dimensions: DimDoc[] = [
       {
         value: "(default)",
         label: "Default endpoint",
-        effect: "Provider.default_endpoint_id, marked as \"current\" among the options.",
+        effect: "The stored default while enabled, else the first enabled endpoint (shared contracts rule); marked as \"current\" among the options.",
       },
       {
         value: "(other)",

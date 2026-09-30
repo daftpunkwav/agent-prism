@@ -614,7 +614,7 @@ const dimensions: DimDoc[] = [
       {
         value: "（默认）",
         label: "默认接入点",
-        effect: "Provider.default_endpoint_id，选项中标记为「当前」。",
+        effect: "已存储的默认接入点在启用时生效，否则回退第一个启用的接入点（contracts 共享规则）；选项中标记为「当前」。",
       },
       {
         value: "（其它）",

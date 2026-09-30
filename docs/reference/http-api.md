@@ -56,7 +56,7 @@ each section.
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
-| GET | `/api/arena/meta` | dimension and baseline metadata | Dimension cards with their options, frameworks, `baseline_defaults`, `baseline_fields`, and `model_compare_ready`. The UI may sit at zero selections with the run disabled |
+| GET | `/api/arena/meta` | dimension and baseline metadata | Dimension cards with their options, frameworks, `baseline_defaults`, `baseline_fields`, `thinking_by_endpoint` (per-endpoint thinking-axis projection), and `model_compare_ready`. The UI may sit at zero selections with the run disabled |
 | POST | `/api/arena/run` | start one comparison run | SSE with event name `"arena"`. Body: `question` of 1 to 4000 characters, `dimension` defaulting to `framework` and accepting any registered custom dimension id (an unknown axis is rejected with 422 before the stream opens), `selections` of 1 to 16 dimension values (an empty or omitted list fails with an in-stream `error` event), optional `column_sessions`, and `attachments` of at most 5 with 64 KiB text each. `onAbort` cancels the run, and abort books `cancelled`. In-stream failures are emitted as `error` events, never a silent close |
 | POST | `/api/arena/answer` | answer one pending ask_user question | body of `agent_id`, `question_id`, and `answer`; 404 when no live column waits |
 | GET | `/api/arena/pending-asks` | columns waiting on the human | returns `{pending}`, one `{agentId, questions}` entry per column with its full pending ask_user questions |
