@@ -13,7 +13,7 @@
  * time ranges are half-open [from, to) over createdAt/updatedAt.
  */
 
-import type { SessionEntry, SessionKind, SessionRecord, SessionStatus, SessionStore } from "@agentprism/contracts";
+import { SessionNotFoundError, type SessionEntry, type SessionKind, type SessionRecord, type SessionStatus, type SessionStore } from "@agentprism/contracts";
 
 /** Sort orders for session queries. */
 export type SessionSort = "newest" | "oldest" | "title";
@@ -97,14 +97,26 @@ export async function querySessions(store: SessionStore, query: SessionQuery = {
   });
   if (entryText !== "") {
     const kept: SessionRecord[] = [];
+    // A store-wide fault (disk error, corrupt journal) must stay visible: it
+    // silently narrows the result set otherwise. Skipped sessions are counted,
+    // and one warning per query reports the count — the page must not fail
+    // wholesale because one session's entries are unreadable.
+    let skippedUnexpected = 0;
     for (const record of rows) {
       let entries: readonly SessionEntry[] = [];
       try {
         entries = await store.listEntries(record.id);
-      } catch {
+      } catch (error) {
+        // A concurrent delete between list() and listEntries() is normal: skip silently.
+        if (!(error instanceof SessionNotFoundError)) skippedUnexpected += 1;
         continue;
       }
       if (entries.some((entry) => entry.content.toLowerCase().includes(entryText))) kept.push(record);
+    }
+    if (skippedUnexpected > 0) {
+      console.warn(
+        `[session-query] entry-text scan skipped ${skippedUnexpected} session(s) on unexpected store errors`,
+      );
     }
     rows = kept;
   }
