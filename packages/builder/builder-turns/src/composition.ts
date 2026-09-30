@@ -47,6 +47,15 @@ export interface CompositionBlockIndex {
   /** Known endpoint ids; when provided, a non-empty unknown endpoint_id rejects ("" always means the provider default). */
   knownEndpointIds?: readonly string[];
   /**
+   * Endpoint api formats by id; when provided, a claude_agent_sdk composition
+   * must resolve to an anthropic_messages endpoint (the explicit pick, else the
+   * provider default) — the Claude Code CLI authenticates against the endpoint
+   * itself, so any other format would only surface as a turn-time driver failure.
+   */
+  endpointApiFormats?: Readonly<Record<string, string>>;
+  /** Provider default endpoint id; resolves the "" (endpoint default) pick for the format gate. */
+  defaultEndpointId?: string;
+  /**
    * Legal values per registered custom dimension. When provided, an unknown
    * dimension id or an illegal value rejects at configure time; a custom value
    * with no entry here would only fail later, at run assembly.
@@ -74,6 +83,24 @@ export function validateComposition(composition: BuilderComposition, index: Comp
     !index.knownEndpointIds.includes(composition.endpoint_id)
   ) {
     throw BuilderError.invalid(`Unknown endpoint block "${composition.endpoint_id}" (it may have been deleted or renamed)`);
+  }
+  // The Claude Code CLI authenticates against the endpoint itself, so a
+  // claude_agent_sdk composition must resolve to an anthropic_messages endpoint
+  // (the explicit pick, else the provider default). Checked after endpoint
+  // existence so a stale id keeps its own clearer message; an index without
+  // format facts keeps the old behavior (the turn-time driver error is the
+  // backstop). Own-key lookup: ids are caller input, an inherited
+  // Object.prototype member must not pass as a format.
+  if (composition.framework === "claude_agent_sdk" && index.endpointApiFormats !== undefined) {
+    const resolvedId = composition.endpoint_id !== "" ? composition.endpoint_id : (index.defaultEndpointId ?? "");
+    const format = Object.hasOwn(index.endpointApiFormats, resolvedId)
+      ? index.endpointApiFormats[resolvedId]
+      : undefined;
+    if (format !== undefined && format !== "anthropic_messages") {
+      throw BuilderError.invalid(
+        `Framework "claude_agent_sdk" needs an anthropic_messages endpoint (endpoint "${resolvedId}" speaks ${format})`,
+      );
+    }
   }
   if (index.customDimensionValues !== undefined) {
     for (const [dimensionId, value] of Object.entries(composition.custom)) {

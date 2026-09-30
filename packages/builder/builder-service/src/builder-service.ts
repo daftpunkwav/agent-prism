@@ -627,12 +627,17 @@ export class BuilderService {
 
   private assertCompositionAvailable(composition: BuilderComposition): void {
     const sources = this.catalogSources();
+    const endpoints = sources.endpoints();
     validateComposition(composition, {
       availableFrameworks: sources.frameworks()
         .filter((framework) => framework.status === "available")
         .map((framework) => framework.id),
       knownTools: sources.tools().map((definition) => definition.name),
-      knownEndpointIds: sources.endpoints().map((endpoint) => endpoint.id),
+      knownEndpointIds: endpoints.map((endpoint) => endpoint.id),
+      // Format facts back the claude_agent_sdk ↔ anthropic_messages gate (the
+      // palette disables the chip client-side; this enforces it server-side).
+      endpointApiFormats: Object.fromEntries(endpoints.map((endpoint) => [endpoint.id, endpoint.api_format])),
+      defaultEndpointId: endpoints.find((endpoint) => endpoint.default)?.id,
       customDimensionValues: Object.fromEntries(
         sources.customDimensions().map((dimension) => [dimension.id, dimension.options.map((option) => option.value)]),
       ),

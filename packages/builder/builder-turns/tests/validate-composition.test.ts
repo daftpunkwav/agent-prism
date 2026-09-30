@@ -38,6 +38,66 @@ describe("validateComposition", () => {
   });
 });
 
+describe("validateComposition claude sdk endpoint gate", () => {
+  const base = { availableFrameworks: ["native", "claude_agent_sdk"], knownTools: [...DEFAULT_BUILDER_TOOLS] };
+  const formats = { endpointApiFormats: { "ep-anthropic": "anthropic_messages", "ep-openai": "openai_chat" } };
+
+  it("accepts claude_agent_sdk on an anthropic endpoint, explicit or default", () => {
+    expect(() =>
+      validateComposition(baseComposition({ framework: "claude_agent_sdk", endpoint_id: "ep-anthropic" }), {
+        ...base,
+        ...formats,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateComposition(baseComposition({ framework: "claude_agent_sdk", endpoint_id: "" }), {
+        ...base,
+        ...formats,
+        defaultEndpointId: "ep-anthropic",
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects claude_agent_sdk on a non-anthropic endpoint, explicit or default", () => {
+    expect(() =>
+      validateComposition(baseComposition({ framework: "claude_agent_sdk", endpoint_id: "ep-openai" }), {
+        ...base,
+        ...formats,
+      }),
+    ).toThrow(/claude_agent_sdk/);
+    expect(() =>
+      validateComposition(baseComposition({ framework: "claude_agent_sdk", endpoint_id: "" }), {
+        ...base,
+        ...formats,
+        defaultEndpointId: "ep-openai",
+      }),
+    ).toThrow(/anthropic_messages/);
+  });
+
+  it("leaves other frameworks and format-less indexes untouched", () => {
+    // Another framework on the same non-anthropic endpoint is fine.
+    expect(() =>
+      validateComposition(baseComposition({ framework: "native", endpoint_id: "ep-openai" }), { ...base, ...formats }),
+    ).not.toThrow();
+    // Callers without format facts keep the old behavior (turn-time driver error).
+    expect(() =>
+      validateComposition(baseComposition({ framework: "claude_agent_sdk", endpoint_id: "ep-openai" }), base),
+    ).not.toThrow();
+  });
+
+  it("never resolves a format through the prototype chain", () => {
+    // "toString" is not a known endpoint, so the existence check rejects first;
+    // an index that knows it must still not read the inherited member as a format.
+    expect(() =>
+      validateComposition(baseComposition({ framework: "claude_agent_sdk", endpoint_id: "toString" }), {
+        ...base,
+        ...formats,
+        knownEndpointIds: ["ep-anthropic", "ep-openai"],
+      }),
+    ).toThrow(/toString/);
+  });
+});
+
 describe("validateComposition custom dimensions", () => {
   const index = {
     availableFrameworks: ["native"],
