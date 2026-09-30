@@ -65,8 +65,8 @@ fs.writeFileSync(path.join(dataRoot, "builder_sessions.json"), JSON.stringify(cr
 
 const COMPOSITION_TIMEOUT = 120_000;
 
-/** Minimal surface of the assembled Hono app the suite drives. */
-let app: { request: (path: string, init?: RequestInit) => Promise<Response> };
+/** Minimal surface of the assembled Hono app the suite drives (request may return sync or promised). */
+let app: { request: (path: string, init?: RequestInit) => Response | Promise<Response> };
 
 beforeAll(
   async () => {
