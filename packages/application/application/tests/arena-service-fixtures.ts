@@ -22,6 +22,7 @@ export interface MockRouter {
   };
   listBaselineFields: Mock;
   modelCompareReady: Mock;
+  thinkingAxesByEndpoint: Mock;
 }
 
 /** Loose runner double: slots and streams the run tests reprogram. */

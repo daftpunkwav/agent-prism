@@ -245,7 +245,7 @@ function makeService(
       return () => `run-${(n += 1).toString(16)}`;
     })() },
     clock: { now: () => 1_790_000_000_000 },
-    endpoints: () => [{ id: "ep1", name: "MiniMax", model: "abab", api_format: "openai_chat", thinking_capable: true }],
+    endpoints: () => [{ id: "ep1", name: "MiniMax", model: "abab", api_format: "openai_chat", thinking_capable: true, default: true }],
     // Real builtin surface: composition validation must see ask_user & co.
     toolDefinitions: () => createBuiltinToolRegistry().listDefinitions(),
     // Registered custom-dimension packages, injected at the composition root.
