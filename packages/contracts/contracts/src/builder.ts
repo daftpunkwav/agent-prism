@@ -297,6 +297,8 @@ const BuilderEndpointBlockSchema = z.object({
   model: z.string().default(""),
   api_format: z.string().default(""),
   thinking_capable: z.boolean().default(false),
+  /** True for the provider default endpoint: the one an empty endpoint_id resolves to. */
+  default: z.boolean().default(false),
 });
 export type BuilderEndpointBlock = z.infer<typeof BuilderEndpointBlockSchema>;
 

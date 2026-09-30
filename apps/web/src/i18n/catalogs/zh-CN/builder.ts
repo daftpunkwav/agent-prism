@@ -56,6 +56,7 @@ export const builder = {
   swapped: "热切换已应用",
   endpointDefault: "默认接入点",
   reserved: "预留",
+  claudeSdkNeedsAnthropic: "Claude Agent SDK 直连端点,仅支持 anthropic_messages 格式的接入点;请切换接入点",
   // chat
   chatPlaceholder: "给 Agent 下达任务…（/compact 压缩历史）",
   attach: {
@@ -139,9 +140,6 @@ export const builder = {
     structured: "结构化输出",
     terse: "极简",
     off: "关闭",
-    low: "低",
-    medium: "中",
-    high: "高",
     tool_tail: "工具尾修剪",
     token_budget: "Token 预算",
     budget: "分组预算",

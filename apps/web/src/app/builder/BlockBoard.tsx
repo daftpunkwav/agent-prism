@@ -81,11 +81,27 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
     const prefix = group.block === "history_mode" ? "history_" : "";
     capabilityOptions.set(
       group.block,
-      group.options.map((option) => ({ ...option, label: opt(option.value, prefix, option.label) })),
+      group.options.map((option) => ({
+        ...option,
+        // Thinking levels stay verbatim: vendor-defined tokens ("xhigh") have no
+        // translation, so the standard three must not localize either.
+        label: group.block === "thinking" ? option.label : opt(option.value, prefix, option.label),
+      })),
     );
   }
 
   const set = (patch: Partial<BuilderComposition>) => onChange({ ...composition, ...patch });
+
+  // The Claude Code CLI authenticates against the endpoint itself (every other
+  // driver round-trips completions through the host), so it only works on an
+  // anthropic_messages endpoint: the chip disables when the composition's
+  // endpoint (or the provider default, for the empty "endpoint default" pick)
+  // speaks another format.
+  const activeEndpoint =
+    composition.endpoint_id !== ""
+      ? catalog.endpoints.find((endpoint) => endpoint.id === composition.endpoint_id)
+      : catalog.endpoints.find((endpoint) => endpoint.default);
+  const claudeSdkBlocked = activeEndpoint !== undefined && activeEndpoint.api_format !== "anthropic_messages";
 
   const toggleTool = (name: string) => {
     const tools = composition.tools.includes(name)
@@ -164,19 +180,28 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
       </header>
 
       <Slot title={t("builder.slotFramework")}>
-        {catalog.frameworks.map((framework) => (
-          <button
-            key={framework.id}
-            type="button"
-            className="builder-chip"
-            data-selected={composition.framework === framework.id}
-            disabled={framework.status === "reserved"}
-            title={framework.status === "reserved" ? `${t("builder.reserved")}: ${framework.reason}` : framework.id}
-            onClick={() => set({ framework: framework.id })}
-          >
-            {framework.name}
-          </button>
-        ))}
+        {catalog.frameworks.map((framework) => {
+          const claudeSdkMismatch = framework.id === "claude_agent_sdk" && claudeSdkBlocked;
+          return (
+            <button
+              key={framework.id}
+              type="button"
+              className="builder-chip"
+              data-selected={composition.framework === framework.id}
+              disabled={framework.status === "reserved" || claudeSdkMismatch}
+              title={
+                framework.status === "reserved"
+                  ? `${t("builder.reserved")}: ${framework.reason}`
+                  : claudeSdkMismatch
+                    ? t("builder.claudeSdkNeedsAnthropic")
+                    : framework.id
+              }
+              onClick={() => set({ framework: framework.id })}
+            >
+              {framework.name}
+            </button>
+          );
+        })}
       </Slot>
 
       <Slot title={t("builder.slotModel")}>

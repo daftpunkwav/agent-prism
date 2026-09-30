@@ -56,6 +56,7 @@ export const builder = {
   swapped: "Hot-swap applied",
   endpointDefault: "Default endpoint",
   reserved: "Reserved",
+  claudeSdkNeedsAnthropic: "Claude Agent SDK authenticates against the endpoint itself and needs an anthropic_messages endpoint; switch the endpoint first",
   // chat
   chatPlaceholder: "Give the agent a task… (/compact condenses history)",
   attach: {
@@ -139,9 +140,6 @@ export const builder = {
     structured: "Structured",
     terse: "Terse",
     off: "Off",
-    low: "Low",
-    medium: "Medium",
-    high: "High",
     tool_tail: "Tool-tail pruning",
     token_budget: "Token budget",
     budget: "Source budget",
