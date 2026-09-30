@@ -378,7 +378,6 @@ function SegmentRow({
         <div className="builder-seg-tag">
           <Terminal size={12} aria-hidden />
           {t("builder.toolProgress")}
-          {!segment.completed && <span className="builder-seg-live-hint">{t("builder.streaming")}</span>}
         </div>
         <pre className="builder-seg-pre">{segment.text}</pre>
       </div>

@@ -96,7 +96,6 @@ export const builder = {
   fileDiff: "File diff",
   result: "Result",
   toolProgress: "Tool output",
-  streaming: "· streaming",
   error: "Error",
   verify: "Verify",
   reflect: "Reflect",

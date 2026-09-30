@@ -390,7 +390,6 @@ const TraceStep = memo(function TraceStep({
             <Terminal className="h-3 w-3" aria-hidden />
             {t("arena.trace.toolProgress")}
           </span>
-          {!seg.completed && <span className="ml-1 text-muted-foreground">{t("arena.trace.streaming")}<span className="trace-cursor" /></span>}
         </span>
         <pre className="text-xs font-mono whitespace-pre-wrap break-words text-muted-foreground max-h-48 overflow-auto">
           {seg.text}

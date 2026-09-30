@@ -298,7 +298,6 @@ export const arena = {
     reflect: "Reflect",
     harnessEdit: "Self-evolve",
     toolProgress: "Run output",
-    streaming: "· streaming",
     fileDiff: "File changes",
   },
   logs: {

@@ -96,7 +96,6 @@ export const builder = {
   fileDiff: "文件变更",
   result: "结果",
   toolProgress: "运行输出",
-  streaming: "· 流式",
   error: "错误",
   verify: "验证",
   reflect: "反思",

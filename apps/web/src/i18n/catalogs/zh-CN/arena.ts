@@ -297,7 +297,6 @@ export const arena = {
     reflect: "反思",
     harnessEdit: "自进化",
     toolProgress: "运行输出",
-    streaming: "· 流式",
     fileDiff: "文件变更",
   },
   logs: {
