@@ -13,6 +13,7 @@
  * - fail: declared runtime dependency used nowhere in src/ nor tests/ (stale)
  * - fail: declared devDependency used nowhere in src/ nor tests/ (stale)
  * - fail: dependency cycle along value/dynamic edges (type-only edges ignored)
+ * - fail: more than one resolved @langchain/core version in pnpm-lock.yaml
  * - warn: declared runtime dependency used only in tests (demote to devDependencies)
  */
 
@@ -145,6 +146,25 @@ for (const pkg of pkgs) {
     const inSrc = src.value.has(dep) || src.typeOnly.has(dep);
     const inTests = tests.value.has(dep) || tests.typeOnly.has(dep);
     if (!inSrc && !inTests) fail(`${self}: stale devDependency ${dep} (unused in src/ and tests/)`);
+  }
+}
+
+// Single-instance family: the LangChain message/handler surface crosses package
+// boundaries as live instances (apps/server hands BaseCallbackHandler and message
+// instances to provider-langchain / driver-langchain), so a second resolved
+// @langchain/core copy would break instanceof at those boundaries. The lockfile is
+// the source of truth — any second version, declared or transitive, fails here.
+const LOCKFILE = path.join(ROOT, "pnpm-lock.yaml");
+if (fs.existsSync(LOCKFILE)) {
+  const coreVersions = new Set();
+  for (const m of fs.readFileSync(LOCKFILE, "utf8").matchAll(/^  '?@langchain\/core@([^':(]+)/gm)) {
+    coreVersions.add(m[1]);
+  }
+  if (coreVersions.size > 1) {
+    fail(
+      `@langchain/core resolved as multiple versions (${[...coreVersions].join(", ")}); ` +
+        "the LangChain family must stay single-instance (instanceof breaks across the provider/driver boundary)",
+    );
   }
 }
 
