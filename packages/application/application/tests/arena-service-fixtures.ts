@@ -53,6 +53,7 @@ export function mockRouter(overrides: Record<string, any> = {}): MockRouter {
     },
     listBaselineFields: vi.fn().mockReturnValue([]),
     modelCompareReady: vi.fn().mockReturnValue(true),
+    thinkingAxesByEndpoint: vi.fn().mockReturnValue({}),
     ...overrides,
   };
 }

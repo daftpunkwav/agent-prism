@@ -30,20 +30,23 @@ export type BaselineDraft = Record<string, string>;
 
 /**
  * The thinking mode actually in effect: the stored draft wins, but only when
- * the server still offers it. The served option set follows the default
- * endpoint's capability (budget pairs exist on anthropic_messages endpoints
- * only), so a draft kept from an earlier endpoint falls back to level mapping
- * instead of rendering a dead budget tab and shipping a mode the server would
- * reject or silently downgrade.
+ * the server still offers it for the endpoint the baseline pins. The option
+ * set comes from the per-endpoint thinking projection when present (a pinned
+ * non-default endpoint serves its own mode set); older backends without the
+ * projection fall back to the catalog-wide field (a default-endpoint snapshot).
+ * A draft kept from an earlier endpoint falls back to level mapping instead of
+ * rendering a dead budget tab and shipping a mode the server would reject.
  */
 export function effectiveThinkingMode(meta: ArenaMeta | null, baseline: BaselineDraft): "levels" | "budget" {
-  // Without the served option set there is nothing to vouch for the draft's
+  const endpointId = baseline["endpoint_id"] ?? meta?.baseline_defaults?.["endpoint_id"] ?? "";
+  const axes = endpointId !== "" ? meta?.thinking_by_endpoint?.[endpointId] : undefined;
+  // Without a served option set there is nothing to vouch for the draft's
   // budget pin, so level mapping is the only safe answer (meta is always
   // loaded before a run can be assembled).
-  const served = meta?.baseline_fields.find((field) => field.field === "thinking_mode");
-  if (!served || served.options.length === 0) return "levels";
+  const served = axes !== undefined ? axes.mode_options : meta?.baseline_fields.find((field) => field.field === "thinking_mode")?.options;
+  if (!served || served.length === 0) return "levels";
   const raw = baseline["thinking_mode"] ?? meta?.baseline_defaults?.["thinking_mode"] ?? "levels";
-  if (!served.options.some((option) => option.value === raw)) return "levels";
+  if (!served.some((option) => option.value === raw)) return "levels";
   return raw === "budget" ? "budget" : "levels";
 }
 

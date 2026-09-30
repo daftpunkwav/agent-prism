@@ -68,6 +68,7 @@ export function resolveBaselineOverrides(
   }
 
   const lockedField = dimensionFieldName(dimension);
+  assertThinkingPinsLegal(raw, deps);
   const resolved: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
     // Custom-dimension pins arrive as one nested record; each entry becomes a
@@ -89,6 +90,13 @@ export function resolveBaselineOverrides(
       continue;
     }
     if (key === lockedField) continue;
+    if (key === "thinking_level" || key === "thinking_budget" || key === "thinking_mode") {
+      // Legality was checked endpoint-scoped by assertThinkingPinsLegal (the
+      // catalog options are a default-endpoint snapshot and may not match this
+      // baseline's endpoint); pass the token through to buildPipelineBase.
+      resolved[key] = coerceFieldValue(key, String(value));
+      continue;
+    }
     // Column label is an identity pin (threads), not a comparison variable: pass through
     // without dimension-catalog validation; buildPipelineBase applies it verbatim.
     if (key === "label") {
@@ -105,6 +113,72 @@ export function resolveBaselineOverrides(
     resolved[key] = coerceFieldValue(key, token);
   }
   return resolved;
+}
+
+/**
+ * Endpoint-scoped legality for the three thinking pins. The catalog option
+ * tables are a default-endpoint snapshot, so a baseline pinned to another
+ * endpoint must validate against that endpoint's own level set / budget pair
+ * table — the same semantics applyThinkingFields then enforces per column.
+ * The endpoint resolves from the baseline's endpoint_id (else the catalog
+ * default); an unresolvable endpoint is left to buildPipelineBase's loud error.
+ */
+function assertThinkingPinsLegal(raw: Record<string, unknown>, deps: BaselineResolverDeps): void {
+  const modePin = raw.thinking_mode;
+  const levelPin = raw.thinking_level;
+  const budgetPin = raw.thinking_budget;
+  if (modePin === undefined && levelPin === undefined && budgetPin === undefined) return;
+  const requested =
+    typeof raw.endpoint_id === "string" && raw.endpoint_id !== ""
+      ? raw.endpoint_id
+      : String(deps.dimensionCatalog.defaultBaseValue("endpoint_id") ?? "");
+  const endpoint = requested !== "" ? deps.providerLookup.lookupEndpoint(requested, deps.provider) : undefined;
+  if (endpoint === undefined) return;
+  const pairs = endpoint.thinking_budget_pairs ?? [];
+  const budgetApplicable =
+    endpoint.thinking_capable && endpoint.api_format === "anthropic_messages" && pairs.length > 0;
+  if (modePin !== undefined && !(modePin === "levels" || (modePin === "budget" && budgetApplicable))) {
+    throw new Error(
+      `Baseline thinking_mode "${String(modePin)}" is not applicable on endpoint "${endpoint.id}" ` +
+        `(${endpoint.api_format}${endpoint.thinking_capable ? ", no budget pairs configured" : ", thinking not capable"})`,
+    );
+  }
+  // The mode that would actually apply: the pin when servable, else the endpoint's
+  // own configuration (an unservable budget-mode config degrades to levels below).
+  const effectiveMode =
+    modePin === "levels" || modePin === "budget"
+      ? modePin
+      : endpoint.thinking_mode === "budget" && budgetApplicable
+        ? "budget"
+        : "levels";
+  if (effectiveMode === "budget") {
+    if (levelPin !== undefined && levelPin !== "off") {
+      throw new Error(
+        `Baseline thinking_level "${String(levelPin)}" is not applicable in budget mode: unset it or switch the thinking mode`,
+      );
+    }
+    if (
+      budgetPin !== undefined &&
+      budgetPin !== "" &&
+      budgetPin !== "0" &&
+      !pairs.some((pair) => pair.level === String(budgetPin))
+    ) {
+      throw new Error(`Baseline thinking_budget "${String(budgetPin)}" matches no budget pair on endpoint "${endpoint.id}"`);
+    }
+    return;
+  }
+  const custom = endpoint.thinking_levels ?? [];
+  const allowed = endpoint.thinking_capable ? (custom.length > 0 ? custom : ["low", "medium", "high"]) : [];
+  if (levelPin !== undefined && levelPin !== "off" && !allowed.includes(String(levelPin))) {
+    throw new Error(
+      `Baseline thinking_level "${String(levelPin)}" is not served by endpoint "${endpoint.id}" (serves: ${["off", ...allowed].join(", ")})`,
+    );
+  }
+  if (budgetPin !== undefined && budgetPin !== "" && budgetPin !== "0") {
+    throw new Error(
+      `Baseline thinking_budget "${String(budgetPin)}" is not applicable in level mode: unset it or switch the thinking mode`,
+    );
+  }
 }
 
 /**

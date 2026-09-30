@@ -301,7 +301,7 @@ describe("mutually exclusive thinking modes", () => {
     const { provider, lookup, catalog } = makeBudgetDeps();
     expect(() =>
       resolveBaselineOverrides("prompt", { thinking_budget: "2048" }, { provider, providerLookup: lookup, dimensionCatalog: catalog }),
-    ).toThrow('Baseline field "thinking_budget" has unsupported value');
+    ).toThrow('Baseline thinking_budget "2048" matches no budget pair on endpoint "ep-budget"');
   });
 
   it("keeps level mode working when the baseline pins the mode explicitly", () => {
@@ -378,12 +378,12 @@ describe("mutually exclusive thinking modes", () => {
 
   it("rejects an explicitly pinned budget mode the synced catalog does not offer", () => {
     // The default sync here serves an openai endpoint with thinking disabled:
-    // budget pairs never appear in the option set, so the pin is illegal at
-    // the validation layer already.
+    // budget pairs never apply on it, so the pin is illegal at the validation
+    // layer already (endpoint-scoped, not the catalog-wide option table).
     const { provider, lookup, catalog } = makeDeps();
     expect(() =>
       resolveBaselineOverrides("prompt", { thinking_mode: "budget" }, { provider, providerLookup: lookup, dimensionCatalog: catalog }),
-    ).toThrow('Baseline field "thinking_mode" has unsupported value: budget');
+    ).toThrow('Baseline thinking_mode "budget" is not applicable on endpoint');
   });
 
   it("rejects a pinned budget mode on a thinking-incapable endpoint at assembly", () => {

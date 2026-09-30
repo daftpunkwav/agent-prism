@@ -415,6 +415,27 @@ export const FrameworkDescriptorSchema = z.object({
 });
 export type FrameworkDescriptor = z.infer<typeof FrameworkDescriptorSchema>;
 
+/**
+ * Per-endpoint thinking-axis projection: the option set and defaults the three
+ * thinking baseline fields (thinking_level / thinking_budget / thinking_mode)
+ * serve when the baseline pins this endpoint. The catalog-wide baseline_fields
+ * snapshot follows the default endpoint only; the UI overlays this record so a
+ * non-default endpoint's own level set / budget pair table shows up the moment
+ * it is selected.
+ */
+export const EndpointThinkingAxesSchema = z.object({
+  /** Level-mode options (empty when the endpoint is an active budget-mode one). */
+  level_options: z.array(BaselineFieldOptionSchema),
+  level_default: z.string(),
+  /** Budget-pair options (empty when the endpoint has no servable pair table). */
+  budget_options: z.array(BaselineFieldOptionSchema),
+  budget_default: z.string(),
+  /** Mode tokens the endpoint can serve: ["levels"], or both when budget pairs apply. */
+  mode_options: z.array(BaselineFieldOptionSchema),
+  mode_default: z.string(),
+});
+export type EndpointThinkingAxes = z.infer<typeof EndpointThinkingAxesSchema>;
+
 /** GET /api/arena/meta response. */
 export const ArenaMetaSchema = z.object({
   dimensions: z.array(DimensionMetaSchema),
@@ -422,6 +443,8 @@ export const ArenaMetaSchema = z.object({
   baseline_defaults: z.record(z.string(), z.string()),
   baseline_fields: z.array(BaselineFieldSchema),
   model_compare_ready: z.boolean(),
+  /** endpoint id → thinking axes projection (absent from older backends). */
+  thinking_by_endpoint: z.record(z.string(), EndpointThinkingAxesSchema).default({}),
 });
 export type ArenaMeta = z.infer<typeof ArenaMetaSchema>;
 

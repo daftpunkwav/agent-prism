@@ -302,6 +302,19 @@ export function BaselineModal({
                     // kept from an endpoint that offered budget pairs must not
                     // disable the level field here when the current one doesn't.
                     const thinkingMode = effectiveThinkingMode(meta, baseline);
+                    // The three thinking axes follow the endpoint the baseline pins,
+                    // not the catalog-wide snapshot (which trails the default
+                    // endpoint): a non-default endpoint's own level set / budget
+                    // pair table overlays the served field definition.
+                    const pinnedEndpointId = baseline["endpoint_id"] || meta?.baseline_defaults?.["endpoint_id"] || "";
+                    const axes = pinnedEndpointId !== "" ? meta?.thinking_by_endpoint?.[pinnedEndpointId] : undefined;
+                    const axesField = (fieldName: string): { options: Array<{ value: string; label: string }>; def: string } | null => {
+                      if (axes === undefined) return null;
+                      if (fieldName === "thinking_level") return { options: axes.level_options, def: axes.level_default };
+                      if (fieldName === "thinking_budget") return { options: axes.budget_options, def: axes.budget_default };
+                      if (fieldName === "thinking_mode") return { options: axes.mode_options, def: axes.mode_default };
+                      return null;
+                    };
                     return (
                       <div key={g} className="baseline-group" data-group={g}>
                         <p className="baseline-group-title">{t(`arena.group.${g}`)}</p>
@@ -311,7 +324,8 @@ export function BaselineModal({
                             const modeDisabled =
                               (field.field === "thinking_level" && thinkingMode === "budget") ||
                               (field.field === "thinking_budget" && thinkingMode !== "budget");
-                            const value = baseline[field.field] ?? field.default;
+                            const override = axesField(field.field);
+                            const value = baseline[field.field] ?? override?.def ?? field.default;
                             const fieldLab = baselineFieldLabel(t, field.field, field.label);
                             // Numeric editor only for unlocked number-kind fields with a
                             // server-provided range (old backends omit input/min/max and
@@ -368,7 +382,7 @@ export function BaselineModal({
                                     value={field.field === "thinking_mode" ? thinkingMode : value}
                                     onChange={(next) => onBaselineFieldChange(field.field, next)}
                                     ariaLabel={t("arena.setup.baselineFieldAria", { label: fieldLab })}
-                                    options={field.options.map((opt) => ({
+                                    options={(override?.options ?? field.options).map((opt) => ({
                                       value: opt.value,
                                       label: baselineOptionLabel(t, field.field, opt.value, opt.label),
                                     }))}

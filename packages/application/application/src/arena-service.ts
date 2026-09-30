@@ -128,6 +128,7 @@ export class ArenaService {
       baseline_defaults: this.deps.router.dimensionCatalog.baselineDefaultsPayload(),
       baseline_fields: this.deps.router.listBaselineFields(),
       model_compare_ready: this.deps.router.modelCompareReady(),
+      thinking_by_endpoint: this.deps.router.thinkingAxesByEndpoint(),
     };
   }
 

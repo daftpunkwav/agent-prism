@@ -10,11 +10,64 @@
  * External state to catalog projection only; routing lives in DimensionRouter.
  */
 
-import type { ProviderConfig, ProviderLookup } from "@agentprism/contracts";
+import type { EndpointThinkingAxes, LlmEndpoint, ProviderConfig, ProviderLookup } from "@agentprism/contracts";
 import { customFieldKey, MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, TEMPERATURE_OPTIONS, TOP_P_OPTIONS } from "@agentprism/contracts";
 import { customDimension, customDimensionDefault } from "@agentprism/harness";
 import { currentEndpointLabel, DimensionCatalog, type DimensionOptionTriple } from "@agentprism/dimensions";
 import { snapIntToOptions, snapToOptions } from "./field-values.js";
+
+/**
+ * Projects one endpoint's thinking configuration onto the three thinking baseline
+ * axes (level / budget / mode). Single source for both the catalog sync (default
+ * endpoint) and the meta payload's per-endpoint record, so the baseline panel and
+ * the run-request validation can never disagree about what an endpoint serves.
+ *
+ * Mode options follow endpoint capability: budget pairs only exist on
+ * anthropic_messages endpoints, so any other endpoint serves ["levels"] only —
+ * offering budget there would be a dead end (the run-side fails loud on it).
+ * When the endpoint is an active budget-mode one, the level axis empties and the
+ * budget axis carries the pair table (plus the "0" follow-level token).
+ */
+export function endpointThinkingAxes(endpoint: LlmEndpoint): EndpointThinkingAxes {
+  const budgetPairsApplicable =
+    endpoint.thinking_capable &&
+    endpoint.api_format === "anthropic_messages" &&
+    (endpoint.thinking_budget_pairs ?? []).length > 0;
+  const modeOptions: EndpointThinkingAxes["mode_options"] = [{ value: "levels", label: "Level mapping" }];
+  if (budgetPairsApplicable) modeOptions.push({ value: "budget", label: "Budget pairs" });
+  if (endpoint.thinking_capable && endpoint.thinking_mode === "budget" && budgetPairsApplicable) {
+    const defaultPair = (endpoint.thinking_budget_pairs ?? []).find((pair) => pair.level === endpoint.thinking_level);
+    return {
+      level_options: [],
+      level_default: "off",
+      budget_options: [
+        { value: "0", label: "Off" },
+        ...(endpoint.thinking_budget_pairs ?? []).map((pair) => ({
+          value: pair.level,
+          label: `${pair.level} · ${pair.budget_tokens}/${pair.max_tokens > 0 ? pair.max_tokens : "auto"} tok`,
+        })),
+      ],
+      budget_default: defaultPair === undefined ? "0" : defaultPair.level,
+      mode_options: modeOptions,
+      mode_default: "budget",
+    };
+  }
+  const customLevels = endpoint.thinking_levels ?? [];
+  const levels = endpoint.thinking_capable
+    ? (customLevels.length > 0 ? customLevels : ["low", "medium", "high"])
+    : [];
+  return {
+    level_options: [
+      { value: "off", label: "Off" },
+      ...levels.map((name) => ({ value: name, label: name })),
+    ],
+    level_default: endpoint.thinking_capable ? endpoint.thinking_level : "off",
+    budget_options: [],
+    budget_default: "0",
+    mode_options: modeOptions,
+    mode_default: "levels",
+  };
+}
 
 /** Config sync dependencies: catalog + provider lookup port (wired at the composition root; the instance is created and held by DimensionRouter). */
 export interface ProviderDimensionSyncDeps {
@@ -125,59 +178,27 @@ export class ProviderDimensionSync {
     if (defaultEndpoint !== undefined) {
       this.dimensionCatalog.setDefaultBase("model_id", defaultEndpoint.model);
       // The two thinking axes are mutually exclusive and follow the default
-      // endpoint's mode: level mode exposes the endpoint's level set on the
-      // thinking axis; budget mode (anthropic endpoints with budget pairs)
-      // exposes the pair table's level names on the budget axis instead. The
-      // endpoint's own default selection seeds both axes' baseline defaults.
-      const budgetPairsApplicable =
-        defaultEndpoint.thinking_capable &&
-        defaultEndpoint.api_format === "anthropic_messages" &&
-        defaultEndpoint.thinking_mode === "budget" &&
-        defaultEndpoint.thinking_budget_pairs.length > 0;
-      if (budgetPairsApplicable) {
-        const defaultPair = defaultEndpoint.thinking_budget_pairs.find(
-          (pair) => pair.level === defaultEndpoint.thinking_level,
-        );
-        const budgetDefault = defaultPair === undefined ? "0" : defaultPair.level;
-        this.dimensionCatalog.setDimensionOptions("thinking_level", []);
-        this.dimensionCatalog.setDefaultBase("thinking_level", "off");
-        this.dimensionCatalog.setDimensionOptions("thinking_budget", [
-          { field: "thinking_budget", value: "0", label: "Off" },
-          ...defaultEndpoint.thinking_budget_pairs.map((pair): DimensionOptionTriple => ({
-            field: "thinking_budget",
-            value: pair.level,
-            label: `${pair.level} · ${pair.budget_tokens}/${pair.max_tokens > 0 ? pair.max_tokens : "auto"} tok`,
-          })),
-        ]);
-        this.dimensionCatalog.setDefaultBase("thinking_budget", budgetDefault);
-        this.dimensionCatalog.setDefaultBase("thinking_mode", "budget");
-        this.dimensionCatalog.setBaselineFieldOptions("thinking_mode", [
-          { field: "thinking_mode", value: "levels", label: "Level mapping" },
-          { field: "thinking_mode", value: "budget", label: "Budget pairs" },
-        ]);
-      } else {
-        const customLevels = defaultEndpoint.thinking_levels ?? [];
-        const levels = defaultEndpoint.thinking_capable
-          ? (customLevels.length > 0 ? customLevels : ["low", "medium", "high"])
-          : [];
-        this.dimensionCatalog.setDimensionOptions(
-          "thinking_level",
-          [{ field: "thinking_level", value: "off", label: "Off" }, ...levels.map((name) => ({ field: "thinking_level", value: name, label: name }))],
-        );
-        this.dimensionCatalog.setDefaultBase(
-          "thinking_level",
-          defaultEndpoint.thinking_capable ? defaultEndpoint.thinking_level : "off",
-        );
-        this.dimensionCatalog.setDimensionOptions("thinking_budget", []);
-        this.dimensionCatalog.setDefaultBase("thinking_budget", 0);
-        this.dimensionCatalog.setDefaultBase("thinking_mode", "levels");
-        // Budget pairs only exist on anthropic_messages endpoints: on any other
-        // endpoint the budget tab is a dead end (no pair options to pick, the
-        // mode silently degrades server-side), so it must not be offered here.
-        this.dimensionCatalog.setBaselineFieldOptions("thinking_mode", [
-          { field: "thinking_mode", value: "levels", label: "Level mapping" },
-        ]);
-      }
+      // endpoint's projected axes (shared with the meta payload's per-endpoint
+      // record): level mode exposes the endpoint's level set on the thinking
+      // axis; an active budget-mode endpoint exposes the pair table on the
+      // budget axis instead. Mode tokens follow capability, so a levels-mode
+      // endpoint that has a servable pair table still offers the budget switch.
+      const axes = endpointThinkingAxes(defaultEndpoint);
+      this.dimensionCatalog.setDimensionOptions(
+        "thinking_level",
+        axes.level_options.map((option): DimensionOptionTriple => ({ field: "thinking_level", ...option })),
+      );
+      this.dimensionCatalog.setDefaultBase("thinking_level", axes.level_default);
+      this.dimensionCatalog.setDimensionOptions(
+        "thinking_budget",
+        axes.budget_options.map((option): DimensionOptionTriple => ({ field: "thinking_budget", ...option })),
+      );
+      this.dimensionCatalog.setDefaultBase("thinking_budget", axes.budget_default === "0" ? 0 : axes.budget_default);
+      this.dimensionCatalog.setDefaultBase("thinking_mode", axes.mode_default);
+      this.dimensionCatalog.setBaselineFieldOptions(
+        "thinking_mode",
+        axes.mode_options.map((option): DimensionOptionTriple => ({ field: "thinking_mode", ...option })),
+      );
     }
     this.dimensionCatalog.setDefaultBase("temperature", snapToOptions(provider.temperature, TEMPERATURE_OPTIONS));
     this.dimensionCatalog.setDefaultBase("top_p", snapToOptions(provider.top_p, TOP_P_OPTIONS));

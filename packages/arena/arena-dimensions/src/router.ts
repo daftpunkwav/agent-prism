@@ -9,14 +9,14 @@
  * Config syncing is delegated; this class keeps routing and queries only.
  */
 
-import type { BaselineOverrides, PipelineConfig } from "@agentprism/contracts";
+import type { BaselineOverrides, EndpointThinkingAxes, PipelineConfig } from "@agentprism/contracts";
 import { dimensionFieldName } from "@agentprism/contracts";
 import { ARENA_MIN_SELECT } from "@agentprism/contracts";
 import { DimensionCatalog, type DimensionOptionTriple } from "@agentprism/dimensions";
 import { coerceFieldValue, normalizeOptionToken } from "./field-values.js";
 import { resolveBaselineOverrides, buildPipelineBase } from "./baseline.js";
 import { listBaselineFields } from "./baseline-fields.js";
-import { ProviderDimensionSync } from "./provider-dimension-sync.js";
+import { endpointThinkingAxes, ProviderDimensionSync } from "./provider-dimension-sync.js";
 
 /** Dimension routing dependencies: catalog + config syncer (both built and injected at the composition root, independently replaceable/mocked). */
 export interface DimensionRouterDeps {
@@ -78,6 +78,23 @@ export class DimensionRouter {
       dimensionCatalog: this.dimensionCatalog,
       ensureModelSynced: () => this.sync.ensureModelSynced(),
     });
+  }
+
+  /**
+   * Per-endpoint thinking-axis projection for the meta payload: each enabled
+   * endpoint's level/budget/mode option set, keyed by endpoint id. The UI
+   * overlays the catalog-wide baseline fields (a default-endpoint snapshot)
+   * with the record of the endpoint the baseline currently pins.
+   */
+  thinkingAxesByEndpoint(): Record<string, EndpointThinkingAxes> {
+    this.sync.ensureModelSynced();
+    const provider = this.sync.loadProvider();
+    const out: Record<string, EndpointThinkingAxes> = {};
+    for (const endpoint of provider.endpoints) {
+      if (endpoint.enabled === false) continue;
+      out[endpoint.id] = endpointThinkingAxes(endpoint);
+    }
+    return out;
   }
 
   /** Core of the single-variable principle: each column differs only in the comparison dimension's field. */
