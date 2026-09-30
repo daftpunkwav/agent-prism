@@ -438,6 +438,28 @@ describe("BuilderService.chatTurn", () => {
     harness.release();
   });
 
+  it("applies the same availability gate to a swap, not only to creation", async () => {
+    // patchComposition shares assertCompositionAvailable with createSession: a
+    // PATCH swapping onto a block the live palette does not offer (a deleted or
+    // disabled endpoint id) must throw before any turn, never surface mid-run.
+    // The framework is carried explicitly because the patch schema's field
+    // defaults fill the partial composition (framework would otherwise reset
+    // to "native" and trip the framework gate first).
+    const harness = makeDriverHarness(["fake"], { block: true });
+    const service = makeService(harness);
+    const view = service.createSession(BuilderCreateRequestSchema.parse({ name: "S", composition: { framework: "fake" } }));
+    harness.release();
+    expect(() =>
+      service.patchComposition(
+        view.id,
+        BuilderPatchRequestSchema.parse({ composition: { framework: "fake", endpoint_id: "ghost" } }),
+      ),
+    ).toThrow(/ghost/);
+    // The rejected swap leaves the stored composition untouched.
+    const detail = await service.getSessionDetail(view.id);
+    expect(detail.session.composition.endpoint_id).toBe("");
+  });
+
   it("keeps the terminal complete on long turns (tail retention, not first-N)", async () => {
     // thought_delta streams per chunk: 900 deltas exceed MAX_TURN_EVENTS. First-N retention
     // would lose the terminal complete (turn misreported failed, history dropped) and extract

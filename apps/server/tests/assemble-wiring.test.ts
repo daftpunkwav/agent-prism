@@ -291,6 +291,36 @@ describe("assemble() route wiring", () => {
       const disabled = await create({ framework: "native", endpoint_id: "ep-off" });
       expect(disabled.status).toBe(422);
       expect(((await disabled.json()) as { detail?: string }).detail).toContain("ep-off");
+
+      // The same gate guards the hot-swap (PATCH) path: an illegal swap answers
+      // 422 before any turn starts, and a rejected swap leaves the stored
+      // composition untouched; a legal one still goes through.
+      const swapHost = await create({ framework: "native", endpoint_id: "ep-live" });
+      expect(swapHost.status).toBe(200);
+      const hostId = ((await swapHost.json()) as { id?: string }).id ?? "";
+      const swapToDisabled = await app.request(`/api/builder/sessions/${hostId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ composition: { endpoint_id: "ep-off" } }),
+      });
+      expect(swapToDisabled.status).toBe(422);
+      const swapToWrongFormat = await app.request(`/api/builder/sessions/${hostId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ composition: { framework: "claude_agent_sdk", endpoint_id: "ep-openai" } }),
+      });
+      expect(swapToWrongFormat.status).toBe(422);
+      const afterRejected = (await (
+        await app.request(`/api/builder/sessions/${hostId}`)
+      ).json()) as { session?: { composition?: Record<string, unknown> } };
+      expect(afterRejected.session?.composition?.["endpoint_id"]).toBe("ep-live");
+      const legalSwap = await app.request(`/api/builder/sessions/${hostId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ composition: { endpoint_id: "ep-openai" } }),
+      });
+      expect(legalSwap.status).toBe(200);
+      expect(((await legalSwap.json()) as { changed_fields?: string[] }).changed_fields).toContain("endpoint_id");
     },
   );
 
