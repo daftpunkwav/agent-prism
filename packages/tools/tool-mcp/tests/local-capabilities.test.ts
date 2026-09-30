@@ -1,11 +1,11 @@
 /**
- * @file servers test
+ * @file local-capabilities test
  * @description Locks MCP filesystem scoping and fetch fail-closed behavior.
  */
 import { describe, expect, it } from "vitest";
 import type { ToolWorkspace } from "@agentprism/contracts";
 import { UrlValidationError } from "@agentprism/contracts";
-import { createMcpFetchTool, mcpFetchTool, mcpFsListTool, mcpFsReadTool, mcpServerTools } from "../src/servers.js";
+import { createMcpFetchTool, mcpFetchTool, mcpFsListTool, mcpFsReadTool, mcpServerTools } from "../src/local-capabilities.js";
 
 function workspace(files: Record<string, string>): ToolWorkspace {
   return {

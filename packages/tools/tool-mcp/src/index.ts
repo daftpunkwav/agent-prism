@@ -6,8 +6,8 @@
  * - Re-export MCP servers, policy tables, and registry bridging
  */
 
-export * from "./servers.js";
-export * from "./bridge.js";
+export * from "./local-capabilities.js";
+export * from "./policy-bridge.js";
 export * from "./transport.js";
 export * from "./client.js";
 export * from "./remote-tools.js";

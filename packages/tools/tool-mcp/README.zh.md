@@ -10,6 +10,9 @@ MCP 挂接 seam：把进程内文件系统与 fetch 能力服务器桥接为 too
   使用 `mcp__` 命名。
 - 仅依赖 `contracts`；server 以进程内方式跑在 column workspace
   上，无 socket、无外部进程。
+- `local-capabilities`、`policy-bridge`（原名 `servers`、`bridge`）：进程内 tool
+  定义及其 policy 映射——无 socket；真正的外部进程在 `transport`、`client`
+  与 `mcp-servers-store` 注册表。
 - `transport`、`client`、`remote-tools`：用于外部 MCP server 的 JSON-RPC stdio
   client，含 handshake、tools/list、tools/call、超时，并以
   `mcp__<server>__<tool>` 命名桥接进 registry。

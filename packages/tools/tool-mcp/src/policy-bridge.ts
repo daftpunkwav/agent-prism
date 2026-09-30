@@ -1,5 +1,5 @@
 /**
- * @file tool-mcp/bridge
+ * @file tool-mcp/policy-bridge
  * @description MCP policy selection and registry bridging.
  *
  * Responsibilities:
@@ -9,7 +9,7 @@
  */
 
 import type { McpPolicy, ToolRegistry } from "@agentprism/contracts";
-import { mcpServerTools, type McpFetchDeps } from "./servers.js";
+import { mcpServerTools, type McpFetchDeps } from "./local-capabilities.js";
 
 /** MCP tool names attached by each policy (sorted for stability). */
 export const MCP_TOOLS_BY_POLICY: Record<McpPolicy, readonly string[]> = {

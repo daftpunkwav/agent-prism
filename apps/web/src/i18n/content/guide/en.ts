@@ -198,7 +198,7 @@ const PIPELINE_STAGES: Array<{
     title: "Orchestrated execution",
     detail:
       "Native loop or a thin framework bridge (LangChain family, SDK bridges); SSE carries tool_progress / file_diff; the trailing report event includes hard metrics + artifacts + narrative.",
-    module: "drivers/* · harness/verification/harness-runner.ts · evaluation/report.ts",
+    module: "drivers/* · harness/verification/loop.ts · evaluation/report.ts",
   },
   {
     title: "Streaming back",

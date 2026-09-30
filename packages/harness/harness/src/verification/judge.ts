@@ -19,6 +19,9 @@ export interface JudgeOptions {
   tracker?: TokenTracker;
 }
 
+/** Legacy alias of JudgeOptions kept for API compatibility (no new consumers). */
+export type { JudgeOptions as LlmJudgeOptions };
+
 /** LLM judges whether an answer passes; parse failures count as failing. */
 export async function verifyResult(
   question: string,

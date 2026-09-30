@@ -9,7 +9,7 @@ Neutral execution semantics: context pipeline, prompt assembly, reasoning modes,
 | `context/` | Message normalization, truncation, and pipeline: `applyContextPipeline`, `MapContextPolicyRegistry` |
 | `prompt/` | Prompt assembly: `prompt-builder`, `assembly`, `MapPromptSectionRegistry`, builtin sections |
 | `reasoning/` | Reasoning modes: `reasoning-modes` |
-| `verification/` | Runner, judging, reflection, evolution, loop, answer extraction: `harness-runner` et al. |
+| `verification/` | Judging, reflection, evolution, verification loop, answer extraction (`judge`, `reflect`, `evolve`, `loop`) |
 | `memory/` | Retrieval augmentation: `rag` |
 | `control/` | Tool admission: `tool-guard` (`ToolAccess`) |
 | `execution-context.ts` / `usage.ts` | Execution context and usage accounting |

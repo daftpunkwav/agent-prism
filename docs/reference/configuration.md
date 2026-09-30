@@ -141,7 +141,7 @@ These are deliberately not env-tunable.
 | `SEARCH_API_URL` | same | endpoint override for tests, defaulting to Exa at `https://api.exa.ai/search` and Tavily at `https://api.tavily.com/search` |
 | `NEXT_PUBLIC_API_BASE` | `packages/client/client/src/http.ts` | prefix for all client URLs; a same-origin proxy needs nothing |
 | `ARENA_BASE` | `scripts/run-matrix.mjs` | base URL of a running server, default `http://localhost:8281` |
-| `ARENA_TOT_WIDTH` | `driver-run-support/src/reasoning-constants.ts` (`totWidth`), consumed by the native, langgraph, and plan-execute drivers | ToT branch width, clamped 2 to 5, default 3; inside the server the runtime knob wins — `assemble.ts` seeds this variable from the effective knob at boot and on every knobs hot-apply |
+| `ARENA_TOT_WIDTH` | `driver-run-support/src/reasoning-knobs.ts` (`totWidth`), consumed by the native, langgraph, and plan-execute drivers | ToT branch width, clamped 2 to 5, default 3; inside the server the runtime knob wins — `assemble.ts` seeds this variable from the effective knob at boot and on every knobs hot-apply |
 | `ARENA_SELF_CONSISTENCY_N` | same helper (`selfConsistencyAttempts`) | self-consistency attempt count, clamped 2 to 9, default 5; model calls scale with it; same seeding precedence |
 | `ARENA_CREWAI_PROCESS` | `driver-crewai/src/crew.ts` and `driver-crewai/python/bootstrap.py` | `hierarchical` switches the crew to the manager process, anything else keeps `sequential`; same seeding precedence |
 | `ARENA_PYTHON` | `driver-run-support/src/python-probe.ts` | interpreter override for the framework runtime probes; unset or blank falls back to `python`, then `python3` |

@@ -5,6 +5,9 @@ MCP attachment seam: in-process filesystem/fetch capability servers bridged as t
 - `McpPolicy` (`off`/`fs`/`full`) selects which servers attach; `mcpToolsForPolicy` lists them.
 - `registerMcpTools(registry, policy)` bridges server handlers into a `ToolRegistry` with `mcp__` names.
 - Depends only on `contracts`; servers run in-process against the column workspace (no sockets, no external processes).
+- `local-capabilities`/`policy-bridge` (formerly `servers`/`bridge`): the in-process tool
+  definitions and their policy mapping — no sockets; real external processes live in
+  `transport`/`client` plus the `mcp-servers-store` registry.
 - `transport`/`client`/`remote-tools`: JSON-RPC stdio client for external MCP
   servers (handshake, tools/list, tools/call, timeouts) plus registry bridging
   under `mcp__<server>__<tool>` names.

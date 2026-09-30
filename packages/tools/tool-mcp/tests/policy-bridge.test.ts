@@ -1,5 +1,5 @@
 /**
- * @file bridge test
+ * @file policy-bridge test
  * @description Locks MCP policy mapping and registry bridging.
  */
 import { describe, expect, it } from "vitest";
@@ -9,7 +9,7 @@ import {
   hasMcpAttachment,
   mcpToolsForPolicy,
   registerMcpTools,
-} from "../src/bridge.js";
+} from "../src/policy-bridge.js";
 
 describe("mcpToolsForPolicy", () => {
   it("off attaches nothing", () => {

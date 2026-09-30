@@ -197,7 +197,7 @@ const PIPELINE_STAGES: Array<{
     title: "编排执行",
     detail:
       "Native 循环或薄框架桥（LangChain 家族、SDK 桥）；SSE 含 tool_progress / file_diff；尾部 report 事件含硬指标+产物+叙事。",
-    module: "drivers/* · harness/verification/harness-runner.ts · evaluation/report.ts",
+    module: "drivers/* · harness/verification/loop.ts · evaluation/report.ts",
   },
   {
     title: "流式回传",

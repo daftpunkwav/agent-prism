@@ -1,9 +1,9 @@
 /**
- * @file reasoning-constants test
+ * @file reasoning-knobs test
  * @description Locks the env-tunable ToT width knob and score parsing.
  */
 import { describe, expect, it } from "vitest";
-import { parseScoreVerdict, selfConsistencyAttempts, totWidth } from "../src/reasoning-constants.js";
+import { parseScoreVerdict, selfConsistencyAttempts, totWidth } from "../src/reasoning-knobs.js";
 
 describe("totWidth", () => {
   it("defaults to 3 when the env knob is absent or invalid", () => {

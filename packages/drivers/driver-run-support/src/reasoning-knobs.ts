@@ -1,10 +1,11 @@
 /**
- * @file reasoning-constants
- * @description Shared reasoning-mode constants across drivers.
+ * @file reasoning-knobs
+ * @description Env-tunable reasoning knobs and shared verdict parsing across drivers.
  *
  * Responsibilities:
  * - Single source deciding "needs retry" after reflection (reflexion keywords)
- * - Env-tunable ToT branching width and score parsing shared by native/LG/plan-execute
+ * - Env-tunable ToT branching width and self-consistency attempt count (ARENA_TOT_WIDTH / ARENA_SELF_CONSISTENCY_N)
+ * - Score parsing shared by native/LG/plan-execute ToT loops
  *
  * Shared by the native state machine and the langgraph graph: keyword list is
  * shared; round caps differ (native caps reflexion rounds at 2, langgraph caps by max_steps).

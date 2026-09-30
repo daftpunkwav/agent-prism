@@ -28,7 +28,7 @@ export * from "./dimensions/custom-dimensions.js";
 export * from "./dimensions/custom-dimension-hooks.js";
 export * from "./control/tool-guard.js";
 export * from "./control/repeat-reminder.js";
-export * from "./verification/harness-runner.js";
+export * from "./verification/event-stream-runnable.js";
 export * from "./verification/judge.js";
 export * from "./verification/reflect.js";
 export * from "./verification/evolve.js";

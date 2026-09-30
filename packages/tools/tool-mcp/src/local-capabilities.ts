@@ -1,5 +1,5 @@
 /**
- * @file tool-mcp/servers
+ * @file tool-mcp/local-capabilities
  * @description In-process MCP capability servers (filesystem + fetch).
  *
  * Responsibilities:
@@ -9,6 +9,8 @@
  * Servers run in-process against the column workspace: no sockets, no child
  * processes, no external MCP transport. Names use the `mcp__` prefix so model
  * transcripts show exactly when an MCP bridge (rather than a builtin) served a call.
+ * External server processes are a different seam: transport/client/remote-tools
+ * bridge real stdio servers (operator registry: mcp-servers-store).
  */
 
 import { UrlValidationError } from "@agentprism/contracts";

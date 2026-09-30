@@ -13,7 +13,7 @@ export * from "./registry.js";
 export * from "./builtin-registration.js";
 export * from "./event-translation.js";
 export * from "./capability-banner.js";
-export * from "./reasoning-constants.js";
+export * from "./reasoning-knobs.js";
 export * from "./reasoning-support.js";
 export * from "./self-consistency.js";
 export * from "./recursion-limit.js";

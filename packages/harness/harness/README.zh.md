@@ -13,7 +13,7 @@
 | `context/` | 消息规范化、截断与 pipeline：`applyContextPipeline`、`MapContextPolicyRegistry` |
 | `prompt/` | Prompt 装配：`prompt-builder`、`assembly`、`MapPromptSectionRegistry`、内置 sections |
 | `reasoning/` | Reasoning 模式：`reasoning-modes` |
-| `verification/` | Runner、judging、reflection、evolution、loop、答案提取：`harness-runner` 等 |
+| `verification/` | judging、reflection、evolution、验证 loop、答案提取（`judge`、`reflect`、`evolve`、`loop`） |
 | `memory/` | 检索增强：`rag` |
 | `control/` | Tool 准入：`tool-guard`，即 `ToolAccess` |
 | `execution-context.ts` / `usage.ts` | 执行 context 与用量记账 |

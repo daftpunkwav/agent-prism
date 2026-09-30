@@ -7,7 +7,7 @@
  * - Provide the settings-UI field metadata (group/kind/range/options/defaults)
  *
  * Reasoning-width defaults are exported here and reused by the driver-side
- * fallbacks (driver-run-support reasoning-constants), so knob reset and driver
+ * fallbacks (driver-run-support reasoning-knobs), so knob reset and driver
  * fallback cannot drift. The remaining defaults must stay in sync with the
  * harness strategy fallbacks; env-derived defaults live in config
  * (defaultRuntimeKnobs over the Settings reads).
