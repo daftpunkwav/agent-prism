@@ -107,6 +107,8 @@ export const myDimension: CustomDimension = {
   的选项、超过 200 字符的选项取值（每个持久化 config 记录的上限）、`default` 不在
   `options` 内、与内置维度或内置 context 策略撞 id（否则该维度的 effectiveness 行会与那条
   策略的行合并）、第二个包抢占已注册 id——全部在启动期报错，绝不推迟到运行期。
+  run、baseline、builder 三个 wire schema 的 `custom` 映射用同一正则校验键，键不可能
+  来自已注册维度的请求在解析期即以 `422` 拒绝。
 - **未知 id 在三处 fail-loud**：配置期（Builder 组合）、基线解析（钉了一个没有包提供的
   维度）、运行装配（存储的 thread 对应的包已被移除）。任何一处都不会静默跑成"其实是另一
   个实验"。

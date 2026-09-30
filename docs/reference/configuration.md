@@ -27,7 +27,7 @@ out-of-box behavior equals the default column.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `LLM_PROVIDER_NAME` | `StepFun` | provider-store seed, used only when `data/provider_config.json` is missing or corrupt |
+| `LLM_PROVIDER_NAME` | `StepFun` | provider-store seed, used only when `data/provider_config.json` cannot provide a usable config (missing, corrupt, or unreadable after a retry) |
 | `LLM_API_KEY` | `""` | seed API key |
 | `LLM_BASE_URL` | `https://api.stepfun.com/step_plan` | seed base URL |
 | `LLM_MODEL` | `step-3.7-flash` | seed model |
@@ -203,6 +203,20 @@ effective catalog from the next turn on. `GET` and `PUT /api/settings/mcp` repla
 whole managed MCP server list; the store keeps a shared in-memory array that per-run
 consumers read, so a save reaches the next run immediately.
 
+## Provider endpoints
+
+Endpoints live in `data/provider_config.json` and are edited through the settings API.
+Each endpoint carries an `enabled` flag (default on, `LlmEndpointSchema` in
+`contracts/src/provider.ts`) and `default_endpoint_id` names the stored default. The
+effective default — the target of an empty `endpoint_id`, the builder palette marker,
+and the arena baseline defaults — is one rule, resolved by `resolveDefaultEndpoint` in
+`contracts/src/provider-types.ts`: the stored default while it is still enabled,
+otherwise the first enabled endpoint. When nothing is enabled, the first configured
+endpoint is returned, and picks that resolve to a disabled endpoint fail loud at model
+construction (`model-factory.ts`). Disabled endpoints do not anchor the default, are
+excluded from the builder palette, and are skipped by the per-endpoint thinking-axis
+projection in `/api/arena/meta`.
+
 ## Credential references
 
 Provider endpoints stored through the settings API may hold an API key that is exactly
@@ -218,7 +232,7 @@ Paths are defined in `config/src/paths.ts`.
 
 | Path | Content | Recovery behavior |
 |---|---|---|
-| `data/provider_config.json` and `.bak` | provider endpoints and settings | a corrupt main file recovers from `.bak`; if still unusable, the `LLM_*` env seed applies |
+| `data/provider_config.json` and `.bak` | provider endpoints and settings | a missing file falls to the `LLM_*` env seed; a corrupt main file recovers from `.bak`; a read that still throws after one bounded retry falls back to the seed with a warning (`provider-store.ts` `load`) |
 | `data/sessions.json` and `.bak` | session ledger snapshot `{version:1, sessions:[…]}`, compacted from the op log | a corrupt main file recovers from `.bak`; stale `active` rows flip to `failed` on load |
 | `data/sessions.jsonl` | append-only session op log replayed on boot (corrupt lines are skipped and counted) | compacted into the snapshot by `checkpoint()`: on the 30-minute host cadence, on shutdown, and once the log passes its 32 MB size budget |
 | `data/sessions.json.blobs/` | oversized ledger entry texts named `<sessionId>.<seq>.blob.txt`, each at most 128 K characters | per-session purge on delete |

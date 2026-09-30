@@ -73,6 +73,12 @@ resolved at runtime by `driver-claude-agent-sdk/src/cli-path.ts`:
 - Nothing found: returns `undefined`, the SDK then fails with its own
   missing-CLI error — also loud, just worded by the SDK.
 
+A `claude_agent_sdk` composition must resolve to an `anthropic_messages` endpoint —
+the explicit endpoint pick, else the provider default. `validateComposition` in
+`builder-turns/src/composition.ts` rejects other formats at create and swap time
+(HTTP 422), and the driver re-checks per column at turn time
+(`driver-claude-agent-sdk/src/endpoint.ts`).
+
 ### Python dual-runtime bridge
 
 `driver-run-support/src/python-probe.ts` resolves the interpreter

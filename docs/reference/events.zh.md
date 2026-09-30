@@ -18,7 +18,7 @@
 | `step_start` | driver 开始一次 LLM 调用时、在首个 token 之前发出 |
 | `action` | tool 调用 |
 | `observation` | tool 结果，在 `OBSERVATION_MAX_CHARS = 8000` 处截断 |
-| `tool_progress` | 流式 tool 进度 |
+| `tool_progress` | 流式 tool 输出；在 trace 视图中折叠进前置的 `action` 段 |
 | `file_diff` | write 或 edit tool 成功后发出，所有 driver 均如此 |
 | `verify` | verification 循环输出 |
 | `reflect` | 反思或思考输出；planner 与 critic 也经此承载 |

@@ -88,11 +88,11 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
 
 | 方法 | 路径 | 用途 | 备注 |
 |---|---|---|---|
-| GET | `/api/builder/catalog` | 用于装配的选项目录 | |
+| GET | `/api/builder/catalog` | 用于装配的选项目录 | 设置中停用的端点不提供 |
 | GET | `/api/builder/sessions` | 列出 builder sessions | |
 | POST | `/api/builder/sessions` | 创建 session | `name` 至多 60 字符；空名使 store 生成显示名；部分 `composition` |
 | GET | `/api/builder/sessions/:id` | 详情，含 trace log | |
-| PATCH | `/api/builder/sessions/:id` | 在 turn 之间热替换 composition | |
+| PATCH | `/api/builder/sessions/:id` | 在 turn 之间热替换 composition | 与创建时同一套配置期校验（未知或停用端点、`claude_agent_sdk` 端点格式、非法 custom 值）；被拒绝的 swap 返回 422，已存 composition 保持不变 |
 | DELETE | `/api/builder/sessions/:id` | 删除 session | |
 | POST | `/api/builder/sessions/:id/abort` | 中止进行中的 turn | `{ok, aborted}` |
 | POST | `/api/builder/sessions/:id/chat` | 一次 chat turn | SSE，事件名 `"builder"`；`message` 至多 12 000 字符；`attachments` 至多 5；除非客户端断开，否则以 `[DONE]` 终止 |

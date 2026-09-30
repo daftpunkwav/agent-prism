@@ -16,7 +16,7 @@ the wire is zod-validated against these schemas.
 | `step_start` | emitted when a driver starts one LLM call, before the first token |
 | `action` | tool call |
 | `observation` | tool result, truncated at `OBSERVATION_MAX_CHARS = 8000` |
-| `tool_progress` | streaming tool progress |
+| `tool_progress` | streamed tool output; folded into the preceding `action` segment in the trace view |
 | `file_diff` | emitted after write or edit tools succeed, in all drivers |
 | `verify` | verification loop output |
 | `reflect` | reflection or deliberation output; the planner and critic ride this too |

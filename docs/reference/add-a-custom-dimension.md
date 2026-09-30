@@ -120,6 +120,9 @@ patch) changes nothing.
   `options`, an id that collides with a builtin dimension or with a builtin context
   strategy (the run's effectiveness rows would merge with that strategy's), and a
   second package claiming a registered id — all at startup, never at run time.
+  The `custom` maps on the run, baseline, and builder wire schemas validate keys
+  with the same regex, so a request whose keys could not have come from a
+  registered dimension rejects with `422` at parse time.
 - **Unknown ids fail loudly** at three points: configure time (Builder
   composition), baseline resolution (a pin naming a dimension no package provides),
   and run assembly (a stored thread whose package was removed). Nothing silently

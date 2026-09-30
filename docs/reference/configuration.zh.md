@@ -26,7 +26,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 
 | 变量 | 默认 | 用途 |
 |---|---|---|
-| `LLM_PROVIDER_NAME` | `StepFun` | provider-store 播种，仅在 `data/provider_config.json` 缺失或损坏时使用 |
+| `LLM_PROVIDER_NAME` | `StepFun` | provider-store 播种，仅在 `data/provider_config.json` 无法提供可用配置时使用（缺失、损坏，或一次重试后仍不可读） |
 | `LLM_API_KEY` | `""` | 播种 API key |
 | `LLM_BASE_URL` | `https://api.stepfun.com/step_plan` | 播种 base URL |
 | `LLM_MODEL` | `step-3.7-flash` | 播种模型 |
@@ -193,6 +193,17 @@ knob 允许 0，而 `AGENT_MAX_DELEGATION_DEPTH` 要求 ≥1）。
 `PUT /api/settings/mcp` 整体替换托管 MCP 服务器列表；store 持有共享内存数组供
 每次运行读取，保存后立即对下一轮运行生效。
 
+## Provider 端点
+
+端点存于 `data/provider_config.json`，经 settings API 编辑。每个端点带 `enabled`
+开关（默认开，见 `contracts/src/provider.ts` 的 `LlmEndpointSchema`），
+`default_endpoint_id` 命名存储的默认端点。生效默认——空 `endpoint_id` 的解析目标、
+builder palette 的默认标记、arena baseline 默认——是同一条规则，由
+`contracts/src/provider-types.ts` 的 `resolveDefaultEndpoint` 解析：存储默认仍启用时
+用它，否则取首个启用的端点。全部端点都停用时返回首个配置的端点，解析到停用端点的
+选择在模型构造时响亮失败（`model-factory.ts`）。停用端点不锚定默认，不进入
+builder palette，也不参与 `/api/arena/meta` 的按端点 thinking 轴投影。
+
 ## 凭证引用
 
 经 settings API 存储的 provider endpoint 可持有恰好为 `"${env:NAME}"` 的 API key。
@@ -206,7 +217,7 @@ knob 允许 0，而 `AGENT_MAX_DELEGATION_DEPTH` 要求 ≥1）。
 
 | 路径 | 内容 | 恢复行为 |
 |---|---|---|
-| `data/provider_config.json` 与 `.bak` | provider endpoints 与 settings | 主文件损坏则从 `.bak` 恢复；仍不可用则应用 `LLM_*` env 播种 |
+| `data/provider_config.json` 与 `.bak` | provider endpoints 与 settings | 缺失则应用 `LLM_*` env 播种；主文件损坏则从 `.bak` 恢复；一次有界重试后仍抛错的读取以告警回退到播种（`provider-store.ts` 的 `load`） |
 | `data/sessions.json` 与 `.bak` | session 账本快照 `{version:1, sessions:[…]}`，由 op 日志压缩而来 | 主文件损坏则从 `.bak` 恢复；陈旧的 `active` 行在加载时翻转为 `failed` |
 | `data/sessions.jsonl` | 追加式 session op 日志，启动时重放（损坏行跳过并计数） | 由 `checkpoint()` 压缩进快照：每 30 分钟的宿主节奏、关机时，以及日志超过 32 MB 大小预算时 |
 | `data/sessions.json.blobs/` | 超大账本条目文本，命名为 `<sessionId>.<seq>.blob.txt`，每个至多 128 K 字符 | 删除时按 session 清除 |

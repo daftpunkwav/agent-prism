@@ -88,11 +88,11 @@ each section.
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
-| GET | `/api/builder/catalog` | option catalog for composition | |
+| GET | `/api/builder/catalog` | option catalog for composition | endpoints disabled in settings are not offered |
 | GET | `/api/builder/sessions` | list builder sessions | |
 | POST | `/api/builder/sessions` | create session | `name` at most 60 characters; an empty name makes the store generate a display name; partial `composition` |
 | GET | `/api/builder/sessions/:id` | detail including the trace log | |
-| PATCH | `/api/builder/sessions/:id` | hot-swap the composition between turns | |
+| PATCH | `/api/builder/sessions/:id` | hot-swap the composition between turns | same configure-time validation as create (unknown or disabled endpoint, `claude_agent_sdk` endpoint format, illegal custom values); a rejected swap returns 422 and leaves the stored composition unchanged |
 | DELETE | `/api/builder/sessions/:id` | delete session | |
 | POST | `/api/builder/sessions/:id/abort` | abort an in-flight turn | `{ok, aborted}` |
 | POST | `/api/builder/sessions/:id/chat` | one chat turn | SSE with event name `"builder"`; `message` at most 12 000 characters; `attachments` at most 5; terminates with `[DONE]` unless the client disconnected |

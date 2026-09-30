@@ -67,6 +67,11 @@ breaking，移动版本范围前先读 changelog。
 - 都找不到：返回 `undefined`，SDK 随后以自己的 missing-CLI 错误失败——同样
   响亮，只是错误文案来自 SDK。
 
+`claude_agent_sdk` composition 必须解析到 `anthropic_messages` 端点——显式选择的
+端点，否则 provider 默认端点。`builder-turns/src/composition.ts` 的
+`validateComposition` 在创建与 swap 时即拒绝其他格式（HTTP 422），driver 在运行期
+逐列复查（`driver-claude-agent-sdk/src/endpoint.ts`）。
+
 ### Python 双运行时桥
 
 `driver-run-support/src/python-probe.ts` 解析解释器（`ARENA_PYTHON` 覆盖，
