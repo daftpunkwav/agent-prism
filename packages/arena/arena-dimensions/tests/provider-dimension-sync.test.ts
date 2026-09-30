@@ -7,8 +7,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { ProviderDimensionSync } from "@agentprism/arena-dimensions";
+import type { LlmEndpoint, ProviderConfig, ProviderLookup } from "@agentprism/contracts";
+import { ProviderDimensionSync, endpointThinkingAxes } from "@agentprism/arena-dimensions";
 import { DimensionCatalog } from "@agentprism/dimensions";
 
 function makeEndpoint(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -209,5 +209,61 @@ describe("thinking_mode baseline option convergence", () => {
     expect(modes).toEqual(["levels", "budget"]);
     expect(sync.catalog.isLegalFieldValue("thinking_mode", "budget")).toBe(true);
     expect(sync.catalog.isLegalFieldValue("thinking_budget", "super")).toBe(true);
+  });
+});
+
+describe("endpointThinkingAxes (per-endpoint meta projection)", () => {
+  it("budget mode: level axis empties, budget axis carries the pair table with the off token", () => {
+    const axes = endpointThinkingAxes(makeEndpoint("ep-1", {
+      api_format: "anthropic_messages",
+      thinking_capable: true,
+      thinking_level: "super",
+      thinking_mode: "budget",
+      thinking_budget_pairs: [
+        { level: "low", budget_tokens: 1000, max_tokens: 1200 },
+        { level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 },
+      ],
+    }) as unknown as LlmEndpoint);
+    expect(axes.level_options).toEqual([]);
+    expect(axes.level_default).toBe("off");
+    expect(axes.budget_options.map((o) => o.value)).toEqual(["0", "low", "super"]);
+    expect(axes.budget_default).toBe("super");
+    expect(axes.mode_options.map((o) => o.value)).toEqual(["levels", "budget"]);
+    expect(axes.mode_default).toBe("budget");
+  });
+
+  it("level mode with a custom level set: the level axis mirrors it and budget stays empty", () => {
+    const axes = endpointThinkingAxes(makeEndpoint("ep-1", {
+      thinking_capable: true,
+      thinking_level: "max",
+      thinking_levels: ["max", "mid"],
+      thinking_mode: "levels",
+    }) as unknown as LlmEndpoint);
+    expect(axes.level_options.map((o) => o.value)).toEqual(["off", "max", "mid"]);
+    expect(axes.level_default).toBe("max");
+    expect(axes.budget_options).toEqual([]);
+    expect(axes.budget_default).toBe("0");
+    expect(axes.mode_options.map((o) => o.value)).toEqual(["levels"]);
+    expect(axes.mode_default).toBe("levels");
+  });
+
+  it("a thinking-incapable endpoint serves an empty level axis and levels-only mode", () => {
+    const axes = endpointThinkingAxes(makeEndpoint("ep-1") as unknown as LlmEndpoint);
+    expect(axes.level_options.map((o) => o.value)).toEqual(["off"]);
+    expect(axes.level_default).toBe("off");
+    expect(axes.budget_options).toEqual([]);
+    expect(axes.mode_options.map((o) => o.value)).toEqual(["levels"]);
+  });
+
+  it("budget pairs on a non-anthropic format stay inert (no dead budget mode)", () => {
+    const axes = endpointThinkingAxes(makeEndpoint("ep-1", {
+      thinking_capable: true,
+      thinking_level: "high",
+      thinking_mode: "levels",
+      thinking_budget_pairs: [{ level: "super", budget_tokens: 500_000, max_tokens: 1_000_000 }],
+    }) as unknown as LlmEndpoint);
+    expect(axes.mode_options.map((o) => o.value)).toEqual(["levels"]);
+    expect(axes.budget_options).toEqual([]);
+    expect(axes.level_options.map((o) => o.value)).toEqual(["off", "low", "medium", "high"]);
   });
 });
