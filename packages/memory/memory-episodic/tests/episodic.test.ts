@@ -134,3 +134,58 @@ describe("EpisodicMemory dedup", () => {
     expect(mem.size).toBe(2);
   });
 });
+
+describe("EpisodicMemory capacity", () => {
+  it("trims the oldest entries once the cap is reached", async () => {
+    let now = 1_000;
+    const mem = new EpisodicMemory({ maxEntries: 3, now: () => now++ });
+    for (let i = 1; i <= 4; i += 1) {
+      await mem.recordExperience({
+        task: `task ${i}`,
+        framework: "",
+        model: "",
+        success: true,
+        keyActions: [],
+        lessons: `lesson ${i}`,
+        workspaceTag: "",
+      });
+    }
+
+    expect(mem.size).toBe(3);
+    const tasks = mem.list().map((entry) => entry.task);
+    // The oldest experience is the one that goes; the newest survives the cap.
+    expect(tasks).not.toContain("task 1");
+    expect(tasks).toEqual(expect.arrayContaining(["task 2", "task 3", "task 4"]));
+  });
+
+  it("refreshes a near-duplicate in place without evicting for the update", async () => {
+    let now = 1_000;
+    const mem = new EpisodicMemory({ maxEntries: 3, now: () => now++ });
+    for (let i = 1; i <= 3; i += 1) {
+      await mem.recordExperience({
+        task: `task ${i}`,
+        framework: "",
+        model: "",
+        success: true,
+        keyActions: ["bash"],
+        lessons: `lesson ${i}`,
+        workspaceTag: "",
+      });
+    }
+    // A dup update grows the store by zero entries: nothing may be evicted for it.
+    await mem.recordExperience({
+      task: "Task 3",
+      framework: "",
+      model: "",
+      success: true,
+      keyActions: ["read"],
+      lessons: "lesson 3",
+      workspaceTag: "",
+    });
+
+    expect(mem.size).toBe(3);
+    expect(mem.list().map((entry) => entry.task)).toEqual(
+      expect.arrayContaining(["task 1", "task 2", "task 3"]),
+    );
+  });
+});

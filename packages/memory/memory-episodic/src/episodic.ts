@@ -6,6 +6,7 @@
  * - Record task experiences (goal, tools, errors, self-correction, outcome)
  * - Recall the most relevant past experiences for a new task question
  * - Deduplicate near-identical reports for the same task
+ * - Cap the store: past the ceiling the oldest experiences are pruned on write
  *
  * Depends only on @agentprism/contracts (schemas) and
  * @agentprism/memory-store (atomic persistence + search index).
@@ -14,11 +15,20 @@
 import type { EpisodicMemoryEntry, MemoryRecallOptions } from "@agentprism/contracts";
 import { MemoryStore } from "@agentprism/memory-store";
 
+/** Default entry ceiling: past this, the store drops the oldest experiences. */
+export const DEFAULT_MAX_EPISODIC_ENTRIES = 5_000;
+
 export interface EpisodicMemoryOptions {
   /** Optional file path for atomic JSON persistence (omitted = in-memory only). */
   filePath?: string;
   /** Time source in ms epoch (injected; defaults to Date.now). */
   now?: () => number;
+  /**
+   * Maximum entries held; the oldest go first. An unbounded experience store
+   * grows for the life of the deployment (one append per top-level run), and
+   * the per-write full-serialization cost grows with it.
+   */
+  maxEntries?: number;
 }
 
 /** Search text combining task, actions, lessons, and outcome. */
@@ -38,11 +48,14 @@ function normalizeTask(task: string): string {
 export class EpisodicMemory {
   private readonly store: MemoryStore<EpisodicMemoryEntry>;
   private readonly now: () => number;
+  private readonly maxEntries: number;
   private idCounter = 0;
 
   constructor(options: EpisodicMemoryOptions = {}) {
     this.store = new MemoryStore<EpisodicMemoryEntry>(episodicSearchText, { filePath: options.filePath });
     this.now = options.now ?? Date.now;
+    const maxEntries = options.maxEntries ?? DEFAULT_MAX_EPISODIC_ENTRIES;
+    this.maxEntries = Number.isFinite(maxEntries) ? Math.max(1, Math.trunc(maxEntries)) : DEFAULT_MAX_EPISODIC_ENTRIES;
   }
 
   get size(): number {
@@ -64,9 +77,12 @@ export class EpisodicMemory {
           timestamp: this.now(),
           workspaceTag: entry.workspaceTag || existing.workspaceTag,
         };
+        // Update in place: no capacity dance (an update does not grow the store).
         return this.store.save(merged);
       }
     }
+    // Room for the entry about to be inserted, so the cap holds once this call returns.
+    await this.enforceCapacity(1);
     const record: EpisodicMemoryEntry = {
       ...entry,
       keyActions: [...entry.keyActions],
@@ -98,6 +114,22 @@ export class EpisodicMemory {
       const id = `ep-${this.now()}-${this.idCounter}`;
       if (this.store.get(id) === undefined) return id;
     }
+  }
+
+  /**
+   * Trims the store down to `maxEntries`, dropping the oldest experiences first
+   * with the id as a stable tie-break. An experience referenced again (near-dup
+   * record) is refreshed in place (see recordExperience), so the cap costs the
+   * stalest long-tail history rather than whatever was written last.
+   */
+  private async enforceCapacity(pending: number = 0): Promise<number> {
+    const overflow = this.store.size + pending - this.maxEntries;
+    if (overflow <= 0) return 0;
+    const oldest = [...this.store.list()]
+      .sort((a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id))
+      .slice(0, overflow)
+      .map((entry) => entry.id);
+    return this.store.deleteMany(oldest);
   }
 
   /** Lists all recorded experiences (insertion order is not guaranteed). */
