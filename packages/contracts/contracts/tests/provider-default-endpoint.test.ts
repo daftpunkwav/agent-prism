@@ -80,9 +80,15 @@ describe("resolveDefaultEndpoint (shared default-endpoint rule)", () => {
     expect(resolveDefaultEndpoint(provider)?.id).toBe("b");
   });
 
-  it("when nothing is enabled the stored default returns (fail-loud anchor)", () => {
-    const provider = config([endpoint("a", { enabled: false })], "a");
+  it("when nothing is enabled the first configured endpoint returns (fail-loud anchor)", () => {
+    // Multi-endpoint case: the nothing-enabled fallback is positional (endpoints[0]),
+    // not the stored default — the two are only indistinguishable when a single
+    // disabled endpoint happens to be both. Either way the result keeps the
+    // pinned-endpoint fail-loud path at model construction intact.
+    const provider = config([endpoint("a", { enabled: false }), endpoint("b", { enabled: false })], "b");
     expect(resolveDefaultEndpoint(provider)?.id).toBe("a");
+    // Single-endpoint degenerate case resolves to the same anchor.
+    expect(resolveDefaultEndpoint(config([endpoint("a", { enabled: false })], "a"))?.id).toBe("a");
   });
 
   it("no endpoints at all resolves to undefined", () => {

@@ -93,6 +93,80 @@ describe("createColumnModel disabled endpoint", () => {
   });
 });
 
+describe("default-endpoint rule at model construction (skips disabled)", () => {
+  /** Stored default disabled + one enabled endpoint; the enabled one is distinguishable by URL and window. */
+  function twoEndpointProvider(): ProviderConfig {
+    return {
+      ...fixture("openai_chat"),
+      endpoints: [
+        {
+          id: "ep-off",
+          label: "off",
+          provider_name: "",
+          api_key: "k",
+          base_url: "https://off.example.com/v1",
+          use_full_url: false,
+          api_format: "openai_chat",
+          auth_field: "",
+          model: "m-off",
+          context_window: 111_000,
+          max_input_tokens: 120_000,
+          max_output_tokens: 4096,
+          website_url: "",
+          thinking_capable: false,
+          image_input: false,
+          video_input: false,
+          enabled: false,
+          thinking_level: "off",
+        },
+        {
+          id: "ep-on",
+          label: "on",
+          provider_name: "",
+          api_key: "k",
+          base_url: "https://on.example.com/v1",
+          use_full_url: false,
+          api_format: "openai_chat",
+          auth_field: "",
+          model: "m-on",
+          context_window: 222_000,
+          max_input_tokens: 120_000,
+          max_output_tokens: 4096,
+          website_url: "",
+          thinking_capable: false,
+          image_input: false,
+          video_input: false,
+          enabled: true,
+          thinking_level: "off",
+        },
+      ],
+      default_endpoint_id: "ep-off",
+    } as unknown as ProviderConfig;
+  }
+
+  it("createChatModel without overrides builds the judge/narrative model on the enabled endpoint", () => {
+    // The composition root builds the judge and narrative models with no
+    // endpointId/baseUrl override, so resolution rides the shared
+    // default-endpoint rule. createChatModel itself has no enabled gate: before
+    // the rule skipped disabled endpoints, a disabled stored default put the
+    // judge on the disabled endpoint's URL and credentials.
+    const model = createChatModel({ provider: twoEndpointProvider() });
+    expect((model as unknown as { clientConfig?: { baseURL?: string } }).clientConfig?.baseURL).toBe(
+      "https://on.example.com/v1",
+    );
+  });
+
+  it("createColumnModel with an empty endpoint_id resolves the enabled endpoint, never the disabled refusal", () => {
+    // An empty endpoint_id means the provider default: the column must build on
+    // the enabled endpoint (window 222_000 proves the pick) instead of dying in
+    // the "disabled in settings" refusal the old stored-default rule produced.
+    const config = PipelineConfigSchema.parse({ label: "col", harness: "bare", endpoint_id: "" });
+    const bundle = createColumnModel({ provider: twoEndpointProvider() }, config);
+    expect(bundle.contextWindow).toBe(222_000);
+    expect(bundle.maxInputTokens).toBe(120_000);
+  });
+});
+
 describe("createChatModel timeout units", () => {
   it("openai_chat timeout is milliseconds (120000 not 120)", () => {
     const model = createChatModel({ provider: fixture("openai_chat") });

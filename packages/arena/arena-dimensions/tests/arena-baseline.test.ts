@@ -238,6 +238,19 @@ describe("resolveBaselineOverrides endpoint/model resolution", () => {
     expect(config.endpoint_id).toBe("ep-1"); // default_endpoint_id wins via lookup
   });
 
+  it("fails loud when no endpoints are configured at all", () => {
+    const provider = { endpoints: [], temperature: 0.7 } as unknown as ProviderConfig;
+    const lookup: ProviderLookup = {
+      load: () => provider,
+      syncEndpointCatalog: () => {},
+      lookupEndpoint: () => undefined,
+      listEndpoints: () => [],
+    };
+    expect(() =>
+      buildPipelineBase({ provider, providerLookup: lookup, dimensionCatalog: new DimensionCatalog() }, {}),
+    ).toThrow("No endpoints configured");
+  });
+});
 
 describe("mutually exclusive thinking modes", () => {
   /** Anthropic endpoint configured for budget mode with two pair rows. */
@@ -469,19 +482,5 @@ describe("mutually exclusive thinking modes", () => {
         { thinking_mode: "budget" },
       ),
     ).toThrow("no budget pairs configured");
-  });
-});
-
-  it("fails loud when no endpoints are configured at all", () => {
-    const provider = { endpoints: [], temperature: 0.7 } as unknown as ProviderConfig;
-    const lookup: ProviderLookup = {
-      load: () => provider,
-      syncEndpointCatalog: () => {},
-      lookupEndpoint: () => undefined,
-      listEndpoints: () => [],
-    };
-    expect(() =>
-      buildPipelineBase({ provider, providerLookup: lookup, dimensionCatalog: new DimensionCatalog() }, {}),
-    ).toThrow("No endpoints configured");
   });
 });
