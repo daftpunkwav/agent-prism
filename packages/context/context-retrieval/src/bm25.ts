@@ -16,6 +16,16 @@ export interface Bm25Document {
   text: string;
 }
 
+/** A document whose tokens were produced upstream (e.g. cached by the index). */
+export interface Bm25TokenizedDocument {
+  id: string;
+  /** Pre-tokenized body; duplicates kept (BM25 term frequency needs them). */
+  tokens: readonly string[];
+}
+
+/** Corpus input: raw text or pre-tokenized tokens (exactly one of the two). */
+export type Bm25Input = Bm25Document | Bm25TokenizedDocument;
+
 /** BM25 saturation (k1) and length-normalization (b) defaults. */
 export const BM25_K1 = 1.2;
 export const BM25_B = 0.75;
@@ -26,7 +36,7 @@ export function tokenize(text: string): string[] {
 }
 
 /** Term frequencies of one token list. */
-function termFrequencies(tokens: string[]): Map<string, number> {
+function termFrequencies(tokens: readonly string[]): Map<string, number> {
   const out = new Map<string, number>();
   for (const token of tokens) out.set(token, (out.get(token) ?? 0) + 1);
   return out;
@@ -41,13 +51,15 @@ export class Bm25 {
   private readonly k1: number;
   private readonly b: number;
 
-  constructor(documents: Bm25Document[], options: { k1?: number; b?: number } = {}) {
+  constructor(documents: Bm25Input[], options: { k1?: number; b?: number } = {}) {
     this.k1 = options.k1 ?? BM25_K1;
     this.b = options.b ?? BM25_B;
     // Term frequencies are query-invariant: tokenize and count once here, so
     // score() is a per-query-term lookup instead of re-counting the whole
     // corpus on every call (queries run per LLM call; the corpus does not change).
-    const tokenized = documents.map((doc) => tokenize(doc.text));
+    // Callers holding tokens already (ChunkIndex caches them per chunk) pass
+    // Bm25TokenizedDocument so the corpus is not tokenized a second time.
+    const tokenized = documents.map((doc) => ("tokens" in doc ? doc.tokens : tokenize(doc.text)));
     this.docTfs = tokenized.map((tokens) => termFrequencies(tokens));
     this.docLengths = tokenized.map((tokens) => tokens.length);
     const total = this.docLengths.reduce((sum, len) => sum + len, 0);

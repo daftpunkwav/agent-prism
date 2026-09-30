@@ -31,6 +31,14 @@ describe("Bm25", () => {
     expect(new Bm25(docs).score("zzzqqq")).toEqual([0, 0, 0]);
   });
 
+  it("scores pre-tokenized documents identically to raw text", () => {
+    const text = "agent memory compaction 上下文 压缩";
+    const query = "compaction 上下文";
+    const fromText = new Bm25([{ id: "a", text }]).score(query);
+    const fromTokens = new Bm25([{ id: "a", tokens: tokenize(text) }]).score(query);
+    expect(fromTokens).toEqual(fromText);
+  });
+
   it("matches a per-query tf recomputation oracle bit-for-bit", () => {
     // The scorer precomputes per-document term frequencies at construction.
     // This oracle keeps the original per-query recomputation side by side and

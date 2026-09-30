@@ -19,7 +19,8 @@ export interface IndexedChunk {
   id: string;
   path: string;
   content: string;
-  tokens: ReadonlySet<string>;
+  /** Full token list of `content` (duplicates kept); shared with the BM25 scorer so each chunk is tokenized once. */
+  tokens: readonly string[];
   /** Run-relative age rank (0 = freshest); unknown ages use Number.MAX_SAFE_INTEGER. */
   ageRank: number;
 }
@@ -70,7 +71,9 @@ export class ChunkIndex {
       this.chunks.push({
         ...chunk,
         id: `${chunk.path}#${count}`,
-        tokens: new Set(tokenize(chunk.content)),
+        // Tokenized once here; ensureScorer hands the same list to the scorer
+        // instead of re-tokenizing the whole corpus on every rebuild.
+        tokens: tokenize(chunk.content),
       });
     }
     while (this.chunks.length > INDEX_TOTAL_CAP) this.chunks.shift();
@@ -102,7 +105,9 @@ export class ChunkIndex {
   /** Rebuilds the scorer when a mutation happened since the last build. */
   private ensureScorer(): Bm25 | null {
     if (this.scorerStale) {
-      this.scorer = this.chunks.length === 0 ? null : new Bm25(this.chunks.map((chunk) => ({ id: chunk.id, text: chunk.content })));
+      // Chunks carry their token list from add(), so the rebuild reuses it
+      // (Bm25TokenizedDocument) rather than tokenizing the whole corpus again.
+      this.scorer = this.chunks.length === 0 ? null : new Bm25(this.chunks.map((chunk) => ({ id: chunk.id, tokens: chunk.tokens })));
       this.scorerStale = false;
     }
     return this.scorer;
