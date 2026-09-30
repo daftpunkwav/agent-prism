@@ -1,14 +1,3 @@
-/* Focus visibility: 21th electric-blue outline */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-button:focus:not(:focus-visible),
-a:focus:not(:focus-visible) {
-  outline: none;
-}
-
 /* Route error boundary */
 .error-boundary {
   max-width: 36rem;
