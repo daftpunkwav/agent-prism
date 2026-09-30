@@ -284,8 +284,9 @@ describe("ModelModal thinking cluster", () => {
     fireEvent.click(screen.getByRole("button", { name: en().defaultThinkingLevel }));
     const options = screen.getAllByRole("option");
     // The vendor list is offered as-is, with "off" always available; the standard
-    // named levels are gone.
-    expect(options.map((option) => option.textContent)).toEqual(["Off", "adaptive"]);
+    // named levels are gone. Levels render verbatim (vendor-defined tokens have
+    // no translation, so the standard names must not localize either).
+    expect(options.map((option) => option.textContent)).toEqual(["off", "adaptive"]);
   });
 
   it("adds, edits, and removes custom levels, and keeps the selected one", () => {
@@ -300,7 +301,7 @@ describe("ModelModal thinking cluster", () => {
     // Removing the selected row drops the choice to off: keeping a value the vendor
     // list no longer offers would leave the control showing an unselectable level.
     fireEvent.click(screen.getByRole("button", { name: en().customLevelRemoveAria.replace("{index}", "1") }));
-    expect(screen.getByRole("button", { name: en().defaultThinkingLevel }).textContent).toContain("Off");
+    expect(screen.getByRole("button", { name: en().defaultThinkingLevel }).textContent).toContain("off");
 
     fireEvent.click(saveButton());
     const saved = onSave.mock.calls[0]?.[0] as ModelSlot;

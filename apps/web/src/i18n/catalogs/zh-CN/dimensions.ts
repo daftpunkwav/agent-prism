@@ -118,20 +118,6 @@ export const dimensions = {
       edit_run: "读写+运行",
       read_only: "只读",
     },
-    thinking: {
-      off: "关闭",
-      low: "低",
-      medium: "中",
-      high: "高",
-    },
-    thinking_budget: {
-      "0": "关闭",
-      "2048": "2048",
-      "8192": "8192",
-      "16384": "16384",
-      "32768": "32768",
-      "65536": "65536",
-    },
     temperature: {
       "0": "0（确定性）",
       "0_3": "0.3",

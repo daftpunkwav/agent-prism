@@ -118,20 +118,6 @@ export const dimensions = {
       edit_run: "Read/write + run",
       read_only: "Read-only",
     },
-    thinking: {
-      off: "Off",
-      low: "Low",
-      medium: "Medium",
-      high: "High",
-    },
-    thinking_budget: {
-      "0": "Off",
-      "2048": "2048",
-      "8192": "8192",
-      "16384": "16384",
-      "32768": "32768",
-      "65536": "65536",
-    },
     temperature: {
       "0": "0 (deterministic)",
       "0_3": "0.3",

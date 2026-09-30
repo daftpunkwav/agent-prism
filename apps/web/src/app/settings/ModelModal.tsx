@@ -34,23 +34,17 @@ export interface ModelModalProps {
   onSave(draft: ModelSlot): void;
 }
 
-/** Effective level options: vendor-defined levels replace the standard set when present. */
-function levelOptions(
-  thinkingLevels: string[],
-  label: (value: string) => string,
-): Array<{ value: string; label: string }> {
+/** Effective level options: vendor-defined levels replace the standard set when present. Levels render verbatim (vendor-defined tokens have no translation). */
+function levelOptions(thinkingLevels: string[]): Array<{ value: string; label: string }> {
   if (thinkingLevels.length > 0) {
-    return [{ value: "off", label: label("off") }, ...thinkingLevels.map((name) => ({ value: name, label: name }))];
+    return [{ value: "off", label: "off" }, ...thinkingLevels.map((name) => ({ value: name, label: name }))];
   }
-  return ["off", "low", "medium", "high"].map((value) => ({ value, label: label(value) }));
+  return ["off", "low", "medium", "high"].map((value) => ({ value, label: value }));
 }
 
 /** Budget-mode level options: off plus the pair table's level names. */
-function budgetLevelOptions(
-  pairs: Array<{ level: string; budget_tokens: number; max_tokens: number }>,
-  offLabel: string,
-): Array<{ value: string; label: string }> {
-  return [{ value: "off", label: offLabel }, ...pairs.map((pair) => ({ value: pair.level, label: pair.level }))];
+function budgetLevelOptions(pairs: Array<{ level: string; budget_tokens: number; max_tokens: number }>): Array<{ value: string; label: string }> {
+  return [{ value: "off", label: "off" }, ...pairs.map((pair) => ({ value: pair.level, label: pair.level }))];
 }
 
 /** Token-count input ceiling: mirrors the backend parse range so a stray typed value never becomes a 422. */
@@ -96,18 +90,10 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const levelLabel = (value: string) =>
-    value === "low"
-      ? t("settings.model.levelLow")
-      : value === "medium"
-        ? t("settings.model.levelMedium")
-        : value === "high"
-          ? t("settings.model.levelHigh")
-          : t("settings.model.levelOff");
-  const options = levelOptions(draft.thinking_levels, levelLabel);
+  const options = levelOptions(draft.thinking_levels);
   // Older JSON-imported rows may not carry the pair table at all.
   const budgetPairs = draft.thinking_budget_pairs ?? [];
-  const budgetOptions = budgetLevelOptions(budgetPairs, t("settings.model.levelOff"));
+  const budgetOptions = budgetLevelOptions(budgetPairs);
   // A pair whose output cap does not exceed its budget would be silently dropped
   // by the backend clamp (max → 0); block the save instead so the typo surfaces.
   const pairError = budgetPairs.some(

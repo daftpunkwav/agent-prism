@@ -71,6 +71,9 @@ export function localizeCurrentSuffix(t: TFn, label: string): string {
  * Option display label for a known dimension.
  * Model options are dynamic (endpoint names) — only the current-suffix is localized.
  * Temperature option keys use underscores (0_3) because catalog paths cannot embed dots.
+ * Thinking levels render verbatim: they are vendor-defined tokens (custom model
+ * levels like "xhigh" have no translation), so translating the standard three
+ * would make the same axis mix translated and raw values.
  */
 export function dimOptionLabel(
   t: TFn,
@@ -79,6 +82,7 @@ export function dimOptionLabel(
   fallback: string,
 ): string {
   if (dimensionId === "model") return localizeCurrentSuffix(t, fallback);
+  if (dimensionId === "thinking") return fallback;
   const catalogValue = dimensionId === "temperature" ? value.replaceAll(".", "_") : value;
   return catalogOrFallback(
     t,
