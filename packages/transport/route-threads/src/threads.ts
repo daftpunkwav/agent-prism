@@ -9,8 +9,7 @@
 
 import type { HttpApplicationDeps } from "@agentprism/http-runtime";
 import { ThreadCreateRequestSchema, ThreadForkRequestSchema, ThreadRunRequestSchema, systemErrorEvent, sanitizeErrorMessage } from "@agentprism/contracts";
-import { streamSSE } from "hono/streaming";
-import { parseJsonBody, settingsOf, type HttpApp } from "@agentprism/http-runtime";
+import { parseJsonBody, settingsOf, streamSSE, type HttpApp } from "@agentprism/http-runtime";
 
 /** Thread-domain routes: lifecycle plus the SSE resume-run stream. */
 export function registerThreadRoutes(app: HttpApp, deps: HttpApplicationDeps): void {

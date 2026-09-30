@@ -8,8 +8,7 @@
 
 import type { HttpApplicationDeps } from "@agentprism/http-runtime";
 import { ArenaAnswerRequestSchema, ArenaRunRequestSchema, ArenaStopColumnRequestSchema, JudgeRequestSchema, MatrixRequestSchema, systemErrorEvent, sanitizeErrorMessage } from "@agentprism/contracts";
-import { streamSSE } from "hono/streaming";
-import { parseJsonBody, settingsOf, type HttpApp } from "@agentprism/http-runtime";
+import { parseJsonBody, settingsOf, streamSSE, type HttpApp } from "@agentprism/http-runtime";
 
 /** Arena experiment-domain routes: metadata / SSE run stream / templates / judging. */
 export function registerArenaRoutes(app: HttpApp, deps: HttpApplicationDeps): void {

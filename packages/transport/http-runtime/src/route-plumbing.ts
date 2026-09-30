@@ -1,20 +1,30 @@
 /**
  * @file routes/route-plumbing
- * @description Shared route plumbing: app type, body limits, JSON parsing.
+ * @description Shared route plumbing: app type, SSE stream helper, body limits, JSON parsing.
  *
  * Responsibilities:
  * - Define the HttpApp shape used by all route registrars
+ * - Re-export the hono SSE helper so route leaves import no framework directly
  * - Assert request body size limits
  * - Provide raw and validated JSON body parsing
  */
 
 import type { Context } from "hono";
 import type { Hono } from "hono";
+import { streamSSE as honoStreamSSE } from "hono/streaming";
 import type { Settings } from "@agentprism/config";
 import { AppError, firstIssueMessage } from "@agentprism/application";
 
 /** Transport app type: all route groups share the same middleware context. */
 export type HttpApp = Hono<{ Variables: { appSettings: Settings } }>;
+
+/**
+ * hono's SSE helper surfaced through the http-runtime seam: route-* leaves consume
+ * this binding instead of declaring hono themselves, so hono stays single-sourced.
+ * Local alias (not `export { … } from`) keeps the export resolvable to a declaration
+ * for check-export-tests.
+ */
+export const streamSSE = honoStreamSSE;
 
 /**
  * Reads validated service settings from the request context (injected by middleware).

@@ -9,7 +9,7 @@
  */
 
 import type { ApiFormat } from "@agentprism/contracts";
-import { DEFAULT_LLM_BASE_URL, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_NAME, THREAD_MESSAGE_MAX_CHARS } from "@agentprism/contracts";
+import { DEFAULT_ASK_USER_WAIT_MS, DEFAULT_LLM_BASE_URL, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_NAME, THREAD_MESSAGE_MAX_CHARS } from "@agentprism/contracts";
 import { loadEnvFile } from "./env-file.js";
 import { ENV_FILE } from "./paths.js";
 
@@ -199,7 +199,7 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env, envFile: stri
     llmRetryDelayMs: readInt(source, "LLM_RETRY_DELAY_MS", 500, { min: 0, max: 10_000 }),
     breakerThreshold: readInt(source, "BREAKER_THRESHOLD", 3, { min: 1, max: 10 }),
     breakerCooldownMs: readInt(source, "BREAKER_COOLDOWN_MS", 30_000, { min: 1_000, max: 300_000 }),
-    askUserWaitMs: readInt(source, "ASK_USER_WAIT_MS", 300_000, { min: 10_000, max: 600_000 }),
+    askUserWaitMs: readInt(source, "ASK_USER_WAIT_MS", DEFAULT_ASK_USER_WAIT_MS, { min: 10_000, max: 600_000 }),
     maxConcurrentColumns: readInt(source, "MAX_CONCURRENT_COLUMNS", 8, { min: 1, max: 16 }),
     maxWorkspaces: readInt(source, "MAX_WORKSPACES", 32, { min: 1, max: 256 }),
     workspaceTtlSeconds: readInt(source, "WORKSPACE_TTL_SECONDS", 3600, { min: 60, max: 86_400 }),

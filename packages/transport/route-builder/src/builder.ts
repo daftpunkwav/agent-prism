@@ -19,8 +19,7 @@ import {
 } from "@agentprism/contracts";
 import { BuilderError } from "@agentprism/builder-service";
 import { sanitizeErrorMessage } from "@agentprism/contracts";
-import { streamSSE } from "hono/streaming";
-import { parseJsonBody, settingsOf, type HttpApp } from "@agentprism/http-runtime";
+import { parseJsonBody, settingsOf, streamSSE, type HttpApp } from "@agentprism/http-runtime";
 
 const STREAM_DONE = "[DONE]";
 

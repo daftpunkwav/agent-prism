@@ -20,8 +20,7 @@
   "dependencies": {
     "@agentprism/builder-service": "workspace:*",
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/http-runtime": "workspace:*",
-    "hono": "^4.6.0"
+    "@agentprism/http-runtime": "workspace:*"
   },
   "devDependencies": {
     "@agentprism/config": "workspace:*",

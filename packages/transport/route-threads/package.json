@@ -19,8 +19,7 @@
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*",
-    "@agentprism/http-runtime": "workspace:*",
-    "hono": "^4.6.0"
+    "@agentprism/http-runtime": "workspace:*"
   },
   "devDependencies": {
     "@agentprism/application": "workspace:*",
