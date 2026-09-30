@@ -334,9 +334,10 @@ export async function* runAgentExecution(
     }
     // Orchestration discipline seeding (fresh workspaces only; reused follow-ups
     // keep the plan/goal the agent already wrote). Best-effort: a seed failure
-    // must never fail the run it was meant to discipline.
-    const orchestration = (spec.config as Record<string, unknown>)["orchestration"];
-    if (!workspaceReused && orchestration !== undefined) {
+    // must never fail the run it was meant to discipline. "direct" (the schema
+    // default) seeds nothing.
+    const orchestration = spec.config.orchestration;
+    if (!workspaceReused && orchestration !== "direct") {
       try {
         if (orchestration === "plan_first" && !workspace.fs.exists(PLAN_STORE_FILE)) {
           workspace.fs.writeFile(
@@ -356,7 +357,7 @@ export async function* runAgentExecution(
     // Delegation: the child shares the workspace (files stay visible to the parent).
     // (subagentDepth is hoisted above the try so the catch path shares it.)
     /**
-     * Runs one nested delegation turn sharing this workspace: spawn uses blank
+     * Runs one delegated turn sharing this workspace: spawn uses blank
      * history, fork inherits the parent transcript plus the subtask as a new
      * user turn. The caller toolset minus the withheld delegation tools (no
      * privilege change: depth 1 cannot re-delegate), capped steps. Token cost
@@ -371,7 +372,7 @@ export async function* runAgentExecution(
      * @param inheritedHistory Parent transcript for fork mode (spawn passes []).
      * @returns Settled answer text, or a failure message (never throws for turn failures).
      */
-    const runNested = async (
+    const runDelegated = async (
       task: string,
       maxSteps: number,
       agentSuffix: string,
@@ -436,7 +437,7 @@ export async function* runAgentExecution(
             // question. Parent history is already bounded by the chat contract.
             const inherited: ChatMessage[] =
               mode === "fork" ? [...spec.history, { role: "user", content: spec.question }] : [];
-            const nested = await runNested(task, maxSteps, "/sub", [SUBAGENT_TOOL_NAME], inherited);
+            const nested = await runDelegated(task, maxSteps, "/sub", [SUBAGENT_TOOL_NAME], inherited);
             if (nested.failure !== null) return `(subagent failed: ${nested.failure})`;
             return nested.answer;
           };
@@ -447,7 +448,7 @@ export async function* runAgentExecution(
             let handoff = "";
             let lastAnswer = "";
             for (let round = 1; round <= maxRounds; round += 1) {
-              const nested = await runNested(
+              const nested = await runDelegated(
                 [
                   `Round ${round}/${maxRounds}. Objective: ${objective}`,
                   `Previous handoff (may be empty): ${handoff}`,
@@ -492,7 +493,7 @@ export async function* runAgentExecution(
                   aborted.name = "AbortError";
                   throw aborted;
                 }
-                results[index] = await runNested(
+                results[index] = await runDelegated(
                   task,
                   maxSteps,
                   `/scatter-${index + 1}`,
@@ -516,10 +517,9 @@ export async function* runAgentExecution(
             }
             return settled.map((answer, index) => `[task ${index + 1}/${tasks.length}]\n${answer}`).join("\n\n");
           };
-    const skillPolicy = String((spec.config as Record<string, unknown>)["skill_policy"] ?? "on_demand");
-    const mcpPolicy = String((spec.config as Record<string, unknown>)["mcp_policy"] ?? "off");
-    const approvalMode = (spec.config as Record<string, unknown>)["approval_mode"];
-    const sandboxMode = (spec.config as Record<string, unknown>)["sandbox_mode"];
+    // Column policies read from the typed config (PipelineConfig always carries
+    // them — schema defaults or baseline/builder assembly fill every field).
+    const skillPolicy = spec.config.skill_policy;
     // Preloaded injects the effective catalog (bundled + user dir + workspace,
     // disabled filtered), not just the bundled set, so settings changes apply.
     const skillPreloadBlock =
@@ -565,7 +565,23 @@ export async function* runAgentExecution(
       rag: ragCache,
       llm: spec.columnRuntime.llm,
       llmVendor: spec.columnRuntime.llmVendor,
-      tools: buildToolAccess(workspace, spec.config.toolset, ragCache, spec.signal, spec.toolNames, subagentSpawn, ralphSpawn, scatterSpawn, mcpPolicy, skillPolicy, spec.sessions, String(approvalMode ?? "auto"), String(sandboxMode ?? "off"), subagentDepth === 0 || spec.propagateAskUser === true ? spec.askUser : undefined, spec.toolTuning),
+      tools: buildToolAccess({
+        workspace,
+        toolset: spec.config.toolset,
+        ragCache,
+        signal: spec.signal,
+        toolNames: spec.toolNames,
+        subagentSpawn,
+        ralphSpawn,
+        scatterSpawn,
+        mcpPolicy: spec.config.mcp_policy,
+        skillPolicy,
+        sessions: spec.sessions,
+        approvalMode: spec.config.approval_mode,
+        sandboxMode: spec.config.sandbox_mode,
+        askUser: subagentDepth === 0 || spec.propagateAskUser === true ? spec.askUser : undefined,
+        tuning: spec.toolTuning,
+      }),
       skillPreloadBlock,
       memoryRecall,
       contextAnalytics,

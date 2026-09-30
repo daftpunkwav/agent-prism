@@ -15,8 +15,12 @@
 
 import {
   sanitizeErrorMessage,
+  type ApprovalMode,
   type AskUserRespond,
+  type McpPolicy,
+  type SandboxMode,
   type SessionQueryPort,
+  type SkillPolicy,
   type ToolDefinition,
   type ToolExecuteOptions,
   type ToolWorkspace,
@@ -247,28 +251,59 @@ async function safeFetchUrl(url: string, signal: AbortSignal | undefined, timeou
 const sandboxGuard = toBeforeExecute();
 
 /**
+ * Inputs of one column's tool-access assembly. An options object, because the
+ * 15-positional-parameter shape buried four adjacent policy strings at call
+ * sites. Absent optional fields keep the same built-in defaults the old
+ * positional parameters carried (schema defaults: mcp off, skills on_demand,
+ * approval auto, sandbox off).
+ */
+export interface ToolAccessInput {
+  workspace: Workspace;
+  toolset: string;
+  ragCache: RagStoreCache;
+  signal?: AbortSignal;
+  toolNames?: readonly string[];
+  subagentSpawn?: SubagentSpawn;
+  ralphSpawn?: RalphSpawn;
+  scatterSpawn?: ScatterSpawn;
+  /** MCP attachment policy of the column config (default "off"). */
+  mcpPolicy?: McpPolicy;
+  /** Skill availability policy of the column config (default "on_demand"). */
+  skillPolicy?: SkillPolicy;
+  sessions?: SessionQueryPort;
+  /** Approval review mode of the column config (default "auto"). */
+  approvalMode?: ApprovalMode;
+  /** OS write-containment mode of the column config (default "off"). */
+  sandboxMode?: SandboxMode;
+  askUser?: AskUserRespond;
+  /** Operator-tuned delegation/fetch knobs (default {}). */
+  tuning?: AgentToolTuning;
+}
+
+/**
  * Builds column tool access: toolset-filtered registry plus live delegation tools.
  *
  * RAG invalidation, sandbox deny-list, and authorization wrap every call here so
  * drivers cannot bypass them; see the inline invariants on the execute path.
  */
-export function buildToolAccess(
-  workspace: Workspace,
-  toolset: string,
-  ragCache: RagStoreCache,
-  signal?: AbortSignal,
-  toolNames?: readonly string[],
-  subagentSpawn?: SubagentSpawn,
-  ralphSpawn?: RalphSpawn,
-  scatterSpawn?: ScatterSpawn,
-  mcpPolicy: string = "off",
-  skillPolicy: string = "on_demand",
-  sessions?: SessionQueryPort,
-  approvalMode: string = "auto",
-  sandboxMode: string = "off",
-  askUser?: AskUserRespond,
-  tuning: AgentToolTuning = {},
-): ToolAccess {
+export function buildToolAccess(input: ToolAccessInput): ToolAccess {
+  const {
+    workspace,
+    toolset,
+    ragCache,
+    signal,
+    toolNames,
+    subagentSpawn,
+    ralphSpawn,
+    scatterSpawn,
+    sessions,
+    askUser,
+  } = input;
+  const mcpPolicy = input.mcpPolicy ?? "off";
+  const skillPolicy = input.skillPolicy ?? "on_demand";
+  const approvalMode = input.approvalMode ?? "auto";
+  const sandboxMode = input.sandboxMode ?? "off";
+  const tuning = input.tuning ?? {};
   const approvalGate = new ApprovalGate(normalizeApprovalMode(approvalMode));
   const full = createBuiltinToolRegistry();
   // One repeat tracker per column execution (shared by direct and LC-bridged
