@@ -60,6 +60,26 @@ describe("MemoryStore", () => {
     expect(store.search("node", 1)).toHaveLength(1);
   });
 
+  it("prunes in compare order and counts reserved slots toward the cap", async () => {
+    // Caller contract of pruneToCap: the pending inserts (reserved) count
+    // against the cap, so the eviction count is size + reserved - cap, taken
+    // from the head of the caller's compare order.
+    const store = new MemoryStore<Note>(extract);
+    for (const id of ["a", "b", "c"]) {
+      await store.save({ id, title: `note ${id}`, body: "" });
+    }
+    const oldestFirst = (x: Note, y: Note) => x.id.localeCompare(y.id);
+    // 3 present + 2 reserved against a cap of 3: the two compare-smallest go.
+    expect(await store.pruneToCap(3, 2, oldestFirst)).toBe(2);
+    expect(store.list().map((note) => note.id)).toEqual(["c"]);
+    // Under the cap (even with reserved slots): nothing to evict.
+    expect(await store.pruneToCap(3, 2, oldestFirst)).toBe(0);
+    expect(store.size).toBe(1);
+    // deleteMany removes exactly the present ids and reports that count.
+    expect(await store.deleteMany(["c", "missing"])).toBe(1);
+    expect(store.size).toBe(0);
+  });
+
   it("persists atomically and reloads across restarts", async () => {
     const filePath = tempFile();
     try {

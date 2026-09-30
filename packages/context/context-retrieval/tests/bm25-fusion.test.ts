@@ -31,6 +31,15 @@ describe("Bm25", () => {
     expect(new Bm25(docs).score("zzzqqq")).toEqual([0, 0, 0]);
   });
 
+  it("scores a finite zero vector over an all-zero-length corpus", () => {
+    // Every document tokenizes to zero tokens (punctuation/whitespace chunks),
+    // so the mean document length degenerates. The scores must stay finite
+    // zeros — never NaN — because downstream fusion ranks on them.
+    const empty = new Bm25([{ id: "punct", text: "!!!" }, { id: "blank", text: "" }]);
+    expect(empty.size).toBe(2);
+    expect(empty.score("anything")).toEqual([0, 0]);
+  });
+
   it("scores pre-tokenized documents identically to raw text", () => {
     const text = "agent memory compaction 上下文 压缩";
     const query = "compaction 上下文";

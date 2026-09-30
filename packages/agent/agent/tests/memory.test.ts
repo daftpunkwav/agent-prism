@@ -3,7 +3,7 @@
  * @description Locks cross-session memory recall/record wiring in runAgentExecution.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PipelineConfigSchema, type EpisodicMemoryEntry, type MemoryServicePort, type SemanticFact } from "@agentprism/contracts";
 import type { AgentExecutionContext } from "@agentprism/harness";
 import { captureDriver, collect, convergingFailureDriver, testDeps, testSpec } from "./run-fixtures.js";
@@ -57,6 +57,29 @@ function stubMemory(): MemoryServicePort & {
   };
 }
 
+/** In-memory stub whose every recall rejects (memory backend down). */
+function rejectingMemory(message: string): MemoryServicePort & {
+  records: Array<Omit<EpisodicMemoryEntry, "id" | "timestamp">>;
+} {
+  const records: Array<Omit<EpisodicMemoryEntry, "id" | "timestamp">> = [];
+  const reject = async (): Promise<never> => {
+    throw new Error(message);
+  };
+  return {
+    records,
+    async recordEpisodic(entry) {
+      records.push(entry);
+      return { ...entry, id: "ep-test", timestamp: 1 };
+    },
+    recallEpisodic: reject,
+    async recordSemantic(fact: Omit<SemanticFact, "id">) {
+      return { ...fact, id: "sem-test" };
+    },
+    recallSemantic: reject,
+    recallAll: reject,
+  };
+}
+
 describe("memory wiring", () => {
   it("mounts episodic recall into the context and settles one post-mortem", async () => {
     const deps = testDeps();
@@ -81,6 +104,42 @@ describe("memory wiring", () => {
       config: PipelineConfigSchema.parse({ label: "col", harness: "bare", memory: "full" }),
     }));
     expect((seen as unknown as AgentExecutionContext).memoryRecall).toBeUndefined();
+  });
+
+  it("stays stateless for policy none even when a service is injected", async () => {
+    // A globally wired memory service with a column that opted out is a real
+    // deployment shape: the per-run policy must win over the injected port.
+    const deps = testDeps();
+    const memory = stubMemory();
+    let seen: AgentExecutionContext | null = null;
+    await collect(deps, testSpec(captureDriver((ctx) => { seen = ctx; }), {
+      config: PipelineConfigSchema.parse({ label: "col", harness: "bare", memory: "none" }),
+      memory,
+    }));
+    expect((seen as unknown as AgentExecutionContext).memoryRecall).toBeUndefined();
+    expect(memory.recalls).toEqual([]);
+    expect(memory.records).toEqual([]);
+  });
+
+  it("keeps the run stateless when the memory backend rejects recall", async () => {
+    // Degradation path: a dead memory backend must not take the top-level run
+    // down with it. The run completes, the recall resolves empty, and the skip
+    // is logged loudly; the post-mortem write is independent of recall health.
+    const deps = testDeps();
+    const memory = rejectingMemory("memory backend unreachable");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    let seen: AgentExecutionContext | null = null;
+    const events = await collect(deps, testSpec(captureDriver((ctx) => { seen = ctx; }), {
+      config: PipelineConfigSchema.parse({ label: "col", harness: "bare", memory: "episodic" }),
+      memory,
+    }));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("memory recall skipped"));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("memory backend unreachable"));
+    warn.mockRestore();
+    expect((seen as unknown as AgentExecutionContext).memoryRecall).toBeUndefined();
+    expect(events.some((e) => e.type === "error")).toBe(false);
+    expect(events.some((e) => e.type === "complete")).toBe(true);
+    expect(memory.records).toHaveLength(1);
   });
 
   it("records an internally converged failure as unsuccessful", async () => {
