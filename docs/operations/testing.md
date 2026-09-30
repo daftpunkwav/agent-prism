@@ -51,7 +51,7 @@ its share of tests. Reports land in `cov-report/` as text plus a JSON summary.
 
 Coverage thresholds fail the run when any metric falls under its floor: statements
 89, branches 78, functions 90, and lines 91 (about one and a half points under the
-90.35/79.73/91.69/92.44 baseline). CI runs on the Windows reference platform, so the
+90.59/80.13/91.91/92.69 baseline). CI runs on the Windows reference platform, so the
 numbers come from the same run that gates the merge, and the margin absorbs
 run-to-run noise and spawn jitter while turning a broad regression red instead of
 letting coverage slide. Raise the bar as coverage improves; a red gate means
