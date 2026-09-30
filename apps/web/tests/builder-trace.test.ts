@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * @file builder trace helper tests
- * @description Covers the pure display helpers behind the builder observability panel.
+ * @file builder trace tests
+ * @description Covers the pure display helpers in app/builder/builderTrace.
  *
  * Responsibilities:
  * - Pin trace-kind accent mapping and log-row shaping
