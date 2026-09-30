@@ -324,6 +324,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
               className="form-input builder-num"
               min={0} max={2}
               value={composition.temperature}
+              invalidMessage={t("builder.invalidNumber")}
               onChange={(temperature) => set({ temperature })}
             />
           </label>
@@ -333,6 +334,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
               className="form-input builder-num"
               min={0} max={1}
               value={composition.top_p}
+              invalidMessage={t("builder.invalidNumber")}
               onChange={(top_p) => set({ top_p })}
             />
           </label>
@@ -343,6 +345,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
               integer
               min={64} max={384000}
               value={composition.max_output_tokens}
+              invalidMessage={t("builder.invalidNumber")}
               onChange={(max_output_tokens) => set({ max_output_tokens })}
             />
           </label>
@@ -353,6 +356,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
               integer
               min={1} max={1000000}
               value={composition.max_steps}
+              invalidMessage={t("builder.invalidNumber")}
               onChange={(max_steps) => set({ max_steps })}
             />
           </label>
@@ -362,6 +366,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
               className="form-input builder-num"
               min={-2} max={2}
               value={composition.frequency_penalty}
+              invalidMessage={t("builder.invalidNumber")}
               onChange={(frequency_penalty) => set({ frequency_penalty })}
             />
           </label>
@@ -371,6 +376,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
               className="form-input builder-num"
               min={-2} max={2}
               value={composition.presence_penalty}
+              invalidMessage={t("builder.invalidNumber")}
               onChange={(presence_penalty) => set({ presence_penalty })}
             />
           </label>

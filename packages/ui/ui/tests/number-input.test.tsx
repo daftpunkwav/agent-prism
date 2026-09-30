@@ -1,29 +1,24 @@
 // @vitest-environment jsdom
 /**
  * @file number input tests
- * @description Locks the debounced commit behavior: free typing, idle commit,
- * blur commit, clamping, and integer truncation.
+ * @description Locks the blur-commit semantics: free typing never rewrites
+ * mid-edit text, commit happens on blur/Enter only, invalid edits keep the
+ * user's text with a message, and Escape restores the committed value.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NumberInput } from "../src/NumberInput.js";
 
 /** Stateful harness: a NumberInput whose parent actually applies committed values. */
-function Harness({ initial, min, max, integer }: { initial: number; min?: number; max?: number; integer?: boolean }) {
+function Harness({ initial, min, max, integer, invalidMessage }: { initial: number; min?: number; max?: number; integer?: boolean; invalidMessage?: string }) {
   const [value, setValue] = useState(initial);
-  return <NumberInput value={value} onChange={setValue} min={min} max={max} integer={integer} ariaLabel="tokens" />;
+  return <NumberInput value={value} onChange={setValue} min={min} max={max} integer={integer} invalidMessage={invalidMessage} ariaLabel="tokens" />;
 }
 
 describe("NumberInput", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
-  });
+  afterEach(cleanup);
 
   function type(text: string) {
     const input = screen.getByLabelText("tokens");
@@ -32,54 +27,83 @@ describe("NumberInput", () => {
     return input;
   }
 
-  it("commits the parsed value after the typing debounce elapses", () => {
+  it("never commits while typing: no timer rewrites mid-edit text", () => {
+    vi.useFakeTimers();
     const onChange = vi.fn();
-    render(<NumberInput value={0} min={0} ariaLabel="tokens" onChange={onChange} />);
-    type("500");
-    expect(onChange).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(600);
-    expect(onChange).toHaveBeenCalledWith(500);
-  });
-
-  it("lets the user clear the field mid-edit without immediate zero commits", () => {
-    const onChange = vi.fn();
-    render(<NumberInput value={128000} ariaLabel="tokens" onChange={onChange} />);
+    render(<NumberInput value={0} ariaLabel="tokens" onChange={onChange} />);
     const input = type("");
+    vi.advanceTimersByTime(2000);
     expect(onChange).not.toHaveBeenCalled();
-    fireEvent.change(input, { target: { value: "500" } });
-    vi.advanceTimersByTime(600);
-    expect(onChange).toHaveBeenCalledWith(500);
+    // The cleared field stays cleared: the deleted zero must not come back.
+    expect((input as HTMLInputElement).value).toBe("");
+    vi.useRealTimers();
   });
 
-  it("commits immediately and syncs the display on blur", () => {
+  it("commits on blur and syncs the display", () => {
     render(<Harness initial={0} />);
     const input = type("42");
     fireEvent.blur(input);
     expect((input as HTMLInputElement).value).toBe("42");
   });
 
-  it("clamps to min and truncates integers on commit", () => {
-    render(<Harness initial={0} min={1024} integer />);
-    const input = type("12.9");
+  it("keeps an invalid edit on screen with the caller's message instead of restoring", () => {
+    render(<Harness initial={16} invalidMessage="Enter a valid number" />);
+    const input = type("");
     fireEvent.blur(input);
-    expect((input as HTMLInputElement).value).toBe("1024");
+    // The user's (empty) text is not rewritten to 16; the message explains why.
+    expect((input as HTMLInputElement).value).toBe("");
+    expect(screen.getByRole("alert").textContent).toBe("Enter a valid number");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
   });
 
-  it("keeps the previous value for unparseable text", () => {
-    render(<Harness initial={16} />);
+  it("keeps out-of-range text and flags it instead of clamping", () => {
+    render(<Harness initial={1} min={1} max={2} invalidMessage="out of range" />);
+    const input = type("5000");
+    fireEvent.blur(input);
+    expect((input as HTMLInputElement).value).toBe("5000");
+    expect(screen.getByRole("alert").textContent).toBe("out of range");
+  });
+
+  it("flags unparseable text without committing", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={16} ariaLabel="tokens" invalidMessage="bad" onChange={onChange} />);
     const input = type("abc");
     fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect((input as HTMLInputElement).value).toBe("abc");
+    expect(screen.getByRole("alert").textContent).toBe("bad");
+  });
+
+  it("clears the flag and commits once the text is corrected", () => {
+    render(<Harness initial={0} invalidMessage="bad" />);
+    const input = type("");
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: "7" } });
+    fireEvent.blur(input);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("accepts an exactly-bounds value and truncates integers", () => {
+    render(<Harness initial={0} min={1} max={10} integer />);
+    const input = type("9.9");
+    fireEvent.blur(input);
+    expect((input as HTMLInputElement).value).toBe("9");
+  });
+
+  it("restores the committed value on Escape without firing onChange", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={16} ariaLabel="tokens" onChange={onChange} />);
+    const input = type("500");
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(onChange).not.toHaveBeenCalled();
     expect((input as HTMLInputElement).value).toBe("16");
   });
 
-  it("drops the pending debounce commit on unmount", () => {
-    // Cancel-right-after-typing (e.g. closing a modal via Escape) must not
-    // resurrect the discarded text through a late onChange.
-    const onChange = vi.fn();
-    const { unmount } = render(<NumberInput value={0} ariaLabel="tokens" onChange={onChange} />);
-    type("500");
-    unmount();
-    vi.advanceTimersByTime(1000);
-    expect(onChange).not.toHaveBeenCalled();
+  it("syncs the display when the external value changes", () => {
+    const { rerender } = render(<NumberInput value={0} ariaLabel="tokens" onChange={vi.fn()} />);
+    const input = screen.getByLabelText("tokens");
+    fireEvent.change(input, { target: { value: "5" } });
+    rerender(<NumberInput value={99} ariaLabel="tokens" onChange={vi.fn()} />);
+    expect((input as HTMLInputElement).value).toBe("99");
   });
 });

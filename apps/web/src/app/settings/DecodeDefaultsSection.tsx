@@ -41,6 +41,7 @@ export function DecodeDefaultsSection({ form, onChange }: DecodeDefaultsSectionP
             min={DECODE_FIELD_RANGES.temperature.min}
             max={DECODE_FIELD_RANGES.temperature.max}
             value={form.temperature}
+            invalidMessage={t("settings.decode.invalidNumber")}
             onChange={(temperature) => onChange({ temperature })}
           />
         </Field>
@@ -50,6 +51,7 @@ export function DecodeDefaultsSection({ form, onChange }: DecodeDefaultsSectionP
             min={DECODE_FIELD_RANGES.top_p.min}
             max={DECODE_FIELD_RANGES.top_p.max}
             value={form.top_p}
+            invalidMessage={t("settings.decode.invalidNumber")}
             onChange={(top_p) => onChange({ top_p })}
           />
         </Field>
@@ -60,6 +62,7 @@ export function DecodeDefaultsSection({ form, onChange }: DecodeDefaultsSectionP
             min={DECODE_FIELD_RANGES.max_output_tokens.min}
             max={DECODE_FIELD_RANGES.max_output_tokens.max}
             value={form.max_output_tokens}
+            invalidMessage={t("settings.decode.invalidNumber")}
             onChange={(max_output_tokens) => onChange({ max_output_tokens })}
           />
         </Field>

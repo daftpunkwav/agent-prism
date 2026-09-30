@@ -219,6 +219,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 integer
                 min={1024}
                 value={draft.context_window}
+                invalidMessage={t("settings.model.invalidNumber")}
                 onChange={(context_window) => patch({ context_window })}
               />
             </Field>
@@ -228,6 +229,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 integer
                 min={256}
                 value={draft.max_input_tokens}
+                invalidMessage={t("settings.model.invalidNumber")}
                 onChange={(max_input_tokens) => patch({ max_input_tokens })}
               />
             </Field>
@@ -237,6 +239,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 integer
                 min={64}
                 value={draft.max_output_tokens}
+                invalidMessage={t("settings.model.invalidNumber")}
                 onChange={(max_output_tokens) => patch({ max_output_tokens })}
               />
             </Field>
@@ -424,6 +427,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                         min={0}
                         max={TOKEN_INPUT_MAX}
                         value={pair.budget_tokens}
+                        invalidMessage={t("settings.model.invalidNumber")}
                         onChange={(budget_tokens) => {
                           const next = [...budgetPairs];
                           next[index] = { ...pair, budget_tokens };
@@ -436,6 +440,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                         min={0}
                         max={TOKEN_INPUT_MAX}
                         value={pair.max_tokens}
+                        invalidMessage={t("settings.model.invalidNumber")}
                         onChange={(max_tokens) => {
                           const next = [...budgetPairs];
                           next[index] = { ...pair, max_tokens };

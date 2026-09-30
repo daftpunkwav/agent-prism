@@ -1,28 +1,29 @@
 /**
  * @file NumberInput
- * @description Debounced numeric input for the shared UI package.
+ * @description Blur-committed numeric input for the shared UI package.
  *
  * Responsibilities:
- * - Let users type freely (empty and partial states included) without the
- *   controlled-value "stuck zero" problem
- * - Commit the parsed number after the typing pauses (debounce) or on blur,
- *   clamped to [min, max] when provided
- * - Stay presentation-only: parsing/rounding rules live here, domain
- *   validation stays with the caller
+ * - Let users type freely (empty and partial states included): every keystroke
+ *   only updates local text, so mid-edit content is never rewritten under the
+ *   user — commit waits for the user to finish (blur or Enter), never a timer
+ * - Validate on commit: a finite in-range number reports through onChange
+ *   (integers truncate); empty, unparseable, or out-of-range text keeps the
+ *   user's input visible, flags the field, and shows the caller's message
+ *   instead of silently restoring the previous value
+ * - Escape restores the last committed value; stay presentation-only: parsing
+ *   rules live here, domain validation stays with the caller
  */
 
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 
-const COMMIT_DEBOUNCE_MS = 500;
-
 export interface NumberInputProps {
   value: number;
   onChange: (value: number) => void;
-  /** Inclusive lower bound applied on commit. */
+  /** Inclusive lower bound; text outside the range is flagged, not committed. */
   min?: number;
-  /** Inclusive upper bound applied on commit. */
+  /** Inclusive upper bound; text outside the range is flagged, not committed. */
   max?: number;
   /** Truncate to an integer on commit (token counts, steps). */
   integer?: boolean;
@@ -30,38 +31,10 @@ export interface NumberInputProps {
   placeholder?: string;
   ariaLabel?: string;
   disabled?: boolean;
+  /** Message shown under the field while the committed text is invalid (empty, unparseable, or out of range). */
+  invalidMessage?: string;
 }
 
-/** Result of validating free text: a clamped number, or "revert" for empty/unparseable input. */
-interface CommitResult {
-  committed: number;
-  revert: boolean;
-}
-
-/** Empty or unparseable text reverts to the current value; finite text clamps to [min, max]. */
-function parseCommitted(
-  text: string,
-  fallback: number,
-  min: number | undefined,
-  max: number | undefined,
-  integer: boolean,
-): CommitResult {
-  const trimmed = text.trim();
-  if (trimmed === "") return { committed: fallback, revert: true };
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return { committed: fallback, revert: true };
-  let value = parsed;
-  if (integer) value = Math.trunc(value);
-  if (min !== undefined) value = Math.max(min, value);
-  if (max !== undefined) value = Math.min(max, value);
-  return { committed: value, revert: false };
-}
-
-/**
- * Numeric input with idle-commit semantics: every keystroke only updates local
- * text; once typing pauses (COMMIT_DEBOUNCE_MS) or the field blurs, the text
- * is parsed, clamped, and reported through onChange.
- */
 export function NumberInput({
   value,
   onChange,
@@ -72,48 +45,48 @@ export function NumberInput({
   placeholder,
   ariaLabel,
   disabled,
+  invalidMessage,
 }: NumberInputProps) {
   const [text, setText] = useState(String(value));
-  const [editing, setEditing] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Latest external value, readable from the debounce closure: the closure captures
-  // the value of the render that scheduled it, so a parent update inside the debounce
-  // window would otherwise be compared against (and overwritten with) a stale value.
-  const valueRef = useRef(value);
-  valueRef.current = value;
-
-  // External value changes (reset, saved reload) win whenever the user is not
-  // mid-edit; during editing the free text stays untouched.
+  const [invalid, setInvalid] = useState(false);
+  // Sync on actual value changes only, not on focus state: a rejected edit
+  // (invalid text kept on screen) leaves the external value untouched, and
+  // resetting on blur would erase the very text the user is supposed to fix.
+  const committedRef = useRef(value);
   useEffect(() => {
-    if (!editing) setText(String(value));
-  }, [value, editing]);
-
-  // A pending debounce must not fire onChange after unmount (e.g. a modal was
-  // cancelled right after typing): the commit would resurrect discarded text.
-  useEffect(() => {
-    return () => {
-      if (timer.current !== null) clearTimeout(timer.current);
-    };
-  }, []);
-
-  const commit = (raw: string) => {
-    if (timer.current !== null) {
-      clearTimeout(timer.current);
-      timer.current = null;
+    if (committedRef.current !== value) {
+      committedRef.current = value;
+      setText(String(value));
+      setInvalid(false);
     }
-    const current = valueRef.current;
-    const { committed, revert } = parseCommitted(raw, current, min, max, integer);
-    setText(String(committed));
-    if (!revert && committed !== current) onChange(committed);
+  }, [value]);
+
+  const restore = () => {
+    committedRef.current = value;
+    setText(String(value));
+    setInvalid(false);
   };
 
-  const schedule = (raw: string) => {
-    setText(raw);
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = setTimeout(() => commit(raw), COMMIT_DEBOUNCE_MS);
+  const commit = () => {
+    const trimmed = text.trim();
+    const parsed = trimmed === "" ? NaN : Number(trimmed);
+    if (Number.isFinite(parsed)) {
+      const committed = integer ? Math.trunc(parsed) : parsed;
+      const inRange = (min === undefined || committed >= min) && (max === undefined || committed <= max);
+      if (inRange) {
+        setInvalid(false);
+        setText(String(committed));
+        if (committed !== value) onChange(committed);
+        return;
+      }
+    }
+    // Invalid edit: keep the user's text on screen (never silently rewrite it
+    // to the previous value), flag the field, and surface the caller's message.
+    if (invalidMessage !== undefined) setInvalid(true);
+    else restore();
   };
 
-  return (
+  const field = (
     <input
       type="text"
       inputMode="decimal"
@@ -121,18 +94,36 @@ export function NumberInput({
       value={text}
       placeholder={placeholder}
       aria-label={ariaLabel}
+      aria-invalid={invalid || undefined}
       disabled={disabled}
-      onChange={(e) => schedule(e.target.value)}
-      onBlur={() => {
-        setEditing(false);
-        commit(text);
+      onChange={(e) => {
+        setText(e.target.value);
+        if (invalid) setInvalid(false);
       }}
-      onFocus={() => setEditing(true)}
+      onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           (e.target as HTMLInputElement).blur();
         }
+        if (e.key === "Escape") {
+          // Restore first, then blur: commit runs on the restored text and is a
+          // no-op, so discarding an edit never fires onChange.
+          restore();
+          (e.target as HTMLInputElement).blur();
+        }
       }}
     />
+  );
+
+  if (invalidMessage === undefined) return field;
+  return (
+    <span className="block w-full">
+      {field}
+      {invalid && (
+        <p role="alert" className="text-[11px] leading-snug text-destructive">
+          {invalidMessage}
+        </p>
+      )}
+    </span>
   );
 }

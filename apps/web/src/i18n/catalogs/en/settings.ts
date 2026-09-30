@@ -94,6 +94,7 @@ export const settings = {
     contextWindow: "Context window",
     maxInput: "Max input",
     maxOutput: "Max output (capability)",
+    invalidNumber: "Enter a valid number within the allowed range",
     thinkingCapable: "Supports thinking (extended thinking / reasoning)",
     imageInput: "Supports image input",
     videoInput: "Supports video input",
@@ -112,6 +113,7 @@ export const settings = {
     title: "Shared Decode Defaults (Arena baseline seed)",
     desc: "When comparing models, each column's temperature / Top P / generation cap matches the Arena baseline; these values only seed the defaults.",
     maxOutput: "Baseline max output",
+    invalidNumber: "Enter a valid number within the allowed range",
     notes: "Global notes (optional)",
     notesPlaceholder: "e.g. notes for the multi-provider bench",
   },
@@ -210,6 +212,7 @@ export const settings = {
     saved: "Runtime parameters saved and applied",
     saveFailed: "Failed to save runtime parameters",
     resetTitle: "Reset to default",
+    invalidNumber: "Enter a valid number within the allowed range",
     fields: {
       contextWindowMessages: "Sliding window (messages kept)",
       contextCharsPerToken: "Chars per token estimate",
