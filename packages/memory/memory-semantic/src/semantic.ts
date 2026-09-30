@@ -108,16 +108,16 @@ export class SemanticMemory {
   async recallFacts(query: string, options: MemoryRecallOptions = {}): Promise<readonly SemanticFact[]> {
     const now = options.now ?? this.now();
     const limit = Math.max(1, Math.min(options.limit ?? 5, 20));
-    const effective = this.store.list().filter((fact) => isFactEffective(fact, now));
     if (query.trim() === "") {
-      return [...effective].sort((a, b) => b.confidence - a.confidence).slice(0, limit);
+      return this.store
+        .list()
+        .filter((fact) => isFactEffective(fact, now))
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, limit);
     }
-    const scoped = new MemoryStore<SemanticFact>(semanticSearchText);
-    for (const fact of effective) {
-      // MemoryStore.save is async only due to persistence; in-memory saves settle immediately.
-      await scoped.save(fact);
-    }
-    const hits = scoped.search(query, limit * 2);
+    // Rank the live store directly (expired facts excluded by the matches
+    // predicate) instead of rebuilding a filtered index per query.
+    const hits = this.store.search(query, limit * 2, (fact) => isFactEffective(fact, now));
     const threshold = options.threshold;
     const above = threshold !== undefined ? hits.filter((h) => h.score >= threshold) : hits;
     return above.slice(0, limit).map((h) => h.item);

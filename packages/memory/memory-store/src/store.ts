@@ -185,9 +185,11 @@ export class MemoryStore<T extends { id: string }> {
 
   /**
    * Searches the store using term-frequency ranking over exact token matches.
-   * Returns at most `limit` hits sorted by descending score.
+   * Returns at most `limit` hits sorted by descending score. The optional
+   * `matches` predicate restricts which items participate; it applies before
+   * ranking and the limit cut, so a filtered view needs no second index.
    */
-  search(query: string, limit = 3): Array<{ item: T; score: number }> {
+  search(query: string, limit = 3, matches?: (item: T) => boolean): Array<{ item: T; score: number }> {
     const queryTokens = tokenizeText(query);
     const capped = Math.max(0, Math.trunc(limit));
     if (queryTokens.length === 0 || this.items.size === 0 || capped === 0) {
@@ -198,6 +200,7 @@ export class MemoryStore<T extends { id: string }> {
     const scored: Array<{ item: T; score: number }> = [];
 
     for (const doc of this.items.values()) {
+      if (matches !== undefined && !matches(doc.item)) continue;
       let matchCount = 0;
       let totalTokenScore = 0;
 
