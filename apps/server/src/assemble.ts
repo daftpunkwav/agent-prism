@@ -359,9 +359,9 @@ export async function assemble(): Promise<RuntimeComponents> {
     flushDebounceMs: settings.fileFlushDebounceMs,
   });
   // Append-only backend: each mutation appends a line instead of rewriting the whole
-  // ledger (which was O(sessions × entries) per milestone). The snapshot stays the
-  // legacy path, so an existing sessions.json loads unchanged; the periodic
-  // checkpoint compacts the log back into it.
+  // ledger (the legacy path rewrote every session's entries on each appended
+  // milestone). The snapshot stays the legacy path, so an existing sessions.json
+  // loads unchanged; the periodic checkpoint compacts the log back into it.
   const sessionStore = new JsonlSessionStore({
     log: new NodeAppendFile(SESSIONS_LOG_PATH),
     snapshot: new AtomicJsonFile(SESSIONS_PATH),

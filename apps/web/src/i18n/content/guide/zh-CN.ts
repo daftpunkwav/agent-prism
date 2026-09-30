@@ -807,8 +807,8 @@ const dimensions: DimDoc[] = [
     langChain: "MCP 工具走同一注册表桥，与内置无异；create_agent 视为普通工具。",
     langGraph: "同一桥：图工具节点经共享注册表执行 MCP 工具。",
     modules: [
-      "packages/tools/tool-mcp/src/servers.ts",
-      "packages/tools/tool-mcp/src/bridge.ts",
+      "packages/tools/tool-mcp/src/local-capabilities.ts",
+      "packages/tools/tool-mcp/src/policy-bridge.ts",
       "packages/agent/agent/src/agent-execution.ts",
     ],
     baselineTip: "先在文件列举任务上对比 off vs fs；任务确需抓取时再加 full。",

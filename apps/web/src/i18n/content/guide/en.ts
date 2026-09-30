@@ -811,8 +811,8 @@ const dimensions: DimDoc[] = [
     langChain: "MCP tools ride the same registry bridge as builtins; create_agent sees them as ordinary tools.",
     langGraph: "Same bridge: graph tool nodes execute MCP tools through the shared registry.",
     modules: [
-      "packages/tools/tool-mcp/src/servers.ts",
-      "packages/tools/tool-mcp/src/bridge.ts",
+      "packages/tools/tool-mcp/src/local-capabilities.ts",
+      "packages/tools/tool-mcp/src/policy-bridge.ts",
       "packages/agent/agent/src/agent-execution.ts",
     ],
     baselineTip: "Compare off vs fs on a file-listing task first; add full only when the task genuinely needs fetching.",

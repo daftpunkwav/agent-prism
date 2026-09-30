@@ -153,7 +153,11 @@ export interface AgentRunSpec {
 /** Delegation ceiling: parent -> child only (a child never sees delegation tools). */
 const MAX_DELEGATION_DEPTH = 1;
 
-/** Memory policy token from the pipeline config (absent = stateless). */
+/**
+ * Memory policy token from the pipeline config ("none" and unknown tokens mean
+ * stateless). The "none" fallback is defensive: PipelineConfigSchema already
+ * defaults memory to "none", so the field is always present in practice.
+ */
 function memoryPolicyOf(config: PipelineConfig): string {
   return config.memory ?? "none";
 }
@@ -537,7 +541,7 @@ export async function* runAgentExecution(
     const memoryRecall =
       subagentDepth === 0 ? await recallMemoryForRun(memoryService, memoryPolicy, spec.question) : undefined;
     // Per-run context analytics: usage estimates + strategy observations are
-  // reported at run end so operators see what each context strategy cost.
+    // reported at run end so operators see what each context strategy cost.
     const contextAnalytics = createContextAnalytics();
     // Custom dimensions of this run, resolved once at the single assembly point:
     // the budget hook folds into the tuning bag every driver already spreads, and

@@ -2,6 +2,9 @@
  * @file chatEntry
  * @description Chat entry shape shared by the chat panel and the trace helpers.
  *
+ * Responsibilities:
+ * - Define the ChatEntry shape rendered by the chat bubbles and trace helpers
+ *
  * Owned here (not in ChatPanel) so pure display modules can type against it
  * without importing a React component.
  */
