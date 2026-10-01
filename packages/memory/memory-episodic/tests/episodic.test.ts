@@ -188,4 +188,21 @@ describe("EpisodicMemory capacity", () => {
       expect.arrayContaining(["task 1", "task 2", "task 3"]),
     );
   });
+
+  it("keeps the cap when two inserts overlap at the ceiling", async () => {
+    const mem = new EpisodicMemory({ maxEntries: 2, now: () => 1_000 });
+    const experience = (task: string) => ({
+      task,
+      framework: "",
+      model: "",
+      success: true,
+      keyActions: [] as string[],
+      lessons: task,
+      workspaceTag: "",
+    });
+    await mem.recordExperience(experience("a"));
+    await mem.recordExperience(experience("b"));
+    await Promise.all([mem.recordExperience(experience("c")), mem.recordExperience(experience("d"))]);
+    expect(mem.size).toBe(2);
+  });
 });

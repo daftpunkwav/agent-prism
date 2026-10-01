@@ -38,8 +38,13 @@ export function semanticSearchText(fact: SemanticFact): string {
 /** Whether a fact is effective at `now` (handles open-ended validity). */
 export function isFactEffective(fact: SemanticFact, now: number): boolean {
   if (fact.validFrom > now) return false;
-  if (fact.validUntil !== undefined && fact.validUntil !== 0 && fact.validUntil <= now) return false;
+  if (isFactExpired(fact, now)) return false;
   return true;
+}
+
+/** Whether a fact's validity window has closed. Not-yet-effective facts stay stored. */
+function isFactExpired(fact: SemanticFact, now: number): boolean {
+  return fact.validUntil !== undefined && fact.validUntil !== 0 && fact.validUntil <= now;
 }
 
 function normalizePart(part: string): string {
@@ -47,8 +52,9 @@ function normalizePart(part: string): string {
 }
 
 /**
- * Semantic fact store with TTL expiry: expired facts are invisible to recall
- * and pruned lazily on write.
+ * Semantic fact store with TTL expiry: facts past validUntil are invisible to
+ * recall and pruned lazily on write. Facts that have not started yet stay
+ * stored and stay hidden until validFrom.
  */
 export class SemanticMemory {
   private readonly store: MemoryStore<SemanticFact>;
@@ -72,36 +78,43 @@ export class SemanticMemory {
    * window, and source refresh) instead of duplicated.
    */
   async recordFact(fact: Omit<SemanticFact, "id">): Promise<SemanticFact> {
-    await this.pruneExpired();
-    const key = [normalizePart(fact.subject), normalizePart(fact.predicate), normalizePart(fact.object)].join("|");
-    for (const existing of this.store.list()) {
-      const existingKey = [normalizePart(existing.subject), normalizePart(existing.predicate), normalizePart(existing.object)].join("|");
-      if (existingKey === key) {
-        // Refresh in place. No capacity dance here: an update does not grow the store,
-        // and evicting a fact to record this one would drop unrelated knowledge (the
-        // weakest fact could be the very one being refreshed).
-        const merged: SemanticFact = {
-          ...existing,
-          confidence: fact.confidence,
-          validFrom: fact.validFrom,
-          validUntil: fact.validUntil,
-          source: fact.source || existing.source,
-        };
-        return this.store.save(merged);
+    // Expiry, cap trim, and insert share one snapshot. Same reason as episodic
+    // memory: an await between those steps lets a concurrent writer exceed the
+    // cap and leaves a crash window that drops rows nothing replaced.
+    return this.store.transact(() => {
+      this.dropExpired(this.now());
+      const key = [normalizePart(fact.subject), normalizePart(fact.predicate), normalizePart(fact.object)].join("|");
+      for (const existing of this.store.list()) {
+        const existingKey = [normalizePart(existing.subject), normalizePart(existing.predicate), normalizePart(existing.object)].join("|");
+        if (existingKey === key) {
+          // Refresh in place. No capacity dance here: an update does not grow the store,
+          // and evicting a fact to record this one would drop unrelated knowledge (the
+          // weakest fact could be the very one being refreshed).
+          const merged: SemanticFact = {
+            ...existing,
+            confidence: fact.confidence,
+            validFrom: fact.validFrom,
+            validUntil: fact.validUntil,
+            source: fact.source || existing.source,
+          };
+          this.store.put(merged);
+          return merged;
+        }
       }
-    }
-    // Room for the fact about to be inserted, so the cap holds once this call
-    // returns. Eviction takes the least valuable facts first: lowest confidence,
-    // then oldest, with the id as a stable tie-break. A fact referenced again is
-    // refreshed in place (the merge branch above), so the cap costs the weakest
-    // long-tail knowledge rather than whatever was written last.
-    await this.store.pruneToCap(
-      this.maxFacts,
-      1,
-      (a, b) => a.confidence - b.confidence || a.validFrom - b.validFrom || a.id.localeCompare(b.id),
-    );
-    const record: SemanticFact = { ...fact, id: this.store.nextId("sem-", this.now) };
-    return this.store.save(record);
+      // Room for the fact about to be inserted, so the cap holds once this call
+      // returns. Eviction takes the least valuable facts first: lowest confidence,
+      // then oldest, with the id as a stable tie-break. A fact referenced again is
+      // refreshed in place (the merge branch above), so the cap costs the weakest
+      // long-tail knowledge rather than whatever was written last.
+      this.store.pruneInMemory(
+        this.maxFacts,
+        1,
+        (a, b) => a.confidence - b.confidence || a.validFrom - b.validFrom || a.id.localeCompare(b.id),
+      );
+      const record: SemanticFact = { ...fact, id: this.store.nextId("sem-", this.now) };
+      this.store.put(record);
+      return record;
+    });
   }
 
   /** Recalls up to `limit` (default 5) effective facts matching a query. */
@@ -123,11 +136,17 @@ export class SemanticMemory {
     return above.slice(0, limit).map((h) => h.item);
   }
 
-  /** Removes expired facts; returns the number pruned (one persist for the batch). */
+  /** Removes facts whose validity window has closed. Not-yet-effective facts stay. */
   async pruneExpired(now?: number): Promise<number> {
     const at = now ?? this.now();
-    const expired = this.store.list().filter((fact) => !isFactEffective(fact, at)).map((fact) => fact.id);
-    return expired.length === 0 ? 0 : this.store.deleteMany(expired);
+    if (!this.store.list().some((fact) => isFactExpired(fact, at))) return 0;
+    return this.store.transact(() => this.dropExpired(at));
+  }
+
+  /** Drops closed-window facts from memory. Does not persist; call inside transact. */
+  private dropExpired(at: number): number {
+    const expired = this.store.list().filter((fact) => isFactExpired(fact, at)).map((fact) => fact.id);
+    return this.store.drop(expired);
   }
 
   /** Lists all facts including expired ones (use recallFacts for effective-only). */

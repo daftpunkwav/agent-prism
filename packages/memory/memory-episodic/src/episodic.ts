@@ -67,36 +67,44 @@ export class EpisodicMemory {
    * appending (keeps recall sharp across repeated runs).
    */
   async recordExperience(entry: Omit<EpisodicMemoryEntry, "id" | "timestamp">): Promise<EpisodicMemoryEntry> {
-    const normalized = normalizeTask(entry.task);
-    for (const existing of this.store.list()) {
-      if (normalizeTask(existing.task) === normalized && existing.success === entry.success && existing.lessons === entry.lessons) {
-        const merged: EpisodicMemoryEntry = {
-          ...existing,
-          keyActions: Array.from(new Set([...existing.keyActions, ...entry.keyActions])),
-          timestamp: this.now(),
-          workspaceTag: entry.workspaceTag || existing.workspaceTag,
-        };
-        // Update in place: no capacity dance (an update does not grow the store).
-        return this.store.save(merged);
+    // Dedup, cap trim, and insert share one snapshot. An await between the trim
+    // and the insert lets a concurrent writer observe the hole and push the
+    // store past the cap, and a crash in that window drops the evicted row
+    // without keeping the new one.
+    return this.store.transact(() => {
+      const normalized = normalizeTask(entry.task);
+      for (const existing of this.store.list()) {
+        if (normalizeTask(existing.task) === normalized && existing.success === entry.success && existing.lessons === entry.lessons) {
+          const merged: EpisodicMemoryEntry = {
+            ...existing,
+            keyActions: Array.from(new Set([...existing.keyActions, ...entry.keyActions])),
+            timestamp: this.now(),
+            workspaceTag: entry.workspaceTag || existing.workspaceTag,
+          };
+          // Update in place: no capacity dance (an update does not grow the store).
+          this.store.put(merged);
+          return merged;
+        }
       }
-    }
-    // Room for the entry about to be inserted, so the cap holds once this call
-    // returns. Eviction takes the stalest experiences first, with the id as a
-    // stable tie-break. An experience referenced again (near-dup record) is
-    // refreshed in place, so the cap costs stale long-tail history rather than
-    // whatever was written last.
-    await this.store.pruneToCap(
-      this.maxEntries,
-      1,
-      (a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id),
-    );
-    const record: EpisodicMemoryEntry = {
-      ...entry,
-      keyActions: [...entry.keyActions],
-      id: this.store.nextId("ep-", this.now),
-      timestamp: this.now(),
-    };
-    return this.store.save(record);
+      // Room for the entry about to be inserted, so the cap holds once this call
+      // returns. Eviction takes the stalest experiences first, with the id as a
+      // stable tie-break. An experience referenced again (near-dup record) is
+      // refreshed in place, so the cap costs stale long-tail history rather than
+      // whatever was written last.
+      this.store.pruneInMemory(
+        this.maxEntries,
+        1,
+        (a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id),
+      );
+      const record: EpisodicMemoryEntry = {
+        ...entry,
+        keyActions: [...entry.keyActions],
+        id: this.store.nextId("ep-", this.now),
+        timestamp: this.now(),
+      };
+      this.store.put(record);
+      return record;
+    });
   }
 
   /** Recalls up to `limit` (default 3) relevant experiences for a task query. */

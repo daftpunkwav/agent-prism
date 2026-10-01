@@ -42,6 +42,19 @@ describe("SemanticMemory", () => {
     expect(hits.map((f) => f.object)).not.toContain("npm");
   });
 
+  it("keeps a not-yet-effective fact until its window opens", async () => {
+    let now = 1000;
+    const mem = new SemanticMemory({ now: () => now });
+    await mem.recordFact({ subject: "plan", predicate: "starts", object: "later", confidence: 1, validFrom: 5000, source: "" });
+    await mem.recordFact({ subject: "plan", predicate: "uses", object: "now", confidence: 1, validFrom: 0, source: "" });
+    expect(mem.list().map((fact) => fact.object).sort()).toEqual(["later", "now"]);
+    const hidden = await mem.recallFacts("plan");
+    expect(hidden.map((fact) => fact.object)).toContain("now");
+    expect(hidden.map((fact) => fact.object)).not.toContain("later");
+    now = 5000;
+    expect((await mem.recallFacts("plan")).map((fact) => fact.object)).toContain("later");
+  });
+
   it("prunes expired facts on write", async () => {
     let now = 1000;
     const mem = new SemanticMemory({ now: () => now });

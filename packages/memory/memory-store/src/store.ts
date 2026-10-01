@@ -5,6 +5,7 @@
  * Responsibilities:
  * - Load and atomically persist structured collections of memory items
  * - Allocate collision-free item ids and trim capped collections
+ * - Batch a prune and its insert into one persist via transact
  * - Provide multi-language tokenization (CJK + Latin word segmentation)
  * - Provide term-frequency search ranking over text representations
  * - Crash-safe across restarts via AtomicJsonFile (atomic replace + backup recovery)
@@ -104,17 +105,44 @@ export class MemoryStore<T extends { id: string }> {
     await this.file.write(array);
   }
 
-  /** Saves or updates an item in the store. */
-  async save(item: T): Promise<T> {
+  /**
+   * Runs `edit` to completion, then persists once. The callback must not
+   * await: concurrent callers only interleave at this persist, so a prune and
+   * the insert it made room for land in the same snapshot. A crash during the
+   * write loses the new snapshot or keeps the previous one, never a pruned
+   * store missing the insert.
+   */
+  async transact<R>(edit: () => R): Promise<R> {
+    const result = edit();
+    await this.persist();
+    return result;
+  }
+
+  /** Inserts or replaces an item in memory. Does not persist; call inside transact. */
+  put(item: T): void {
     const rawText = this.extractSearchText(item);
-    const doc: MemoryDocument<T> = {
+    this.items.set(item.id, {
       item,
       rawText,
       searchTokens: tokenizeText(rawText),
-    };
-    this.items.set(item.id, doc);
-    await this.persist();
-    return item;
+    });
+  }
+
+  /** Removes ids from memory. Does not persist; call inside transact. */
+  drop(ids: readonly string[]): number {
+    let removed = 0;
+    for (const id of ids) {
+      if (this.items.delete(id)) removed += 1;
+    }
+    return removed;
+  }
+
+  /** Saves or updates an item in the store. */
+  async save(item: T): Promise<T> {
+    return this.transact(() => {
+      this.put(item);
+      return item;
+    });
   }
 
   /** Retrieves an item by its unique ID. */
@@ -138,16 +166,27 @@ export class MemoryStore<T extends { id: string }> {
   /**
    * Trims the store down to `cap`, counting `reserved` items the caller is about
    * to insert so the cap holds once their write lands. Victims go in `compare`
-   * order (the caller owns the eviction policy); deletion is one batched persist.
+   * order (the caller owns the eviction policy). Memory only: the caller
+   * persists once, together with the insert this made room for.
    */
-  async pruneToCap(cap: number, reserved: number, compare: (a: T, b: T) => number): Promise<number> {
+  pruneInMemory(cap: number, reserved: number, compare: (a: T, b: T) => number): number {
     const overflow = this.items.size + reserved - cap;
     if (overflow <= 0) return 0;
     const victims = [...this.list()]
       .sort(compare)
       .slice(0, overflow)
       .map((item) => item.id);
-    return this.deleteMany(victims);
+    return this.drop(victims);
+  }
+
+  /**
+   * Trims the store and persists that trim. Prefer pruneInMemory inside
+   * transact when the trim exists to make room for an insert in the same snapshot.
+   */
+  async pruneToCap(cap: number, reserved: number, compare: (a: T, b: T) => number): Promise<number> {
+    const removed = this.pruneInMemory(cap, reserved, compare);
+    if (removed > 0) await this.persist();
+    return removed;
   }
 
   /** Lists all items currently in the store. */
@@ -157,11 +196,8 @@ export class MemoryStore<T extends { id: string }> {
 
   /** Removes an item by ID. Returns true if removed. */
   async delete(id: string): Promise<boolean> {
-    const removed = this.items.delete(id);
-    if (removed) {
-      await this.persist();
-    }
-    return removed;
+    if (!this.items.has(id)) return false;
+    return this.transact(() => this.drop([id]) === 1);
   }
 
   /**
@@ -169,18 +205,15 @@ export class MemoryStore<T extends { id: string }> {
    * rewrote the whole collection (and its backup) per item.
    */
   async deleteMany(ids: readonly string[]): Promise<number> {
-    let removed = 0;
-    for (const id of ids) {
-      if (this.items.delete(id)) removed += 1;
-    }
-    if (removed > 0) await this.persist();
-    return removed;
+    if (!ids.some((id) => this.items.has(id))) return 0;
+    return this.transact(() => this.drop(ids));
   }
 
   /** Clears all items. */
   async clear(): Promise<void> {
-    this.items.clear();
-    await this.persist();
+    await this.transact(() => {
+      this.items.clear();
+    });
   }
 
   /**
