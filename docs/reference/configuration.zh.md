@@ -103,6 +103,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 
 | 变量 | 默认 | 用途 |
 |---|---|---|
+| `ARENA_CUSTOM_DIMENSIONS` | 启用，除非值恰好为 `off` | 不注册任何 `packages/custom/*` 维度，因此不会出现自定义 Arena 轴、Builder 积木块或基线字段；根 `.env` 计入，进程环境变量优先 |
 | `ARENA_EVENT_RETENTION` | `5000`，范围 500 至 100 000 | 为对比报告保留的每 pipeline event 数 |
 | `ARENA_DISCONNECT_GRACE_MS` | `5000`，范围 500 至 60 000 | 客户端断开后的拆除等待时长 |
 | `SSE_HEARTBEAT_MS` | `15000`，范围 1 000 至 60 000 | run、matrix、chat、thread 流上的 SSE 注释 ping 间隔，防止代理丢弃静默连接 |
@@ -130,7 +131,6 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 |---|---|---|
 | `MCP_SERVERS` | `apps/server/src/assemble.ts` 到 `tool-mcp/src/config.ts` | stdio MCP server 的 JSON 数组 `{command, args?, env?, timeoutMs?, tools?, name?, enabled?}`；`timeoutMs` 默认 `MCP_REQUEST_TIMEOUT_MS`；仅在 `data/mcp_servers.json` 尚不存在时播种托管 store——运维经 settings API 保存后以文件为准；格式错误的 env JSON 告警一次并被忽略，启动继续 |
 | `DRIVERS` | `apps/server/src/load-drivers.ts` | 可选逗号分隔的 driver allowlist，大小写不敏感，如 `native,plan_execute,self_critique`；未设或空白表示全部内置；未知名称告警并忽略 |
-| `ARENA_CUSTOM_DIMENSIONS` | `apps/server/src/assemble.ts` 与 `arena-dimensions/src/capability-options.ts` | 恰为 `off` 时不注册任何 `packages/custom/*` 维度，因此不会出现自定义 Arena 轴、Builder 积木块或基线字段；其他任意值（含未设）保持启用 |
 | `SEARCH_PROVIDER` | `tool-builtins/src/definitions/web-search.ts` | `exa` 或 `tavily`；其他任何值失败关闭并给出设置提示 |
 | `SEARCH_API_KEY` | 同上 | provider key；缺失则失败关闭 |
 | `SEARCH_API_URL` | 同上 | 测试用 endpoint 覆盖，默认 Exa 为 `https://api.exa.ai/search`，Tavily 为 `https://api.tavily.com/search` |
@@ -208,8 +208,9 @@ builder palette，也不参与 `/api/arena/meta` 的按端点 thinking 轴投影
 
 经 settings API 存储的 provider endpoint 可持有恰好为 `"${env:NAME}"` 的 API key。
 `provider-catalog/src/endpoints.ts` 中的 `resolveCredentialReference` 在构造模型的
-唯一消费点解析它。存储值保持为引用，已解析的密钥绝不写回，缺失变量解析为 `""`，
-随后在模型构造时失败关闭。不做部分插值。
+唯一消费点解析它。查找与 `loadSettings` 使用同一次合并：根 `.env` 计入，进程环境变量
+优先。存储值保持为引用，已解析的密钥绝不写回，缺失变量解析为 `""`，随后在模型构造时
+失败关闭。不做部分插值。
 
 ## 持久化布局
 

@@ -4,7 +4,7 @@
  *
  * Responsibilities:
  * - Parse KEY=VALUE lines with optional quoting and an optional `export` prefix
- * - Return parsed values only; never touch process.env directly
+ * - Merge a .env file under an env map without writing process.env
  */
 
 import { readFileSync } from "node:fs";
@@ -45,4 +45,17 @@ export function loadEnvFile(filePath: string = ENV_FILE): Record<string, string>
     if (key !== "") values[key] = value;
   }
   return values;
+}
+
+/**
+ * Merges a .env file under an env map. The file fills gaps; a defined env value
+ * wins, including empty string. Does not write process.env. This is the merge
+ * loadSettings and credential lookup both use.
+ */
+export function mergedEnv(env: NodeJS.ProcessEnv = process.env, envFile: string = ENV_FILE): Record<string, string> {
+  const source: Record<string, string> = { ...loadEnvFile(envFile) };
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) source[key] = value;
+  }
+  return source;
 }

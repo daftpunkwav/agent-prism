@@ -10,6 +10,7 @@
 
 import type { IdGenerator, LlmEndpoint, ThinkingBudgetPair, ThinkingMode } from "@agentprism/contracts";
 import { DEFAULT_LLM_BASE_URL, DEFAULT_MODEL_ID } from "@agentprism/contracts";
+import { mergedEnv } from "@agentprism/config";
 
 /**
  * Credential reference syntax: the whole value must be `${env:NAME}` (env names
@@ -18,9 +19,9 @@ import { DEFAULT_LLM_BASE_URL, DEFAULT_MODEL_ID } from "@agentprism/contracts";
  */
 export const CREDENTIAL_REFERENCE_PATTERN = /^\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}$/;
 
-/** Default secret lookup reads process.env (mirrors config loadSettings). */
+/** Default secret lookup uses the same .env-then-process merge as loadSettings. */
 export function defaultEnvLookup(name: string): string | undefined {
-  return process.env[name];
+  return mergedEnv()[name];
 }
 
 /**

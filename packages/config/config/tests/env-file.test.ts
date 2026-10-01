@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadEnvFile } from "../src/env-file.js";
+import { loadEnvFile, mergedEnv } from "../src/env-file.js";
 
 describe("loadEnvFile", () => {
   let dir: string;
@@ -66,5 +66,14 @@ describe("loadEnvFile", () => {
     expect(loadEnvFile(victim)).toEqual({});
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it("lets a defined env value win over the file, and keeps file-only keys", () => {
+    const file = join(dir, ".env");
+    writeFileSync(file, "FILE_ONLY=from-file\nSHARED=from-file\n", "utf-8");
+    expect(mergedEnv({ SHARED: "from-env" }, file)).toMatchObject({
+      FILE_ONLY: "from-file",
+      SHARED: "from-env",
+    });
   });
 });

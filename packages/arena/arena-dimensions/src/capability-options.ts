@@ -50,7 +50,9 @@ function customDimensionOptions(): Record<string, DimensionOptionTriple[]> {
  * Keys are builtin dimension ids plus every registered custom dimension id, so
  * the map is a plain string-keyed record over the live registry.
  */
-export function buildCapabilityOptionProjection(): Partial<Record<string, DimensionOptionTriple[]>> {
+export function buildCapabilityOptionProjection(
+  options: { customDimensions?: boolean } = {},
+): Partial<Record<string, DimensionOptionTriple[]>> {
   const sectionIds = getBuiltinPromptSectionRegistry().listIds();
   const contextRegistered = new Set(createBuiltinContextPolicyRegistry().listIds());
   const reasoningFromSections = idsWithPrefix(sectionIds, "reasoning:");
@@ -58,9 +60,9 @@ export function buildCapabilityOptionProjection(): Partial<Record<string, Dimens
     REASONING_MODE_META.map((meta) => meta.mode).filter((mode) => reasoningFromSections.has(mode)),
   );
   const toolsetRegistered = new Set(Object.keys(TOOL_NAMES_BY_TOOLSET));
-  // Custom-dimension subpackages each own a comparison axis; the env switch turns
-  // every one of them off at once.
-  const customEnabled = process.env.ARENA_CUSTOM_DIMENSIONS !== "off";
+  // The composition root passes the settings switch. Omitted means on, which is
+  // the historical default when ARENA_CUSTOM_DIMENSIONS is unset.
+  const customEnabled = options.customDimensions !== false;
 
   return {
     prompt: project(PROMPT_OPTIONS, idsWithPrefix(sectionIds, "profile:")),

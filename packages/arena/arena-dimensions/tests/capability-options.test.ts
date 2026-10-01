@@ -66,15 +66,8 @@ describe("custom-dimension projection", () => {
     expect(values).not.toContain(CUSTOM_DIMENSION_ID);
   });
 
-  it("drops every custom axis when ARENA_CUSTOM_DIMENSIONS=off", () => {
-    const previous = process.env.ARENA_CUSTOM_DIMENSIONS;
-    process.env.ARENA_CUSTOM_DIMENSIONS = "off";
-    try {
-      expect(buildCapabilityOptionProjection()[CUSTOM_DIMENSION_ID]).toBeUndefined();
-    } finally {
-      if (previous === undefined) delete process.env.ARENA_CUSTOM_DIMENSIONS;
-      else process.env.ARENA_CUSTOM_DIMENSIONS = previous;
-    }
+  it("drops every custom axis when the caller turns custom dimensions off", () => {
+    expect(buildCapabilityOptionProjection({ customDimensions: false })[CUSTOM_DIMENSION_ID]).toBeUndefined();
   });
 
   it("shapes the arena row with label, subtitle, field, and default", () => {

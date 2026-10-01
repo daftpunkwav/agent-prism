@@ -58,7 +58,7 @@ const PENDING = {
   "@agentprism/http-runtime": ["readRawBodyText", "settingsOf"],
   "@agentprism/memory-episodic": ["episodicSearchText"],
   "@agentprism/memory-semantic": ["semanticSearchText"],
-  "@agentprism/provider-catalog": ["ProviderLookupAdapter", "defaultEnvLookup"],
+  "@agentprism/provider-catalog": ["ProviderLookupAdapter"],
   "@agentprism/provider-langchain": ["createColumnRuntime", "llmMessagesToLc", "serializeWireResponse"],
   "@agentprism/runtime": ["Workspace"],
   "@agentprism/session-format": ["SessionMigrationError"],

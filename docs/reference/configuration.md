@@ -105,6 +105,7 @@ content wants a lower `CONTEXT_CHARS_PER_TOKEN`.
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `ARENA_CUSTOM_DIMENSIONS` | on, unless the value is exactly `off` | skips registering every `packages/custom/*` dimension, so no custom Arena axis, Builder block, or baseline field appears; root `.env` counts, and a process env value wins |
 | `ARENA_EVENT_RETENTION` | `5000`, range 500 to 100 000 | per-pipeline events retained for the comparison report |
 | `ARENA_DISCONNECT_GRACE_MS` | `5000`, range 500 to 60 000 | teardown wait after a client disconnect |
 | `SSE_HEARTBEAT_MS` | `15000`, range 1 000 to 60 000 | SSE comment-ping interval on run, matrix, chat, and thread streams, which keeps proxies from dropping quiet connections |
@@ -135,7 +136,6 @@ These are deliberately not env-tunable.
 |---|---|---|
 | `MCP_SERVERS` | `apps/server/src/assemble.ts` to `tool-mcp/src/config.ts` | JSON array of stdio MCP servers `{command, args?, env?, timeoutMs?, tools?, name?, enabled?}`; `timeoutMs` defaults to `MCP_REQUEST_TIMEOUT_MS`; it seeds the managed store (`data/mcp_servers.json`) only while that file does not exist yet — once an operator saves through the settings API the file wins; malformed env JSON warns once and is ignored, and startup continues |
 | `DRIVERS` | `apps/server/src/load-drivers.ts` | optional comma-separated driver allowlist, case-insensitive, such as `native,plan_execute,self_critique`; unset or blank means all builtins; unknown names warn and are ignored |
-| `ARENA_CUSTOM_DIMENSIONS` | `apps/server/src/assemble.ts` and `arena-dimensions/src/capability-options.ts` | exactly `off` skips registering every `packages/custom/*` dimension, so no custom Arena axis, Builder block, or baseline field appears; any other value, unset included, keeps them on |
 | `SEARCH_PROVIDER` | `tool-builtins/src/definitions/web-search.ts` | `exa` or `tavily`; anything else fails closed with a setup hint |
 | `SEARCH_API_KEY` | same | provider key; missing fails closed |
 | `SEARCH_API_URL` | same | endpoint override for tests, defaulting to Exa at `https://api.exa.ai/search` and Tavily at `https://api.tavily.com/search` |
@@ -221,10 +221,11 @@ projection in `/api/arena/meta`.
 
 Provider endpoints stored through the settings API may hold an API key that is exactly
 `"${env:NAME}"`. `resolveCredentialReference` in `provider-catalog/src/endpoints.ts`
-resolves it at the single consumption point where models are constructed. The stored
-value stays a reference, resolved secrets are never written back, and a missing variable
-resolves to `""`, which then fails closed at model construction. There is no partial
-interpolation.
+resolves it at the single consumption point where models are constructed. Lookup uses
+the same merge as `loadSettings`: a root `.env` value counts, and a process env value
+wins. The stored value stays a reference, resolved secrets are never written back, and
+a missing variable resolves to `""`, which then fails closed at model construction.
+There is no partial interpolation.
 
 ## Persistence layout
 

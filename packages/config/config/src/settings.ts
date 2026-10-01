@@ -10,7 +10,7 @@
 
 import type { ApiFormat } from "@agentprism/contracts";
 import { DEFAULT_ASK_USER_WAIT_MS, DEFAULT_LLM_BASE_URL, DEFAULT_MODEL_ID, DEFAULT_PROVIDER_NAME, THREAD_MESSAGE_MAX_CHARS } from "@agentprism/contracts";
-import { loadEnvFile } from "./env-file.js";
+import { mergedEnv } from "./env-file.js";
 import { ENV_FILE } from "./paths.js";
 
 /** Service-process runtime config (env vars + repo-root .env; env vars take priority). */
@@ -69,6 +69,8 @@ export interface Settings {
   serverShutdownGraceMs: number;
   projectMaxCount: number;
   projectSnapshotMaxChars: number;
+  /** False only when ARENA_CUSTOM_DIMENSIONS is exactly `off`. */
+  customDimensionsEnabled: boolean;
 }
 
 class SettingsLoadError extends Error {
@@ -174,11 +176,7 @@ export function buildCorsOriginList(corsOrigins: string, frontendPort: number): 
 
 /** Loads configuration from process env and the .env file. */
 export function loadSettings(env: NodeJS.ProcessEnv = process.env, envFile: string = ENV_FILE): Settings {
-  const fileValues = loadEnvFile(envFile);
-  const source: Record<string, string> = { ...fileValues };
-  for (const [key, value] of Object.entries(env)) {
-    if (value !== undefined) source[key] = value;
-  }
+  const source = mergedEnv(env, envFile);
 
   const settings: Settings = {
     llmProviderName: readString(source, "LLM_PROVIDER_NAME", DEFAULT_PROVIDER_NAME),
@@ -248,6 +246,7 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env, envFile: stri
     serverShutdownGraceMs: readInt(source, "SERVER_SHUTDOWN_GRACE_MS", 5_000, { min: 500, max: 60_000 }),
     projectMaxCount: readInt(source, "PROJECT_MAX_COUNT", 50, { min: 1, max: 1_000 }),
     projectSnapshotMaxChars: readInt(source, "PROJECT_SNAPSHOT_MAX_CHARS", 2_000_000, { min: 100_000, max: 20_000_000 }),
+    customDimensionsEnabled: readString(source, "ARENA_CUSTOM_DIMENSIONS", "") !== "off",
   };
 
   // Fail fast on validation: a wildcard config fails immediately

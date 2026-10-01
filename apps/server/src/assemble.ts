@@ -163,16 +163,16 @@ export function buildColumnCallbacks(
  * @throws Error on non-loopback hosts without API_TOKEN, or on missing seams/drivers.
  */
 export async function assemble(): Promise<RuntimeComponents> {
+  const settings = loadSettings();
   // Custom-dimension subpackages: each registered dimension becomes an Arena
   // comparison axis, a Builder block, and a pinnable baseline field. Registered
   // here (not at module load) so importing this module stays side-effect free.
-  // ARENA_CUSTOM_DIMENSIONS=off disables every one of them. Registration is
-  // idempotent per descriptor identity, so a repeated assemble() is safe.
-  if (process.env.ARENA_CUSTOM_DIMENSIONS !== "off") {
+  // ARENA_CUSTOM_DIMENSIONS=off disables every one of them. The switch is a
+  // settings field, so a root .env value counts. Registration is idempotent
+  // per descriptor identity, so a repeated assemble() is safe.
+  if (settings.customDimensionsEnabled) {
     registerCustomDimensions([summaryBudgetDimension, memoryTopNDimension, toolReplayDimension]);
   }
-
-  const settings = loadSettings();
 
   // Crash debris sweep: an atomic write that died between the tmp write and the
   // rename leaves its `.tmp` file behind forever. At startup no writes are in
@@ -459,7 +459,7 @@ export async function assemble(): Promise<RuntimeComponents> {
 
 
   router.syncFrameworkOptions(available);
-  router.syncCapabilityOptions(buildCapabilityOptionProjection());
+  router.syncCapabilityOptions(buildCapabilityOptionProjection({ customDimensions: settings.customDimensionsEnabled }));
   for (const dim of REQUIRED_CAPABILITY_DIMS) {
     if (dimensionCatalog.dimensionOptions(dim).length === 0) {
       throw new Error(`Required capability seam "${dim}" has zero implementations: refusing to start`);

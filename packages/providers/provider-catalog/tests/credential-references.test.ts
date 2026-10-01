@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { resolveCredentialReference } from "../src/endpoints.js";
+import { defaultEnvLookup, resolveCredentialReference } from "../src/endpoints.js";
 import { maskApiKey } from "../src/provider-config.js";
 
 describe("resolveCredentialReference", () => {
@@ -18,6 +18,15 @@ describe("resolveCredentialReference", () => {
 
   it("fails closed on missing variables", () => {
     expect(resolveCredentialReference("${env:MISSING_XYZ}", () => undefined)).toBe("");
+  });
+
+  it("default lookup sees process.env through the shared merge", () => {
+    process.env.AGENTPRISM_LOOKUP_PROBE = "probe";
+    try {
+      expect(defaultEnvLookup("AGENTPRISM_LOOKUP_PROBE")).toBe("probe");
+    } finally {
+      delete process.env.AGENTPRISM_LOOKUP_PROBE;
+    }
   });
 
   it("passes non-references and malformed shapes through untouched", () => {

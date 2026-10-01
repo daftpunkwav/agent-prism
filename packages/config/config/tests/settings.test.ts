@@ -115,6 +115,12 @@ describe("loadSettings parsing and range checks", () => {
     expect(settings.contextToolTailKeepChars).toBe(1_200);
     expect(settings.contextBudgetTokens).toBe(6_000);
     expect(settings.contextCheckpointTargetTokens).toBe(2_000);
+    expect(settings.customDimensionsEnabled).toBe(true);
+  });
+
+  it("turns custom dimensions off only for the exact off switch", () => {
+    expect(loadSettings({ ARENA_CUSTOM_DIMENSIONS: "off" }, MISSING_ENV).customDimensionsEnabled).toBe(false);
+    expect(loadSettings({ ARENA_CUSTOM_DIMENSIONS: "on" }, MISSING_ENV).customDimensionsEnabled).toBe(true);
   });
 
   it("column/workspace/concurrency bounds fail fast", () => {
