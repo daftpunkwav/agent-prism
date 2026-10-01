@@ -6,12 +6,13 @@
  * Responsibilities:
  * - Pin toolTuningValue fallback semantics (unset, set, non-finite)
  * - Pin the read cap following the tuned maxFileChars on a real execute
+ * - Pin that building another registry does not clear operator caps
  * - Pin the web_fetch definition metadata timeout following the tuned value
  */
 
 import { afterEach, describe, expect, it } from "vitest";
 import { ScopedFileSystem } from "@agentprism/environment";
-import { readTool, setToolTuning, toolTuningValue, webFetchTool } from "../src/index.js";
+import { createBuiltinToolRegistry, readTool, setToolTuning, toolTuningValue, webFetchTool } from "../src/index.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -53,6 +54,12 @@ describe("tool tuning seam", () => {
     } finally {
       ws.cleanup();
     }
+  });
+
+  it("a later registry build keeps the operator caps", () => {
+    setToolTuning({ maxFileChars: 10 });
+    createBuiltinToolRegistry();
+    expect(toolTuningValue("maxFileChars", 100)).toBe(10);
   });
 
   it("web_fetch definition timeout metadata follows the tuned value", () => {

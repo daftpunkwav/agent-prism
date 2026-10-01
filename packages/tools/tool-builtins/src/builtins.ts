@@ -31,17 +31,15 @@ import { scatterPlaceholderTool } from "./definitions/scatter.js";
 import { webFetchTool } from "./definitions/web-fetch.js";
 import { writeTool } from "./definitions/write.js";
 import { MapToolRegistry } from "@agentprism/tool-registry";
-import { setToolTuning, type ToolTuning } from "./tuning.js";
 
 const BUILTIN_TOOLS = [readTool, writeTool, editTool, lsTool, bashTool, applyPatchTool, globTool, grepTool, webFetchTool, todoTool, askUserTool, webSearchTool, runJobTool, bashSessionTool, subagentPlaceholderTool, skillTool, goalTool, ralphPlaceholderTool, planTool, sessionQueryPlaceholderTool, symbolsTool, scatterPlaceholderTool] as const;
 
 /**
- * Creates a registry with all builtin workspace tools registered. The optional
- * tuning applies operator overrides (caps/timeouts) composition-time; definitions
- * read tuned values at execute time, so registration order never freezes them.
+ * Creates a registry with all builtin workspace tools registered.
+ * Operator caps live in setToolTuning, not here: definitions read them at
+ * execute time, and building another registry must not replace them.
  */
-export function createBuiltinToolRegistry(tuning: ToolTuning = {}): ToolRegistry {
-  setToolTuning(tuning);
+export function createBuiltinToolRegistry(): ToolRegistry {
   const registry = new MapToolRegistry();
   for (const tool of BUILTIN_TOOLS) {
     registry.register(tool);

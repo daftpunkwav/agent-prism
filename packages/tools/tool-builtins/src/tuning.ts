@@ -7,9 +7,10 @@
  * - Provide the composition-time injection seam and execute-time accessor
  *
  * Follows the setWebSearchEnvReader precedent: the composition root applies the
- * operator's values once via setToolTuning (createBuiltinToolRegistry does this),
- * and definitions read tuned values at execute time so registration order never
- * freezes a stale number. Absent fields keep each tool's built-in default.
+ * operator's values once via setToolTuning, and definitions read tuned values at
+ * execute time so registration order never freezes a stale number. Registry
+ * construction does not touch this state: a column that builds its own registry
+ * must not clear the operator's caps. Absent fields keep each tool's built-in default.
  */
 
 export interface ToolTuning {

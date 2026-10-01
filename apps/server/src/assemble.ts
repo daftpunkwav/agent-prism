@@ -32,6 +32,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import {
   configureUserSkills,
   createBuiltinToolRegistry,
+  setToolTuning,
   createUserSkill,
   deleteUserSkill,
   disposeWorkspaceProcesses,
@@ -387,7 +388,7 @@ export async function assemble(): Promise<RuntimeComponents> {
   const sessions = new SessionService({ store: sessionStore, clock });
   // Builtin tool surface for the builder catalog: resolved once at the
   // composition root, so builder-service never imports tool implementations.
-  const builtinTools = createBuiltinToolRegistry({
+  setToolTuning({
     maxOutputChars: settings.toolMaxOutputChars,
     maxFileChars: settings.toolMaxFileChars,
     runTimeoutDefaultS: settings.toolRunTimeoutDefaultS,
@@ -395,6 +396,9 @@ export async function assemble(): Promise<RuntimeComponents> {
     webFetchTimeoutMs: settings.webFetchTimeoutMs,
     webSearchTimeoutMs: settings.webSearchTimeoutMs,
   });
+  // The catalog registry is separate from column registries. Caps stay in
+  // setToolTuning so a later createBuiltinToolRegistry() does not clear them.
+  const builtinTools = createBuiltinToolRegistry();
   // Operator-tuned context strategy budgets: every column run carries them so
   // the harness strategies compare under identical, operator-chosen budgets.
   // Both objects are shared by reference with every column run: the runtime
