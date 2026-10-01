@@ -114,6 +114,33 @@ describe("LayeredSandboxPolicy blocks destruction", { retry: 1 }, () => {
     }
   });
 
+  it("blocks Remove-Item of protected Windows directories, not a project folder", () => {
+    for (const command of ["Remove-Item -Recurse -Force C:\\Windows", "Remove-Item -Recurse -Force C:\\Windows\\System32", "ri -r -f C:\\"]) {
+      expect(blockedWin(command), command).toMatch(/^Blocked by sandbox policy/);
+    }
+    expect(blockedWin("Remove-Item -Recurse -Force .\\build")).toBeNull();
+  });
+
+  it("blocks device-prefixed Windows paths that name a protected root", () => {
+    for (const command of [
+      "Remove-Item -Recurse -Force \\\\?\\C:\\Windows",
+      "Remove-Item -Recurse -Force \\\\?\\C:\\Windows\\System32",
+      "Remove-Item -Recurse -Force \\\\.\\C:\\Windows",
+      "rm -rf \\\\?\\C:\\Windows\\System32\\..",
+    ]) {
+      expect(blockedWin(command), command).toMatch(/^Blocked by sandbox policy/);
+    }
+    expect(blockedWin("Remove-Item -Recurse -Force \\\\?\\D:\\work\\repo")).toBeNull();
+  });
+
+  it("decodes PowerShell -EncodedCommand and blocks an undecodable payload", () => {
+    const encode = (command: string) => Buffer.from(command, "utf16le").toString("base64");
+    expect(blockedWin(`powershell -EncodedCommand ${encode("Remove-Item -Recurse -Force C:\\Windows")}`)).toMatch(/^Blocked by sandbox policy/);
+    expect(blockedWin(`pwsh -enc ${encode("Get-Location")}`)).toBeNull();
+    expect(blockedWin("powershell -EncodedCommand not-base64!!!")).toMatch(/undecodable PowerShell -EncodedCommand/);
+    expect(blockedWin("powershell -EncodedCommand")).toMatch(/undecodable PowerShell -EncodedCommand/);
+  });
+
   it("reviews a wrapper nested inside another wrapper", () => {
     expect(blocked("bash -c \"bash -c 'rm -rf /'\"")).toMatch(/^Blocked by sandbox policy/);
     expect(blocked("bash -c \"bash -c 'echo hi'\"")).toBeNull();

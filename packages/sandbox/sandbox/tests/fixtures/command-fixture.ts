@@ -23,6 +23,7 @@ export const MUST_BLOCK = [
   "dd if=/dev/zero of=/dev/sda",
   "chmod -R 777 /",
   "chown -R user /",
+  "rm -rf /usr/../etc",
   ":(){ :|:& };:",
 ];
 

@@ -18,6 +18,7 @@
 
 import type { ToolArgs } from "@agentprism/contracts";
 import type { SandboxPolicy, SandboxVerdict } from "./policy-seam.js";
+import { normalizeRemovalTarget, PROTECTED_POSIX_ROOTS, PROTECTED_WINDOWS_ROOTS } from "./removal-targets.js";
 
 /** One argv word; `quoted` means part of it came from quotes (literal, certain). */
 export interface ShellWord {
@@ -184,19 +185,6 @@ export function parseShellCommand(command: string, platform: string = process.pl
   return segments;
 }
 
-/**
- * Normalizes a removal target for root comparison: all-slash runs become "/",
- * bare drive letters regain their separator, anything else loses trailing
- * separators (so `C:\` still matches the protected drive-root entry, and
- * `/etc/` still matches `/etc`).
- */
-function normalizeTarget(target: string): string {
-  const stripped = target.replace(/[/\\]+$/, "");
-  if (stripped === "") return "/";
-  if (/^[a-zA-Z]:$/.test(stripped)) return `${stripped.toLowerCase()}\\`;
-  return stripped;
-}
-
 /** Sudo layers are transparent to attackers; strip repeated prefixes (any case). */
 function stripSudo(words: ShellWord[]): ShellWord[] {
   let rest = words;
@@ -213,30 +201,6 @@ function hasLongFlag(words: ShellWord[], word: string): boolean {
   return words.some((w) => w.text === `--${word}`);
 }
 
-/**
- * POSIX roots whose recursive forced removal is never legitimate (case-sensitive:
- * Linux paths are; `rm -rf /HOME` targets a different directory than `/home`).
- */
-const PROTECTED_POSIX_ROOTS = new Set([
-  "/",
-  "/*",
-  "~",
-  "/root",
-  "/etc",
-  "/usr",
-  "/bin",
-  "/sbin",
-  "/boot",
-  "/dev",
-  "/proc",
-  "/sys",
-  "/var",
-  "/home",
-]);
-
-/** Windows roots (compared case-insensitively: Windows paths are not). */
-const PROTECTED_WINDOWS_ROOTS = new Set(["c:\\", "c:\\windows", "c:\\windows\\system32"]);
-
 /** Device path prefixes a redirect may never target (block/volume devices only). */
 const BLOCK_DEVICE_PREFIXES = ["/dev/sd", "/dev/hd", "/dev/nvme", "/dev/mmcblk", "/dev/vd", "/dev/xvd", "/dev/da", "\\\\.\\physicaldrive"];
 
@@ -248,9 +212,12 @@ const INTERPRETER_HEADS = new Set(["bash", "sh", "dash", "zsh", "ksh", "cmd", "p
 
 /** Wrapper flags per interpreter family: POSIX shells take exactly one word; cmd/PowerShell join the rest. */
 const POSIX_WRAPPER_FLAGS = new Set(["-c"]);
-// -encodedcommand/-enc carry base64 PowerShell (i.e. the real command is invisible to
-// every static rule below), so the wrapper review must not fail open on them.
-const WIN_WRAPPER_FLAGS = new Set(["-c", "/c", "-command", "-encodedcommand", "-enc", "-e"]);
+const WIN_COMMAND_FLAGS = new Set(["-c", "/c", "-command"]);
+// -encodedcommand/-enc/-e carry UTF-16LE base64. The payload is decoded and judged;
+// a payload that does not decode is blocked, because the real command is invisible.
+const WIN_ENCODED_FLAGS = new Set(["-encodedcommand", "-enc", "-e"]);
+const WIN_WRAPPER_FLAGS = new Set([...WIN_COMMAND_FLAGS, ...WIN_ENCODED_FLAGS]);
+const ENCODED_COMMAND_BLOCK = "Blocked by sandbox policy: undecodable PowerShell -EncodedCommand";
 
 /**
  * Reviews commands smuggled through an explicit interpreter wrapper
@@ -271,11 +238,41 @@ function reviewInterpreterWrapper(segment: CommandSegment, platform: string, dep
   const flagIndex = lowered.findIndex((w, i) => i > 0 && wrapperFlags.has(w));
   if (flagIndex === -1) return null;
   const rest = stripped.slice(flagIndex + 1);
+  const flag = lowered[flagIndex] ?? "";
+  if (!posixFamily && WIN_ENCODED_FLAGS.has(flag)) {
+    return reviewEncodedPowerShell(rest[0]?.text ?? "", platform, depth);
+  }
   if (rest.length === 0) return null;
   // POSIX shells take exactly one word as the command string; cmd and
   // PowerShell concatenate the remaining arguments into one command line.
   const innerText = posixFamily ? rest[0]?.text ?? "" : rest.map((w) => w.text).join(" ");
   for (const nested of parseShellCommand(innerText, platform, depth + 1)) {
+    const verdict = reviewDestructiveSegment(nested, platform);
+    if (verdict !== null) return verdict;
+    const wrapped = reviewInterpreterWrapper(nested, platform, depth + 1);
+    if (wrapped !== null) return wrapped;
+  }
+  return null;
+}
+
+/** Decodes a PowerShell -EncodedCommand payload (UTF-16LE base64). Null when it is not decodable. */
+function decodePowerShellEncoded(payload: string): string | null {
+  const compact = payload.replace(/\s+/g, "");
+  if (compact.length < 4 || compact.length % 4 !== 0) return null;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
+  const bytes = Buffer.from(compact, "base64");
+  if (bytes.length === 0) return null;
+  const roundTrip = bytes.toString("base64").replace(/=+$/, "");
+  if (roundTrip !== compact.replace(/=+$/, "")) return null;
+  const text = bytes.toString("utf16le");
+  return text === "" ? null : text;
+}
+
+/** Judges the decoded command. An undecodable payload is blocked: the real command would otherwise be invisible. */
+function reviewEncodedPowerShell(payload: string, platform: string, depth: number): SandboxVerdict {
+  const decoded = decodePowerShellEncoded(payload);
+  if (decoded === null) return ENCODED_COMMAND_BLOCK;
+  for (const nested of parseShellCommand(decoded, platform, depth + 1)) {
     const verdict = reviewDestructiveSegment(nested, platform);
     if (verdict !== null) return verdict;
     const wrapped = reviewInterpreterWrapper(nested, platform, depth + 1);
@@ -320,7 +317,7 @@ function reviewDestructiveSegment(segment: CommandSegment, platform: string): Sa
   }
   if (head === "rm" && (hasShortFlag(rawWords, "r") || hasLongFlag(rawWords, "recursive")) && (hasShortFlag(rawWords, "f") || hasLongFlag(rawWords, "force"))) {
     // Targets keep original case (POSIX); the Windows subset compares lowered.
-    const targets = rawWords.filter((w) => !w.text.startsWith("-") && w.text.toLowerCase() !== "rm").map((w) => normalizeTarget(w.text));
+    const targets = rawWords.filter((w) => !w.text.startsWith("-") && w.text.toLowerCase() !== "rm").map((w) => normalizeRemovalTarget(w.text));
     const hit = targets.find((t) => PROTECTED_POSIX_ROOTS.has(t) || PROTECTED_WINDOWS_ROOTS.has(t.toLowerCase()));
     if (hit !== undefined) {
       return `Blocked by sandbox policy: recursive forced removal of ${hit}`;
@@ -331,7 +328,7 @@ function reviewDestructiveSegment(segment: CommandSegment, platform: string): Sa
     return "Blocked by sandbox policy: raw device write";
   }
   if ((head === "chmod" || head === "chown") && hasShortFlag(rawWords, "r")) {
-    const targets = rawWords.filter((w) => !w.text.startsWith("-") && w.text.toLowerCase() !== head).map((w) => normalizeTarget(w.text));
+    const targets = rawWords.filter((w) => !w.text.startsWith("-") && w.text.toLowerCase() !== head).map((w) => normalizeRemovalTarget(w.text));
     if (targets.some((t) => t === "/" || t === "/*")) {
       return `Blocked by sandbox policy: recursive ${head} of filesystem root`;
     }
@@ -340,9 +337,10 @@ function reviewDestructiveSegment(segment: CommandSegment, platform: string): Sa
   if (platform === "win32" && (head === "remove-item" || head === "ri")) {
     const recursive = words.some((w) => w === "-recurse" || w.startsWith("-recurse:") || w === "-r" || w === "-rf");
     const forced = words.some((w) => w === "-force" || w.startsWith("-force:") || w === "-f" || w === "-rf");
-    const targets = words.filter((w) => !w.startsWith("-") && w !== head).map(normalizeTarget);
-    if (recursive && forced && targets.some((t) => /^[a-z]:\\?$/.test(t))) {
-      return `Blocked by sandbox policy: recursive forced removal of ${targets[0]}`;
+    const targets = words.filter((w) => !w.startsWith("-") && w !== head).map(normalizeRemovalTarget);
+    const hit = targets.find((t) => PROTECTED_WINDOWS_ROOTS.has(t.toLowerCase()));
+    if (recursive && forced && hit !== undefined) {
+      return `Blocked by sandbox policy: recursive forced removal of ${hit}`;
     }
   }
   return null;

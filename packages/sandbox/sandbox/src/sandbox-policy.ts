@@ -20,6 +20,7 @@
 import type { ToolArgs } from "@agentprism/contracts";
 import { LayeredSandboxPolicy } from "./command-analysis.js";
 import type { SandboxPolicy, SandboxVerdict } from "./policy-seam.js";
+import { normalizeRemovalTarget, PROTECTED_POSIX_ROOTS, PROTECTED_WINDOWS_ROOTS } from "./removal-targets.js";
 
 export type { SandboxPolicy, SandboxVerdict } from "./policy-seam.js";
 
@@ -28,42 +29,6 @@ export class AllowAllSandboxPolicy implements SandboxPolicy {
   reviewShellCommand(_command: string, _platform?: string): SandboxVerdict {
     return null;
   }
-}
-
-/**
- * POSIX roots whose recursive forced removal is never legitimate (case-sensitive:
- * Linux paths are; `rm -rf /HOME` targets a different directory than `/home`).
- */
-const PROTECTED_POSIX_ROOTS = new Set([
-  "/",
-  "/*",
-  "~",
-  "/root",
-  "/etc",
-  "/usr",
-  "/bin",
-  "/sbin",
-  "/boot",
-  "/dev",
-  "/proc",
-  "/sys",
-  "/var",
-  "/home",
-]);
-
-/** Windows roots (compared case-insensitively: Windows paths are not). */
-const PROTECTED_WINDOWS_ROOTS = new Set(["c:\\", "c:\\windows", "c:\\windows\\system32"]);
-
-/**
- * Normalizes a removal target for root comparison: all-slash runs become "/",
- * bare drive letters regain their separator; anything else loses trailing
- * separators (so `C:\` still matches the protected drive-root entry).
- */
-function normalizeTarget(target: string): string {
-  const stripped = target.replace(/[/\\]+$/, "");
-  if (stripped === "") return "/";
-  if (/^[a-zA-Z]:$/.test(stripped)) return `${stripped.toLowerCase()}\\`;
-  return stripped;
 }
 
 /** Sudo layers are transparent to attackers; strip repeated prefixes (any case). */
@@ -113,7 +78,7 @@ function reviewSegment(segment: string, platform: string): SandboxVerdict {
   }
   if (head === "rm" && (hasShortFlag(tokens, "r") || hasLongFlag(tokens, "recursive")) && (hasShortFlag(tokens, "f") || hasLongFlag(tokens, "force"))) {
     // Targets keep original case (POSIX); the Windows subset compares lowered.
-    const targets = rawTokens.filter((t) => !t.startsWith("-") && t.toLowerCase() !== "rm").map(normalizeTarget);
+    const targets = rawTokens.filter((t) => !t.startsWith("-") && t.toLowerCase() !== "rm").map(normalizeRemovalTarget);
     const hit = targets.find((t) => PROTECTED_POSIX_ROOTS.has(t) || PROTECTED_WINDOWS_ROOTS.has(t.toLowerCase()));
     if (hit !== undefined) {
       return `Blocked by sandbox policy: recursive forced removal of ${hit}`;
@@ -124,7 +89,7 @@ function reviewSegment(segment: string, platform: string): SandboxVerdict {
     return "Blocked by sandbox policy: raw device write";
   }
   if ((head === "chmod" || head === "chown") && hasShortFlag(tokens, "r")) {
-    const targets = tokens.filter((t) => !t.startsWith("-") && t !== head).map(normalizeTarget);
+    const targets = tokens.filter((t) => !t.startsWith("-") && t !== head).map(normalizeRemovalTarget);
     if (targets.some((t) => t === "/" || t === "/*")) {
       return `Blocked by sandbox policy: recursive ${head} of filesystem root`;
     }
@@ -133,9 +98,10 @@ function reviewSegment(segment: string, platform: string): SandboxVerdict {
   if (platform === "win32" && (head === "remove-item" || head === "ri")) {
     const recursive = tokens.some((t) => t === "-recurse" || t.startsWith("-recurse:") || t === "-r" || t === "-rf");
     const forced = tokens.some((t) => t === "-force" || t.startsWith("-force:") || t === "-f" || t === "-rf");
-    const targets = tokens.filter((t) => !t.startsWith("-") && t !== head).map(normalizeTarget);
-    if (recursive && forced && targets.some((t) => /^[a-z]:\\?$/.test(t))) {
-      return `Blocked by sandbox policy: recursive forced removal of ${targets[0]}`;
+    const targets = tokens.filter((t) => !t.startsWith("-") && t !== head).map(normalizeRemovalTarget);
+    const hit = targets.find((t) => PROTECTED_WINDOWS_ROOTS.has(t.toLowerCase()));
+    if (recursive && forced && hit !== undefined) {
+      return `Blocked by sandbox policy: recursive forced removal of ${hit}`;
     }
   }
   return null;

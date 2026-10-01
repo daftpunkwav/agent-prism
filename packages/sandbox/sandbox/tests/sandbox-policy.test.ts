@@ -27,6 +27,9 @@ describe("DenyListSandboxPolicy blocks destruction", () => {
 
   it("blocks win32 drive wipes on win32 only", () => {
     expect(blocked("Remove-Item -Recurse -Force C:\\", "win32")).toMatch(/^Blocked by sandbox policy/);
+    expect(blocked("Remove-Item -Recurse -Force C:\\Windows\\System32", "win32")).toMatch(/^Blocked by sandbox policy/);
+    expect(blocked("Remove-Item -Recurse -Force \\\\?\\C:\\Windows", "win32")).toMatch(/^Blocked by sandbox policy/);
+    expect(blocked("Remove-Item -Recurse -Force .\\build", "win32")).toBeNull();
     expect(blocked("Remove-Item -Recurse -Force C:\\", "linux")).toBeNull();
   });
 });
