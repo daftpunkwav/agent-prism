@@ -7,8 +7,8 @@
  * - Define the block catalog, session views, and request/response schemas
  * - Define the trace entry model (LLM wire traffic + session lifecycle) and the SSE chunk union
  *
- * Pure schemas only: no framework, driver, or provider imports. The builder domain
- * package owns behavior; this file is the single wire truth shared with the client.
+ * Pure schemas plus the framework protocol rule the palette and the composition
+ * validator both read. No framework, driver, or provider imports.
  */
 
 import { z } from "zod";
@@ -288,11 +288,37 @@ export type BuilderStreamChunk = z.infer<typeof BuilderStreamChunkSchema>;
 
 // ---- block catalog ----
 
+/**
+ * Frameworks that authenticate against the endpoint itself and speak one
+ * protocol. Every other framework accepts any api_format. The catalog field
+ * and validateComposition both read this map, so the palette cannot offer a
+ * combination the server would only reject later.
+ */
+const FRAMEWORK_REQUIRED_API_FORMAT: Readonly<Record<string, string>> = {
+  claude_agent_sdk: "anthropic_messages",
+};
+
+/** Required endpoint api_format for a framework. Empty means any protocol. */
+export function requiredApiFormat(frameworkId: string): string {
+  return FRAMEWORK_REQUIRED_API_FORMAT[frameworkId] ?? "";
+}
+
+/**
+ * Whether an endpoint protocol satisfies a framework requirement. An empty
+ * requirement accepts any format, including an unresolved endpoint. A required
+ * format matches only that exact protocol, so an unknown format fails closed.
+ */
+export function apiFormatSatisfies(requiredApiFormat: string, endpointApiFormat: string | undefined): boolean {
+  return requiredApiFormat === "" || endpointApiFormat === requiredApiFormat;
+}
+
 const BuilderFrameworkBlockSchema = z.object({
   id: z.string(),
   name: z.string(),
   status: z.enum(["available", "reserved"]),
   reason: z.string().default(""),
+  /** Endpoint api_format this framework requires. Empty accepts any protocol. */
+  required_api_format: z.string().default(""),
 });
 
 const BuilderEndpointBlockSchema = z.object({

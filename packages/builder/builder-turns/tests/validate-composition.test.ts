@@ -74,15 +74,15 @@ describe("validateComposition claude sdk endpoint gate", () => {
     ).toThrow(/anthropic_messages/);
   });
 
-  it("leaves other frameworks and format-less indexes untouched", () => {
+  it("leaves unconstrained frameworks alone and fails closed without format facts", () => {
     // Another framework on the same non-anthropic endpoint is fine.
     expect(() =>
       validateComposition(baseComposition({ framework: "native", endpoint_id: "ep-openai" }), { ...base, ...formats }),
     ).not.toThrow();
-    // Callers without format facts keep the old behavior (turn-time driver error).
+    // A constrained framework cannot skip the check by omitting the format map.
     expect(() =>
       validateComposition(baseComposition({ framework: "claude_agent_sdk", endpoint_id: "ep-openai" }), base),
-    ).not.toThrow();
+    ).toThrow(/unknown format/);
   });
 
   it("never resolves a format through the prototype chain", () => {

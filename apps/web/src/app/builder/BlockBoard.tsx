@@ -14,7 +14,7 @@
 
 import { RotateCcw } from "lucide-react";
 import { NumberInput, UiSelect, type UiSelectEntry } from "@agentprism/ui";
-import { BUILDER_CUSTOM_BLOCK_PREFIX, customBlockDimension } from "@agentprism/client";
+import { BUILDER_CUSTOM_BLOCK_PREFIX, apiFormatSatisfies, customBlockDimension } from "@agentprism/client";
 import type { BuilderCatalog, BuilderComposition } from "@agentprism/client";
 import { isMissingMessage } from "@/i18n/resolveMessage";
 import { useT } from "@/i18n/useT";
@@ -92,16 +92,18 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
 
   const set = (patch: Partial<BuilderComposition>) => onChange({ ...composition, ...patch });
 
-  // The Claude Code CLI authenticates against the endpoint itself (every other
-  // driver round-trips completions through the host), so it only works on an
-  // anthropic_messages endpoint: the chip disables when the composition's
-  // endpoint (or the provider default, for the empty "endpoint default" pick)
-  // speaks another format.
+  // Frameworks that speak one protocol carry required_api_format on the catalog
+  // (the same rule validateComposition enforces). The active endpoint is the
+  // explicit pick, else the provider default. A constrained framework with no
+  // resolved endpoint fails closed: the chip and Apply both stay disabled.
   const activeEndpoint =
     composition.endpoint_id !== ""
       ? catalog.endpoints.find((endpoint) => endpoint.id === composition.endpoint_id)
       : catalog.endpoints.find((endpoint) => endpoint.default);
-  const claudeSdkBlocked = activeEndpoint !== undefined && activeEndpoint.api_format !== "anthropic_messages";
+  const formatBlocked = (requiredApiFormat: string | undefined) =>
+    !apiFormatSatisfies(requiredApiFormat ?? "", activeEndpoint?.api_format);
+  const selectedFramework = catalog.frameworks.find((framework) => framework.id === composition.framework);
+  const selectedFormatBlocked = formatBlocked(selectedFramework?.required_api_format);
 
   const toggleTool = (name: string) => {
     const tools = composition.tools.includes(name)
@@ -169,8 +171,14 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
           <button
             type="button"
             className="btn-primary builder-apply"
-            disabled={!dirty || swapBlocked}
-            title={swapBlocked ? t("builder.swapBlocked") : t("builder.applySwap")}
+            disabled={!dirty || swapBlocked || selectedFormatBlocked}
+            title={
+              swapBlocked
+                ? t("builder.swapBlocked")
+                : selectedFormatBlocked
+                  ? t("builder.frameworkNeedsFormat", { format: selectedFramework?.required_api_format ?? "" })
+                  : t("builder.applySwap")
+            }
             onClick={onApplySwap}
           >
             {t("builder.applySwap")}
@@ -181,19 +189,19 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
 
       <Slot title={t("builder.slotFramework")}>
         {catalog.frameworks.map((framework) => {
-          const claudeSdkMismatch = framework.id === "claude_agent_sdk" && claudeSdkBlocked;
+          const formatMismatch = formatBlocked(framework.required_api_format);
           return (
             <button
               key={framework.id}
               type="button"
               className="builder-chip"
               data-selected={composition.framework === framework.id}
-              disabled={framework.status === "reserved" || claudeSdkMismatch}
+              disabled={framework.status === "reserved" || formatMismatch}
               title={
                 framework.status === "reserved"
                   ? `${t("builder.reserved")}: ${framework.reason}`
-                  : claudeSdkMismatch
-                    ? t("builder.claudeSdkNeedsAnthropic")
+                  : formatMismatch
+                    ? t("builder.frameworkNeedsFormat", { format: framework.required_api_format })
                     : framework.id
               }
               onClick={() => set({ framework: framework.id })}

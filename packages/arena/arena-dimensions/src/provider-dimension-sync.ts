@@ -11,16 +11,18 @@
  */
 
 import type { EndpointThinkingAxes, LlmEndpoint, ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { customFieldKey, MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, resolveDefaultEndpoint, servableThinkingLevels, TEMPERATURE_OPTIONS, TOP_P_OPTIONS } from "@agentprism/contracts";
+import { customFieldKey, MAX_OUTPUT_TOKENS_OPTIONS, PENALTY_OPTIONS, resolveDefaultEndpoint, servableThinkingLevels, TEMPERATURE_OPTIONS, thinkingBudgetApplicable, TOP_P_OPTIONS } from "@agentprism/contracts";
 import { customDimension, customDimensionDefault } from "@agentprism/harness";
 import { currentEndpointLabel, DimensionCatalog, type DimensionOptionTriple } from "@agentprism/dimensions";
 import { snapIntToOptions, snapToOptions } from "./field-values.js";
 
 /**
  * Projects one endpoint's thinking configuration onto the three thinking baseline
- * axes (level / budget / mode). Single source for both the catalog sync (default
- * endpoint) and the meta payload's per-endpoint record, so the baseline panel and
- * the run-request validation can never disagree about what an endpoint serves.
+ * axes (level / budget / mode). Single source for the catalog sync (default
+ * endpoint) and the meta payload's per-endpoint record. Legality of a pinned
+ * token is thinkingBudgetApplicable plus the served level set, not this
+ * projection: the projection empties the axis the endpoint's own mode is not
+ * using, while a baseline may pin the other mode.
  *
  * Mode options follow endpoint capability: budget pairs only exist on
  * anthropic_messages endpoints, so any other endpoint serves ["levels"] only —
@@ -29,10 +31,7 @@ import { snapIntToOptions, snapToOptions } from "./field-values.js";
  * budget axis carries the pair table (plus the "0" follow-level token).
  */
 export function endpointThinkingAxes(endpoint: LlmEndpoint): EndpointThinkingAxes {
-  const budgetPairsApplicable =
-    endpoint.thinking_capable &&
-    endpoint.api_format === "anthropic_messages" &&
-    (endpoint.thinking_budget_pairs ?? []).length > 0;
+  const budgetPairsApplicable = thinkingBudgetApplicable(endpoint);
   const modeOptions: EndpointThinkingAxes["mode_options"] = [{ value: "levels", label: "Level mapping" }];
   if (budgetPairsApplicable) modeOptions.push({ value: "budget", label: "Budget pairs" });
   if (endpoint.thinking_capable && endpoint.thinking_mode === "budget" && budgetPairsApplicable) {

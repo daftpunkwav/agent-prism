@@ -324,6 +324,12 @@ export function BaselineModal({
                               (field.field === "thinking_level" && thinkingMode === "budget") ||
                               (field.field === "thinking_budget" && thinkingMode !== "budget");
                             const override = axesField(field.field);
+                            // The three thinking axes use the pinned endpoint's projection
+                            // when the backend sent one. The catalog snapshot is the
+                            // default endpoint only, so enablement must follow the same
+                            // list the dropdown renders. Older backends leave the
+                            // projection null and keep the snapshot.
+                            const servedOptions = override?.options ?? field.options;
                             const value = baseline[field.field] ?? override?.def ?? field.default;
                             const fieldLab = baselineFieldLabel(t, field.field, field.label);
                             // Numeric editor only for unlocked number-kind fields with a
@@ -373,7 +379,7 @@ export function BaselineModal({
                                     // An unsynced axis (e.g. budget pairs on an
                                     // endpoint that has none) renders as an empty
                                     // dropdown: disabled, never clickable-with-nothing-to-pick.
-                                    disabled={locked || running || modeDisabled || field.options.length === 0}
+                                    disabled={locked || running || modeDisabled || servedOptions.length === 0}
                                     // The mode select shows the normalized mode: a stale
                                     // draft token the server no longer serves must not
                                     // render as a dead raw value (UiSelect falls back to
@@ -381,7 +387,7 @@ export function BaselineModal({
                                     value={field.field === "thinking_mode" ? thinkingMode : value}
                                     onChange={(next) => onBaselineFieldChange(field.field, next)}
                                     ariaLabel={t("arena.setup.baselineFieldAria", { label: fieldLab })}
-                                    options={(override?.options ?? field.options).map((opt) => ({
+                                    options={servedOptions.map((opt) => ({
                                       value: opt.value,
                                       label: baselineOptionLabel(t, field.field, opt.value, opt.label),
                                     }))}

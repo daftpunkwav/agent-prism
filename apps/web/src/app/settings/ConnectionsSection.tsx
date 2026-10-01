@@ -28,7 +28,7 @@ import { UiSelect } from "@agentprism/ui";
 import { DEFAULT_PROVIDER_NAME, safeHttpUrl, testProvider } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 import type { ConnectionGroup, ModelSlot } from "./settingsConnectionModel";
-import { API_KEY_SENTINEL, blankModel, isLocalModelId, newLocalId } from "./settingsConnectionModel";
+import { API_KEY_SENTINEL, appliedThinkingMode, blankModel, isLocalModelId, legalThinkingLevel, newLocalId } from "./settingsConnectionModel";
 import { ModelModal } from "./ModelModal";
 import { Field } from "./Field";
 
@@ -228,7 +228,7 @@ export function ConnectionsSection({
                   .slice(0, 16)
               : base.thinking_levels;
             const level = typeof m.thinking_level === "string" ? m.thinking_level.trim().slice(0, 32) : "off";
-            const mode = m.thinking_mode === "budget" || m.thinking_mode === "levels" ? m.thinking_mode : base.thinking_mode;
+            const rawMode = m.thinking_mode === "budget" || m.thinking_mode === "levels" ? m.thinking_mode : base.thinking_mode;
             const pairLevels = Array.isArray(m.thinking_budget_pairs)
               ? (m.thinking_budget_pairs as Record<string, unknown>[])
                 .filter(
@@ -239,14 +239,15 @@ export function ConnectionsSection({
                 )
                 .map((pair) => ({ level: pair.level, budget_tokens: pair.budget_tokens, max_tokens: pair.max_tokens }))
               : (base.thinking_budget_pairs ?? []);
-            // The level allowlist follows the mode: budget mode validates against
-            // the pair names (the default budget level rides thinking_level).
-            const allowedLevels =
-              mode === "budget" && pairLevels.length > 0
-                ? pairLevels.map((pair) => pair.level)
-                : levels.length > 0
-                  ? levels
-                  : ["low", "medium", "high"];
+            // Budget mode is anthropic-only. The surviving level comes from the
+            // same allowlist the model dialog and the save path use.
+            const mode = appliedThinkingMode(c.api_format, rawMode);
+            const thinkingLevel = legalThinkingLevel({
+              thinking_level: level,
+              thinking_levels: levels,
+              thinking_mode: mode,
+              thinking_budget_pairs: pairLevels,
+            });
             return {
               id: base.id,
               label: str(m.label, ""),
@@ -257,10 +258,7 @@ export function ConnectionsSection({
               max_output_tokens:
                 typeof m.max_output_tokens === "number" ? m.max_output_tokens : base.max_output_tokens,
               thinking_capable: m.thinking_capable === true,
-              thinking_level:
-                level === "off" || allowedLevels.includes(level)
-                  ? level
-                  : "off",
+              thinking_level: thinkingLevel,
               thinking_levels: levels,
               thinking_mode: mode,
               thinking_budget_pairs: pairLevels,

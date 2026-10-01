@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { effectiveThinkingLevel, servableThinkingLevels } from "@agentprism/contracts";
+import { effectiveThinkingLevel, servableThinkingLevels, thinkingBudgetApplicable } from "@agentprism/contracts";
 
 describe("servableThinkingLevels", () => {
   it("serves nothing for a non-thinking endpoint", () => {
@@ -14,6 +14,17 @@ describe("servableThinkingLevels", () => {
   it("serves the custom list when configured, else the standard set", () => {
     expect(servableThinkingLevels({ thinking_capable: true, thinking_levels: ["xhigh", "max"] })).toEqual(["xhigh", "max"]);
     expect(servableThinkingLevels({ thinking_capable: true, thinking_levels: [] })).toEqual(["low", "medium", "high"]);
+  });
+});
+
+describe("thinkingBudgetApplicable", () => {
+  const base = { thinking_capable: true, api_format: "anthropic_messages", thinking_budget_pairs: [{ level: "super", budget_tokens: 2048, max_tokens: 4096 }] };
+
+  it("requires an anthropic endpoint that can think and has at least one pair", () => {
+    expect(thinkingBudgetApplicable(base)).toBe(true);
+    expect(thinkingBudgetApplicable({ ...base, api_format: "openai_chat" })).toBe(false);
+    expect(thinkingBudgetApplicable({ ...base, thinking_capable: false })).toBe(false);
+    expect(thinkingBudgetApplicable({ ...base, thinking_budget_pairs: [] })).toBe(false);
   });
 });
 

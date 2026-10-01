@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { BuilderCompositionSchema, defaultBuilderComposition } from "../src/builder.js";
+import { BuilderCompositionSchema, apiFormatSatisfies, defaultBuilderComposition, requiredApiFormat } from "../src/builder.js";
 
 describe("defaultBuilderComposition", () => {
   it("returns the schema's own defaults", () => {
@@ -26,5 +26,16 @@ describe("defaultBuilderComposition", () => {
     expect(composition.reasoning).toBe("react");
     expect(composition.tools).toContain("read");
     expect(composition.max_output_tokens).toBeGreaterThan(0);
+  });
+});
+
+describe("requiredApiFormat", () => {
+  it("names the one protocol a constrained framework speaks, and nothing for the rest", () => {
+    expect(requiredApiFormat("claude_agent_sdk")).toBe("anthropic_messages");
+    expect(requiredApiFormat("native")).toBe("");
+    expect(apiFormatSatisfies("", undefined)).toBe(true);
+    expect(apiFormatSatisfies("anthropic_messages", "anthropic_messages")).toBe(true);
+    expect(apiFormatSatisfies("anthropic_messages", "openai_chat")).toBe(false);
+    expect(apiFormatSatisfies("anthropic_messages", undefined)).toBe(false);
   });
 });

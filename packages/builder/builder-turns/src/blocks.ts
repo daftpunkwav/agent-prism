@@ -15,6 +15,7 @@
 import type { ToolDefinition } from "@agentprism/contracts";
 import {
   BUILDER_CUSTOM_BLOCK_PREFIX,
+  requiredApiFormat,
   ContextStrategySchema,
   HarnessLevelSchema,
   HistoryModeSchema,
@@ -187,6 +188,7 @@ export function buildBuilderCatalog(sources: BuilderCatalogSources): BuilderCata
       name: framework.name,
       status: framework.status,
       reason: framework.reason ?? "",
+      required_api_format: requiredApiFormat(framework.id),
     })),
     endpoints: sources.endpoints(),
     tools,

@@ -245,4 +245,93 @@ describe("BaselineModal", () => {
     const budgetTrigger = screen.getByLabelText("Baseline Thinking budget") as HTMLButtonElement;
     expect(budgetTrigger.disabled).toBe(true);
   });
+
+  it("enables a pinned endpoint's thinking axis even when the default snapshot is empty", () => {
+    // The catalog snapshot follows the default endpoint (levels only, so the
+    // budget axis has no options). The baseline is pinned to an endpoint whose
+    // own projection carries budget pairs. Enablement follows that projection.
+    const meta = {
+      model_compare_ready: false,
+      baseline_defaults: { endpoint_id: "ep-default" },
+      thinking_by_endpoint: {
+        "ep-default": {
+          level_options: [
+            { value: "off", label: "Off" },
+            { value: "high", label: "high" },
+          ],
+          level_default: "high",
+          budget_options: [],
+          budget_default: "0",
+          mode_options: [{ value: "levels", label: "Level mapping" }],
+          mode_default: "levels",
+        },
+        "ep-anthropic": {
+          level_options: [],
+          level_default: "off",
+          budget_options: [
+            { value: "0", label: "Off" },
+            { value: "super", label: "super" },
+          ],
+          budget_default: "super",
+          mode_options: [
+            { value: "levels", label: "Level mapping" },
+            { value: "budget", label: "Budget pairs" },
+          ],
+          mode_default: "budget",
+        },
+      },
+      baseline_fields: [
+        {
+          field: "thinking_mode",
+          label: "Thinking mode",
+          group: "decode",
+          dimension: null,
+          input: "select",
+          default: "levels",
+          options: [{ value: "levels", label: "Level mapping" }],
+        },
+        {
+          field: "thinking_level",
+          label: "Thinking",
+          group: "decode",
+          dimension: null,
+          input: "select",
+          default: "high",
+          options: [
+            { value: "off", label: "Off" },
+            { value: "high", label: "high" },
+          ],
+        },
+        {
+          field: "thinking_budget",
+          label: "Thinking budget",
+          group: "decode",
+          dimension: null,
+          input: "select",
+          default: "0",
+          options: [],
+        },
+      ],
+    } as unknown as ArenaMeta;
+    render(
+      <I18nProvider initialLocale="en">
+        <BaselineModal
+          open
+          onClose={vi.fn()}
+          running={false}
+          meta={meta}
+          dimension="framework"
+          baseline={{ endpoint_id: "ep-anthropic", thinking_mode: "budget" }}
+          onBaselineFieldChange={vi.fn()}
+          onResetBaseline={vi.fn()}
+          showPromptBanner={false}
+          onDismissPromptBanner={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+    const budgetTrigger = screen.getByLabelText("Baseline Thinking budget") as HTMLButtonElement;
+    expect(budgetTrigger.disabled).toBe(false);
+    const levelTrigger = screen.getByLabelText("Baseline Thinking") as HTMLButtonElement;
+    expect(levelTrigger.disabled).toBe(true);
+  });
 });

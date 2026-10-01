@@ -8,9 +8,50 @@
  */
 
 import type { LlmEndpointUpdate, ProviderConfig } from "@agentprism/client";
+import { effectiveThinkingLevel, servableThinkingLevels } from "@agentprism/client";
 
 /** Displayed in place of a stored API key; never enters form state (empty means "keep stored"). */
 export const API_KEY_SENTINEL = "****************";
+
+/** Budget pairs exist only on anthropic_messages. Every other format stays on level mapping. */
+export function appliedThinkingMode(apiFormat: string, mode: string | undefined): "levels" | "budget" {
+  return apiFormat === "anthropic_messages" && mode === "budget" ? "budget" : "levels";
+}
+
+/**
+ * Level names an editor may offer besides "off": the vendor list when present,
+ * otherwise the standard set from servableThinkingLevels.
+ */
+export function editorThinkingLevels(thinkingLevels: readonly string[]): string[] {
+  return servableThinkingLevels({ thinking_capable: true, thinking_levels: [...thinkingLevels] });
+}
+
+/**
+ * The level token that survives the applied mode. Illegal tokens become "off".
+ * Callers still force "off" when thinking is disabled; this only checks the
+ * allowlist for the mode that will actually be saved.
+ */
+export function legalThinkingLevel(input: {
+  thinking_level: string;
+  thinking_levels: readonly string[];
+  thinking_mode: "levels" | "budget";
+  thinking_budget_pairs: ReadonlyArray<{ level: string }>;
+}): string {
+  return effectiveThinkingLevel(
+    {
+      thinking_capable: true,
+      thinking_level: input.thinking_level,
+      thinking_levels: [...input.thinking_levels],
+      thinking_mode: input.thinking_mode,
+      thinking_budget_pairs: input.thinking_budget_pairs.map((pair) => ({
+        level: pair.level,
+        budget_tokens: 0,
+        max_tokens: 0,
+      })),
+    },
+    input.thinking_level,
+  );
+}
 
 /** A single model slot under one connection (matching one backend LlmEndpoint) */
 export type ModelSlot = {
@@ -187,6 +228,18 @@ export function groupEndpoints(cfg: ProviderConfig): ConnectionGroup[] {
     }
     if (!g.website_url && ep.website_url) g.website_url = ep.website_url;
     if (!g.provider_name && ep.provider_name) g.provider_name = ep.provider_name;
+    const thinkingLevels = Array.isArray(ep.thinking_levels)
+      ? ep.thinking_levels.filter((l): l is string => typeof l === "string")
+      : [];
+    const thinkingPairs = Array.isArray(ep.thinking_budget_pairs)
+      ? ep.thinking_budget_pairs
+          .filter(
+            (pair): pair is { level: string; budget_tokens: number; max_tokens: number } =>
+              typeof pair?.level === "string" && typeof pair?.budget_tokens === "number" && typeof pair?.max_tokens === "number",
+          )
+          .map((pair) => ({ level: pair.level, budget_tokens: pair.budget_tokens, max_tokens: pair.max_tokens }))
+      : [];
+    const thinkingMode = appliedThinkingMode(ep.api_format, ep.thinking_mode);
     g.models.push({
       id: ep.id,
       label: ep.label ?? "",
@@ -198,16 +251,16 @@ export function groupEndpoints(cfg: ProviderConfig): ConnectionGroup[] {
       image_input: !!ep.image_input,
       video_input: !!ep.video_input,
       enabled: ep.enabled !== false,
-      // The public view is a string; illegal values are rejected by the backend zod — pass through, storage clamps
-      thinking_level: ep.thinking_level || "off",
-      thinking_levels: Array.isArray(ep.thinking_levels) ? ep.thinking_levels.filter((l): l is string => typeof l === "string") : [],
-      thinking_mode: ep.thinking_mode === "budget" ? "budget" : "levels",
-      thinking_budget_pairs: Array.isArray(ep.thinking_budget_pairs)
-        ? ep.thinking_budget_pairs
-          .filter((pair): pair is { level: string; budget_tokens: number; max_tokens: number } =>
-            typeof pair?.level === "string" && typeof pair?.budget_tokens === "number" && typeof pair?.max_tokens === "number")
-          .map((pair) => ({ level: pair.level, budget_tokens: pair.budget_tokens, max_tokens: pair.max_tokens }))
-        : [],
+      // Illegal levels become off here, so the form matches what flatten will save.
+      thinking_levels: thinkingLevels,
+      thinking_mode: thinkingMode,
+      thinking_level: legalThinkingLevel({
+        thinking_level: ep.thinking_level || "off",
+        thinking_levels: thinkingLevels,
+        thinking_mode: thinkingMode,
+        thinking_budget_pairs: thinkingPairs,
+      }),
+      thinking_budget_pairs: thinkingPairs,
       thinking_budget_tokens: typeof ep.thinking_budget_tokens === "number" ? ep.thinking_budget_tokens : 0,
       thinking_max_tokens: typeof ep.thinking_max_tokens === "number" ? ep.thinking_max_tokens : 0,
     });
@@ -227,6 +280,7 @@ export function flattenConnections(connections: ConnectionGroup[]): LlmEndpointU
   for (const c of connections) {
     for (const m of c.models) {
       if (!m.model.trim()) continue;
+      const thinkingMode = appliedThinkingMode(c.api_format, m.thinking_mode);
       endpoints.push({
         id: isLocalModelId(m.id) ? "" : m.id,
         label: m.label,
@@ -244,9 +298,16 @@ export function flattenConnections(connections: ConnectionGroup[]): LlmEndpointU
         thinking_capable: m.thinking_capable,
         image_input: m.image_input,
         video_input: m.video_input,
-        thinking_level: m.thinking_capable ? m.thinking_level : "off",
         thinking_levels: m.thinking_levels.filter((l) => l.trim() !== ""),
-        thinking_mode: m.thinking_mode === "budget" && c.api_format === "anthropic_messages" ? "budget" : "levels",
+        thinking_mode: thinkingMode,
+        thinking_level: m.thinking_capable
+          ? legalThinkingLevel({
+              thinking_level: m.thinking_level,
+              thinking_levels: m.thinking_levels,
+              thinking_mode: thinkingMode,
+              thinking_budget_pairs: m.thinking_budget_pairs ?? [],
+            })
+          : "off",
         thinking_budget_pairs: m.thinking_budget_pairs ?? [],
         thinking_budget_tokens: m.thinking_budget_tokens,
         thinking_max_tokens: m.thinking_max_tokens,

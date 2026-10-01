@@ -26,12 +26,19 @@ const probe: BuilderCustomBlock = {
 describe("buildBuilderCatalog", () => {
   it("appends one custom block per registered dimension, after the builtin slots", () => {
     const catalog = buildBuilderCatalog({
-      frameworks: () => [{ id: "native", name: "Native", status: "available" }],
+      frameworks: () => [
+        { id: "native", name: "Native", status: "available" },
+        { id: "claude_agent_sdk", name: "Claude", status: "available" },
+      ],
       endpoints: () => [],
       tools: () => [tool("write"), tool("read")],
       customDimensions: () => [probe],
     });
 
+    expect(catalog.frameworks).toEqual([
+      { id: "native", name: "Native", status: "available", reason: "", required_api_format: "" },
+      { id: "claude_agent_sdk", name: "Claude", status: "available", reason: "", required_api_format: "anthropic_messages" },
+    ]);
     expect(catalog.tools.map((entry) => entry.name)).toEqual(["read", "write"]);
     const builtin = catalog.capabilities.filter((entry) => !entry.block.startsWith("custom:"));
     // Builtin slots keep empty copy: the web titles them from its own i18n catalogs.

@@ -21,6 +21,7 @@ import { Plus, Trash2, X } from "lucide-react";
 import { NumberInput, UiSelect } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
 import type { ModelSlot } from "./settingsConnectionModel";
+import { appliedThinkingMode, editorThinkingLevels, legalThinkingLevel } from "./settingsConnectionModel";
 import { Field } from "./Field";
 
 export interface ModelModalProps {
@@ -36,10 +37,7 @@ export interface ModelModalProps {
 
 /** Effective level options: vendor-defined levels replace the standard set when present. Levels render verbatim (vendor-defined tokens have no translation). */
 function levelOptions(thinkingLevels: string[]): Array<{ value: string; label: string }> {
-  if (thinkingLevels.length > 0) {
-    return [{ value: "off", label: "off" }, ...thinkingLevels.map((name) => ({ value: name, label: name }))];
-  }
-  return ["off", "low", "medium", "high"].map((value) => ({ value, label: value }));
+  return [{ value: "off", label: "off" }, ...editorThinkingLevels(thinkingLevels).map((name) => ({ value: name, label: name }))];
 }
 
 /** Budget-mode level options: off plus the pair table's level names. */
@@ -120,15 +118,15 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
   /** Switching the applied mode is the tab click: a default level the other mode cannot represent resets to off. */
   const switchMode = (mode: "levels" | "budget") => {
     if (mode === draft.thinking_mode) return;
-    const allowed =
-      mode === "budget"
-        ? budgetPairs.map((pair) => pair.level)
-        : draft.thinking_levels.length > 0
-          ? draft.thinking_levels
-          : ["low", "medium", "high"];
+    const applied = appliedThinkingMode(apiFormat, mode);
     patch({
-      thinking_mode: mode,
-      thinking_level: draft.thinking_level === "off" || allowed.includes(draft.thinking_level) ? draft.thinking_level : "off",
+      thinking_mode: applied,
+      thinking_level: legalThinkingLevel({
+        thinking_level: draft.thinking_level,
+        thinking_levels: draft.thinking_levels,
+        thinking_mode: applied,
+        thinking_budget_pairs: applied === "budget" ? budgetPairs : [],
+      }),
     });
   };
 
@@ -139,22 +137,22 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
       .map((pair) => ({ ...pair, level: pair.level.trim() }))
       .filter((pair, i, arr) => pair.level !== "" && arr.findIndex((other) => other.level === pair.level) === i)
       .slice(0, 16);
-    const levelAllowed =
-      draft.thinking_mode === "budget" && isAnthropic
-        ? pairs.map((pair) => pair.level)
-        : levels.length > 0
-          ? levels
-          : ["low", "medium", "high"];
-    const levelKept = draft.thinking_level === "off" || levelAllowed.includes(draft.thinking_level);
+    const thinkingMode = appliedThinkingMode(apiFormat, draft.thinking_mode);
     onSave({
       ...draft,
       model: draft.model.trim(),
       label: draft.label.trim(),
       thinking_levels: levels,
       thinking_budget_pairs: isAnthropic ? pairs : [],
-      // Budget mode is an anthropic-only concept; other formats always stay level-mapped.
-      thinking_mode: isAnthropic && draft.thinking_mode === "budget" ? "budget" : "levels",
-      thinking_level: draft.thinking_capable && levelKept ? draft.thinking_level : "off",
+      thinking_mode: thinkingMode,
+      thinking_level: draft.thinking_capable
+        ? legalThinkingLevel({
+            thinking_level: draft.thinking_level,
+            thinking_levels: levels,
+            thinking_mode: thinkingMode,
+            thinking_budget_pairs: pairs,
+          })
+        : "off",
     });
   };
 

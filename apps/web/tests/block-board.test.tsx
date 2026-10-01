@@ -172,6 +172,40 @@ describe("BlockBoard", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ custom: { summary_budget: "2000" } }));
   });
 
+  it("disables a constrained framework and Apply when the endpoint speaks another protocol", () => {
+    const catalog = {
+      ...CATALOG,
+      endpoints: [
+        { id: "ep-openai", name: "OpenAI", api_format: "openai_chat", default: true },
+        { id: "ep-anthropic", name: "Anthropic", api_format: "anthropic_messages", default: false },
+      ],
+      frameworks: [
+        { id: "native", name: "Native", status: "available", reason: "", required_api_format: "" },
+        { id: "claude_agent_sdk", name: "Claude", status: "available", reason: "", required_api_format: "anthropic_messages" },
+      ],
+    } as unknown as BuilderCatalog;
+    const composition = { ...COMPOSITION, framework: "claude_agent_sdk", endpoint_id: "ep-openai" } as BuilderComposition;
+    render(
+      <I18nProvider initialLocale="en">
+        <BlockBoard
+          catalog={catalog}
+          composition={composition}
+          onChange={vi.fn()}
+          onApplySwap={vi.fn()}
+          onRestoreDefaults={vi.fn()}
+          dirty
+          swapBlocked={false}
+        />
+      </I18nProvider>,
+    );
+    const claude = screen.getByRole("button", { name: "Claude" }) as HTMLButtonElement;
+    expect(claude.disabled).toBe(true);
+    expect(claude.getAttribute("title")).toContain("anthropic_messages");
+    const apply = screen.getByRole("button", { name: new RegExp(en().applySwap) }) as HTMLButtonElement;
+    expect(apply.disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Native" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("reports restore-default clicks", () => {
     const { onRestoreDefaults } = renderBoard();
     const restore = screen.getByRole("button", { name: en().restoreDefaults });

@@ -9,7 +9,7 @@
  */
 
 import type { BaselineOverrides, LlmEndpoint, PipelineConfig, ProviderConfig, ProviderLookup } from "@agentprism/contracts";
-import { dimensionFieldName, customFieldDimension, resolveDefaultEndpoint, servableThinkingLevels } from "@agentprism/contracts";
+import { dimensionFieldName, customFieldDimension, resolveDefaultEndpoint, servableThinkingLevels, thinkingBudgetApplicable } from "@agentprism/contracts";
 import {
   effectiveThinkingLevel,
   MAX_OUTPUT_TOKENS_OPTIONS,
@@ -133,10 +133,27 @@ function assertThinkingPinsLegal(raw: Record<string, unknown>, deps: BaselineRes
       ? raw.endpoint_id
       : String(deps.dimensionCatalog.defaultBaseValue("endpoint_id") ?? "");
   const endpoint = requested !== "" ? deps.providerLookup.lookupEndpoint(requested, deps.provider) : undefined;
+  // An unresolvable endpoint is buildPipelineBase's loud error. Checking it
+  // here would report a thinking-pin failure for what is really a missing endpoint.
   if (endpoint === undefined) return;
+  assertServedThinkingPins(endpoint, { mode: modePin, level: levelPin, budget: budgetPin });
+}
+
+/**
+ * Pin legality for one endpoint. Membership only: a mode the endpoint cannot
+ * serve, a level outside the served set, or a budget token outside the pair
+ * table. Numeric expansion (pair name → token counts, the 1024 floor) stays
+ * in applyThinkingFields. Column assembly calls this again because a model
+ * comparison column may not be the baseline's endpoint.
+ */
+function assertServedThinkingPins(
+  endpoint: LlmEndpoint,
+  pins: { mode?: unknown; level?: unknown; budget?: unknown },
+): void {
+  const { mode: modePin, level: levelPin, budget: budgetPin } = pins;
+  if (modePin === undefined && levelPin === undefined && budgetPin === undefined) return;
   const pairs = endpoint.thinking_budget_pairs ?? [];
-  const budgetApplicable =
-    endpoint.thinking_capable && endpoint.api_format === "anthropic_messages" && pairs.length > 0;
+  const budgetApplicable = thinkingBudgetApplicable(endpoint);
   if (modePin !== undefined && !(modePin === "levels" || (modePin === "budget" && budgetApplicable))) {
     throw new Error(
       `Baseline thinking_mode "${String(modePin)}" is not applicable on endpoint "${endpoint.id}" ` +
@@ -288,13 +305,12 @@ export function buildPipelineBase(
  * Applies the mutually exclusive thinking fields against the column's endpoint.
  * The mode comes from the baseline override when given, else the endpoint's own
  * configuration; the two intensity fields can never both apply:
+ * - pinned tokens are checked by assertServedThinkingPins (the same membership
+ *   rule resolveBaselineOverrides uses) against this column's endpoint
  * - level mode: the requested level resolves through effectiveThinkingLevel
- *   (illegal levels fail closed to off); any budget override is rejected loud —
- *   the catalog would normally have refused it already, but the endpoint may
- *   have switched modes after the options were synced.
- * - budget mode (anthropic endpoints with budget pairs): the budget token is a
- *   pair level name resolved to its numeric pair; a non-off level override is
- *   rejected loud for the same reason.
+ *   (an unpinned illegal endpoint default fails closed to off)
+ * - budget mode: the budget token is a pair level name resolved to its numeric
+ *   pair; a pair below the 1024 protocol floor fails here, not at model construction
  */
 function applyThinkingFields(
   data: Record<string, unknown>,
@@ -311,24 +327,16 @@ function applyThinkingFields(
   const requestedBudget =
     overrides.thinking_budget !== undefined ? String(overrides.thinking_budget) : String(data.thinking_budget ?? 0);
 
-  const budgetApplicable =
-    endpoint.thinking_capable && endpoint.api_format === "anthropic_messages" && (endpoint.thinking_budget_pairs ?? []).length > 0;
-  // An explicitly pinned mode is caller intent: asking for budget semantics on
-  // an endpoint that cannot serve them must fail loud, never silently run as
-  // level mode while the column config claims "budget". (The endpoint's own
-  // mismatched default still degrades below — that is config auto-healing, not
-  // a caller request.)
-  if (overrides.thinking_mode === "budget" && !budgetApplicable) {
-    throw new Error(
-      `Baseline thinking_mode "budget" is not applicable on endpoint "${endpoint.id}" (${endpoint.api_format}${endpoint.thinking_capable ? ", no budget pairs configured" : ", thinking not capable"}); use level mapping or switch the endpoint`,
-    );
-  }
+  // Same membership rule as resolveBaselineOverrides, against THIS column's
+  // endpoint. A model-comparison column is not the baseline endpoint.
+  assertServedThinkingPins(endpoint, {
+    mode: overrides.thinking_mode,
+    level: overrides.thinking_level,
+    budget: overrides.thinking_budget,
+  });
+
+  const budgetApplicable = thinkingBudgetApplicable(endpoint);
   if (mode === "budget" && budgetApplicable) {
-    if (overrides.thinking_level !== undefined && requestedLevel !== "off") {
-      throw new Error(
-        `Baseline thinking_level "${requestedLevel}" is not applicable in budget mode: unset it or switch the thinking mode`,
-      );
-    }
     const pair = (endpoint.thinking_budget_pairs ?? []).find((candidate) => candidate.level === requestedBudget);
     if (requestedBudget === "" || requestedBudget === "0") {
       data.thinking_level = "off";
@@ -353,11 +361,6 @@ function applyThinkingFields(
     return;
   }
 
-  if (overrides.thinking_budget !== undefined && requestedBudget !== "" && requestedBudget !== "0") {
-    throw new Error(
-      `Baseline thinking_budget "${requestedBudget}" is not applicable in level mode: unset it or switch the thinking mode`,
-    );
-  }
   // Record the mode that actually applied: a budget token on an endpoint
   // without pairs (or on another format) degrades to level semantics here.
   data.thinking_mode = "levels";

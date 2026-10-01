@@ -122,6 +122,22 @@ describe("settings connection model", () => {
     expect(endpointOut?.thinking_level).toBe("high");
   });
 
+  it("drops a budget-only level when the format cannot serve budget mode", () => {
+    const group = blankConnection();
+    group.api_format = "openai_chat";
+    group.models[0] = {
+      ...blankModel(),
+      model: "gpt-x",
+      thinking_capable: true,
+      thinking_mode: "budget",
+      thinking_level: "super",
+      thinking_budget_pairs: [{ level: "super", budget_tokens: 4096, max_tokens: 8192 }],
+    };
+    const [out] = flattenConnections([group]);
+    expect(out?.thinking_mode).toBe("levels");
+    expect(out?.thinking_level).toBe("off");
+  });
+
   it("detects locally generated ids", () => {
     expect(isLocalModelId("m_abc")).toBe(true);
     expect(isLocalModelId("new_abc")).toBe(true);

@@ -634,8 +634,8 @@ export class BuilderService {
         .map((framework) => framework.id),
       knownTools: sources.tools().map((definition) => definition.name),
       knownEndpointIds: endpoints.map((endpoint) => endpoint.id),
-      // Format facts backing the claude_agent_sdk ↔ anthropic_messages gate (the
-      // palette disables the chip client-side; this enforces it server-side).
+      // Format facts for frameworks that require one protocol (requiredApiFormat).
+      // The palette reads the same rule off the catalog; this enforces it.
       endpointApiFormats: Object.fromEntries(endpoints.map((endpoint) => [endpoint.id, endpoint.api_format])),
       defaultEndpointId: endpoints.find((endpoint) => endpoint.default)?.id,
       customDimensionValues: Object.fromEntries(

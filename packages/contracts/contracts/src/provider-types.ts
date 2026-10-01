@@ -5,7 +5,8 @@
  * Responsibilities:
  * - Define endpoint entities and provider config with decode defaults
  * - Define the effective default-endpoint rule (enabled endpoints only)
- * - Define the served thinking-level set and the effective thinking-level rule
+ * - Define the served thinking-level set, the budget-mode applicability rule,
+ *   and the effective thinking-level rule
  */
 
 import type { ThinkingBudgetPair } from "./provider.js";
@@ -98,6 +99,22 @@ export function servableThinkingLevels(
 ): string[] {
   const custom = endpoint.thinking_levels ?? [];
   return endpoint.thinking_capable ? (custom.length > 0 ? custom : ["low", "medium", "high"]) : [];
+}
+
+/**
+ * Whether an endpoint can serve budget-pair thinking. The pair table only
+ * exists on anthropic_messages, and an empty table is not a mode the caller
+ * can pin. Display projection, baseline pin checks, and column assembly all
+ * call this so the three cannot drift about when budget mode is real.
+ */
+export function thinkingBudgetApplicable(
+  endpoint: Pick<LlmEndpoint, "thinking_capable" | "api_format" | "thinking_budget_pairs">,
+): boolean {
+  return (
+    endpoint.thinking_capable &&
+    endpoint.api_format === "anthropic_messages" &&
+    (endpoint.thinking_budget_pairs ?? []).length > 0
+  );
 }
 
 /**

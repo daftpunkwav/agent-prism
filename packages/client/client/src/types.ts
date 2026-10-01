@@ -106,6 +106,12 @@ export { MAX_HISTORY_CHARS, MAX_COLUMN_SESSION_MESSAGES, TOOL_NAMES_BY_TOOLSET }
 /** Brand constants such as the default provider name: contract single source (contracts/provider), consumed by frontend placeholder copy — hardcoding is forbidden. */
 export { DEFAULT_PROVIDER_NAME, DEFAULT_MODEL_ID } from "@agentprism/contracts";
 
+/** Thinking-level allowlist and budget-mode applicability: contract single source, consumed by the settings editors. */
+export { effectiveThinkingLevel, servableThinkingLevels, thinkingBudgetApplicable } from "@agentprism/contracts";
+
+/** Framework protocol rule: contract single source, consumed by the builder palette. */
+export { apiFormatSatisfies, requiredApiFormat } from "@agentprism/contracts";
+
 export interface ProjectCreate {
   name: string;
   question: string;

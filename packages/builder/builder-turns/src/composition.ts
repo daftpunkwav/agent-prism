@@ -14,6 +14,8 @@
 import type { PipelineConfig } from "@agentprism/contracts";
 import {
   TOOL_NAMES_BY_TOOLSET,
+  apiFormatSatisfies,
+  requiredApiFormat,
   type BuilderComposition,
   type BuilderCompositionInput,
   type ToolsetId,
@@ -47,10 +49,9 @@ export interface CompositionBlockIndex {
   /** Known endpoint ids; when provided, a non-empty unknown endpoint_id rejects ("" always means the provider default). */
   knownEndpointIds?: readonly string[];
   /**
-   * Endpoint api formats by id; when provided, a claude_agent_sdk composition
-   * must resolve to an anthropic_messages endpoint (the explicit pick, else the
-   * provider default) — the Claude Code CLI authenticates against the endpoint
-   * itself, so any other format would only surface as a turn-time driver failure.
+   * Endpoint api formats by id. A framework with a required protocol
+   * (requiredApiFormat) fails closed when this map is absent or has no entry
+   * for the resolved endpoint. Frameworks with no required protocol ignore it.
    */
   endpointApiFormats?: Readonly<Record<string, string>>;
   /** Provider default endpoint id; resolves the "" (endpoint default) pick for the format gate. */
@@ -84,21 +85,21 @@ export function validateComposition(composition: BuilderComposition, index: Comp
   ) {
     throw BuilderError.invalid(`Unknown endpoint block "${composition.endpoint_id}" (it may have been deleted, renamed, or disabled)`);
   }
-  // The Claude Code CLI authenticates against the endpoint itself, so a
-  // claude_agent_sdk composition must resolve to an anthropic_messages endpoint
-  // (the explicit pick, else the provider default). Checked after endpoint
-  // existence so a stale id keeps its own clearer message; an index without
-  // format facts keeps the old behavior (the turn-time driver error is the
-  // backstop). Own-key lookup: ids are caller input, an inherited
-  // Object.prototype member must not pass as a format.
-  if (composition.framework === "claude_agent_sdk" && index.endpointApiFormats !== undefined) {
+  // Any framework that authenticates against the endpoint itself declares the
+  // protocol it speaks (requiredApiFormat). The resolved endpoint is the
+  // explicit pick, else the provider default. Checked after endpoint existence
+  // so a stale id keeps its own clearer message. Missing format facts fail
+  // closed for a constrained framework. Own-key lookup: ids are caller input,
+  // an inherited Object.prototype member must not pass as a format.
+  const requiredFormat = requiredApiFormat(composition.framework);
+  if (requiredFormat !== "") {
     const resolvedId = composition.endpoint_id !== "" ? composition.endpoint_id : (index.defaultEndpointId ?? "");
-    const format = Object.hasOwn(index.endpointApiFormats, resolvedId)
-      ? index.endpointApiFormats[resolvedId]
-      : undefined;
-    if (format !== undefined && format !== "anthropic_messages") {
+    const formats = index.endpointApiFormats;
+    const format =
+      formats !== undefined && Object.hasOwn(formats, resolvedId) ? formats[resolvedId] : undefined;
+    if (!apiFormatSatisfies(requiredFormat, format)) {
       throw BuilderError.invalid(
-        `Framework "claude_agent_sdk" needs an anthropic_messages endpoint (endpoint "${resolvedId}" speaks ${format})`,
+        `Framework "${composition.framework}" needs an endpoint with api_format "${requiredFormat}" (endpoint "${resolvedId}" speaks ${format ?? "an unknown format"})`,
       );
     }
   }
