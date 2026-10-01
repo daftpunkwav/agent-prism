@@ -7,13 +7,16 @@ deep dive is
 
 ## Composition-root discipline
 
-- `src/assemble.ts` is the only composition root. Driver registry construction,
-  `registerDriversBestEffort`, and `register*Routes` mounting happen there and
-  nowhere else — wire new capabilities through `assemble.ts`, not module state.
-- Route mounting order in `src/mount-routes.ts` is behavior: literal paths
+- `src/assemble.ts` is the only composition root. Driver registration
+  (`registerFrameworkDrivers`, which wraps `registerDriversBestEffort` in
+  `load-drivers.ts`), domain route mounting (`mountDomainRoutes` in
+  `mount-routes.ts`), and every wiring decision happen there and nowhere
+  else — wire new capabilities through `assemble.ts`, not module state.
+- Route registration order is behavior. `src/mount-routes.ts` mounts each
+  domain leaf in a fixed order, and inside a route package literal paths
   register before parameterized ones (`GET /api/sessions/stats` before
-  `GET /api/sessions/:sessionId`). Preserve registration order when adding
-  routes.
+  `GET /api/sessions/:sessionId` in `route-sessions`). Preserve registration
+  order when adding routes.
 
 ## Build and run
 
@@ -29,9 +32,11 @@ deep dive is
 ## Configuration flow
 
 - Environment keys load through `@agentprism/config` from the repo-root
-  `.env` (single configuration source). `assemble.ts` seeds a few driver-knob
-  env vars (`ARENA_*`, `MCP_SERVERS`) from settings — that file is the bridge;
-  add new knobs through settings/config, not scattered `process.env` reads.
+  `.env` (single configuration source). `assemble.ts` writes a few
+  driver-knob env vars (`ARENA_SELF_CONSISTENCY_N`, `ARENA_TOT_WIDTH`,
+  `ARENA_CREWAI_PROCESS`) from the runtime knobs and reads `MCP_SERVERS` to
+  seed the MCP store — that file is the bridge; add new knobs through
+  settings/config, not scattered `process.env` reads.
 
 ## Tests
 

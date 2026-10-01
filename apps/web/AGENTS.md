@@ -39,6 +39,6 @@ and CSP notes, and source layout live in [README.md](README.md).
 
 ## Tests
 
-- The 58 suites in `tests/` run under the root vitest config from the repo
+- The suites in `tests/` run under the root vitest config from the repo
   root; it maps the `@/` alias to `src/`. Component tests render through
   jsdom + testing-library.
