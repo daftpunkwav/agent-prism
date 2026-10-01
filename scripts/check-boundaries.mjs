@@ -9,7 +9,7 @@
  * - arena-dimensions: only contracts / dimensions / harness (+ foundation);
  *   no @langchain/*, no providers, never the runner
  * - arena-runner: + agent / runtime / arena-dimensions; no @langchain/*, no providers
- * - application: no @agentprism/providers, no @agentprism/evaluation, no @agentprism/harness
+ * - application: no @agentprism/provider-*, no @agentprism/evaluation, no @agentprism/harness
  * - evaluation: only contracts / runtime (SDK-free judging and reports)
  * - dimensions: only contracts
  * - custom dimensions (packages/custom/*): only contracts — a dimension package
@@ -18,7 +18,7 @@
  *   (roots may use a `*` segment: it covers packages added later)
  * - tool-registry: only contracts (seam stays below every composer)
  * - tool-builtins: only contracts / environment / tool-registry
- * - driver-run-support: only contracts / environment / runtime / telemetry / harness
+ * - driver-run-support: only contracts / telemetry / harness
  *   (seam + shared run-support; zero backend deps)
  * - driver-native: + driver-run-support (LangChain-free backend)
  * - driver-langchain: + driver-run-support (LC bridge owner; no langgraph)
@@ -89,7 +89,7 @@ const RULES = [
   {
     name: "application → no providers/evaluation/harness impl",
     roots: ["packages/application/application/src"],
-    forbid: /from\s+["']@agentprism\/(providers|evaluation|harness)/,
+    forbid: /from\s+["']@agentprism\/(provider-|evaluation|harness)/,
   },
   {
     name: "evaluation → only contracts/runtime",
@@ -178,7 +178,7 @@ const RULES = [
   {
     name: "driver-run-support → only foundation/harness/telemetry",
     roots: ["packages/drivers/driver-run-support/src"],
-    forbid: /from\s+["']@agentprism\/(?!contracts|environment|runtime|telemetry|harness)[^"']+["']/,
+    forbid: /from\s+["']@agentprism\/(?!contracts|telemetry|harness)[^"']+["']/,
   },
   {
     name: "driver-native → + driver-run-support",
@@ -305,6 +305,7 @@ const RULES = [
       "packages/memory/memory-store/src",
       "packages/memory/memory-episodic/src",
       "packages/memory/memory-semantic/src",
+      "packages/memory/memory-service/src",
     ],
     forbid: /from\s+["']@langchain\//,
   },
