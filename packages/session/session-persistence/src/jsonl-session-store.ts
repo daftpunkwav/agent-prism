@@ -73,6 +73,11 @@ export interface JsonlSessionStoreDeps {
  */
 const STORE_MUTATION_KEY = "store";
 
+/** Identity for a seq-less replay match. Content is included so two notes at one timestamp stay distinct. */
+function entryIdentity(sessionId: string, at: number, kind: string, content: string): string {
+  return `${sessionId}\0${at}\0${kind}\0${content}`;
+}
+
 /**
  * Append-only JSONL SessionStore with snapshot compaction.
  *
@@ -107,6 +112,14 @@ export class JsonlSessionStore implements SessionStore {
   private appendedSinceCheckpoint = 0;
   /** Normalized append budget between automatic checkpoints. */
   private readonly checkpointBytes: number;
+  /**
+   * Snapshot entry counts keyed by session, timestamp, kind, and content.
+   * Seq-less log lines (legacy writers) claim from this baseline during replay
+   * so a checkpoint crash does not append them again. Live writes always store seq.
+   */
+  private readonly baselineEntryCounts = new Map<string, number>();
+  /** How many seq-less lines have already claimed each baseline identity. */
+  private readonly replayMatched = new Map<string, number>();
 
   constructor(deps: JsonlSessionStoreDeps) {
     this.log = deps.log;
@@ -153,9 +166,11 @@ export class JsonlSessionStore implements SessionStore {
         metadata: { ...(input.metadata ?? {}) },
         entryCount: 0,
       };
+      // Log first: a failed append leaves memory unchanged, and a crash after the
+      // line lands is recovered by replay instead of persisting a memory-only write.
+      await this.append({ op: "create", id: record.id, kind: record.kind, title: record.title, metadata: record.metadata, at: now });
       this.records.set(record.id, record);
       this.entries.set(record.id, []);
-      await this.append({ op: "create", id: record.id, kind: record.kind, title: record.title, metadata: record.metadata, at: now });
       return { ...record };
     });
   }
@@ -173,17 +188,20 @@ export class JsonlSessionStore implements SessionStore {
     return this.mutations.run(STORE_MUTATION_KEY, async () => {
       const record = this.require(id);
       const summary = finish.summary?.trim() ?? "";
-      record.status = "completed";
-      record.updatedAt = this.clock.now();
-      if (summary !== "") record.summary = summary.slice(0, MAX_SUMMARY_CHARS);
-      Object.assign(record.metadata, finish.metadata ?? {});
+      const updatedAt = this.clock.now();
+      const nextSummary = summary !== "" ? summary.slice(0, MAX_SUMMARY_CHARS) : record.summary;
+      const nextMetadata = { ...record.metadata, ...(finish.metadata ?? {}) };
       await this.append({
         op: "complete",
         id,
-        at: record.updatedAt,
-        summary: record.summary,
-        metadata: { ...record.metadata },
+        at: updatedAt,
+        summary: nextSummary,
+        metadata: nextMetadata,
       });
+      record.status = "completed";
+      record.updatedAt = updatedAt;
+      record.summary = nextSummary;
+      record.metadata = nextMetadata;
       return { ...record };
     });
   }
@@ -193,10 +211,12 @@ export class JsonlSessionStore implements SessionStore {
     await this.ensureLoaded();
     return this.mutations.run(STORE_MUTATION_KEY, async () => {
       const record = this.require(id);
+      const updatedAt = this.clock.now();
+      const summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
+      await this.append({ op: "fail", id, at: updatedAt, reason: summary });
       record.status = "failed";
-      record.updatedAt = this.clock.now();
-      record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
-      await this.append({ op: "fail", id, at: record.updatedAt, reason: record.summary });
+      record.updatedAt = updatedAt;
+      record.summary = summary;
       return { ...record };
     });
   }
@@ -206,10 +226,12 @@ export class JsonlSessionStore implements SessionStore {
     await this.ensureLoaded();
     return this.mutations.run(STORE_MUTATION_KEY, async () => {
       const record = this.require(id);
+      const updatedAt = this.clock.now();
+      const summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
+      await this.append({ op: "cancel", id, at: updatedAt, reason: summary });
       record.status = "cancelled";
-      record.updatedAt = this.clock.now();
-      record.summary = reason.trim().slice(0, MAX_SUMMARY_CHARS);
-      await this.append({ op: "cancel", id, at: record.updatedAt, reason: record.summary });
+      record.updatedAt = updatedAt;
+      record.summary = summary;
       return { ...record };
     });
   }
@@ -237,11 +259,11 @@ export class JsonlSessionStore implements SessionStore {
         kind: entry.kind,
         content: await spillOversizedEntry(this.blobs, sessionId, list.length, content),
       };
+      await this.append({ op: "entry", sessionId, seq: stored.seq, at: stored.at, kind: stored.kind, content: stored.content });
       list.push(stored);
       this.entries.set(sessionId, list);
       record.entryCount = list.length;
       record.updatedAt = stored.at;
-      await this.append({ op: "entry", sessionId, seq: stored.seq, at: stored.at, kind: stored.kind, content: stored.content });
       return { ...stored };
     });
   }
@@ -270,15 +292,17 @@ export class JsonlSessionStore implements SessionStore {
   async delete(id: string): Promise<boolean> {
     await this.ensureLoaded();
     return this.mutations.run(STORE_MUTATION_KEY, async () => {
-      const existed = this.records.delete(id);
+      if (!this.records.has(id)) return false;
+      // The delete line is the durable record. Blobs go after it: a crash in
+      // between leaves orphan files, not a session whose body was already erased.
+      await this.append({ op: "delete", id, at: this.clock.now() });
+      this.records.delete(id);
       this.entries.delete(id);
-      if (!existed) return false;
       try {
         await this.blobs.deleteSessionBlobs(id);
       } catch (error) {
         console.warn(`[jsonl-session-store] blob purge failed for ${id}: ${error instanceof Error ? error.message : String(error)}`);
       }
-      await this.append({ op: "delete", id, at: this.clock.now() });
       return true;
     });
   }
@@ -367,6 +391,7 @@ export class JsonlSessionStore implements SessionStore {
       console.warn(`[jsonl-session-store] log unreadable, snapshot state only: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
+    this.captureEntryBaseline();
     for (const line of lines) {
       if (line.trim() === "") continue;
       let op: SessionOp;
@@ -388,6 +413,9 @@ export class JsonlSessionStore implements SessionStore {
     if (op === null || typeof op !== "object" || typeof op.op !== "string") return false;
     if (op.op === "create") {
       if (typeof op.id !== "string" || op.id === "") return false;
+      // The snapshot already holds this session. Applying create again would mark
+      // it failed and drop entries the checkpoint had already saved.
+      if (this.records.has(op.id)) return true;
       if (this.records.size >= MAX_SESSIONS_PER_STORE) return false;
       // Replay-only path: a create op on disk belongs to a previous process,
       // so the run is stale and lands failed (live create() sets active above).
@@ -409,13 +437,20 @@ export class JsonlSessionStore implements SessionStore {
       const record = this.records.get(op.sessionId);
       const list = this.entries.get(op.sessionId) ?? [];
       if (record === undefined || list.length >= MAX_ENTRIES_PER_SESSION) return false;
-      // Out-of-order or duplicate seqs heal by position (replay order is truth).
+      const kind = op.kind === "verdict" || op.kind === "note" ? op.kind : "lifecycle";
+      const content = typeof op.content === "string" ? op.content : "";
+      // A checkpoint writes the snapshot before it truncates the log. An entry
+      // whose seq is already in that snapshot must not be appended again.
+      // Legacy lines omit seq; they claim one matching snapshot entry instead,
+      // so a second identical line is still kept.
+      if (typeof op.seq === "number" && op.seq < list.length) return true;
+      if (typeof op.seq !== "number" && this.claimBaselineEntry(op.sessionId, op.at, kind, content)) return true;
       list.push({
         sessionId: op.sessionId,
         seq: list.length,
         at: op.at,
-        kind: op.kind === "verdict" || op.kind === "note" ? op.kind : "lifecycle",
-        content: typeof op.content === "string" ? op.content : "",
+        kind,
+        content,
       });
       this.entries.set(op.sessionId, list);
       record.entryCount = list.length;
@@ -441,6 +476,28 @@ export class JsonlSessionStore implements SessionStore {
       return true;
     }
     return false;
+  }
+
+  /** Counts snapshot entries so seq-less replay can skip copies already stored. */
+  private captureEntryBaseline(): void {
+    this.baselineEntryCounts.clear();
+    this.replayMatched.clear();
+    for (const [sessionId, list] of this.entries) {
+      for (const entry of list) {
+        const key = entryIdentity(sessionId, entry.at, entry.kind, entry.content);
+        this.baselineEntryCounts.set(key, (this.baselineEntryCounts.get(key) ?? 0) + 1);
+      }
+    }
+  }
+
+  /** True when this seq-less line corresponds to a snapshot entry not yet claimed. */
+  private claimBaselineEntry(sessionId: string, at: number, kind: string, content: string): boolean {
+    const key = entryIdentity(sessionId, at, kind, content);
+    const baseline = this.baselineEntryCounts.get(key) ?? 0;
+    const used = this.replayMatched.get(key) ?? 0;
+    if (used >= baseline) return false;
+    this.replayMatched.set(key, used + 1);
+    return true;
   }
 
   /** Loads snapshot items with read-side caps and stale-active migration. */

@@ -72,6 +72,21 @@ describe("JsonlSessionStore log replay", () => {
     }
   });
 
+  it("keeps identical seq-less entries when the log is the only source", async () => {
+    const { store, cleanup } = backendWithLog([
+      createOp("s-1"),
+      { op: "entry", sessionId: "s-1", at: 1_100, kind: "note", content: "same" },
+      { op: "entry", sessionId: "s-1", at: 1_100, kind: "note", content: "same" },
+    ]);
+    try {
+      const target = store();
+      await target.list({});
+      expect(await target.listEntries("s-1")).toHaveLength(2);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("applies complete, fail, and cancel ops with their summaries", async () => {
     const { store, cleanup } = backendWithLog([
       createOp("s-done"),
