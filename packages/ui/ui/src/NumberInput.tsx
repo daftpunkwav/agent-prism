@@ -49,77 +49,77 @@ export function NumberInput({
 }: NumberInputProps) {
   const [text, setText] = useState(String(value));
   const [invalid, setInvalid] = useState(false);
-  // Sync on actual value changes only, not on focus state: a rejected edit
-  // (invalid text kept on screen) leaves the external value untouched, and
-  // resetting on blur would erase the very text the user is supposed to fix.
-  const committedRef = useRef(value);
-  useEffect(() => {
-    if (committedRef.current !== value) {
-      committedRef.current = value;
-      setText(String(value));
-      setInvalid(false);
-    }
-  }, [value]);
+  // commit() runs from blur, which Escape fires synchronously. setState from
+  // the key handler has not rendered yet, so the text commit reads is this ref.
+  const textRef = useRef(text);
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
-  const restore = () => {
-    committedRef.current = value;
-    setText(String(value));
-    setInvalid(false);
+  const writeText = (next: string) => {
+    textRef.current = next;
+    setText(next);
   };
 
+  // Sync on actual value changes only. A rejected edit leaves the external
+  // value untouched, so this effect does not erase the text the user is fixing.
+  useEffect(() => {
+    writeText(String(value));
+    setInvalid(false);
+  }, [value]);
+
   const commit = () => {
-    const trimmed = text.trim();
+    const current = valueRef.current;
+    const trimmed = textRef.current.trim();
     const parsed = trimmed === "" ? NaN : Number(trimmed);
     if (Number.isFinite(parsed)) {
       const committed = integer ? Math.trunc(parsed) : parsed;
       const inRange = (min === undefined || committed >= min) && (max === undefined || committed <= max);
       if (inRange) {
         setInvalid(false);
-        setText(String(committed));
-        if (committed !== value) onChange(committed);
+        writeText(String(committed));
+        if (committed !== current) onChange(committed);
         return;
       }
     }
     // Invalid edit: keep the user's text on screen (never silently rewrite it
     // to the previous value), flag the field, and surface the caller's message.
     if (invalidMessage !== undefined) setInvalid(true);
-    else restore();
+    else {
+      writeText(String(current));
+      setInvalid(false);
+    }
   };
 
-  const field = (
-    <input
-      type="text"
-      inputMode="decimal"
-      className={className}
-      value={text}
-      placeholder={placeholder}
-      aria-label={ariaLabel}
-      aria-invalid={invalid || undefined}
-      disabled={disabled}
-      onChange={(e) => {
-        setText(e.target.value);
-        if (invalid) setInvalid(false);
-      }}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          (e.target as HTMLInputElement).blur();
-        }
-        if (e.key === "Escape") {
-          // Restore first, then blur: commit runs on the restored text and is a
-          // no-op, so discarding an edit never fires onChange.
-          restore();
-          (e.target as HTMLInputElement).blur();
-        }
-      }}
-    />
-  );
-
-  if (invalidMessage === undefined) return field;
   return (
     <span className="block w-full">
-      {field}
-      {invalid && (
+      <input
+        type="text"
+        inputMode="decimal"
+        className={className}
+        value={text}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        aria-invalid={invalid || undefined}
+        disabled={disabled}
+        onChange={(e) => {
+          writeText(e.target.value);
+          if (invalid) setInvalid(false);
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            (e.target as HTMLInputElement).blur();
+          }
+          if (e.key === "Escape") {
+            // Write the ref before blur: commit reads the ref, sees the committed
+            // value, and does not fire onChange.
+            writeText(String(valueRef.current));
+            setInvalid(false);
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+      />
+      {invalid && invalidMessage !== undefined && (
         <p role="alert" className="text-[11px] leading-snug text-destructive">
           {invalidMessage}
         </p>

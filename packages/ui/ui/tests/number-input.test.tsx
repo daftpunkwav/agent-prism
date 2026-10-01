@@ -94,9 +94,25 @@ describe("NumberInput", () => {
     const onChange = vi.fn();
     render(<NumberInput value={16} ariaLabel="tokens" onChange={onChange} />);
     const input = type("500");
+    // Real focus: blur() inside the key handler only commits when the element
+    // is the active element. fireEvent.focus does not do that.
+    (input as HTMLInputElement).focus();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(document.activeElement).not.toBe(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect((input as HTMLInputElement).value).toBe("16");
+  });
+
+  it("clears an invalid flag on Escape instead of committing the out-of-range text", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={16} min={0} max={100} ariaLabel="tokens" invalidMessage="out of range" onChange={onChange} />);
+    const input = type("5000");
+    (input as HTMLInputElement).focus();
     fireEvent.keyDown(input, { key: "Escape" });
     expect(onChange).not.toHaveBeenCalled();
     expect((input as HTMLInputElement).value).toBe("16");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(input.getAttribute("aria-invalid")).toBeNull();
   });
 
   it("syncs the display when the external value changes", () => {
