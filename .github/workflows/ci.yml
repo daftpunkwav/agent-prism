@@ -154,6 +154,58 @@ jobs:
 
       - run: pnpm audit --prod --audit-level high
 
+  # Bot reviews are a merge precondition with no exemptions: this job polls
+  # the pull request until both CodeRabbit and Sourcery have reviewed the
+  # head commit, and fails if they have not arrived. CodeRabbit posts review
+  # comments but no check run, so it cannot be required directly by the
+  # branch ruleset; this poll is the single enforcement point for both bots.
+  # The gate below folds the result in, so a missing bot review blocks merge.
+  review-gate:
+    name: bot reviews (CodeRabbit + Sourcery)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Wait for both bot reviews on the head commit
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 900))
+          while true; do
+            reviews="$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/reviews" \
+              --jq '.[] | ((.user.login // "") + " " + (.commit_id // ""))' 2>/dev/null || true)"
+            coderabbit=""
+            sourcery=""
+            while IFS= read -r line; do
+              [ -n "$line" ] || continue
+              login=${line% *}
+              commit=${line#* }
+              [ "$commit" = "$HEAD_SHA" ] || continue
+              case "${login//\[bot\]/}" in
+                coderabbitai*) coderabbit=done ;;
+                sourcery-ai*) sourcery=done ;;
+              esac
+            done <<< "$reviews"
+            if [ -n "$coderabbit" ] && [ -n "$sourcery" ]; then
+              echo "CodeRabbit and Sourcery both reviewed $HEAD_SHA"
+              exit 0
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              missing=""
+              [ -z "$coderabbit" ] && missing="CodeRabbit"
+              [ -z "$sourcery" ] && missing="${missing:+$missing, }Sourcery"
+              echo "::error title=Bot reviews missing::No review by $missing on $HEAD_SHA within 15 minutes. Install the GitHub App(s), then re-run this job or push a new commit."
+              exit 1
+            fi
+            sleep 20
+          done
+
   verify:
     # Windows is the reference platform. The restricted-token sandbox, the
     # process-runner suite, and the PowerShell 5.1 cold-start budgets in
@@ -418,7 +470,7 @@ jobs:
   # cancellation, so a cancelled run can never masquerade as green.
   gate:
     name: gate
-    needs: [conventions, changes, audit, verify, workflow-lint, secrets, smoke]
+    needs: [conventions, changes, audit, review-gate, verify, workflow-lint, secrets, smoke]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -430,13 +482,14 @@ jobs:
           CONVENTIONS: ${{ needs.conventions.result }}
           CHANGES: ${{ needs.changes.result }}
           AUDIT: ${{ needs.audit.result }}
+          REVIEW_GATE: ${{ needs.review-gate.result }}
           VERIFY: ${{ needs.verify.result }}
           WORKFLOW_LINT: ${{ needs.workflow-lint.result }}
           SECRETS: ${{ needs.secrets.result }}
           SMOKE: ${{ needs.smoke.result }}
         run: |
           set -euo pipefail
-          results="conventions=$CONVENTIONS changes=$CHANGES audit=$AUDIT verify=$VERIFY workflow_lint=$WORKFLOW_LINT gitleaks=$SECRETS smoke=$SMOKE"
+          results="conventions=$CONVENTIONS changes=$CHANGES audit=$AUDIT review_gate=$REVIEW_GATE verify=$VERIFY workflow_lint=$WORKFLOW_LINT gitleaks=$SECRETS smoke=$SMOKE"
           echo "$results"
           if grep -qE '=(failure|cancelled)' <<< "$results"; then
             echo "::error::one or more gates failed or were cancelled"
