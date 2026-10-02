@@ -21,7 +21,7 @@
     "@agentprism/contracts": "workspace:*",
     "@agentprism/harness": "workspace:*",
     "@agentprism/telemetry": "workspace:*",
-    "zod": "^4.1.5"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^24"
