@@ -33,15 +33,23 @@ function newRunId(idGen: IdGenerator = DEFAULT_ID_GEN): string {
  * (see isReusableWorkspaceName below); changing either bound must keep this inequality,
  * or fresh names stop being reusable.
  */
+/**
+ * Trims one trailing run of dots/whitespace linearly: the regex form `[.\s]+$`
+ * backtracks quadratically on a long run that is not at the string end, and
+ * labels are client-supplied.
+ */
+function trimTrailingDotsOrSpace(text: string): string {
+  let end = text.length;
+  while (end > 0 && (text[end - 1] === "." || /\s/.test(text[end - 1]!))) end -= 1;
+  return text.slice(0, end);
+}
+
 export function newWorkspaceName(label: string, clock: Clock = DEFAULT_CLOCK, idGen: IdGenerator = DEFAULT_ID_GEN): string {
-  const sanitized = label
-    .replaceAll(/[^\p{L}\p{N}._-]+/gu, "_")
-    .replace(/^[._\s]+/, "")
-    .replace(/[.\s]+$/, "")
-    .slice(0, 64)
-    // The truncation point may land on a ".": clean the tail again so Windows stripping trailing dots never drifts the registered name from the disk directory.
-    .replace(/[.\s]+$/, "");
-  const safe = sanitized === "" ? "workspace" : sanitized;
+  const collapsed = label.replaceAll(/[^\p{L}\p{N}._-]+/gu, "_").replace(/^[._\s]+/, "");
+  // The truncation point may land on a "." or whitespace: clean the tail after
+  // the cap so Windows stripping trailing dots never drifts the registered
+  // name from the disk directory.
+  const safe = trimTrailingDotsOrSpace(collapsed.slice(0, 64)) || "workspace";
   return `${safe}_${clock.now()}_${idGen.next().slice(0, 6)}`;
 }
 
