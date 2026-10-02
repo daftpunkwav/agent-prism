@@ -29,6 +29,32 @@ interface Section {
   lines: string[];
 }
 
+/**
+ * Parses one ATX header line: 1-6 leading `#`, whitespace, title, optional
+ * closing hash run. The regex form `(.+?)\s*#*\s*$` re-checks the whitespace/
+ * hash tail for every lazy expansion and degrades quadratically on long
+ * whitespace runs, so the line is walked manually. The corner where only a
+ * hash run follows the opening whitespace keeps one hash as the title, exactly
+ * like the lazy capture did.
+ */
+function parseHeaderLine(line: string): { level: number; title: string } | null {
+  let level = 0;
+  while (level < 6 && line[level] === "#") level += 1;
+  if (level === 0 || !/\s/.test(line[level] ?? "")) return null;
+  let start = level;
+  while (start < line.length && /\s/.test(line[start]!)) start += 1;
+  if (start >= line.length) return { level, title: "" };
+  let end = line.length;
+  while (end > start && /\s/.test(line[end - 1]!)) end -= 1;
+  let hashEnd = end;
+  while (hashEnd > start + 1 && line[hashEnd - 1] === "#") hashEnd -= 1;
+  if (hashEnd < end) {
+    end = hashEnd;
+    while (end > start && /\s/.test(line[end - 1]!)) end -= 1;
+  }
+  return { level, title: line.slice(start, end) };
+}
+
 /** Splits lines into header-delimited sections (preamble becomes level-7). */
 function splitSections(lines: string[]): Section[] {
   const sections: Section[] = [];
@@ -37,10 +63,10 @@ function splitSections(lines: string[]): Section[] {
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i] as string;
     if (/^(`{3,}|~{3,})/.test(line.trim())) inFence = !inFence;
-    const header = !inFence ? /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line) : null;
+    const header = !inFence ? parseHeaderLine(line) : null;
     if (header !== null) {
       if (current.lines.some((l) => l.trim() !== "") || current.title !== "") sections.push(current);
-      current = { level: header[1]?.length ?? 7, title: (header[2] ?? "").trim(), startLine: i + 1, lines: [line] };
+      current = { level: header.level, title: header.title.trim(), startLine: i + 1, lines: [line] };
     } else {
       current.lines.push(line);
     }

@@ -39,7 +39,10 @@ const FUNCTION_PATTERNS = [
   /^(\s*)(?:export\s+|async\s+|public\s+|private\s+|protected\s+|static\s+)*(?:def|function|fn|func)\s+([A-Za-z_$][\w$]*)/,
   /^(\s*)(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(/,
   /^(\s*)(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/,
-  /^(\s*)([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*\{?\s*$/,
+  // The tail groups the optional brace with the whitespace before it: two free
+  // `\s*` around an optional `\{` (`\s*\{?\s*$`) split the whitespace run every
+  // way and degrade quadratically on space-heavy lines.
+  /^(\s*)([A-Za-z_$][\w$]*)\s*\([^;{}]*\)(?:\s*\{)?\s*$/,
 ];
 
 /** `class Name`, `interface Name`, `type Name =`, `struct Name`, `enum Name`, `trait Name`. */

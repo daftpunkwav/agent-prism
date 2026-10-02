@@ -31,6 +31,20 @@ function hasIllegalPathChars(path: string): boolean {
   return false;
 }
 
+/** Trailing punctuation that is prose, not path: .,;:!?) ] } tails are stripped. */
+const TRAILING_PUNCT = ".,;:!?)]}";
+
+/**
+ * Trims one trailing punctuation run linearly: the regex form `[…]+$`
+ * backtracks quadratically on a long punctuation run that is not at the string
+ * end, and mention sources are arbitrary user prompt text.
+ */
+function withoutTrailingPunct(text: string): string {
+  let end = text.length;
+  while (end > 0 && TRAILING_PUNCT.includes(text[end - 1]!)) end -= 1;
+  return text.slice(0, end);
+}
+
 /**
  * Extracts all `@file` mentions from text in source order.
  * An `@` glued inside another token (email, decorator) is not a mention:
@@ -51,7 +65,7 @@ export function parseMentions(text: string): FileMention[] {
       out.push({ path, quoted: true, start: tokenStart, end: tokenStart + match[0].length - opener.length });
     } else if (plainBody !== undefined) {
       // Trailing punctuation is prose, not path: strip .,;:!?)] tails.
-      const path = plainBody.replace(/[.,;:!?)\]}]+$/, "");
+      const path = withoutTrailingPunct(plainBody);
       if (path === "" || path === "@") continue;
       const trimmed = match[0].length - opener.length - (plainBody.length - path.length);
       out.push({ path, quoted: false, start: tokenStart, end: tokenStart + trimmed });
