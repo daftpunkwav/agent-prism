@@ -29,7 +29,7 @@
     "@agentprism/session-query": "workspace:*",
     "@agentprism/session-telemetry": "workspace:*",
     "@agentprism/session-title": "workspace:*",
-    "zod": "^4.1.5"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@agentprism/session": "workspace:*",
