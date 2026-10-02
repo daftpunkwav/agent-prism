@@ -4,9 +4,16 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "packageManager": "pnpm@11.25.0",
+  "packageManager": "pnpm@12.8.1",
   "engines": {
-    "node": ">=20.9"
+    "node": ">=24.21.0 <25"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.21.0",
+      "onFail": "download"
+    }
   },
   "scripts": {
     "build": "pnpm -r build",

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js >= 20.9, from `engines` in `package.json`.
+- Node.js >= 24.21.0 (pinned to the 24 LTS line), from `engines` in `package.json`.
 - pnpm, workspace-managed. The `pnpm-workspace.yaml` globs are `apps/*` and
   `packages/*/*`.
 - A configured LLM provider before any real run. The backend starts without one, and runs
