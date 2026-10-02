@@ -22,6 +22,17 @@ export function isSafeWorkspaceSegment(name: string): boolean {
 }
 
 /**
+ * Trims one trailing underscore run. `x+$` backtracking degrades quadratically
+ * on a long underscore run that is not at the string end, so the trim walks the
+ * tail linearly instead.
+ */
+function trimTrailingUnderscores(text: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === "_") end -= 1;
+  return text.slice(0, end);
+}
+
+/**
  * Disk-safe file stem for a pipeline label (labels are unique within a run).
  * Unsafe characters collapse to `_`; a label with no safe characters left falls
  * back to a content hash so colliding columns can never share a file. Single
@@ -29,7 +40,7 @@ export function isSafeWorkspaceSegment(name: string): boolean {
  * two never drift on the on-disk name.
  */
 export function safeLogStem(label: string): string {
-  const cleaned = label.replace(/[^\p{L}\p{N}._-]+/gu, "_").replace(/^_+|_+$/g, "");
+  const cleaned = trimTrailingUnderscores(label.replace(/[^\p{L}\p{N}._-]+/gu, "_").replace(/^_+/, ""));
   if (cleaned !== "" && cleaned !== "." && isSafeWorkspaceSegment(cleaned)) return cleaned;
   // FNV-1a (no crypto dependency in this layer): collision-safe enough for a
   // per-run directory where labels are already unique.

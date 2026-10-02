@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   FINAL_ANSWER_JSON_SCHEMA,
   FINAL_ANSWER_RESPONSE_FORMAT,
+  jsonObjectCandidate,
   parseStructuredFinalAnswer,
   STRUCTURED_FINAL_KEYS,
 } from "../src/structured-output.js";
@@ -38,5 +39,18 @@ describe("structured-output", () => {
 
   it("rejects non-string file entries", () => {
     expect(parseStructuredFinalAnswer('{"plan":"p","files":[1],"how_to_run":"r"}')).toBeNull();
+  });
+});
+
+describe("jsonObjectCandidate", () => {
+  it("spans from the first brace to the last brace", () => {
+    expect(jsonObjectCandidate('noise {"a": 1} tail {"b": 2}')).toBe('{"a": 1} tail {"b": 2}');
+    expect(jsonObjectCandidate("{}")).toBe("{}");
+  });
+
+  it("returns null without a closing brace after the first brace", () => {
+    expect(jsonObjectCandidate("no braces")).toBeNull();
+    expect(jsonObjectCandidate("{broken json")).toBeNull();
+    expect(jsonObjectCandidate("}abc{")).toBeNull();
   });
 });

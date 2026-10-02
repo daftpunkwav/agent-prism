@@ -10,8 +10,7 @@
  */
 
 import { textFromContent } from "./llm-message.js";
-
-export const JSON_FENCE = /```(?:json|JSON)?\s*\n?(.*?)\n?\s*```/s;
+import { jsonObjectCandidate } from "./structured-output.js";
 
 const INJECTION_PATTERNS: RegExp[] = [
   /ignore\s+(?:all\s+)?previous\s+instructions/i,
@@ -38,10 +37,31 @@ function replaceAllPatterns(text: string, replacement: string): string {
   return result;
 }
 
+/**
+ * Extracts the body of the first fenced block (```…```, optional json/JSON info
+ * string), with surrounding whitespace trimmed. indexOf keeps the scan linear:
+ * the regex form's `\s*(.*?)\s*` around a lazy capture re-scans on every
+ * newline run when the closing fence is missing, degrading quadratically on
+ * hostile model output. Mirrors the replaced fence regex exactly: the info
+ * string is only recognized directly after the opening backticks.
+ */
+function extractFenceBody(text: string): string | null {
+  const open = text.indexOf("```");
+  if (open < 0) return null;
+  let cursor = open + 3;
+  if (text.startsWith("json", cursor) || text.startsWith("JSON", cursor)) cursor += 4;
+  while (cursor < text.length && /\s/.test(text[cursor]!)) cursor += 1;
+  const close = text.indexOf("```", cursor);
+  if (close < 0) return null;
+  let end = close;
+  while (end > cursor && /\s/.test(text[end - 1]!)) end -= 1;
+  return text.slice(cursor, end);
+}
+
 function stripJsonFence(text: string): string {
-  const match = JSON_FENCE.exec(text);
-  if (match?.[1] !== undefined) {
-    return match[1].trim();
+  const body = extractFenceBody(text);
+  if (body !== null) {
+    return body.trim();
   }
   const cleaned = text.replace(/^```(?:json|JSON)?\s*$/gm, "");
   return cleaned.trim();
@@ -67,9 +87,9 @@ export function sanitizePromptAdditions(additions: unknown): string {
 /** Extracts the JSON object section from model output and strips the fence. */
 export function sanitizeForJson(content: unknown): string {
   const text = textFromContent(content);
-  const match = /\{[\s\S]*\}/.exec(text);
-  if (match !== null) {
-    return stripJsonFence(match[0]);
+  const candidate = jsonObjectCandidate(text);
+  if (candidate !== null) {
+    return stripJsonFence(candidate);
   }
   return stripJsonFence(text);
 }
