@@ -20,6 +20,59 @@ permissions:
   contents: read
 
 jobs:
+  # Fastest gate first. The PR title becomes the subject of the squashed merge
+  # commit, so it is validated against the commit conventions before anything
+  # expensive runs. Dependabot titles are machine-generated and regularly
+  # exceed the 72-character budget, so the bot is held to the type prefix only.
+  conventions:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          pattern='^(Revert(: | "))?(feat|fix|docs|refactor|chore|test|perf)(\([a-z0-9-]+\))?!?: '
+          if ! [[ "$PR_TITLE" =~ $pattern ]]; then
+            echo "::error title=Invalid PR title::Expected \"<type>(<scope>): <subject>\" with type one of feat/fix/docs/refactor/chore/test/perf"
+            exit 1
+          fi
+          if [[ "$PR_ACTOR" == "dependabot[bot]" ]]; then
+            exit 0
+          fi
+          # Revert titles repeat the original subject plus the Revert marker,
+          # so they can legitimately exceed the 72-character budget.
+          if [[ "$PR_TITLE" != Revert* && "${#PR_TITLE}" -gt 72 ]]; then
+            echo "::error title=PR title too long::${#PR_TITLE}/72 characters; the title becomes the squashed commit subject"
+            exit 1
+          fi
+          subject="${PR_TITLE#*: }"
+          if ! [[ "$subject" =~ ^[a-z0-9] ]]; then
+            echo "::error title=Invalid PR title::Subject must start with a lowercase letter or digit"
+            exit 1
+          fi
+          if [[ "$subject" == *. ]]; then
+            echo "::error title=Invalid PR title::Subject must not end with a period"
+            exit 1
+          fi
+
+  # Supply-chain gate over the lockfile: production dependencies with known
+  # high or critical advisories block the PR. pnpm audits pnpm-lock.yaml
+  # against the registry, so no install is needed. Development-only advisories
+  # stay out of scope here; the deferred dev majors are tracked in
+  # .github/dependabot.yml instead.
+  audit:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - run: pnpm audit --prod --audit-level high
+
   verify:
     # Windows is the reference platform. The restricted-token sandbox, the
     # process-runner suite, and the PowerShell 5.1 cold-start budgets in
