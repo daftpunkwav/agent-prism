@@ -33,3 +33,17 @@ updates:
         dependency-type: "development"
       npm-production:
         dependency-type: "production"
+    # Development-dependency majors that break typecheck/tests are deferred to a
+    # dedicated migration round instead of blocking the grouped PR red
+    # (@types/node 26 NonSharedBuffer broke typecheck:tests on 2026-10-02).
+    ignore:
+      - dependency-name: "@types/node"
+        versions: [">=25"]
+      - dependency-name: "typescript"
+        versions: [">=6"]
+      - dependency-name: "vitest"
+        versions: [">=5"]
+      - dependency-name: "@vitest/coverage-v8"
+        versions: [">=5"]
+      - dependency-name: "eslint"
+        versions: [">=10"]
