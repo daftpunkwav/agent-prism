@@ -18,7 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^24"
+    "@types/node": "^26"
   },
   "dependencies": {
     "@agentprism/contracts": "workspace:*",

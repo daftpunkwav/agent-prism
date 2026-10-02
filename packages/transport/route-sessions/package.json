@@ -24,6 +24,6 @@
   },
   "devDependencies": {
     "@agentprism/session": "workspace:*",
-    "@types/node": "^24"
+    "@types/node": "^26"
   }
 }

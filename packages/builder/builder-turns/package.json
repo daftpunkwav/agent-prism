@@ -25,6 +25,6 @@
   },
   "devDependencies": {
     "@agentprism/harness": "workspace:*",
-    "@types/node": "^24"
+    "@types/node": "^26"
   }
 }

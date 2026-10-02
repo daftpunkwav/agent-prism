@@ -29,6 +29,6 @@
     "@agentprism/harness": "workspace:*",
     "@agentprism/session": "workspace:*",
     "@agentprism/tool-builtins": "workspace:*",
-    "@types/node": "^24"
+    "@types/node": "^26"
   }
 }

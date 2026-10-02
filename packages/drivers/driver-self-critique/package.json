@@ -26,6 +26,6 @@
   "devDependencies": {
     "@agentprism/runtime": "workspace:*",
     "@agentprism/tool-registry": "workspace:*",
-    "@types/node": "^24"
+    "@types/node": "^26"
   }
 }

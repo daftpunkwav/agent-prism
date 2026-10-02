@@ -30,6 +30,6 @@
     "@agentprism/runtime": "workspace:*",
     "@agentprism/telemetry": "workspace:*",
     "@agentprism/tool-builtins": "workspace:*",
-    "@types/node": "^24"
+    "@types/node": "^26"
   }
 }

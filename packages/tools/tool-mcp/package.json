@@ -21,7 +21,7 @@
     "@agentprism/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24",
+    "@types/node": "^26",
     "@agentprism/tool-registry": "workspace:*"
   }
 }
