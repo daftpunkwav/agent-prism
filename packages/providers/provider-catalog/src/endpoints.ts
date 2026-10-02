@@ -40,16 +40,27 @@ export function resolveCredentialReference(
 }
 
 /**
+ * Trims one trailing slash run linearly: the regex form `\/+$` backtracks
+ * quadratically on a long slash run that is not at the string end, and base
+ * URLs are user-supplied.
+ */
+function withoutTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end -= 1;
+  return value.slice(0, end);
+}
+
+/**
  * Normalizes a base URL for connection fingerprinting: trims, strips trailing
  * slashes, lowercases scheme + host only. Path/query stay case-sensitive per RFC,
  * so two gateways differing only in path case never share a fingerprint (and a key
  * is never inherited across them).
  */
 export function normalizeBaseUrl(rawUrl: string): string {
-  const trimmed = rawUrl.trim().replace(/\/+$/, "");
+  const trimmed = withoutTrailingSlashes(rawUrl.trim());
   try {
     const parsed = new URL(trimmed);
-    return `${parsed.protocol}//${parsed.host}${parsed.pathname}${parsed.search}${parsed.hash}`.replace(/\/+$/, "");
+    return withoutTrailingSlashes(`${parsed.protocol}//${parsed.host}${parsed.pathname}${parsed.search}${parsed.hash}`);
   } catch {
     // Unparseable input: keep the fingerprint deterministic without violating
     // the path case-sensitivity contract — lowercase only the scheme+authority
@@ -71,10 +82,10 @@ export function normalizeBaseUrl(rawUrl: string): string {
 const TERMINAL_API_PATHS = ["/chat/completions", "/responses", "/messages"];
 
 function stripTerminalApiPath(baseUrl: string): string {
-  const trimmed = baseUrl.replace(/\/+$/, "");
+  const trimmed = withoutTrailingSlashes(baseUrl);
   for (const suffix of TERMINAL_API_PATHS) {
     if (trimmed === suffix || trimmed.endsWith(suffix)) {
-      const stripped = trimmed.slice(0, trimmed.length - suffix.length).replace(/\/+$/, "");
+      const stripped = withoutTrailingSlashes(trimmed.slice(0, trimmed.length - suffix.length));
       if (stripped !== "") return stripped;
     }
   }
