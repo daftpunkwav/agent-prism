@@ -58,7 +58,10 @@ export class DenyListSandboxPolicy implements SandboxPolicy {
     if (command.replace(/\s+/g, "").toLowerCase().includes(":(){:|:&};")) {
       return "Blocked by sandbox policy: fork bomb";
     }
-    const segments = command.split(/\s*(?:&&|\|\||[;|\n])\s*/);
+    // No `\s*` padding around the separators: the class-based split with
+    // surrounding `\s*` degrades quadratically on long whitespace runs (the
+    // whitespace is irrelevant — reviewSegment trims each segment anyway).
+    const segments = command.split(/&&|\|\||[;|\n]/);
     for (const segment of segments) {
       const verdict = reviewSegment(segment, platform);
       if (verdict !== null) return verdict;
