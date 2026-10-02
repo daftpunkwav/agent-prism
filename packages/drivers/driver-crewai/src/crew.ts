@@ -11,6 +11,7 @@
  * arena's neutral ports; not vendor code.
  */
 
+import { jsonObjectCandidate } from "@agentprism/contracts";
 import {
   CREW_COMPLETE_KEYWORD,
   CREW_ROLES,
@@ -71,10 +72,10 @@ export function parseManagerAssignment(text: string): ManagerAssignment | null {
       complete: true,
     };
   }
-  const match = /\{[\s\S]*\}/.exec(text);
-  if (match === null) return null;
+  const candidate = jsonObjectCandidate(text);
+  if (candidate === null) return null;
   try {
-    const parsed = JSON.parse(match[0]) as Record<string, unknown>;
+    const parsed = JSON.parse(candidate) as Record<string, unknown>;
     const role = typeof parsed["role"] === "string" ? parsed["role"] : "";
     if (role !== "researcher" && role !== "coder" && role !== "reviewer") return null;
     return {

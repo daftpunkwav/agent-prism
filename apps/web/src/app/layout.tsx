@@ -36,8 +36,9 @@ const themeScript = `(function(){try{var t=localStorage.getItem('${THEME_STORAGE
 
 // Applies the stored skin before the first paint; only registered non-default ids take
 // effect, so a stale or unknown stored value silently falls back to the default look.
-const skinAllowlist = JSON.stringify(SKINS);
-const skinScript = `(function(){try{var s=localStorage.getItem('${SKIN_STORAGE_KEY}');if(s&&s!=='${DEFAULT_SKIN}'&&${skinAllowlist}.indexOf(s)>=0){document.documentElement.dataset.theme=s;}}catch(e){}})();`;
+// The allowlist travels in a data attribute (HTML-escaped, parsed by the script)
+// instead of being interpolated into the script source.
+const skinScript = `(function(){try{var s=localStorage.getItem('${SKIN_STORAGE_KEY}');if(s&&s!=='${DEFAULT_SKIN}'){var a=JSON.parse(document.documentElement.dataset.skinAllowlist||'[]');if(a.indexOf(s)>=0){document.documentElement.dataset.theme=s;}}}catch(e){}})();`;
 
 export default async function RootLayout({
   children,
@@ -52,6 +53,7 @@ export default async function RootLayout({
     <html
       lang={locale}
       data-locale={locale}
+      data-skin-allowlist={JSON.stringify(SKINS)}
       suppressHydrationWarning
       className={`${GeistSans.variable} ${GeistMono.variable}`}
     >

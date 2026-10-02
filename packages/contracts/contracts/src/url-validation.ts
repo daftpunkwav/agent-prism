@@ -168,7 +168,12 @@ export function validateLlmBaseUrl(rawUrl: string): string {
       throw new UrlValidationError("http base_url is only allowed for localhost / 127.0.0.1 / ::1");
     }
   }
-  return rawUrl.trim().replace(/\/+$/, "");
+  const value = rawUrl.trim();
+  // Linear trailing-slash trim: `\/+$` backtracking degrades quadratically on a
+  // long slash run that is not at the string end.
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end -= 1;
+  return value.slice(0, end);
 }
 
 /** Validates a model-supplied fetch target (http/https, allowed host). Returns the parsed URL. */

@@ -52,17 +52,29 @@ export const FINAL_ANSWER_RESPONSE_FORMAT: LlmResponseFormat = {
 };
 
 /**
+ * Extracts the substring from the first `{` to the last `}` as a JSON.parse
+ * candidate (null when no such span exists). indexOf keeps the scan linear:
+ * the regex form `/\{[\s\S]*\}/` restarts from every `{` when the text has no
+ * closing brace, degrading quadratically on hostile model output.
+ */
+export function jsonObjectCandidate(text: string): string | null {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  return start >= 0 && end > start ? text.slice(start, end + 1) : null;
+}
+
+/**
  * Extracts and validates a structured final answer from raw model output.
  * Returns the canonical JSON string when every required key is present with a
  * usable value; null otherwise (caller keeps the raw answer, fail-open).
  */
 export function parseStructuredFinalAnswer(raw: unknown): string | null {
   const text = textFromContent(raw);
-  const match = /\{[\s\S]*\}/.exec(text);
-  if (match === null) return null;
+  const candidate = jsonObjectCandidate(text);
+  if (candidate === null) return null;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(match[0]);
+    parsed = JSON.parse(candidate);
   } catch {
     return null;
   }

@@ -87,7 +87,11 @@ async function executeGlob(workspace: ToolWorkspace, args: ToolArgs): Promise<To
     } catch {
       return { result: `Error: invalid glob pattern: ${pattern}`, fileDiff: null, ok: false, code: "workspace_error" };
     }
-    const basePrefix = basePath === "" ? "" : `${basePath.replace(/\/+$/, "")}/`;
+    // Linear trailing-slash trim: `\/+$` backtracking degrades quadratically on
+    // a long slash run that is not at the string end.
+    let base = basePath;
+    while (base.endsWith("/")) base = base.slice(0, -1);
+    const basePrefix = base === "" ? "" : `${base}/`;
     const files = view.fs.listFiles(basePath, { recursive: true }).filter((file) => matcher.test(file) || matcher.test(`${basePrefix}${file}`));
     if (files.length === 0) {
       return { result: `No files match ${pattern}`, fileDiff: null, ok: true };

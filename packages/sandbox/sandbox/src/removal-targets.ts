@@ -42,7 +42,12 @@ export const PROTECTED_WINDOWS_ROOTS = new Set(["c:\\", "c:\\windows", "c:\\wind
  */
 export function normalizeRemovalTarget(target: string): string {
   const bare = withoutWindowsDevicePrefix(target);
-  const stripped = bare.replace(/[/\\]+$/, "");
+  // Linear trailing-separator trim: `[/\\]+$` backtracking degrades
+  // quadratically on a long separator run that is not at the string end, and
+  // targets come straight from shell command tokens.
+  let end = bare.length;
+  while (end > 0 && (bare[end - 1] === "/" || bare[end - 1] === "\\")) end -= 1;
+  const stripped = bare.slice(0, end);
   if (stripped === "") return "/";
   if (/^[a-zA-Z]:$/.test(stripped)) return `${stripped.toLowerCase()}\\`;
   const drive = /^([a-zA-Z]):[\\/]/.exec(bare);

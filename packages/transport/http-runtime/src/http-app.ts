@@ -13,7 +13,7 @@
  * port ownership belongs to apps/server (owns listen/serve).
  */
 
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import type { Context, MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
@@ -83,16 +83,20 @@ export interface HttpApplicationDeps {
 }
 
 /**
- * Constant-time token comparison: SHA-256 digests compared via timingSafeEqual
- * so the request-boundary check does not leak token content or length through
- * an early-exit string compare (the server may be exposed on the LAN).
- * Digest equality is equivalent to string equality (collision-resistant hash),
- * and fixed-length digests sidestep timingSafeEqual's equal-length requirement.
+ * Constant-time token comparison: timingSafeEqual over the raw UTF-8 bytes, so
+ * the request-boundary check does not leak token content through an early-exit
+ * string compare (the server may be exposed on the LAN). A length mismatch
+ * burns the same one-buffer comparison work before failing, keeping the two
+ * branches indistinguishable by timing.
  */
 function tokensMatch(presented: string, expected: string): boolean {
-  const presentedDigest = createHash("sha256").update(presented, "utf-8").digest();
-  const expectedDigest = createHash("sha256").update(expected, "utf-8").digest();
-  return timingSafeEqual(presentedDigest, expectedDigest);
+  const presentedBytes = Buffer.from(presented, "utf-8");
+  const expectedBytes = Buffer.from(expected, "utf-8");
+  if (presentedBytes.length !== expectedBytes.length) {
+    timingSafeEqual(expectedBytes, expectedBytes);
+    return false;
+  }
+  return timingSafeEqual(presentedBytes, expectedBytes);
 }
 
 /**

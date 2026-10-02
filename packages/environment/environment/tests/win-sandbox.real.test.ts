@@ -52,7 +52,7 @@ describe.skipIf(process.platform !== "win32")("windows restricted-token sandbox 
 
   function capabilityAceCount(root: string, sid: string): number {
     const out = execSync(`icacls "${root}"`, { encoding: "utf-8" });
-    return (out.match(new RegExp(`${sid.replace(/\$/g, "\\$")}:`, "g")) ?? []).length;
+    return (out.match(new RegExp(`${sid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:`, "g")) ?? []).length;
   }
 
   function aclText(target: string): string {

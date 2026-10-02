@@ -145,10 +145,23 @@ const PATH_PATTERN = /(?<![\w@.-])(?:\.{1,2}\/)?(?:[\w@.-]+\/)+[\w@.-]*[\w@-]/g;
 const FILENAME_PATTERN = /\b[a-zA-Z_][\w-]*\.(?:ts|tsx|js|jsx|json|md|txt|html|css|py|go|rs|java|yml|yaml|toml|sh|ps1|log|csv)\b/g;
 const URL_PATTERN = /https?:\/\/[^\s)\]"'`]+/g;
 /** Trailing sentence punctuation that is not part of the URL itself. */
-const URL_TRAILING_PUNCT = /[.,;:!?\u3002\uFF0C\uFF1B\uFF1A\uFF01\uFF1F]+$/;
+const URL_TRAILING_PUNCT = ".,;:!?。，；：！？";
 const COMMAND_PATTERN = /`([^`\n]+)`/g;
 /** Letter units need a word boundary: without it "25 steps" reads as "25 s". */
-const NUMBER_PATTERN = /(?:\d+\.\d+|\d+)(?:\s?(?:%|(?:ms|kb|mb|gb|px|s|x)\b))?/gi;
+// Single-branch fraction: `\d+\.\d+|\d+` makes the digit run ambiguous on
+// fraction-less input and backtracks quadratically over long digit runs.
+const NUMBER_PATTERN = /(?:\d+(?:\.\d+)?)(?:\s?(?:%|(?:ms|kb|mb|gb|px|s|x)\b))?/gi;
+
+/**
+ * Trims one trailing punctuation run linearly: a `[…]+$` regex backtracks
+ * quadratically on a long punctuation run that is not at the string end, and
+ * answers are arbitrary model output.
+ */
+function withoutTrailingPunct(text: string): string {
+  let end = text.length;
+  while (end > 0 && URL_TRAILING_PUNCT.includes(text[end - 1]!)) end -= 1;
+  return text.slice(0, end);
+}
 
 /** Extracts objective entities from one answer, each list deduplicated in order.
  *  Later kinds run on text with earlier kinds' matches removed, so a directory
@@ -157,7 +170,7 @@ export function extractAnswerEntities(text: string): AnswerEntities {
   const dedupe = (items: string[]) => Array.from(new Set(items.map((item) => item.trim()).filter((item) => item !== "")));
   const stripMatches = (source: string, pattern: RegExp) =>
     source.replace(pattern, (matched) => " ".repeat(matched.length));
-  const urls = dedupe((text.match(URL_PATTERN) ?? []).map((url) => url.replace(URL_TRAILING_PUNCT, "")));
+  const urls = dedupe((text.match(URL_PATTERN) ?? []).map(withoutTrailingPunct));
   const withoutUrls = stripMatches(text, URL_PATTERN);
   const dirPaths = withoutUrls.match(PATH_PATTERN) ?? [];
   const withoutDirPaths = stripMatches(withoutUrls, PATH_PATTERN);
