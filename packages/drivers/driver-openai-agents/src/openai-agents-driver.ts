@@ -261,6 +261,11 @@ function parseToolArgs(raw: unknown): Record<string, unknown> {
 
 /** SDK agent names are identifiers: column labels may carry spaces or punctuation. */
 function agentName(label: string): string {
-  const cleaned = label.replace(/[^A-Za-z0-9_-]/g, "_").replace(/^_+|_+$/g, "");
+  const collapsed = label.replace(/[^A-Za-z0-9_-]/g, "_").replace(/^_+/, "");
+  // Linear trailing-underscore trim: `x+$` backtracking degrades quadratically
+  // on a long underscore run that is not at the string end.
+  let end = collapsed.length;
+  while (end > 0 && collapsed[end - 1] === "_") end -= 1;
+  const cleaned = collapsed.slice(0, end);
   return cleaned === "" ? "agent" : cleaned;
 }
