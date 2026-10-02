@@ -38,6 +38,27 @@ export interface SafeFetchOptions {
 }
 
 /**
+ * Finds the attribute value declared in the first tag opened by `openMarker`,
+ * searching linearly: the body between the marker and the next ">" (what the
+ * replaced `<meta[^>]+charset…>` form matched) is matched in isolation, so a
+ * prefix with many openers and no attribute can no longer degrade the scan
+ * quadratically. The haystack must already be lowercased; the pattern's
+ * literals must be lowercase accordingly.
+ */
+function declaredInFirstTag(lower: string, openMarker: string, attribute: RegExp): string | undefined {
+  let pos = 0;
+  for (;;) {
+    const open = lower.indexOf(openMarker, pos);
+    if (open < 0) return undefined;
+    pos = open + openMarker.length;
+    const bodyEnd = lower.indexOf(">", pos);
+    if (bodyEnd < 0) return undefined;
+    const match = attribute.exec(lower.slice(pos, bodyEnd));
+    if (match !== null) return match[1];
+  }
+}
+
+/**
  * Resolves the TextDecoder label for a body: BOM first, then the Content-Type
  * charset parameter, then a meta/XML declaration sniffed in the first bytes.
  * Charset declarations are ASCII, so scanning a byte-wise projection of the
@@ -52,9 +73,10 @@ export function resolveCharset(contentType: string | null | undefined, prefix: U
   if (fromHeader !== undefined) return normalizeCharset(fromHeader);
   let ascii = "";
   for (const byte of prefix.subarray(0, CHARSET_SNIFF_BYTES)) ascii += String.fromCharCode(byte);
+  const lower = ascii.toLowerCase();
   const declared =
-    /<meta[^>]+charset\s*=\s*["']?([\w-]+)/i.exec(ascii)?.[1] ??
-    /<\?xml[^>]+encoding\s*=\s*["']([\w-]+)/i.exec(ascii)?.[1];
+    declaredInFirstTag(lower, "<meta", /charset\s*=\s*["']?([\w-]+)/) ??
+    declaredInFirstTag(lower, "<?xml", /encoding\s*=\s*["']([\w-]+)/);
   return declared === undefined ? "utf-8" : normalizeCharset(declared);
 }
 

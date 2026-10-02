@@ -47,11 +47,13 @@ export function utf8Bytes(text: string): number {
 
 /** Model-safe artifact infix derived from the tool name (kebab, bounded). */
 function sanitizeSource(source: string): string {
-  const clean = source
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return (clean === "" ? "tool" : clean).slice(0, 24);
+  const collapsed = source.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "");
+  // Linear trailing-dash trim: `x+$` backtracking degrades quadratically on a
+  // long dash run that is not at the string end.
+  let end = collapsed.length;
+  while (end > 0 && collapsed[end - 1] === "-") end -= 1;
+  const clean = collapsed.slice(0, end).slice(0, 24);
+  return clean === "" ? "tool" : clean;
 }
 
 /** Basename of a workspace-relative spill listing entry. */

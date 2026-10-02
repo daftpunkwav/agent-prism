@@ -45,16 +45,63 @@ function decodeEntities(text: string): string {
 }
 
 /**
+ * Raw-content elements removed whole (case-insensitive) before tag stripping.
+ */
+const RAW_TAGS = ["script", "style", "noscript"] as const;
+
+/**
+ * Removes comments and raw-content elements in one linear scan. The regex form
+ * (`/<script[\s\S]*?<\/script>/gi`) restarts its lazy scan at every opener
+ * occurrence, so markup with many openers and sparse closers degrades
+ * quadratically, and it silently missed closers with trailing whitespace or
+ * attributes (`</script >`), leaving script bodies in the text projection.
+ * indexOf walks each region once; a tag name ends at whitespace, "/", or ">"
+ * per HTML tokenization, and an unterminated block swallows the rest.
+ */
+function removeRawBlocks(html: string): string {
+  const lower = html.toLowerCase();
+  let out = "";
+  let pos = 0;
+  for (;;) {
+    const open = lower.indexOf("<", pos);
+    if (open < 0) break;
+    let tag: (typeof RAW_TAGS)[number] | null = null;
+    for (const candidate of RAW_TAGS) {
+      if (!lower.startsWith(`<${candidate}`, open)) continue;
+      const next = lower[open + candidate.length + 1];
+      if (next === undefined || next === ">" || next === "/" || /\s/.test(next)) tag = candidate;
+      break;
+    }
+    if (tag === null && lower.startsWith("<!--", open)) {
+      const close = lower.indexOf("-->", open + 4);
+      out += `${html.slice(pos, open)} `;
+      if (close < 0) return out;
+      pos = close + 3;
+      continue;
+    }
+    if (tag === null) {
+      out += `${html.slice(pos, open)}<`;
+      pos = open + 1;
+      continue;
+    }
+    const openEnd = lower.indexOf(">", open);
+    const close = openEnd < 0 ? -1 : lower.indexOf(`</${tag}`, openEnd + 1);
+    out += `${html.slice(pos, open)} `;
+    if (close < 0) return out;
+    const closeEnd = lower.indexOf(">", close);
+    if (closeEnd < 0) return out;
+    pos = closeEnd + 1;
+  }
+  return out + html.slice(pos);
+}
+
+/**
  * Converts HTML to readable text: scripts/styles/noscript removed, block tags
  * become line breaks, remaining tags stripped, entities and whitespace normalized.
  * Deliberately simple — the model reads a text projection, not a browser rendering.
  */
 export function htmlToText(html: string): string {
-  const stripped = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
+  const stripped = removeRawBlocks(html)
     .replace(/<\/(p|div|section|article|header|footer|li|tr|h[1-6]|blockquote|pre)>/gi, "\n")
     .replace(/<(br|hr)\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, " ");
@@ -67,9 +114,26 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
-/** Extracts the first <title>, entity-decoded and whitespace-collapsed; empty when absent. */
+/**
+ * Extracts the first <title>, entity-decoded and whitespace-collapsed; empty
+ * when absent. indexOf keeps the scan linear (the regex form restarted at every
+ * `<title` occurrence when no closer existed) and, like removeRawBlocks, treats
+ * whitespace/"/"/">" as the tag-name boundary.
+ */
 export function extractHtmlTitle(html: string): string {
-  const raw = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? "";
+  const lower = html.toLowerCase();
+  let raw = "";
+  const open = lower.indexOf("<title");
+  if (open >= 0) {
+    const next = lower[open + 6];
+    if (next === undefined || next === ">" || next === "/" || /\s/.test(next)) {
+      const openEnd = lower.indexOf(">", open);
+      const close = openEnd < 0 ? -1 : lower.indexOf("</title", openEnd + 1);
+      if (close >= 0) {
+        raw = html.slice(openEnd + 1, close);
+      }
+    }
+  }
   const title = decodeEntities(raw.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
   return title === "" ? "" : title.length > 200 ? `${title.slice(0, 200)}…` : title;
 }
