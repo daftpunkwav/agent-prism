@@ -14,6 +14,11 @@ env:
   # Deterministic pnpm store location is not needed; caching keys off the lockfile.
   CI: "true"
 
+# Neither job needs write access: artifact upload authenticates with its own
+# runtime token, so GITHUB_TOKEN stays read-only for checkout and nothing else.
+permissions:
+  contents: read
+
 jobs:
   verify:
     # Windows is the reference platform. The restricted-token sandbox, the
