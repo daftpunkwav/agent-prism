@@ -188,8 +188,8 @@ jobs:
               commit=${line#* }
               [ "$commit" = "$HEAD_SHA" ] || continue
               case "${login//\[bot\]/}" in
-                coderabbitai*) coderabbit=done ;;
-                sourcery-ai*) sourcery=done ;;
+                coderabbitai*) coderabbit=yes ;;
+                sourcery-ai*) sourcery=yes ;;
               esac
             done <<< "$reviews"
             if [ -n "$coderabbit" ] && [ -n "$sourcery" ]; then
