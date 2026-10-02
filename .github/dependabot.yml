@@ -2,9 +2,7 @@
 #
 # The github-actions entry is the important one: every "uses:" in the workflows is
 # pinned to a full commit SHA, and this is what keeps those pins current without
-# anyone hand-editing them. Tag-based refs (dtolnay/rust-toolchain@<version>,
-# taiki-e/install-action@<branch>) are intentionally left unpinned - pinning those
-# would freeze the toolchain and break the msrv/stable gates.
+# anyone hand-editing them.
 #
 # Updates are grouped so the required-approval flow stays reviewable.
 version: 2
