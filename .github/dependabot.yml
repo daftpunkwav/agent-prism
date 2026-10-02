@@ -1,0 +1,37 @@
+# Dependabot configuration.
+#
+# The github-actions entry is the important one: every "uses:" in the workflows is
+# pinned to a full commit SHA, and this is what keeps those pins current without
+# anyone hand-editing them. Tag-based refs (dtolnay/rust-toolchain@<version>,
+# taiki-e/install-action@<branch>) are intentionally left unpinned - pinning those
+# would freeze the toolchain and break the msrv/stable gates.
+#
+# Updates are grouped so the required-approval flow stays reviewable.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "javascript"
+    groups:
+      npm-development:
+        dependency-type: "development"
+      npm-production:
+        dependency-type: "production"
