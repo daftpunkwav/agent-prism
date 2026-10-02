@@ -91,7 +91,7 @@ pnpm -r build      # build every package, including Next.js
 
 ## Development
 
-Requirements are Node.js >= 20.9 and pnpm. The workspace members are listed in
+Requirements are Node.js >= 24.21.0 (pinned to the 24 LTS line) and pnpm. The workspace members are listed in
 `pnpm-workspace.yaml`.
 
 ```bash

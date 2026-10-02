@@ -88,7 +88,7 @@ pnpm -r build      # build every package, including Next.js
 
 ## 开发
 
-要求 Node.js >= 20.9 与 pnpm。workspace 成员列于 `pnpm-workspace.yaml`。
+要求 Node.js >= 24.21.0（钉在 24 LTS 线）与 pnpm。workspace 成员列于 `pnpm-workspace.yaml`。
 
 ```bash
 pnpm build         # build all packages

@@ -4,7 +4,7 @@
 
 ## 前置条件
 
-- Node.js >= 20.9，见 `package.json` 的 `engines`。
+- Node.js >= 24.21.0（钉在 24 LTS 线），见 `package.json` 的 `engines`。
 - pnpm，workspace 管理。`pnpm-workspace.yaml` 的 globs 为 `apps/*` 与
   `packages/*/*`。
 - 任何真实 run 之前需配置一个 LLM provider。后端没有 provider 也能启动，run 会在
