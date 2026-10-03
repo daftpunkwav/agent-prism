@@ -9,7 +9,7 @@ on:
     # retrigger the whole pipeline. edited: a title fixed in the UI after a
     # conventions failure has to re-run the check - without it the stale red
     # gate deadlocks the merge, since a title edit never moves the head sha.
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled, unlabeled]
   workflow_dispatch:
 
 concurrency:
@@ -37,6 +37,7 @@ env:
 # runtime token, so GITHUB_TOKEN stays read-only for checkout and nothing else.
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   # Fastest gate first. The PR title becomes the subject of the squashed merge
@@ -248,13 +249,48 @@ jobs:
             sleep 20
           done
 
+  full-approval:
+    name: full-approval (maintainer key)
+    # Two-tier CI: cheap gates run on every event; the expensive tier below
+    # runs only after a maintainer attaches the ci-approved label. This
+    # guard FAILS (never pends) while unapproved, so the aggregate gate is
+    # red with an actionable message instead of a hanging check. GitHub
+    # forbids approving your own pull request, which makes an approval
+    # review unusable as the key for a solo maintainer - a label carries
+    # the same consent and works on the maintainer's own PRs too. Removing
+    # the label re-arms the gate (unlabeled re-triggers this workflow).
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate maintainer approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "non-PR event ($EVENT): full CI runs unconditionally"
+            exit 0
+          fi
+          if gh api "repos/$REPO/pulls/$PR_NUMBER" \
+              --jq '[.labels[].name] | index("ci-approved") != null' | grep -q true; then
+            echo "ci-approved label present: tier-2 unblocked"
+            exit 0
+          fi
+          echo "::error title=Full CI awaiting approval::Tier-1 results are above; attach the ci-approved label to run the full suite (tier 2)."
+          exit 1
+
   verify:
     # Windows is the reference platform. The restricted-token sandbox, the
     # process-runner suite, and the PowerShell 5.1 cold-start budgets in
     # vitest.config.ts are Windows-specific: another runner would skip the
     # security-relevant sandbox cases and drop coverage under the gate.
-    needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    needs: [changes, full-approval]
+    if: >-
+      needs.full-approval.result == 'success' &&
+      (needs.changes.outputs.docs_only != 'true' || github.event.action == 'labeled')
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -430,7 +466,7 @@ jobs:
     # Boots the real host binary and probes it over HTTP, so the composition root,
     # the listener, and the read contracts are exercised outside the test harness.
     # Needs verify, so it is skipped wherever verify is skipped (docs-only PRs).
-    needs: verify
+    needs: [verify, full-approval]
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -512,7 +548,7 @@ jobs:
   # cancellation, so a cancelled run can never masquerade as green.
   gate:
     name: gate
-    needs: [conventions, changes, audit, review-gate, verify, workflow-lint, secrets, smoke]
+    needs: [conventions, changes, audit, review-gate, verify, workflow-lint, secrets, smoke, full-approval]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -529,9 +565,10 @@ jobs:
           WORKFLOW_LINT: ${{ needs.workflow-lint.result }}
           SECRETS: ${{ needs.secrets.result }}
           SMOKE: ${{ needs.smoke.result }}
+          FULL_APPROVAL: ${{ needs.full-approval.result }}
         run: |
           set -euo pipefail
-          results="conventions=$CONVENTIONS changes=$CHANGES audit=$AUDIT review_gate=$REVIEW_GATE verify=$VERIFY workflow_lint=$WORKFLOW_LINT gitleaks=$SECRETS smoke=$SMOKE"
+          results="conventions=$CONVENTIONS changes=$CHANGES audit=$AUDIT review_gate=$REVIEW_GATE verify=$VERIFY workflow_lint=$WORKFLOW_LINT gitleaks=$SECRETS smoke=$SMOKE full_approval=$FULL_APPROVAL"
           echo "$results"
           if grep -qE '=(failure|cancelled)' <<< "$results"; then
             echo "::error::one or more gates failed or were cancelled"
