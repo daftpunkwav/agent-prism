@@ -1,4 +1,4 @@
 {
-  "$comment": "Banned dependencies. Keys are npm package names as pnpm-lock.yaml records them in its packages section; the checker scans the full lockfile (transitive included), so a ban here blocks any path of arrival. Extend with a reason - a ban without one will be questioned at review.",
+  "$comment": "Banned dependencies. Keys are npm package names as pnpm-lock.yaml records them in its packages section; the checker scans the full lockfile (transitive included), so a ban here blocks any path of arrival. Extend with a reason - a ban without one will be questioned at review. Advisory acceptance (vulnerabilities that are accepted rather than bans) lives in package.json pnpm.auditConfig.ignoreGhsas - pnpm's native mechanism, documented here because package.json cannot carry comments: GHSA-vfj7-8cjw-p6xm (braces ReDoS) is accepted as a build-time transitive of the lint toolchain with no runtime entry point; re-check on the next eslint bump.",
   "npm": {}
 }
