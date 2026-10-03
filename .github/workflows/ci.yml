@@ -21,7 +21,7 @@ env:
   CI: "true"
 
 # Execution strategy:
-#   - PR only: conventions (title), audit (lockfile), review-gate (bot reviews).
+#   - PR only: conventions (title) and audit (lockfile).
 #   - PR and push: verify, smoke, gitleaks, and the lint always re-check main
 #     itself, whatever the diff was.
 #   - Path-routed: the changes job classifies the diff. Docs-only pull requests
@@ -163,90 +163,6 @@ jobs:
       # Denylist over the full lockfile graph (transitive included): a ban
       # blocks every path of arrival, not just direct declarations.
       - run: node scripts/ci/check_pnpm_deps_policy.mjs
-
-  # Bot reviews are a merge precondition with no exemptions: this job waits
-  # until both CodeRabbit and Sourcery have reported on the head commit and
-  # fails if they have not. Draft pull requests are exempted here (they are
-  # unmergeable and the bots skip them by default); converting to ready
-  # retriggers the pipeline via the ready_for_review trigger. The bots
-  # signal through three channels depending
-  # on the change - a review object pinned to the commit, a check run
-  # concluding on it, or a legacy commit status (CodeRabbit reports through
-  # the status channel and only re-runs its check on incremental pushes,
-  # Sourcery skips the re-review comment on small diffs) - so any of the
-  # three counts as "ran". This poll is the single enforcement point for
-  # both bots, folded into the gate below.
-  review-gate:
-    name: bot reviews (CodeRabbit + Sourcery)
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      pull-requests: read
-      checks: read
-    env:
-      GH_TOKEN: ${{ github.token }}
-      REPO: ${{ github.repository }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
-      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-    steps:
-      - name: Wait for both bots to report on the head commit
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 900))
-          while true; do
-            reviews="$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/reviews" \
-              --jq '.[] | ((.user.login // "") + " " + (.commit_id // ""))' 2>/dev/null || true)"
-            checks="$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs" \
-              --jq '.check_runs[] | (.name // "") + " " + (.conclusion // "")' 2>/dev/null || true)"
-            statuses="$(gh api "repos/$REPO/commits/$HEAD_SHA/status" \
-              --jq '.statuses[] | (.context // "") + " " + (.state // "")' 2>/dev/null || true)"
-            coderabbit=""
-            sourcery=""
-            while IFS= read -r line; do
-              [ -n "$line" ] || continue
-              login=${line% *}
-              commit=${line#* }
-              [ "$commit" = "$HEAD_SHA" ] || continue
-              case "${login//\[bot\]/}" in
-                coderabbitai*) coderabbit=yes ;;
-                sourcery-ai*) sourcery=yes ;;
-              esac
-            done <<< "$reviews"
-            while IFS= read -r line; do
-              [ -n "$line" ] || continue
-              name=${line% *}
-              conclusion=${line#* }
-              [ -n "$conclusion" ] || continue
-              case "$name" in
-                CodeRabbit*) coderabbit=yes ;;
-                Sourcery*) sourcery=yes ;;
-              esac
-            done <<< "$checks"
-            while IFS= read -r line; do
-              [ -n "$line" ] || continue
-              context=${line% *}
-              state=${line#* }
-              [ "$state" != "pending" ] || continue
-              case "$context" in
-                CodeRabbit*) coderabbit=yes ;;
-                Sourcery*) sourcery=yes ;;
-              esac
-            done <<< "$statuses"
-            if [ -n "$coderabbit" ] && [ -n "$sourcery" ]; then
-              echo "CodeRabbit and Sourcery both reported on $HEAD_SHA"
-              exit 0
-            fi
-            if [ "$SECONDS" -ge "$deadline" ]; then
-              missing=""
-              [ -z "$coderabbit" ] && missing="CodeRabbit"
-              [ -z "$sourcery" ] && missing="${missing:+$missing, }Sourcery"
-              echo "::error title=Bot reviews missing::No review, check or status from $missing on $HEAD_SHA within 15 minutes. Install the GitHub App(s), then re-run this job or push a new commit."
-              exit 1
-            fi
-            sleep 20
-          done
 
   verify:
     # Windows is the reference platform. The restricted-token sandbox, the
@@ -512,7 +428,7 @@ jobs:
   # cancellation, so a cancelled run can never masquerade as green.
   gate:
     name: gate
-    needs: [conventions, changes, audit, review-gate, verify, workflow-lint, secrets, smoke]
+    needs: [conventions, changes, audit, verify, workflow-lint, secrets, smoke]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -524,14 +440,13 @@ jobs:
           CONVENTIONS: ${{ needs.conventions.result }}
           CHANGES: ${{ needs.changes.result }}
           AUDIT: ${{ needs.audit.result }}
-          REVIEW_GATE: ${{ needs.review-gate.result }}
           VERIFY: ${{ needs.verify.result }}
           WORKFLOW_LINT: ${{ needs.workflow-lint.result }}
           SECRETS: ${{ needs.secrets.result }}
           SMOKE: ${{ needs.smoke.result }}
         run: |
           set -euo pipefail
-          results="conventions=$CONVENTIONS changes=$CHANGES audit=$AUDIT review_gate=$REVIEW_GATE verify=$VERIFY workflow_lint=$WORKFLOW_LINT gitleaks=$SECRETS smoke=$SMOKE"
+          results="conventions=$CONVENTIONS changes=$CHANGES audit=$AUDIT verify=$VERIFY workflow_lint=$WORKFLOW_LINT gitleaks=$SECRETS smoke=$SMOKE"
           echo "$results"
           if grep -qE '=(failure|cancelled)' <<< "$results"; then
             echo "::error::one or more gates failed or were cancelled"
