@@ -290,7 +290,7 @@ jobs:
     needs: [changes, full-approval]
     if: >-
       needs.full-approval.result == 'success' &&
-      (needs.changes.outputs.docs_only != 'true' || github.event.action == 'labeled')
+      (needs.changes.outputs.docs_only != 'true' || (github.event.action == 'labeled' && github.event.label.name == 'ci-approved'))
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
