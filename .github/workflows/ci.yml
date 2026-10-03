@@ -133,7 +133,7 @@ jobs:
               # because the tests now execute against different versions.
               */package.json|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|scripts/ci/dependency-policy.json|scripts/ci/check_pnpm_deps_policy.mjs) deps=true ;;
             esac
-          done < <(git diff --name-only "$BASE...HEAD")
+          done < <(git diff --no-renames --name-only "$BASE...HEAD")
           {
             echo "docs_only=$docs_only"
             echo "deps=$deps"
