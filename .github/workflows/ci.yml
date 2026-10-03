@@ -154,32 +154,41 @@ jobs:
 
       - run: pnpm audit --prod --audit-level high
 
-  # Bot reviews are a merge precondition with no exemptions: this job polls
-  # the pull request until both CodeRabbit and Sourcery have reviewed the
-  # head commit, and fails if they have not arrived. CodeRabbit posts review
-  # comments but no check run, so it cannot be required directly by the
-  # branch ruleset; this poll is the single enforcement point for both bots.
-  # The gate below folds the result in, so a missing bot review blocks merge.
+  # Bot reviews are a merge precondition with no exemptions: this job waits
+  # until both CodeRabbit and Sourcery have reported on the head commit and
+  # fails if they have not. The bots signal through three channels depending
+  # on the change - a review object pinned to the commit, a check run
+  # concluding on it, or a legacy commit status (CodeRabbit reports through
+  # the status channel and only re-runs its check on incremental pushes,
+  # Sourcery skips the re-review comment on small diffs) - so any of the
+  # three counts as "ran". This poll is the single enforcement point for
+  # both bots, folded into the gate below.
   review-gate:
     name: bot reviews (CodeRabbit + Sourcery)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
+      contents: read
       pull-requests: read
+      checks: read
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
-      - name: Wait for both bot reviews on the head commit
+      - name: Wait for both bots to report on the head commit
         run: |
           set -euo pipefail
           deadline=$((SECONDS + 900))
           while true; do
             reviews="$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/reviews" \
               --jq '.[] | ((.user.login // "") + " " + (.commit_id // ""))' 2>/dev/null || true)"
+            checks="$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs" \
+              --jq '.check_runs[] | (.name // "") + " " + (.conclusion // "")' 2>/dev/null || true)"
+            statuses="$(gh api "repos/$REPO/commits/$HEAD_SHA/status" \
+              --jq '.statuses[] | (.context // "") + " " + (.state // "")' 2>/dev/null || true)"
             coderabbit=""
             sourcery=""
             while IFS= read -r line; do
@@ -192,15 +201,35 @@ jobs:
                 sourcery-ai*) sourcery=yes ;;
               esac
             done <<< "$reviews"
+            while IFS= read -r line; do
+              [ -n "$line" ] || continue
+              name=${line% *}
+              conclusion=${line#* }
+              [ -n "$conclusion" ] || continue
+              case "$name" in
+                CodeRabbit*) coderabbit=yes ;;
+                Sourcery*) sourcery=yes ;;
+              esac
+            done <<< "$checks"
+            while IFS= read -r line; do
+              [ -n "$line" ] || continue
+              context=${line% *}
+              state=${line#* }
+              [ "$state" != "pending" ] || continue
+              case "$context" in
+                CodeRabbit*) coderabbit=yes ;;
+                Sourcery*) sourcery=yes ;;
+              esac
+            done <<< "$statuses"
             if [ -n "$coderabbit" ] && [ -n "$sourcery" ]; then
-              echo "CodeRabbit and Sourcery both reviewed $HEAD_SHA"
+              echo "CodeRabbit and Sourcery both reported on $HEAD_SHA"
               exit 0
             fi
             if [ "$SECONDS" -ge "$deadline" ]; then
               missing=""
               [ -z "$coderabbit" ] && missing="CodeRabbit"
               [ -z "$sourcery" ] && missing="${missing:+$missing, }Sourcery"
-              echo "::error title=Bot reviews missing::No review by $missing on $HEAD_SHA within 15 minutes. Install the GitHub App(s), then re-run this job or push a new commit."
+              echo "::error title=Bot reviews missing::No review, check or status from $missing on $HEAD_SHA within 15 minutes. Install the GitHub App(s), then re-run this job or push a new commit."
               exit 1
             fi
             sleep 20
