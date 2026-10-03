@@ -23,17 +23,21 @@ env:
   CI: "true"
 
 # Execution strategy:
-#   - PR only: conventions (title) and audit (lockfile).
-#   - PR and push: verify, smoke, gitleaks, and the lint always re-check main
-#     itself, whatever the diff was.
+#   - PR only: conventions (title).
+#   - PR and push: verify, smoke, and the lint always re-check main itself,
+#     whatever the diff was.
+#   - Supply-chain and credential scans (pnpm audit + denylist, gitleaks) live
+#     in security.yml: no path filtering, re-run on every event plus a weekly
+#     schedule, aggregated into the security-gate check.
 #   - Path-routed: the changes job classifies the diff. Docs-only pull requests
-#     skip verify/smoke, dependency diffs trigger audit, and .github edits run
-#     the workflow lint. Classification is fail-open: an unrecognized path is
-#     treated as code, so an unknown file can never sneak past a gate.
-#   - gate is the single required status check. It runs last, passes only when
-#     every job that ran succeeded, treats skipped jobs as legitimately absent,
-#     and fails on cancellation so a cancelled run can never masquerade as
-#     green. Adding or removing jobs never touches the branch ruleset.
+#     skip verify/smoke, and .github edits run the workflow lint.
+#     Classification is fail-open: an unrecognized path is treated as code, so
+#     an unknown file can never sneak past a gate.
+#   - gate summarizes this workflow for the merge rules. It always runs,
+#     passes only when every job that ran succeeded (skipped areas are the
+#     path filtering above working as intended) and fails on cancellation, so
+#     a cancelled run can never masquerade as green. The merge rules also
+#     require security-gate (security.yml); job changes never touch them.
 #
 # Neither job needs write access: artifact upload authenticates with its own
 # runtime token, so GITHUB_TOKEN stays read-only for checkout and nothing else.
@@ -91,7 +95,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       docs_only: ${{ steps.shortcut.outputs.docs_only || steps.classify.outputs.docs_only }}
-      deps: ${{ steps.shortcut.outputs.deps || steps.classify.outputs.deps }}
       workflows: ${{ steps.shortcut.outputs.workflows || steps.classify.outputs.workflows }}
     steps:
       - name: Classify as all-changed (push, workflow_dispatch)
@@ -100,7 +103,6 @@ jobs:
         run: |
           {
             echo "docs_only=false"
-            echo "deps=true"
             echo "workflows=true"
           } >> "$GITHUB_OUTPUT"
 
@@ -119,7 +121,6 @@ jobs:
         run: |
           set -euo pipefail
           docs_only=true
-          deps=false
           workflows=false
           while IFS= read -r f; do
             case "$f" in
@@ -131,40 +132,13 @@ jobs:
             case "$f" in
               # Editing the pipeline must never let the pipeline skip itself.
               .github/*) workflows=true ;;
-              # Manifest or lockfile moves: audit, and verify reruns too,
-              # because the tests now execute against different versions.
-              */package.json|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|scripts/ci/dependency-policy.json|scripts/ci/check_pnpm_deps_policy.mjs) deps=true ;;
             esac
           done < <(git diff --no-renames --name-only "$BASE...HEAD")
           {
             echo "docs_only=$docs_only"
-            echo "deps=$deps"
             echo "workflows=$workflows"
           } >> "$GITHUB_OUTPUT"
-          echo "docs_only=$docs_only deps=$deps workflows=$workflows"
-
-  # Supply-chain gate over the lockfile: production dependencies with known
-  # high or critical advisories block the PR. pnpm audits pnpm-lock.yaml
-  # against the registry, so no install is needed. Development-only advisories
-  # stay out of scope here; the deferred dev majors are tracked in
-  # .github/dependabot.yml instead.
-  audit:
-    if: github.event_name == 'pull_request' && needs.changes.outputs.deps == 'true'
-    needs: changes
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-
-      - run: pnpm audit --prod --audit-level high
-
-      # Denylist over the full lockfile graph (transitive included): a ban
-      # blocks every path of arrival, not just direct declarations.
-      - run: node scripts/ci/check_pnpm_deps_policy.mjs
+          echo "docs_only=$docs_only workflows=$workflows"
 
   verify:
     # Windows is the reference platform. The restricted-token sandbox, the
@@ -313,37 +287,6 @@ jobs:
           tar -xzf /tmp/zizmor.tar.gz -C /usr/local/bin
           zizmor --persona=pedantic --min-severity=medium .github/workflows/
 
-  # Platform secret scanning covers pushes, but it can be bypassed at push
-  # time and it does not gate pull requests. gitleaks scans the full history
-  # on every event, so a secret added and removed inside a pull request is
-  # still caught. The only allowlist entry is the intentional sk-shaped
-  # placeholder used by the provider-catalog masking tests (.gitleaks.toml).
-  secrets:
-    name: gitleaks (secret scan)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Full history: a secret added and removed within a PR must still
-          # be caught, which a shallow checkout cannot see.
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Install gitleaks
-        run: |
-          V=8.30.1
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_linux_x64.tar.gz" -o /tmp/gitleaks.tgz
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_checksums.txt" -o /tmp/checksums.txt
-          grep "gitleaks_${V}_linux_x64.tar.gz" /tmp/checksums.txt | sed "s|gitleaks_${V}_linux_x64.tar.gz|/tmp/gitleaks.tgz|" | sha256sum -c -
-          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
-          /tmp/gitleaks version
-
-      - name: Scan full history
-        run: /tmp/gitleaks detect --source . --redact --verbose --exit-code 1
-
   smoke:
     # Boots the real host binary and probes it over HTTP, so the composition root,
     # the listener, and the read contracts are exercised outside the test harness.
@@ -424,13 +367,14 @@ jobs:
             exit $code
           }
 
-  # Merge-time summary: the branch ruleset requires exactly this check. It
-  # always runs, passes when every job that ran succeeded (skipped areas are
-  # the path filtering above working as intended) and fails on any failure or
-  # cancellation, so a cancelled run can never masquerade as green.
+  # Merge-time summary: the merge rules require this check (alongside
+  # security-gate from security.yml). It always runs, passes when every job
+  # that ran succeeded (skipped areas are the path filtering above working as
+  # intended) and fails on any failure or cancellation, so a cancelled run
+  # can never masquerade as green.
   gate:
     name: gate
-    needs: [conventions, changes, audit, verify, workflow-lint, secrets, smoke]
+    needs: [conventions, changes, verify, workflow-lint, smoke]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -441,14 +385,12 @@ jobs:
         env:
           CONVENTIONS: ${{ needs.conventions.result }}
           CHANGES: ${{ needs.changes.result }}
-          AUDIT: ${{ needs.audit.result }}
           VERIFY: ${{ needs.verify.result }}
           WORKFLOW_LINT: ${{ needs.workflow-lint.result }}
-          SECRETS: ${{ needs.secrets.result }}
           SMOKE: ${{ needs.smoke.result }}
         run: |
           set -euo pipefail
-          results="conventions=$CONVENTIONS changes=$CHANGES audit=$AUDIT verify=$VERIFY workflow_lint=$WORKFLOW_LINT gitleaks=$SECRETS smoke=$SMOKE"
+          results="conventions=$CONVENTIONS changes=$CHANGES verify=$VERIFY workflow_lint=$WORKFLOW_LINT smoke=$SMOKE"
           echo "$results"
           if grep -qE '=(failure|cancelled)' <<< "$results"; then
             echo "::error::one or more gates failed or were cancelled"
