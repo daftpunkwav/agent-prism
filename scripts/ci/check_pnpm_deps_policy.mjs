@@ -18,14 +18,14 @@ const policy = JSON.parse(readFileSync(policyPath, "utf8"));
 const banned = policy.npm ?? {};
 
 const lock = readFileSync(lockPath, "utf8");
-const packagesSection = lock.split(/^packages:\s*$/m)[1];
-if (!packagesSection) {
-  console.error("pnpm-lock.yaml has no packages section - parse failure?");
-  process.exit(1);
-}
 
+// Scan the whole lockfile, not a single `packages:` section: v9 locks hold
+// per-importer packages AND a global snapshots section (two `packages:`
+// blocks in multi-importer workspaces), and every entry key is a real
+// package regardless of which section lists it. A denylist wants the
+// superset.
 const found = new Set();
-for (const match of packagesSection.matchAll(/^ {2}'?\/?(@?[^@\s]+)@/gm)) {
+for (const match of lock.matchAll(/^ {2}'?\/?(@?[^@\s]+)@/gm)) {
   found.add(match[1]);
 }
 if (found.size === 0) {
