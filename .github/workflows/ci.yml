@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+    # ready_for_review: the review bots skip drafts by default, so the gate
+    # cannot clear while a PR is a draft and the conversion to ready must
+    # retrigger the whole pipeline. edited: a title fixed in the UI after a
+    # conventions failure has to re-run the check - without it the stale red
+    # gate deadlocks the merge, since a title edit never moves the head sha.
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
 
 concurrency:
@@ -156,7 +162,10 @@ jobs:
 
   # Bot reviews are a merge precondition with no exemptions: this job waits
   # until both CodeRabbit and Sourcery have reported on the head commit and
-  # fails if they have not. The bots signal through three channels depending
+  # fails if they have not. Draft pull requests are exempted here (they are
+  # unmergeable and the bots skip them by default); converting to ready
+  # retriggers the pipeline via the ready_for_review trigger. The bots
+  # signal through three channels depending
   # on the change - a review object pinned to the commit, a check run
   # concluding on it, or a legacy commit status (CodeRabbit reports through
   # the status channel and only re-runs its check on incremental pushes,
@@ -165,7 +174,7 @@ jobs:
   # both bots, folded into the gate below.
   review-gate:
     name: bot reviews (CodeRabbit + Sourcery)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
