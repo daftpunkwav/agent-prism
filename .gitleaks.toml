@@ -1,0 +1,10 @@
+# gitleaks configuration. The default rule set stays enabled; the only
+# allowlist entry carries the intentional, obviously-fake "sk-" placeholder
+# that exists to exercise the credential-masking preview in the
+# provider-catalog tests. It is not a real credential.
+[extend]
+useDefault = true
+
+[allowlist]
+  description = "Intentional placeholder keys in test fixtures"
+  regexes = ['''sk-1234567890''']
