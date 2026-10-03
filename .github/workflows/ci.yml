@@ -4,11 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
-    # ready_for_review: the review bots skip drafts by default, so the gate
-    # cannot clear while a PR is a draft and the conversion to ready must
-    # retrigger the whole pipeline. edited: a title fixed in the UI after a
-    # conventions failure has to re-run the check - without it the stale red
-    # gate deadlocks the merge, since a title edit never moves the head sha.
+    # ready_for_review: the pull_request event does not fire on the
+    # draft-to-ready conversion unless the type is listed here, so the
+    # pipeline - and the gate the merge rules require - would never report
+    # on a PR that started as a draft. edited: a title fixed in the UI
+    # after a conventions failure has to re-run the check - without it the
+    # stale red gate deadlocks the merge, since a title edit never moves
+    # the head sha.
     types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
 
