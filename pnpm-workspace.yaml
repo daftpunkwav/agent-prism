@@ -35,3 +35,11 @@ ignoredOptionalDependencies:
   - '@anthropic-ai/claude-agent-sdk-linux-x64-musl'
   - '@anthropic-ai/claude-agent-sdk-win32-arm64'
   - '@anthropic-ai/claude-agent-sdk-win32-x64'
+
+# Accepted advisories (pnpm's native audit ignore). GHSA-vfj7-8cjw-p6xm
+# (braces ReDoS) is a build-time transitive of the lint toolchain with no
+# runtime entry point; re-check on the next eslint bump. See also
+# scripts/ci/dependency-policy.json for the never-wanted-package denylist.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-vfj7-8cjw-p6xm
