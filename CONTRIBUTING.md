@@ -42,6 +42,17 @@ What each gate owns and what a failure means:
 same gates on `windows-latest`, plus a `smoke` job that boots the real server binary
 and probes it over HTTP.
 
+## Git hooks (optional)
+
+The repo ships a fast staged-only hook (web ESLint, mirroring the CI lint
+gate). Enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Everything else stays in CI on purpose - the hook is a convenience, not a gate.
+
 ## Tests
 
 - Run from the repo root: `pnpm test`, or `pnpm test:coverage` for the
