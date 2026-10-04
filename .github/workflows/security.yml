@@ -1,0 +1,118 @@
+# Security: supply-chain and credential gates, split from ci.yml so a leak or
+# a vulnerable dependency fails its own workflow instead of being buried in
+# the build gate noise.
+#
+# No path filtering on purpose: vulnerabilities appear without any code change
+# (a new GHSA against an already-pinned version), so both audits re-run on
+# every push/PR and on a weekly schedule that re-scans main and catches drift
+# even when nothing was pushed all week.
+#
+# The gitleaks binary is checksum-verified from the official release; every
+# "uses:" is pinned to a full commit SHA (same policy as ci.yml).
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Platform secret scanning covers pushes, but it can be bypassed at push
+  # time and it does not gate pull requests. gitleaks scans the full history
+  # on every event, so a secret added and removed inside a pull request is
+  # still caught. The only allowlist entry is the intentional sk-shaped
+  # placeholder used by the provider-catalog masking tests (.gitleaks.toml).
+  secrets:
+    name: secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: a secret added and removed within a PR must still
+          # be caught, which a shallow checkout cannot see.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          V=8.30.1
+          curl -sSfL --retry 3 -o /tmp/gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_linux_x64.tar.gz"
+          curl -sSfL --retry 3 -o /tmp/checksums.txt \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_checksums.txt"
+          grep "gitleaks_${V}_linux_x64.tar.gz" /tmp/checksums.txt \
+            | sed "s|gitleaks_${V}_linux_x64.tar.gz|/tmp/gitleaks.tgz|" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+          /tmp/gitleaks version
+
+      - name: Scan full history
+        run: /tmp/gitleaks detect --source . --redact --verbose --exit-code 1
+
+  # Supply-chain gate over the lockfile: production dependencies with known
+  # high or critical advisories block the PR. pnpm audits pnpm-lock.yaml
+  # against the registry, so no install is needed. Development-only advisories
+  # stay out of scope here; the deferred dev majors are tracked in
+  # .github/dependabot.yml instead.
+  audit:
+    name: dependency audit + policy (pnpm)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Pin the runtime the denylist script runs under instead of riding the
+      # runner image's rotating default Node.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - run: pnpm audit --prod --audit-level high
+
+      # Denylist over the full lockfile graph (transitive included): a ban
+      # blocks every path of arrival, not just direct declarations.
+      - run: node scripts/ci/check_pnpm_deps_policy.mjs
+
+  # Merge-time summary: the merge rules require this check (alongside gate
+  # from ci.yml). It always runs, passes when everything that ran succeeded
+  # and fails on any failure or cancellation, so a cancelled run can never
+  # masquerade as green.
+  security-gate:
+    name: security-gate
+    needs: [secrets, audit]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Evaluate security gate results
+        env:
+          SECRETS: ${{ needs.secrets.result }}
+          AUDIT: ${{ needs.audit.result }}
+        run: |
+          set -euo pipefail
+          results="secrets=$SECRETS audit=$AUDIT"
+          echo "$results"
+          if grep -qE '=(failure|cancelled)' <<< "$results"; then
+            echo "::error::one or more security gates failed or were cancelled"
+            exit 1
+          fi
+          echo "all security gates passed"
