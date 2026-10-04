@@ -105,6 +105,7 @@ jobs:
             echo "docs_only=false"
             echo "workflows=true"
           } >> "$GITHUB_OUTPUT"
+          echo "docs_only=false workflows=true (push/dispatch: all changed)"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: github.event_name == 'pull_request'
