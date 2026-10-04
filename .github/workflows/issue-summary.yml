@@ -11,7 +11,9 @@
 # if the digest drifts. Authenticate with a user-owned fine-grained PAT
 # carrying the "Copilot Requests" account permission and nothing else
 # (classic PATs are not supported by the Copilot CLI; repository secret
-# COPILOT_PAT). The v1 backend this starter shipped with - the GitHub
+# COPILOT_PAT). Only an OWNER, MEMBER, or COLLABORATOR reaches inference:
+# anyone can open an issue, and each run spends that PAT owner's Copilot
+# entitlement. The v1 backend this starter shipped with - the GitHub
 # Models inference endpoint - was retired on
 # 2026-07-30, which is why the run soft-skips while the secret is absent
 # instead of failing on every issue.
@@ -35,6 +37,12 @@ permissions: {}
 
 jobs:
   summary:
+    # Skip the runner entirely for untrusted authors. A step-level check
+    # would still bill a job for every drive-by issue.
+    if: >-
+      github.event.issue.author_association == 'OWNER' ||
+      github.event.issue.author_association == 'MEMBER' ||
+      github.event.issue.author_association == 'COLLABORATOR'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
