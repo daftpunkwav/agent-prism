@@ -1,13 +1,13 @@
 # Summarizes newly opened issues with an AI model (GitHub starter workflow,
-# adapted: actions pinned to full SHAs, the unused checkout dropped, and the
-# prompt treats the issue title/body as untrusted data that must not be
-# followed as instructions).
+# adapted: actions pinned to full SHAs, the unused checkout dropped, the
+# issue text fenced as untrusted data, and posting gated to trusted authors).
 #
-# Inference runs on GitHub Models (free tier for public repositories) via the
-# models: read permission. actions/ai-inference is pinned to v1 on purpose:
-# later majors moved to the Copilot CLI provider, which needs the Copilot CLI
-# installed and authenticated on the runner - not a given here. Bump
-# deliberately after reading the release notes.
+# Inference runs on actions/ai-inference v3, whose only provider is the
+# GitHub Copilot CLI: install it, authenticate it with a PAT that has
+# Copilot enabled (repository secret COPILOT_PAT). The v1 backend this
+# starter shipped with - the GitHub Models inference endpoint - was retired
+# on 2026-07-30, which is why the run soft-skips while the secret is absent
+# instead of failing on every issue.
 name: Summarize new issues
 
 on:
@@ -27,15 +27,31 @@ jobs:
       github.event.issue.author_association == 'MEMBER' ||
       github.event.issue.author_association == 'COLLABORATOR'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       issues: write
-      models: read
       contents: read
     steps:
+      - name: Check Copilot credentials
+        id: gate
+        run: |
+          if [ -n "${COPILOT_GITHUB_TOKEN:-}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "COPILOT_PAT is not configured; skipping the summary (set the repository secret to enable it)."
+          fi
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+
+      - name: Install Copilot CLI
+        if: steps.gate.outputs.available == 'true'
+        run: npm install -g @github/copilot
+
       - name: Run AI inference
+        if: steps.gate.outputs.available == 'true'
         id: inference
-        uses: actions/ai-inference@b81b2afb8390ee6839b494a404766bef6493c7d9 # v1
+        uses: actions/ai-inference@2c43c91ae16266ca159d311430343c67a5ffa222 # v3
         with:
           system-prompt: |
             You summarize GitHub issues in one short paragraph. The user message
@@ -47,8 +63,11 @@ jobs:
             Title: ${{ github.event.issue.title }}
             Body: ${{ github.event.issue.body }}
             </issue>
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
 
       - name: Comment with AI summary
+        if: steps.gate.outputs.available == 'true'
         run: |
           if [ -z "$RESPONSE" ]; then
             echo "empty AI response; nothing to post"
