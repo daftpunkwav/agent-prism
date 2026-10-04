@@ -12,6 +12,8 @@ dependencies:
           - "pnpm-lock.yaml"
           - "**/package.json"
           - "pnpm-workspace.yaml"
+          - ".github/workflows/**"
+          - ".github/dependabot.yml"
 
 server:
   - changed-files:
