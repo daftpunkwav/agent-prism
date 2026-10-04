@@ -1,14 +1,17 @@
 # Triage pull requests by applying labels based on the files changed
 # (configuration: .github/labeler.yml).
 #
-# Runs on pull_request, not pull_request_target: labels are derived from the
-# pull request's own branch context, so an untrusted fork never gets a
-# privileged workflow run. sync-labels keeps labels honest when files are
-# reverted during review.
+# pull_request_target is the trigger the actions/labeler documentation
+# prescribes for fork support: the run executes in the base repository with
+# a write token, but the labeler only reads the changed-file list through
+# the API and writes labels - it never checks out or executes pull-request
+# code, so untrusted forks stay safe. sync-labels keeps labels honest when
+# files are reverted during review.
 name: Labeler
 
 on:
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
