@@ -58,11 +58,16 @@ jobs:
         # so the <issue> marker cannot be escaped early, and cap the fields
         # so an oversized issue cannot burn the model budget.
         run: |
+          # Bash substring expansion truncates on character boundaries (the
+          # runner locale is UTF-8), unlike head -c which would split a
+          # multi-byte character in half.
+          title="${ISSUE_TITLE:0:500}"
+          body="${ISSUE_BODY:0:8000}"
           {
             printf '<issue>\nTitle: '
-            printf '%s' "$ISSUE_TITLE" | sed -e 's|</issue>|</ issue>|g' | head -c 500
+            printf '%s' "$title" | sed -e 's|</issue>|</ issue>|g'
             printf '\n\n'
-            printf '%s' "$ISSUE_BODY" | sed -e 's|</issue>|</ issue>|g' | head -c 8000
+            printf '%s' "$body" | sed -e 's|</issue>|</ issue>|g'
             printf '\n</issue>\n'
           } > .issue-prompt.txt
         env:
