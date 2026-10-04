@@ -3,14 +3,16 @@
 # untrusted data).
 #
 # Inference runs on actions/ai-inference v3, whose only provider is the
-# GitHub Copilot CLI. The CLI comes from the committed lockfile under
-# .github/copilot-cli/ (npm ci), so the whole dependency tree - including
-# transitive packages running beside COPILOT_PAT - is pinned and reviewed
-# instead of resolved from registry ranges on every run. Authenticate with
-# a user-owned fine-grained PAT carrying the "Copilot Requests" account
-# permission and nothing else (classic PATs are not supported by the
-# Copilot CLI; repository secret COPILOT_PAT). The v1 backend this starter
-# shipped with - the GitHub Models inference endpoint - was retired on
+# GitHub Copilot CLI. The published packages use a custom license string
+# ("SEE LICENSE IN LICENSE.md") that Trivy cannot map to an SPDX identifier,
+# so committing the lockfile fails the Sourcery review check as an unknown
+# license. The linux-x64 tarball that matches this ubuntu-latest runner is
+# downloaded at runtime instead, pinned by version and sha512, and rejected
+# if the digest drifts. Authenticate with a user-owned fine-grained PAT
+# carrying the "Copilot Requests" account permission and nothing else
+# (classic PATs are not supported by the Copilot CLI; repository secret
+# COPILOT_PAT). The v1 backend this starter shipped with - the GitHub
+# Models inference endpoint - was retired on
 # 2026-07-30, which is why the run soft-skips while the secret is absent
 # instead of failing on every issue.
 name: Summarize new issues
@@ -26,8 +28,10 @@ env:
   LANG: C.UTF-8
   LC_ALL: C.UTF-8
 
-permissions:
-  contents: read
+# No contents scope: the summary is built from the issue event, and the
+# CLI tarball is fetched from the registry. Nothing in this job reads the
+# repository.
+permissions: {}
 
 jobs:
   summary:
@@ -35,12 +39,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       issues: write
-      contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
       - name: Check Copilot credentials
         id: gate
         run: |
@@ -53,11 +52,30 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
 
-      - name: Install the locked Copilot CLI
+      - name: Install the pinned Copilot CLI
         if: steps.gate.outputs.available == 'true'
+        # ubuntu-latest is linux x64 glibc. The platform tarball is a single
+        # binary with no transitive dependencies; the digest is the registry
+        # integrity of @github/copilot-linux-x64@1.0.91.
+        env:
+          COPILOT_CLI_VERSION: "1.0.91"
+          COPILOT_CLI_SHA512: "trQrfHqsKE/DiMtbu1zhlV4iwX0Z/Sp/0rqZZ724i8fULT3qduzAOjHu0IfyVCOSwA+UbopunsxelHHTi+E2qA=="
         run: |
-          npm ci --prefix .github/copilot-cli
-          echo "$(pwd)/.github/copilot-cli/node_modules/.bin" >> "$GITHUB_PATH"
+          set -euo pipefail
+          dest="${RUNNER_TEMP}/copilot-cli"
+          mkdir -p "${dest}"
+          meta="$(npm pack "@github/copilot-linux-x64@${COPILOT_CLI_VERSION}" --pack-destination "${dest}" --json --loglevel=error)"
+          filename="$(node -e 'const meta = JSON.parse(process.argv[1]); process.stdout.write(meta[0].filename)' "${meta}")"
+          tarball="${dest}/${filename}"
+          actual="$(node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); process.stdout.write(crypto.createHash("sha512").update(fs.readFileSync(process.argv[1])).digest("base64"))' "${tarball}")"
+          if [ "${actual}" != "${COPILOT_CLI_SHA512}" ]; then
+            echo "::error::Copilot CLI tarball sha512 does not match the pinned digest"
+            exit 1
+          fi
+          tar -xzf "${tarball}" -C "${dest}"
+          mkdir -p "${dest}/bin"
+          install -m 755 "${dest}/package/copilot" "${dest}/bin/copilot"
+          echo "${dest}/bin" >> "${GITHUB_PATH}"
 
       - name: Build the prompt
         if: steps.gate.outputs.available == 'true'
