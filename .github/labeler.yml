@@ -1,0 +1,29 @@
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: "**/*.md"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "pnpm-lock.yaml"
+          - "**/package.json"
+          - "pnpm-workspace.yaml"
+
+server:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/server/**"
+
+web:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/web/**"
+
+packages:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/**"
