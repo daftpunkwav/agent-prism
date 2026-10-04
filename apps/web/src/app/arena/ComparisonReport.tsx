@@ -221,7 +221,7 @@ export function ComparisonReport({
                       (isFastest ? "metric-best" : "text-muted-foreground")
                     }
                   >
-                    <span className="block">{col.metrics.duration_ms}ms</span>
+                    <div>{col.metrics.duration_ms}ms</div>
                     <span className="mt-1 block h-1 overflow-hidden rounded-none bg-muted/60">
                       <span
                         className="block h-full rounded-none bg-primary/70"
@@ -236,7 +236,7 @@ export function ComparisonReport({
                       (isLowest ? "metric-best" : "text-muted-foreground")
                     }
                   >
-                    <span className="block">{col.metrics.total_tokens.toLocaleString()}</span>
+                    <div>{col.metrics.total_tokens.toLocaleString()}</div>
                     <span className="mt-1 block h-1 overflow-hidden rounded-none bg-muted/60">
                       <span
                         className="block h-full rounded-none bg-success/70"
