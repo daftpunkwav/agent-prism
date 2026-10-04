@@ -297,7 +297,10 @@ export function ComparisonReport({
         <p>
           {t("arena.report.fastestLabel")}
           <span className="font-medium text-foreground"> {show(fastest.label)}</span>
-          <span className="font-mono"> · {fastest.metrics.duration_ms}ms</span>
+          <span className="font-mono">
+            {" "}
+            · {fastest.metrics.duration_ms}ms
+          </span>
         </p>
         <p>
           {t("arena.report.lowestTokenLabel")}
@@ -310,12 +313,18 @@ export function ComparisonReport({
         <p>
           {t("arena.report.fewestToolsLabel")}
           <span className="font-medium text-foreground"> {show(fewestTools.label)}</span>
-          <span className="font-mono"> · {fewestTools.metrics.tool_calls}</span>
+          <span className="font-mono">
+            {" "}
+            · {fewestTools.metrics.tool_calls}
+          </span>
         </p>
         <p>
           {t("arena.report.fewestStepsLabel")}
           <span className="font-medium text-foreground"> {show(fewestSteps.label)}</span>
-          <span className="font-mono"> · {fewestSteps.metrics.steps}</span>
+          <span className="font-mono">
+            {" "}
+            · {fewestSteps.metrics.steps}
+          </span>
         </p>
         {cols.some((c) => c.judge) && (
           <p className="text-[11px]">
