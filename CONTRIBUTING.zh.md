@@ -39,6 +39,17 @@ pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文�
 `windows-latest` 上运行同一组门禁，外加一个 `smoke` job：启动真实的 server 二进制
 并做 HTTP 探测。
 
+## Git 钩子（可选）
+
+仓库自带一个只查暂存文件的快速钩子（web ESLint，对齐 CI 的 lint 门）。
+每个克隆启用一次：
+
+```bash
+git config core.hooksPath .githooks
+```
+
+其余门禁刻意留在 CI——钩子是便利，不是门。
+
 ## 测试
 
 - 从仓库根运行：`pnpm test`，或带阈值门控的 `pnpm test:coverage`。测试策略与预算见

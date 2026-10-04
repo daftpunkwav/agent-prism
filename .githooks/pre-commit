@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Fast staged-only check that mirrors the CI web-lint gate (ESLint over
+# apps/web). The full matrix - typecheck, tests, coverage, i18n, boundaries,
+# dependency hygiene, export coverage, smoke - stays in CI; this hook just
+# keeps lint errors from leaving the machine. No extra tooling: it uses the
+# pnpm-managed eslint that apps/web already depends on. Files outside apps/web
+# have no lint gate in CI, so nothing runs for them here.
+#
+# Checks run against the STAGED contents (git index), never the working tree:
+# an unstaged "fix" in the worktree must not make an unlinted commit pass.
+# Content is piped via stdin with --stdin-filename so the flat config in
+# apps/web resolves rules and ignores against the real path without
+# materializing temp copies.
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Staged web sources eslint covers (added/copied/modified/renamed only).
+# -z + read -d '' yields raw paths: with newline-delimited --name-only Git
+# C-style-quotes exotic filenames (non-ASCII, control chars), which would
+# break both the extension filter and the `git show` below. The extension
+# set mirrors the default files globs of eslint-config-next:
+# **/*.{js,jsx,mjs,ts,tsx,mts,cts}. .cjs matches no config block there, so
+# CI never lints it - and forcing it through --stdin fails on an unresolved
+# plugin - so it stays out of the filter.
+staged=()
+while IFS= read -r -d '' f; do
+  case "$f" in
+    *.js|*.jsx|*.mjs|*.ts|*.tsx|*.mts|*.cts) staged+=("${f#apps/web/}") ;;
+  esac
+done < <(git diff --cached -z --name-only --diff-filter=ACMR -- apps/web)
+
+if [ "${#staged[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+# Resolve the eslint binary once instead of paying pnpm's startup and
+# resolution overhead for every staged file.
+ESLINT_BIN="$ROOT/apps/web/node_modules/.bin/eslint"
+if [ ! -x "$ESLINT_BIN" ]; then
+  echo "pre-commit: eslint not found at apps/web/node_modules/.bin/eslint - run pnpm install" >&2
+  exit 1
+fi
+
+cd apps/web
+for f in "${staged[@]}"; do
+  git show ":apps/web/$f" | "$ESLINT_BIN" --stdin --stdin-filename "$f" || {
+    echo "pre-commit: eslint failed on apps/web/$f" >&2
+    exit 1
+  }
+done
+
+exit 0
