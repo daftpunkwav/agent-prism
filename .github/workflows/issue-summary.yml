@@ -4,7 +4,9 @@
 #
 # Inference runs on actions/ai-inference v3, whose only provider is the
 # GitHub Copilot CLI: install it, authenticate it with a PAT that has
-# Copilot enabled (repository secret COPILOT_PAT). The v1 backend this
+# Copilot enabled and no repository scopes (repository secret
+# COPILOT_PAT - the workflow never uses it for API writes). The v1
+# backend this
 # starter shipped with - the GitHub Models inference endpoint - was retired
 # on 2026-07-30, which is why the run soft-skips while the secret is absent
 # instead of failing on every issue.
@@ -46,7 +48,10 @@ jobs:
 
       - name: Install Copilot CLI
         if: steps.gate.outputs.available == 'true'
-        run: npm install -g @github/copilot
+        # Pinned to a reviewed version: this package runs with COPILOT_PAT in
+        # its environment, so an unreviewed update would be a token-exfiltration
+        # vector (CWE-829). Bump deliberately after checking the release.
+        run: npm install -g @github/copilot@1.0.91
 
       - name: Run AI inference
         if: steps.gate.outputs.available == 'true'
