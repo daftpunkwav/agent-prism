@@ -447,8 +447,9 @@ function settlePendingStep(
 ): void {
   const pendingKey = `stepstart:${turn}:${step}`;
   const idx = segIndex.get(pendingKey);
-  if (idx !== undefined && segs[idx]?.kind === "step" && !segs[idx]!.completed) {
-    segs[idx]!.completed = true;
+  const pending = idx !== undefined ? segs[idx] : undefined;
+  if (pending !== undefined && pending.kind === "step" && !pending.completed) {
+    pending.completed = true;
   }
 }
 
@@ -579,7 +580,9 @@ export function buildTraceComparison(
     const files: string[] = [];
     for (const seg of mergeEvents(events, frameworkId)) {
       if (seg.kind !== "action") continue;
-      toolCalls.push({ tool: seg.tool ?? "unknown", detail: toolDetail(seg.tool ?? "unknown", seg.args) });
+      // Empty tool names are unknown calls, not blank rows (Sourcery finding).
+      const tool = seg.tool === undefined || seg.tool === "" ? "unknown" : seg.tool;
+      toolCalls.push({ tool, detail: toolDetail(tool, seg.args) });
       const path = seg.args?.path;
       if (typeof path === "string" && path !== "" && !files.includes(path)) {
         files.push(path);
