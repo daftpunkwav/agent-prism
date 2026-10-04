@@ -162,7 +162,7 @@ export default function SessionsPage() {
           className="form-input !h-9 !w-auto !px-2 !text-xs"
           aria-label={t("sessions.filterKindAria")}
           value={kindFilter}
-          onChange={(e) => setKindFilter(e.target.value as "" | SessionKind)}
+          onChange={(e) => { setKindFilter(e.target.value as "" | SessionKind); }}
         >
           <option value="">{t("sessions.filterAllKinds")}</option>
           <option value="arena">{t("sessions.kind.arena")}</option>
@@ -173,7 +173,7 @@ export default function SessionsPage() {
           className="form-input !h-9 !w-auto !px-2 !text-xs"
           aria-label={t("sessions.filterStatusAria")}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as "" | SessionStatus)}
+          onChange={(e) => { setStatusFilter(e.target.value as "" | SessionStatus); }}
         >
           <option value="">{t("sessions.filterAllStatuses")}</option>
           <option value="active">{t("sessions.status.active")}</option>

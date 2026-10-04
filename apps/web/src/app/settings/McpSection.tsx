@@ -73,7 +73,7 @@ function ServerForm({
   const [draft, setDraft] = useState<ServerDraft>(draftOf(initial));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const patch = (next: Partial<ServerDraft>) => setDraft((prev) => ({ ...prev, ...next }));
+  const patch = (next: Partial<ServerDraft>) => { setDraft((prev) => ({ ...prev, ...next })); };
 
   const submit = async (): Promise<void> => {
     setError(null);
@@ -136,7 +136,7 @@ function ServerForm({
           className="form-input"
           value={draft.name}
           placeholder={t("settings.mcp.namePlaceholder")}
-          onChange={(event) => patch({ name: event.target.value })}
+          onChange={(event) => { patch({ name: event.target.value }); }}
         />
         <input
           className="form-input"
@@ -164,13 +164,13 @@ function ServerForm({
           className="form-input font-mono text-xs"
           value={draft.timeoutMs}
           placeholder={t("settings.mcp.timeoutPlaceholder")}
-          onChange={(event) => patch({ timeoutMs: event.target.value.replace(/\D/g, "") })}
+          onChange={(event) => { patch({ timeoutMs: event.target.value.replace(/\D/g, "") }); }}
         />
         <input
           className="form-input"
           value={draft.toolsText}
           placeholder={t("settings.mcp.toolsPlaceholder")}
-          onChange={(event) => patch({ toolsText: event.target.value })}
+          onChange={(event) => { patch({ toolsText: event.target.value }); }}
         />
       </div>
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -279,10 +279,10 @@ export function McpSection({ onFlash }: { onFlash: (message: string) => void }) 
             className="form-input !pl-8"
             value={query}
             placeholder={t("settings.mcp.searchPlaceholder")}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); }}
           />
         </div>
-        <button type="button" className="btn-primary shrink-0" onClick={() => setEditing({ mode: "create" })}>
+        <button type="button" className="btn-primary shrink-0" onClick={() => { setEditing({ mode: "create" }); }}>
           <Plus className="h-4 w-4" />
           {t("settings.mcp.create")}
         </button>
@@ -331,7 +331,7 @@ export function McpSection({ onFlash }: { onFlash: (message: string) => void }) 
                   type="button"
                   className="btn-ghost !h-7 !w-7 !p-0 shrink-0"
                   aria-label={t("settings.mcp.editAria", { name: displayName(server) })}
-                  onClick={() => setEditing({ mode: "edit", server })}
+                  onClick={() => { setEditing({ mode: "edit", server }); }}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>

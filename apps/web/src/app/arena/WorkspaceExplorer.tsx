@@ -48,7 +48,7 @@ export function WorkspaceExplorer({
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); };
   }, [onClose]);
 
   const focused = choices.find((choice) => choice.label === focusLabel) ?? choices[0];

@@ -189,7 +189,7 @@ export class ArenaRunner {
     const channel = new EventChannel<ArenaEvent | null>({ capacity: ArenaRunner.CHANNEL_BACKSTOP });
     const internalAbort = new AbortController();
     const signal = options.signal;
-    const forwardAbort = () => internalAbort.abort();
+    const forwardAbort = () => { internalAbort.abort(); };
     signal?.addEventListener("abort", forwardAbort, { once: true });
     // Already cancelled before entering: the abort event has fired and listeners will not
     // trigger again, so sync explicitly

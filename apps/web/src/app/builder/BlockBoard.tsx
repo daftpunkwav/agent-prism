@@ -90,7 +90,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
     );
   }
 
-  const set = (patch: Partial<BuilderComposition>) => onChange({ ...composition, ...patch });
+  const set = (patch: Partial<BuilderComposition>) => { onChange({ ...composition, ...patch }); };
 
   // Frameworks that speak one protocol carry required_api_format on the catalog
   // (the same rule validateComposition enforces). The active endpoint is the
@@ -204,7 +204,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
                     ? t("builder.frameworkNeedsFormat", { format: framework.required_api_format })
                     : framework.id
               }
-              onClick={() => set({ framework: framework.id })}
+              onClick={() => { set({ framework: framework.id }); }}
             >
               {framework.name}
             </button>
@@ -216,7 +216,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
         <div className="builder-row">
           <UiSelect
             value={composition.endpoint_id}
-            onChange={(value) => set({ endpoint_id: value })}
+            onChange={(value) => { set({ endpoint_id: value }); }}
             options={endpointEntries}
             ariaLabel={t("builder.slotModel")}
             className="builder-select"
@@ -228,7 +228,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
             onChange={(event) => set({ model_id: event.target.value })}
           />
         </div>
-        <div className="builder-chip-row">{renderChips("thinking", composition.thinking_level, (value) => set({ thinking_level: value as BuilderComposition["thinking_level"] }))}</div>
+        <div className="builder-chip-row">{renderChips("thinking", composition.thinking_level, (value) => { set({ thinking_level: value as BuilderComposition["thinking_level"] }); })}</div>
       </Slot>
 
       <Slot title={t("builder.slotTools")}>
@@ -238,7 +238,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
             className="builder-chip"
             data-selected={composition.tools.length === 0}
             title={t("builder.noTools")}
-            onClick={() => set({ tools: [] })}
+            onClick={() => { set({ tools: [] }); }}
           >
             {t("builder.noTools")}
           </button>
@@ -250,7 +250,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
               data-selected={composition.tools.includes(tool.name)}
               data-mutating={tool.mutates_workspace}
               title={`${tool.name}: ${tool.description}`}
-              onClick={() => toggleTool(tool.name)}
+              onClick={() => { toggleTool(tool.name); }}
             >
               {tool.name}
             </button>
@@ -262,7 +262,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
         <div className="builder-chip-row">{renderChips("context", composition.context, (value) => set({ context: value as BuilderComposition["context"] }))}</div>
       </Slot>
       <Slot title={t("builder.slotPrompt")}>
-        <div className="builder-chip-row">{renderChips("prompt_profile", composition.prompt_profile, (value) => set({ prompt_profile: value as BuilderComposition["prompt_profile"] }))}</div>
+        <div className="builder-chip-row">{renderChips("prompt_profile", composition.prompt_profile, (value) => { set({ prompt_profile: value as BuilderComposition["prompt_profile"] }); })}</div>
         <textarea
           className="form-input builder-prompt"
           rows={3}
@@ -275,22 +275,22 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
         <div className="builder-chip-row">{renderChips("reasoning", composition.reasoning, (value) => set({ reasoning: value as BuilderComposition["reasoning"] }))}</div>
       </Slot>
       <Slot title={t("builder.slotHarness")}>
-        <div className="builder-chip-row">{renderChips("harness", composition.harness, (value) => set({ harness: value as BuilderComposition["harness"] }))}</div>
+        <div className="builder-chip-row">{renderChips("harness", composition.harness, (value) => { set({ harness: value as BuilderComposition["harness"] }); })}</div>
       </Slot>
       <Slot title={t("builder.slotMemory")}>
-        <div className="builder-chip-row">{renderChips("memory", composition.memory, (value) => set({ memory: value as BuilderComposition["memory"] }))}</div>
+        <div className="builder-chip-row">{renderChips("memory", composition.memory, (value) => { set({ memory: value as BuilderComposition["memory"] }); })}</div>
       </Slot>
       <Slot title={t("builder.slotMcp")}>
-        <div className="builder-chip-row">{renderChips("mcp_policy", composition.mcp_policy, (value) => set({ mcp_policy: value as BuilderComposition["mcp_policy"] }))}</div>
+        <div className="builder-chip-row">{renderChips("mcp_policy", composition.mcp_policy, (value) => { set({ mcp_policy: value as BuilderComposition["mcp_policy"] }); })}</div>
       </Slot>
       <Slot title={t("builder.slotSkill")}>
-        <div className="builder-chip-row">{renderChips("skill_policy", composition.skill_policy, (value) => set({ skill_policy: value as BuilderComposition["skill_policy"] }))}</div>
+        <div className="builder-chip-row">{renderChips("skill_policy", composition.skill_policy, (value) => { set({ skill_policy: value as BuilderComposition["skill_policy"] }); })}</div>
       </Slot>
       <Slot title={t("builder.slotOrchestration")}>
-        <div className="builder-chip-row">{renderChips("orchestration", composition.orchestration, (value) => set({ orchestration: value as BuilderComposition["orchestration"] }))}</div>
+        <div className="builder-chip-row">{renderChips("orchestration", composition.orchestration, (value) => { set({ orchestration: value as BuilderComposition["orchestration"] }); })}</div>
       </Slot>
       <Slot title={t("builder.slotHistoryMode")}>
-        <div className="builder-chip-row">{renderChips("history_mode", composition.history_mode, (value) => set({ history_mode: value as BuilderComposition["history_mode"] }))}</div>
+        <div className="builder-chip-row">{renderChips("history_mode", composition.history_mode, (value) => { set({ history_mode: value as BuilderComposition["history_mode"] }); })}</div>
       </Slot>
 
       {/* Custom-dimension blocks: the server catalog names them `custom:<id>` and
@@ -333,7 +333,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
               min={0} max={2}
               value={composition.temperature}
               invalidMessage={t("builder.invalidNumber")}
-              onChange={(temperature) => set({ temperature })}
+              onChange={(temperature) => { set({ temperature }); }}
             />
           </label>
           <label>
@@ -354,7 +354,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
               min={64} max={384000}
               value={composition.max_output_tokens}
               invalidMessage={t("builder.invalidNumber")}
-              onChange={(max_output_tokens) => set({ max_output_tokens })}
+              onChange={(max_output_tokens) => { set({ max_output_tokens }); }}
             />
           </label>
           <label>

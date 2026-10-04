@@ -109,7 +109,7 @@ export function groupPhases(segments: readonly DisplaySegment[]): PhaseGroup[] {
     // Settled step markers are pure position ticks (SegmentRow hides them too):
     // folding them would paint a meaningless "steps" row per model call. Only a
     // pending marker at the live tail still carries information.
-    if (seg.kind === "step" && seg.completed !== false) continue;
+    if (seg.kind === "step" && seg.completed) continue;
     const category = segmentCategory(seg);
     const prev = mutable[mutable.length - 1];
     let phase: MutablePhase;

@@ -354,7 +354,7 @@ export function BaselineModal({
                                 min: String(field.min),
                                 max: String(field.max),
                               }),
-                              onCommit: (next: string) => onBaselineFieldChange(field.field, next),
+                              onCommit: (next: string) => { onBaselineFieldChange(field.field, next); },
                             };
                             return (
                               <label
@@ -385,7 +385,7 @@ export function BaselineModal({
                                     // render as a dead raw value (UiSelect falls back to
                                     // echoing an unknown value verbatim).
                                     value={field.field === "thinking_mode" ? thinkingMode : value}
-                                    onChange={(next) => onBaselineFieldChange(field.field, next)}
+                                    onChange={(next) => { onBaselineFieldChange(field.field, next); }}
                                     ariaLabel={t("arena.setup.baselineFieldAria", { label: fieldLab })}
                                     options={servedOptions.map((opt) => ({
                                       value: opt.value,

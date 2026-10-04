@@ -34,7 +34,7 @@ async function main(): Promise<void> {
       console.warn(`[server] Session checkpoint failed: ${error instanceof Error ? error.message : String(error)}`);
     });
   }, SESSION_CHECKPOINT_INTERVAL_MS);
-  checkpoint.unref?.();
+  checkpoint.unref();
   // Last-resort crash path: an uncaught exception or unhandled rejection still
   // exits non-zero, but saves the debounced-store tail first (bounded flush).
   installCrashHandlers(() => components?.flushDurableStores() ?? Promise.resolve());
@@ -44,13 +44,13 @@ async function main(): Promise<void> {
       // for connections would otherwise be lost to the process exit (its own
       // flush is fire-and-forget, and the exit kills the debounce timer).
       // The second flush runs in a finally so a stop() failure cannot drop it.
-      await components?.flushDurableStores();
+      await components.flushDurableStores();
       try {
         await stop?.();
       } finally {
         // Compact before the last flush: the log tail lands in the snapshot, so the
         // next boot replays a bounded log.
-        await components?.checkpointStores().catch(() => undefined);
+        await components.checkpointStores().catch(() => undefined);
         await components?.flushDurableStores();
       }
     },

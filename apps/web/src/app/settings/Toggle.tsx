@@ -19,7 +19,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
         "relative h-5 w-9 shrink-0 rounded-full border transition-colors " +
         (checked ? "border-primary/60 bg-primary/80" : "border-border bg-muted")
       }
-      onClick={() => onChange(!checked)}
+      onClick={() => { onChange(!checked); }}
     >
       <span
         className={

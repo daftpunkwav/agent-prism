@@ -33,7 +33,7 @@ function readCookieHeader(cookieHeader: string | undefined, name: string): strin
 export const storageCookieAdapter: LocaleAdapter = {
   readClient(): string | null {
     try {
-      return globalThis.localStorage?.getItem(LOCALE_STORAGE_KEY) ?? null;
+      return globalThis.localStorage.getItem(LOCALE_STORAGE_KEY) ?? null;
     } catch {
       // Storage unavailable (privacy mode, sandbox): fall through to the default locale.
       return null;
@@ -46,7 +46,7 @@ export const storageCookieAdapter: LocaleAdapter = {
 
   write(locale: AppLocale): void {
     try {
-      globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, locale);
+      globalThis.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
     } catch {
       // Ignore write failures: the cookie below still carries the preference for this visit.
     }

@@ -65,7 +65,7 @@ function CopyButton({ text }: { text: string }) {
       onClick={() => {
         void navigator.clipboard.writeText(text).then(() => {
           setCopied(true);
-          setTimeout(() => setCopied(false), 1200);
+          setTimeout(() => { setCopied(false); }, 1200);
         });
       }}
     >

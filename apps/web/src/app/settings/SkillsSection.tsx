@@ -73,21 +73,21 @@ function SkillForm({
           className="form-input"
           value={name}
           placeholder={t("settings.skills.namePlaceholder")}
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => { setName(event.target.value); }}
         />
       )}
       <input
         className="form-input"
         value={description}
         placeholder={t("settings.skills.descriptionPlaceholder")}
-        onChange={(event) => setDescription(event.target.value)}
+        onChange={(event) => { setDescription(event.target.value); }}
       />
       <textarea
         className="form-input font-mono text-xs"
         rows={8}
         value={body}
         placeholder={t("settings.skills.bodyPlaceholder")}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={(event) => { setBody(event.target.value); }}
       />
       {error !== null && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex justify-end gap-2">
@@ -190,10 +190,10 @@ export function SkillsSection({ onFlash }: { onFlash: (message: string) => void 
             className="form-input !pl-8"
             value={query}
             placeholder={t("settings.skills.searchPlaceholder")}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); }}
           />
         </div>
-        <button type="button" className="btn-primary shrink-0" onClick={() => setEditing({ mode: "create" })}>
+        <button type="button" className="btn-primary shrink-0" onClick={() => { setEditing({ mode: "create" }); }}>
           <Plus className="h-4 w-4" />
           {t("settings.skills.create")}
         </button>
@@ -202,7 +202,7 @@ export function SkillsSection({ onFlash }: { onFlash: (message: string) => void 
       {editing !== null && (
         <SkillForm
           initial={editing.mode === "edit" ? editing.skill : null}
-          onCancel={() => setEditing(null)}
+          onCancel={() => { setEditing(null); }}
           onSaved={() => {
             setEditing(null);
             void reload();
@@ -236,7 +236,7 @@ export function SkillsSection({ onFlash }: { onFlash: (message: string) => void 
                     type="button"
                     className="btn-ghost !h-7 !w-7 !p-0 shrink-0"
                     aria-label={t("settings.skills.editAria", { name: skill.name })}
-                    onClick={() => setEditing({ mode: "edit", skill })}
+                    onClick={() => { setEditing({ mode: "edit", skill }); }}
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>

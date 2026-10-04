@@ -189,9 +189,10 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
       }
       const streamKey = `stream:${turn}:${step}`;
       const idx = segIndex.get(streamKey);
-      if (idx !== undefined && segs[idx]!.kind === "thought" && !segs[idx]!.completed) {
-        segs[idx]!.text += chunk;
-        if (ts !== undefined) segs[idx]!.tsEnd = ts;
+      const streamSeg = idx !== undefined ? segs[idx] : undefined;
+      if (streamSeg !== undefined && streamSeg.kind === "thought" && !streamSeg.completed) {
+        streamSeg.text += chunk;
+        if (ts !== undefined) streamSeg.tsEnd = ts;
       } else {
         const s: DisplaySegment = {
           id: `t:thought:${segs.length}`,
@@ -208,8 +209,9 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
     } else if (ev.type === "thought_end") {
       const streamKey = `stream:${turn}:${step}`;
       const idx = segIndex.get(streamKey);
-      if (idx !== undefined && segs[idx]!.kind === "thought" && !segs[idx]!.completed) {
-        segs[idx]!.completed = true;
+      const streamSeg = idx !== undefined ? segs[idx] : undefined;
+      if (streamSeg !== undefined && streamSeg.kind === "thought" && !streamSeg.completed) {
+        streamSeg.completed = true;
       }
     } else if (ev.type === "thinking") {
       openActionIdx = null;
@@ -217,9 +219,10 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
       // Model's inner monologue: kept separate from the visible answer so runaway thinking is never mistaken for the final answer
       const thinkKey = `thinking:${turn}:${step}`;
       const idx = segIndex.get(thinkKey);
-      if (idx !== undefined && segs[idx]!.kind === "thinking") {
-        segs[idx]!.text += ev.content || "";
-        if (ts !== undefined) segs[idx]!.tsEnd = ts;
+      const thinkSeg = idx !== undefined ? segs[idx] : undefined;
+      if (thinkSeg !== undefined && thinkSeg.kind === "thinking") {
+        thinkSeg.text += ev.content || "";
+        if (ts !== undefined) thinkSeg.tsEnd = ts;
       } else {
         const s: DisplaySegment = {
           id: `t:thinking:${segs.length}`,
@@ -288,8 +291,9 @@ export function mergeEvents(events: ArenaEvent[], frameworkId?: string): Display
         continue;
       }
       const idx = segIndex.get(progKey);
-      if (idx !== undefined && segs[idx]!.kind === "tool_progress") {
-        segs[idx]!.text += ev.content || "";
+      const progSeg = idx !== undefined ? segs[idx] : undefined;
+      if (progSeg !== undefined && progSeg.kind === "tool_progress") {
+        progSeg.text += ev.content || "";
       } else {
         const s: DisplaySegment = {
           id: `t:prog:${segs.length}`,
@@ -443,7 +447,7 @@ function settlePendingStep(
 ): void {
   const pendingKey = `stepstart:${turn}:${step}`;
   const idx = segIndex.get(pendingKey);
-  if (idx !== undefined && segs[idx]!.kind === "step" && !segs[idx]!.completed) {
+  if (idx !== undefined && segs[idx]?.kind === "step" && !segs[idx]!.completed) {
     segs[idx]!.completed = true;
   }
 }
@@ -575,7 +579,7 @@ export function buildTraceComparison(
     const files: string[] = [];
     for (const seg of mergeEvents(events, frameworkId)) {
       if (seg.kind !== "action") continue;
-      toolCalls.push({ tool: seg.tool || "unknown", detail: toolDetail(seg.tool || "unknown", seg.args) });
+      toolCalls.push({ tool: seg.tool ?? "unknown", detail: toolDetail(seg.tool ?? "unknown", seg.args) });
       const path = seg.args?.path;
       if (typeof path === "string" && path !== "" && !files.includes(path)) {
         files.push(path);

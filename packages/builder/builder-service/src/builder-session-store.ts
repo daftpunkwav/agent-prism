@@ -342,7 +342,7 @@ export class BuilderSessionStore {
       this.flushTimer = null;
       void this.writeSnapshot();
     }, this.flushDebounceMs);
-    this.flushTimer.unref?.();
+    this.flushTimer.unref();
   }
 
   private async writeSnapshot(): Promise<void> {

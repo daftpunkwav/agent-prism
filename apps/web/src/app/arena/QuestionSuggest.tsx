@@ -62,7 +62,7 @@ export function QuestionSuggest({ anchorRef, items, activeIndex, ariaLabel, onPi
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (popRef.current?.contains(target) || anchorRef.current?.contains(target)) return;
+      if (popRef.current?.contains(target) === true || anchorRef.current?.contains(target) === true) return;
       onClose();
     };
     document.addEventListener("pointerdown", onPointerDown);

@@ -201,7 +201,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
       setContent(editContent);
       setEditing(false);
       showToast(t("arena.ws.saved"));
-      loadFiles();
+      void loadFiles();
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         showToast(t("arena.ws.saveFailed", { message: (err as Error).message }));
@@ -221,7 +221,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
       setShowNewFile(false);
       await loadFiles();
       setSelectedFile(path);
-      loadFile(path);
+      void loadFile(path);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         showToast(t("arena.ws.createFailed", { message: (err as Error).message }));
@@ -276,7 +276,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
     if (selectedFile) {
       // loadFile is a shared async loader; its synchronous setLoading trips a rule
       // false positive, since the real data updates all happen after an await.
-      loadFile(selectedFile);
+      void loadFile(selectedFile);
     }
   }, [selectedFile, loadFile]);
 
@@ -387,7 +387,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
                         className="btn-ghost !h-6 !px-1.5 !rounded-none text-[11px]"
                         data-active={!mdSourceView}
                         aria-pressed={!mdSourceView}
-                        onClick={() => setMdSourceView(false)}
+                        onClick={() => { setMdSourceView(false); }}
                         title={t("arena.ws.previewView")}
                       >
                         <Eye className="h-3 w-3" />
@@ -398,7 +398,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
                         className="btn-ghost !h-6 !px-1.5 !rounded-none text-[11px]"
                         data-active={mdSourceView}
                         aria-pressed={mdSourceView}
-                        onClick={() => setMdSourceView(true)}
+                        onClick={() => { setMdSourceView(true); }}
                         title={t("arena.ws.sourceView")}
                       >
                         <FileCode2 className="h-3 w-3" />
@@ -463,7 +463,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
                   <button
                     type="button"
                     className="btn-ghost !h-7 !px-2 text-[11px]"
-                    onClick={() => setSelectedFile(null)}
+                    onClick={() => { setSelectedFile(null); }}
                     aria-label={t("arena.ws.closeAria")}
                     title={t("arena.ws.closeTitle")}
                   >
@@ -538,7 +538,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
                   value={newFileName}
                   onChange={(e) => setNewFileName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") createFile();
+                    if (e.key === "Enter") void createFile();
                     if (e.key === "Escape") setShowNewFile(false);
                   }}
                   tabIndex={showNewFile ? 0 : -1}
@@ -607,7 +607,7 @@ function TreeNode({ node, depth, expanded, expandedDirs, onToggle, onSelect, sel
           type="button"
           className="w-full flex items-center gap-0.5 py-0.5 px-1 rounded-none text-left text-xs hover:bg-muted/50"
           style={{ paddingLeft }}
-          onClick={() => onToggle(node.path)}
+          onClick={() => { onToggle(node.path); }}
         >
           {expanded ? (
             <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />

@@ -47,7 +47,7 @@ export function SaveProjectCard({
           className="form-input flex-1"
           placeholder={t("arena.project.namePlaceholder")}
           value={projectName}
-          onChange={(e) => onProjectNameChange(e.target.value)}
+          onChange={(e) => { onProjectNameChange(e.target.value); }}
           disabled={savingProject}
           maxLength={100}
           aria-label={t("arena.project.nameAria")}

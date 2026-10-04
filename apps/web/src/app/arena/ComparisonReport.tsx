@@ -45,7 +45,10 @@ export function ComparisonReport({
 }) {
   const t = useT();
   const show = (label: string) => (resolveLabel ? resolveLabel(label) : label);
-  const cols = Object.values(columns).filter((c) => c.metrics);
+  // Explicit predicate: every consumer below assumes metrics is present on each col.
+  const cols = Object.values(columns).filter(
+    (c): c is ColumnState & { metrics: NonNullable<ColumnState["metrics"]> } => c.metrics !== undefined,
+  );
   const columnList = useMemo(() => Object.values(columns), [columns]);
   const comparison = useMemo(
     () =>
@@ -78,15 +81,15 @@ export function ComparisonReport({
     comparison.columns.every((c) => c.toolCalls.length === comparison.columns[0]!.toolCalls.length);
   const divergeIndex = identicalTools ? -1 : comparison.commonToolPrefix;
 
-  const sorted = [...cols].sort((a, b) => a.metrics!.duration_ms - b.metrics!.duration_ms);
+  const sorted = [...cols].sort((a, b) => a.metrics?.duration_ms - b.metrics!.duration_ms);
   const fastest = sorted[0];
   const lowestToken = [...cols].sort(
     (a, b) => a.metrics!.total_tokens - b.metrics!.total_tokens,
   )[0];
-  const fewestTools = [...cols].sort((a, b) => a.metrics!.tool_calls - b.metrics!.tool_calls)[0];
-  const fewestSteps = [...cols].sort((a, b) => a.metrics!.steps - b.metrics!.steps)[0];
+  const fewestTools = [...cols].sort((a, b) => a.metrics?.tool_calls - b.metrics!.tool_calls)[0];
+  const fewestSteps = [...cols].sort((a, b) => a.metrics?.steps - b.metrics!.steps)[0];
   if (!fastest?.metrics || !lowestToken?.metrics || !fewestTools?.metrics || !fewestSteps?.metrics) return null;
-  const maxDuration = Math.max(...cols.map((c) => c.metrics!.duration_ms), 1);
+  const maxDuration = Math.max(...cols.map((c) => c.metrics?.duration_ms), 1);
   const maxTokens = Math.max(...cols.map((c) => c.metrics!.total_tokens), 1);
 
   /** Gap verdicts: one chip per metric where the columns actually differ. */
@@ -94,22 +97,22 @@ export function ComparisonReport({
     [
       {
         label: t("arena.report.fastestLabel").replace(/：|:$/, ""),
-        values: cols.map((c) => c.metrics!.duration_ms),
+        values: cols.map((c) => c.metrics?.duration_ms),
         format: (v: number) => `${v.toLocaleString()}ms`,
       },
       {
         label: t("arena.report.lowestTokenLabel").replace(/：|:$/, ""),
-        values: cols.map((c) => c.metrics!.total_tokens),
+        values: cols.map((c) => c.metrics?.total_tokens),
         format: (v: number) => v.toLocaleString(),
       },
       {
         label: t("arena.report.fewestToolsLabel").replace(/：|:$/, ""),
-        values: cols.map((c) => c.metrics!.tool_calls),
+        values: cols.map((c) => c.metrics?.tool_calls),
         format: (v: number) => `${v}`,
       },
       {
         label: t("arena.report.fewestStepsLabel").replace(/：|:$/, ""),
-        values: cols.map((c) => c.metrics!.steps),
+        values: cols.map((c) => c.metrics?.steps),
         format: (v: number) => `${v}`,
       },
     ] as const
@@ -207,8 +210,8 @@ export function ComparisonReport({
             {cols.map((col) => {
               const isFastest = col.metrics!.duration_ms === fastest.metrics!.duration_ms;
               const isLowest = col.metrics!.total_tokens === lowestToken.metrics!.total_tokens;
-              const isFewestTools = col.metrics!.tool_calls === fewestTools.metrics!.tool_calls;
-              const isFewestSteps = col.metrics!.steps === fewestSteps.metrics!.steps;
+              const isFewestTools = col.metrics?.tool_calls === fewestTools.metrics!.tool_calls;
+              const isFewestSteps = col.metrics?.steps === fewestSteps.metrics!.steps;
               return (
                 <tr key={col.label}>
                   <td className="font-medium">{show(col.label)}</td>
@@ -218,11 +221,11 @@ export function ComparisonReport({
                       (isFastest ? "metric-best" : "text-muted-foreground")
                     }
                   >
-                    <span className="block">{col.metrics!.duration_ms}ms</span>
+                    <span className="block">{col.metrics?.duration_ms}ms</span>
                     <span className="mt-1 block h-1 overflow-hidden rounded-none bg-muted/60">
                       <span
                         className="block h-full rounded-none bg-primary/70"
-                        style={{ width: `${Math.round((col.metrics!.duration_ms / maxDuration) * 100)}%` }}
+                        style={{ width: `${Math.round((col.metrics?.duration_ms / maxDuration) * 100)}%` }}
                       />
                     </span>
                     {isFastest && <span className="metric-best-mark">{t("arena.report.fastestMark")}</span>}
@@ -233,11 +236,11 @@ export function ComparisonReport({
                       (isLowest ? "metric-best" : "text-muted-foreground")
                     }
                   >
-                    <span className="block">{col.metrics!.total_tokens.toLocaleString()}</span>
+                    <span className="block">{col.metrics?.total_tokens.toLocaleString()}</span>
                     <span className="mt-1 block h-1 overflow-hidden rounded-none bg-muted/60">
                       <span
                         className="block h-full rounded-none bg-success/70"
-                        style={{ width: `${Math.round((col.metrics!.total_tokens / maxTokens) * 100)}%` }}
+                        style={{ width: `${Math.round((col.metrics?.total_tokens / maxTokens) * 100)}%` }}
                       />
                     </span>
                     {isLowest && <span className="metric-best-mark">{t("arena.report.lowestMark")}</span>}
@@ -247,11 +250,11 @@ export function ComparisonReport({
                     {isFewestTools && <span className="metric-best-mark">{t("arena.report.fewestMark")}</span>}
                   </td>
                   <td className={"text-right font-mono " + (isFewestSteps ? "metric-best" : "text-muted-foreground")}>
-                    {col.metrics!.steps}
+                    {col.metrics?.steps}
                     {isFewestSteps && <span className="metric-best-mark">{t("arena.report.fewestMark")}</span>}
                   </td>
                   <td className="text-center">
-                    {col.metrics!.success ? (
+                    {col.metrics?.success ? (
                       <span className="inline-flex items-center gap-1.5 text-success">
                         <span className="w-1.5 h-1.5 rounded-full bg-current" />
                         {t("arena.report.success")}
@@ -301,13 +304,13 @@ export function ComparisonReport({
           <span className="font-medium text-foreground"> {show(lowestToken.label)}</span>
           <span className="font-mono">
             {" "}
-            · {lowestToken.metrics!.total_tokens.toLocaleString()}
+            · {lowestToken.metrics?.total_tokens.toLocaleString()}
           </span>
         </p>
         <p>
           {t("arena.report.fewestToolsLabel")}
           <span className="font-medium text-foreground"> {show(fewestTools.label)}</span>
-          <span className="font-mono"> · {fewestTools.metrics!.tool_calls}</span>
+          <span className="font-mono"> · {fewestTools.metrics?.tool_calls}</span>
         </p>
         <p>
           {t("arena.report.fewestStepsLabel")}
