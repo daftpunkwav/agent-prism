@@ -213,7 +213,7 @@ describe("ThreadService.run (resume path)", () => {
 
   it("leaves the transcript untouched when the turn fails, and resets the running flag", async () => {
     const { arena } = fakeArena([{ ...baseEvent("complete"), metrics: { success: false } as ArenaEvent["metrics"] }]);
-    const { service, store } = makeService(arena);
+    const { service } = makeService(arena);
     const view = service.create({ title: "t", config: CONFIG });
 
     await drain(service.run(view.id, { question: "q" }));

@@ -8,7 +8,7 @@
  * Event shape construction belongs to contracts (completeEvent, tokenUpdateEvent).
  */
 
-import type { PipelineMetrics, TokenStats } from "@agentprism/contracts";
+import type { PipelineMetrics } from "@agentprism/contracts";
 import { TokenTracker } from "./token.js";
 
 /** Aggregates a single column run's hard metrics. */

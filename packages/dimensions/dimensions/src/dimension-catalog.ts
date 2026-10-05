@@ -11,7 +11,7 @@
  */
 
 import { DECODE_FIELD_RANGES, dimensionFieldName, type DimensionId } from "@agentprism/contracts";
-import { BASELINE_ONLY_LABELS, BASELINE_ONLY_OPTIONS, DIMENSION_FIELD, FIELD_GROUP, FIELD_LABELS, FIELD_NAME_LABELS, FIELD_SUBTITLES, type DimensionOptionTriple } from "./fields.js";
+import { BASELINE_ONLY_LABELS, BASELINE_ONLY_OPTIONS, FIELD_GROUP, FIELD_LABELS, FIELD_NAME_LABELS, FIELD_SUBTITLES, type DimensionOptionTriple } from "./fields.js";
 import { FRAMEWORK_OPTIONS } from "./dimensions/framework.js";
 import { MAX_STEPS_OPTIONS } from "./dimensions/max-steps.js";
 import { MODEL_OPTIONS } from "./dimensions/model.js";

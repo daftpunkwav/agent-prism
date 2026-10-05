@@ -1,10 +1,11 @@
 /**
  * @file glob tool tests
- * @description Locks glob matching: nested patterns, stability, brace alternation.
+ * @description Locks glob matching: nested patterns, stability, brace alternation, wildcard-run guard.
  */
 
 import { describe, expect, it } from "vitest";
 import {
+  GLOB_MAX_UNBOUNDED_GROUPS,
   globToRegExp,
   globTool,
 } from "@agentprism/tool-builtins";
@@ -68,5 +69,57 @@ describe("globTool", () => {
     expect(globToRegExp("a+b.txt").test("aab.txt")).toBe(false);
     // Unclosed `{` stays literal.
     expect(globToRegExp("a{b").test("a{b")).toBe(true);
+  });
+
+  it("collapses adjacent wildcard runs without changing what matches", () => {
+    // `****`, `**/**`, and `**` are equivalent; the compiled regex must carry a
+    // single unbounded group either way so backtracking stays linear.
+    const forms = ["**", "****", "**/**", "**/**/**"];
+    for (const form of forms) {
+      const regex = globToRegExp(`${form}.ts`);
+      expect(regex.test("a.ts"), form).toBe(true);
+      expect(regex.test("x/y/a.ts"), form).toBe(true);
+      expect(regex.source.match(/\.\*/g)?.length ?? 0, form).toBe(1);
+    }
+  });
+
+  it("rejects patterns with more wildcard runs than the fail-closed cap", () => {
+    // Three separated `**` groups stay legal and still match.
+    expect(globToRegExp("**/a/**/b/**/*.ts").test("x/a/y/b/z/w.ts")).toBe(true);
+    const pattern = ["**", "a", "**", "b", "**", "c", "**", "d.ts"].join("");
+    expect(() => globToRegExp(pattern)).toThrow(RangeError);
+    expect(() => globToRegExp(pattern)).toThrow(/too complex/);
+    expect(GLOB_MAX_UNBOUNDED_GROUPS).toBe(3);
+  });
+
+  it("rejects overlapping single-star runs in one segment", () => {
+    // Each `a*` compiles to a separator-bounded run, but adjacent runs overlap
+    // on the literal `a`, so the backtrack tree still grows combinatorially.
+    expect(() => globToRegExp(`${"a*".repeat(24)}z`)).toThrow(RangeError);
+    // Single stars separated by literal slashes are disjoint per segment: legal.
+    expect(globToRegExp("*/*/*/*/*/*.ts").test("a/b/c/d/e/f.ts")).toBe(true);
+  });
+
+  it("compounds overlap charges across segments", () => {
+    // Two runs per segment stay under the per-segment cap, so only the
+    // cumulative counter can reject the fourth charged segment; a failed
+    // match multiplies every run's split count across segments.
+    expect(globToRegExp(`${"a*a*/".repeat(3)}z`).test("a1a2/a3a4/a5a6/z")).toBe(true);
+    expect(() => globToRegExp(`${"a*a*/".repeat(GLOB_MAX_UNBOUNDED_GROUPS + 1)}z`)).toThrow(RangeError);
+    // Runs of one group per segment add no ambiguity: still legal.
+    expect(globToRegExp("a*/b*/c*/d*/e*/f.ts").test("a1/b2/c3/d4/e5/f.ts")).toBe(true);
+  });
+
+  it("surfaces the complexity cap as a tool error, not a thrown exception", async () => {
+    const ws = tempWorkspace();
+    try {
+      const pattern = "**/a/**/b/**/c/**/d.ts";
+      const outcome = await globTool.execute(ws, { pattern });
+      expect(outcome.ok).toBe(false);
+      expect(outcome.code).toBe("workspace_error");
+      expect(outcome.result).toContain("too complex");
+    } finally {
+      ws.cleanup();
+    }
   });
 });

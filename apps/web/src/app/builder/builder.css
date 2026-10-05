@@ -59,10 +59,14 @@
 }
 
 /* Collapsed side: only the drag line remains (no rail card). Click expands;
-   dragging pulls the column open at the dragged width. */
+   dragging pulls the column open at the dragged width. The element is a real
+   <button>, so reset the UA chrome preflight does not cover. */
 .builder-edge-line {
+  display: block;
   position: relative;
   width: 10px;
+  border: 0;
+  padding: 0;
   cursor: col-resize;
   touch-action: none;
   /* A drag starting here must not begin a text selection. */

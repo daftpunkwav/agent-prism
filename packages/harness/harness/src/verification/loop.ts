@@ -137,7 +137,7 @@ export async function* runVerificationLoop(
 
     let feedback = sanitizePromptAdditions([insight]);
     if (deps.level === "self_evolve") {
-      const edit = await proposeHarnessEdit(deps.question, answer, insight, feedback, deps.llm, {
+      const edit = await proposeHarnessEdit(deps.question, insight, feedback, deps.llm, {
         signal: deps.signal,
         tracker: deps.tracker,
       });

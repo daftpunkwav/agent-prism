@@ -39,7 +39,9 @@ function contextOf(run: CustomDimensionRun): CustomDimensionContext {
 export function applyCustomContextTuning(
   activeDimensions: readonly ActiveCustomDimension[],
   base: ContextTuning,
-  run: CustomDimensionRun,
+  // Signature stays aligned with the other three folds; the contextTuning hook
+  // contract intentionally carries no run context (it folds budgets only).
+  _run: CustomDimensionRun,
 ): ContextTuning {
   let current = base;
   for (const { dimension, value } of activeDimensions) {

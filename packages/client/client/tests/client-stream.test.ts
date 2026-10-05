@@ -175,7 +175,7 @@ describe("streamMatrixRun", () => {
     const controller = new AbortController();
     vi.stubGlobal(
       "fetch",
-      stubFetch((_url, init) => {
+      stubFetch((_url, _init) => {
         controller.abort();
         return Promise.reject(new DOMException("The operation was aborted.", "AbortError"));
       }),

@@ -182,7 +182,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
             onClick={onApplySwap}
           >
             {t("builder.applySwap")}
-            {dirty ? <span className="builder-dirty-dot" aria-label={t("builder.dirty")} /> : null}
+            {dirty ? <span className="builder-dirty-dot" role="img" aria-label={t("builder.dirty")} /> : null}
           </button>
         </div>
       </header>

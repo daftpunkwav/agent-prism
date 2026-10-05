@@ -29,7 +29,7 @@ describe("verification injection gates", () => {
 
   it("proposeHarnessEdit proposes nothing without invoking the model", async () => {
     const llm = mockLlm();
-    const result = await proposeHarnessEdit("q", "a", POISONED, "prompt", llm as never);
+    const result = await proposeHarnessEdit("q", POISONED, "prompt", llm as never);
     expect(result).toEqual({ prompt_additions: [], reasoning: "Self-evolve input rejected" });
     expect(llm.invoke).not.toHaveBeenCalled();
   });

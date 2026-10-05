@@ -43,9 +43,10 @@ describe("WorkspaceRegistry LRU window", () => {
   it("prefers evicting workspaces idle beyond the tuned window", () => {
     // Window 100s: the older workspace (idle 200s) is preferred over the newest (idle 50s).
     const { registry, advance } = makeRegistry(2, { lruActiveWindowSeconds: 100 });
-    const older = registry.create("ws-older");
+    // Created for their TTL-timing side effects; assertions address them by name.
+    registry.create("ws-older");
     advance(150);
-    const newer = registry.create("ws-newer");
+    registry.create("ws-newer");
     advance(50);
     const forced = registry.create("ws-forced");
     expect(registry.get("ws-older")).toBeUndefined();
@@ -59,7 +60,7 @@ describe("WorkspaceRegistry pin", () => {
   it("keeps a pinned workspace across TTL expiry while an idle unpinned one is evicted", () => {
     const { registry, advance } = makeRegistry();
     const pinned = registry.create("ws-pinned");
-    const loose = registry.create("ws-loose");
+    registry.create("ws-loose");
     registry.pin("ws-pinned");
 
     advance(7200); // past the default 3600s TTL for both

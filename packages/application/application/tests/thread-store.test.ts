@@ -11,7 +11,7 @@
 import { describe, expect, it } from "vitest";
 import { PipelineConfigSchema, type Clock, type IdGenerator, type ThreadMessage } from "@agentprism/contracts";
 import { AtomicJsonFile } from "@agentprism/persistence";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ThreadStoreCaps } from "../src/thread-store.js";

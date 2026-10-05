@@ -455,7 +455,7 @@ export function BuilderClient() {
           }
         });
     },
-    [activeId, composition, refreshSessions, sessionName, t],
+    [activeId, composition, refreshSessions, sessionName, t, locale],
   );
 
   const handleStop = useCallback(() => {
@@ -514,11 +514,15 @@ export function BuilderClient() {
   /** Press-and-release on a handle or edge line toggles that column; a press
    * that travels drags — resizing an open column, or pulling a collapsed one
    * open at the dragged width. Teardown covers pointercancel and unmount. */
+  const edgeGestureClick = useRef(false);
   const startGesture = useCallback(
-    (side: "left" | "right") => (event: React.PointerEvent<HTMLDivElement>) => {
+    (side: "left" | "right") => (event: React.PointerEvent<HTMLElement>) => {
       // Only the primary pointer with the primary button starts a gesture:
       // right/middle clicks and extra touch fingers must be ignored.
       if (event.button !== 0 || !event.isPrimary) return;
+      // The click this gesture dispatches after pointerup must not re-toggle
+      // (onUp already did); only gesture-free clicks fall through to onClick.
+      edgeGestureClick.current = true;
       const pointerId = event.pointerId;
       const startX = event.clientX;
       const startY = event.clientY;
@@ -564,6 +568,9 @@ export function BuilderClient() {
       const onCancel = (cancel: PointerEvent) => {
         if (cancel.pointerId !== pointerId) return;
         // Interrupted gestures (palm rejection, alt-tab, stylus) settle silently.
+        // pointercancel suppresses the follow-up click, so the swallow flag
+        // must not outlive the gesture.
+        edgeGestureClick.current = false;
         teardown();
       };
       const teardown = () => {
@@ -587,6 +594,20 @@ export function BuilderClient() {
 
   /** Keyboard resize step (px per ArrowLeft/ArrowRight press). */
   const RESIZE_STEP = 16;
+
+  /** Click activation for the collapsed edge buttons: assistive-tech activate
+   * actions dispatch click without keydown. The click a pointer gesture emits
+   * after its own pointerup toggle is swallowed via edgeGestureClick. */
+  const handleEdgeActivate = useCallback(
+    (side: "left" | "right") => () => {
+      if (edgeGestureClick.current) {
+        edgeGestureClick.current = false;
+        return;
+      }
+      toggleSide(side);
+    },
+    [toggleSide],
+  );
 
   /** Arrow keys resize; Enter/Space toggles the column (pointer parity). */
   const resizeByKeyboard = useCallback(
@@ -762,18 +783,17 @@ export function BuilderClient() {
           onKeyDown={resizeByKeyboard("left")}
         />
       </aside>
-      ) : (
-        <div
-          className="builder-edge-line"
-          data-side="left"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={t("builder.expandBoard")}
-          tabIndex={0}
-          onPointerDown={startGesture("left")}
-          onKeyDown={resizeByKeyboard("left")}
-        />
-      )}
+        ) : (
+          <button
+            type="button"
+            className="builder-edge-line"
+            data-side="left"
+            aria-label={t("builder.expandBoard")}
+            onPointerDown={startGesture("left")}
+            onKeyDown={resizeByKeyboard("left")}
+            onClick={handleEdgeActivate("left")}
+          />
+        )}
 
       <section className="builder-col builder-col-chat">
         <ChatPanel
@@ -809,15 +829,17 @@ export function BuilderClient() {
         />
       </aside>
       ) : (
-        <div
+        // Collapsed state: the handle only expands the pane (Enter/Space toggle,
+        // arrows are inert), so a real button is the honest semantics; a
+        // focusable separator would additionally require value attributes.
+        <button
+          type="button"
           className="builder-edge-line"
           data-side="right"
-          role="separator"
-          aria-orientation="vertical"
           aria-label={t("builder.expandTrace")}
-          tabIndex={0}
           onPointerDown={startGesture("right")}
           onKeyDown={resizeByKeyboard("right")}
+          onClick={handleEdgeActivate("right")}
         />
       )}
 

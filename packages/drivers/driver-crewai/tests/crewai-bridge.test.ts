@@ -6,7 +6,7 @@
  *              prompt assembly (system prompt, context pipeline, prior history).
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
 import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmMessage } from "@agentprism/contracts";
 import { PipelineConfigSchema, extractAnswerFromEvents } from "@agentprism/contracts";
