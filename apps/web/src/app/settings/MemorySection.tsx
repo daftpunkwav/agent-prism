@@ -26,8 +26,8 @@ export function MemorySection({ onFlash }: { onFlash(message: string): void }) {
   const reload = useCallback((): void => {
     fetchMemoryStatus()
       .then(setStatus)
-      .catch((err: Error) => setLoadError(err.message))
-      .finally(() => setLoading(false));
+      .catch((err: Error) => { setLoadError(err.message); })
+      .finally(() => { setLoading(false); });
   }, []);
 
   useEffect(() => {

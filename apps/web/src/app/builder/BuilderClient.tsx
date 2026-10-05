@@ -184,12 +184,12 @@ export function BuilderClient() {
   useEffect(() => {
     void fetchBuilderCatalog()
       .then(setCatalog)
-      .catch(() => setCatalog(null));
+      .catch(() => { setCatalog(null); });
     void refreshSessions()
       .then((list) => {
         if (list.length > 0) switchSession(list[0]?.id ?? null);
       })
-      .catch(() => setSessions([]));
+      .catch(() => { setSessions([]); });
   }, [refreshSessions, switchSession]);
 
   // Load persisted side widths/collapse after mount (never during render: the
@@ -210,9 +210,9 @@ export function BuilderClient() {
   // A width valid at one window size can breach the fraction bounds at another;
   // re-clamp open side widths whenever the viewport changes.
   useEffect(() => {
-    const onViewportResize = () => setLayout(clampLayout);
+    const onViewportResize = () => { setLayout(clampLayout); };
     window.addEventListener("resize", onViewportResize);
-    return () => window.removeEventListener("resize", onViewportResize);
+    return () => { window.removeEventListener("resize", onViewportResize); };
   }, []);
 
   // A pointer gesture outlives renders: if the shell unmounts mid-press its
@@ -665,7 +665,7 @@ export function BuilderClient() {
                       value={renameDraft}
                       maxLength={60}
                       aria-label={t("builder.renameAria")}
-                      onChange={(e) => setRenameDraft(e.target.value)}
+                      onChange={(e) => { setRenameDraft(e.target.value); }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") void handleRename(session.id, renameDraft);
                         if (e.key === "Escape") setRenamingId(null);
@@ -683,7 +683,7 @@ export function BuilderClient() {
                       type="button"
                       className="builder-session-delete"
                       aria-label={t("builder.renameCancel")}
-                      onClick={() => setRenamingId(null)}
+                      onClick={() => { setRenamingId(null); }}
                     >
                       <X size={12} />
                     </button>
@@ -781,7 +781,7 @@ export function BuilderClient() {
           hasSession={activeId !== null}
           running={chatBusy}
           liveSegments={liveSegments}
-          onSend={(message, attachments) => handleSend(message, attachments)}
+          onSend={(message, attachments) => { handleSend(message, attachments); }}
           onStop={handleStop}
         />
       </section>
@@ -825,7 +825,7 @@ export function BuilderClient() {
         pending={pendingAsk}
         submitting={askSubmitting}
         onAnswer={handleAskAnswer}
-        onClose={() => setPendingAsk(null)}
+        onClose={() => { setPendingAsk(null); }}
       />
     </div>
   );

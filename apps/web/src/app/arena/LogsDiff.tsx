@@ -202,7 +202,7 @@ export function LogsDiff({ columns, resolveLabel, running }: LogsDiffProps) {
   const viewButton = (mode: LogsViewMode, label: string, icon: React.ReactNode) => (
     <button
       type="button"
-      onClick={() => setView(mode)}
+      onClick={() => { setView(mode); }}
       className={
         "inline-flex items-center gap-1 rounded-[var(--radius-sm)] border px-2 py-0.5 text-[11px] transition-colors " +
         (view === mode

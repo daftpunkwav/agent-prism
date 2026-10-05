@@ -58,9 +58,9 @@ export function installSignalHandlers(stop: () => Promise<void>, options: { shut
         process.exit(1);
       });
   };
-  const onSigint = (): void => shutdown("SIGINT");
-  const onSigterm = (): void => shutdown("SIGTERM");
-  const onSigbreak = (): void => shutdown("SIGBREAK");
+  const onSigint = (): void => { shutdown("SIGINT"); };
+  const onSigterm = (): void => { shutdown("SIGTERM"); };
+  const onSigbreak = (): void => { shutdown("SIGBREAK"); };
   process.on("SIGINT", onSigint);
   process.on("SIGTERM", onSigterm);
   // SIGBREAK exists on Windows (Ctrl+Break); elsewhere process.on is a no-op

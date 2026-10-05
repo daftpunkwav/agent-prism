@@ -125,7 +125,7 @@ export function AnswerAlignment({
             {open ? t("arena.diff.collapse") : t("arena.diff.answerAlignTitle")}
           </summary>
           <ul className="answer-align-list mt-2">
-            {pairwise[0]!.rows.map((row, index) => (
+            {pairwise[0]?.rows.map((row, index) => (
               <AlignedRow
                 key={index}
                 row={row}

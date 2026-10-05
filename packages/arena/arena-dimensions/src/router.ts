@@ -76,7 +76,7 @@ export class DimensionRouter {
   listBaselineFields(): ReturnType<typeof listBaselineFields> {
     return listBaselineFields({
       dimensionCatalog: this.dimensionCatalog,
-      ensureModelSynced: () => this.sync.ensureModelSynced(),
+      ensureModelSynced: () => { this.sync.ensureModelSynced(); },
     });
   }
 

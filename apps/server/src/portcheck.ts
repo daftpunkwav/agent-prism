@@ -69,8 +69,8 @@ export function portInUse(host: string, port: number, timeoutMs = 500): Promise<
           finish(inUse);
         };
         socket.once("connect", () => done(true));
-        socket.once("error", () => done(false));
-        socket.setTimeout(timeoutMs, () => done(false));
+        socket.once("error", () => { done(false); });
+        socket.setTimeout(timeoutMs, () => { done(false); });
       });
     });
     try {

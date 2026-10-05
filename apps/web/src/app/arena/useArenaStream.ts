@@ -352,7 +352,7 @@ export function useArenaStream() {
           baseline,
           // Malformed SSE events must not be dropped silently: leave a trace to catch missing Trace segments
           onParseError: (raw, err) =>
-            console.warn(`[arena] SSE event parse failed: ${err.message} raw=${raw.slice(0, 120)}`),
+            { console.warn(`[arena] SSE event parse failed: ${err.message} raw=${raw.slice(0, 120)}`); },
           columnSessions,
           attachments,
           language,

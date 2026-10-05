@@ -389,8 +389,8 @@ function GuideToc() {
       },
       { rootMargin: "-20% 0px -55% 0px", threshold: [0.15, 0.4, 0.7] },
     );
-    sections.forEach((s) => io.observe(s));
-    return () => io.disconnect();
+    sections.forEach((s) => { io.observe(s); });
+    return () => { io.disconnect(); };
   }, [tocGroups]);
 
   return (

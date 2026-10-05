@@ -275,7 +275,7 @@ export function AskUserModal({ pending, submitting, onAnswer, onClose, variant =
                       value={drafts[question.id] ?? ""}
                       placeholder={t("common.askAnswerPlaceholder")}
                       disabled={submitting}
-                      onChange={(event) => setDrafts((prev) => ({ ...prev, [question.id]: event.target.value }))}
+                      onChange={(event) => { setDrafts((prev) => ({ ...prev, [question.id]: event.target.value })); }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" && !event.nativeEvent.isComposing) {
                           event.preventDefault();

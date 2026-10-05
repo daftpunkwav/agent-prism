@@ -147,7 +147,7 @@ export function ArenaClient() {
   const allSettled = columnList.length >= 1 && columnList.every((c) => c.metrics || c.error);
   // "Completed" = has metrics and success: backend failed columns also carry all-zero metrics (success:false); checking existence alone would count failed turns as complete
   const allCompleted =
-    columnList.length >= 1 && columnList.every((c) => c.metrics && c.metrics.success);
+    columnList.length >= 1 && columnList.every((c) => c.metrics?.success);
 
   // Auto-judge orchestration; resetJudge's reference is stable (useCallback([])), so runArena can call it in a closure
   const { resetJudge } = useArenaAutoJudge({
@@ -401,7 +401,7 @@ export function ArenaClient() {
       >
         <ArenaSetupModule
           baselineOpen={baselineOpen}
-          onOpenBaseline={() => setBaselineOpen(true)}
+          onOpenBaseline={() => { setBaselineOpen(true); }}
           running={running}
           meta={meta}
           dimension={dimension}
@@ -410,20 +410,20 @@ export function ArenaClient() {
           activeSelections={activeSelections}
           onToggleSelection={toggleSelection}
           explorerOpen={explorerOpen}
-          onToggleExplorer={() => setExplorerOpen((v) => !v)}
+          onToggleExplorer={() => { setExplorerOpen((v) => !v); }}
         />
 
         <BaselineModal
           open={baselineOpen}
-          onClose={() => setBaselineOpen(false)}
+          onClose={() => { setBaselineOpen(false); }}
           running={running}
           meta={meta}
           dimension={dimension}
           baseline={baseline}
-          onBaselineFieldChange={(field, value) => setBaseline((prev) => ({ ...prev, [field]: value }))}
+          onBaselineFieldChange={(field, value) => { setBaseline((prev) => ({ ...prev, [field]: value })); }}
           onResetBaseline={resetBaseline}
           showPromptBanner={showPromptBanner}
-          onDismissPromptBanner={() => setShowPromptBanner(false)}
+          onDismissPromptBanner={() => { setShowPromptBanner(false); }}
         />
 
         <ComposerBar
@@ -456,14 +456,14 @@ export function ArenaClient() {
             <div role="tablist" aria-label={t("arena.stage.tabsAria")} className="arena-stage-tabs">
               <MainTabButton
                 active={mainTab === "results"}
-                onClick={() => setMainTab("results")}
+                onClick={() => { setMainTab("results"); }}
                 icon={<Terminal className="h-3.5 w-3.5" />}
                 label={t("arena.tab.results")}
                 badge={running ? t("arena.tab.running") : columnList.length > 0 ? columnList.length : null}
               />
               <MainTabButton
                 active={mainTab === "report"}
-                onClick={() => setMainTab("report")}
+                onClick={() => { setMainTab("report"); }}
                 icon={<BarChart3 className="h-3.5 w-3.5" />}
                 label={t("arena.tab.report")}
                 disabled={!hasMetrics}
@@ -472,7 +472,7 @@ export function ArenaClient() {
               />
               <MainTabButton
                 active={mainTab === "diff"}
-                onClick={() => setMainTab("diff")}
+                onClick={() => { setMainTab("diff"); }}
                 icon={<GitCompare className="h-3.5 w-3.5" />}
                 label={t("arena.tab.diff")}
                 disabled={!allCompleted}
@@ -480,13 +480,13 @@ export function ArenaClient() {
               />
               <MainTabButton
                 active={mainTab === "logs"}
-                onClick={() => setMainTab("logs")}
+                onClick={() => { setMainTab("logs"); }}
                 icon={<FileJson className="h-3.5 w-3.5" />}
                 label={t("arena.tab.logs")}
               />
               <MainTabButton
                 active={mainTab === "matrix"}
-                onClick={() => setMainTab("matrix")}
+                onClick={() => { setMainTab("matrix"); }}
                 icon={<BarChart3 className="h-3.5 w-3.5" />}
                 label={t("arena.tab.matrix")}
               />
@@ -575,7 +575,7 @@ export function ArenaClient() {
             resolveLabel={resolvePipelineLabel}
             running={running}
             refreshToken={workspaceRefreshToken}
-            onClose={() => setExplorerOpen(false)}
+            onClose={() => { setExplorerOpen(false); }}
           />
         )}
       </div>

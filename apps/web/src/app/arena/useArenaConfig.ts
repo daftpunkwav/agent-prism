@@ -82,7 +82,7 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
       .finally(() => {
         if (!ac.signal.aborted) setMetaLoading(false);
       });
-    return () => ac.abort();
+    return () => { ac.abort(); };
   }, [setError, t]);
 
   // Preference persistence: every settled baseline change writes through to

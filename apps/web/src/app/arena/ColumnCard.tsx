@@ -175,7 +175,7 @@ export const ColumnCard = memo(function ColumnCard({
             <button
               type="button"
               className="btn-ghost column-seed-btn !h-7 !px-2 text-[11px]"
-              onClick={() => onUseAsSeed(col.label)}
+              onClick={() => { onUseAsSeed(col.label); }}
               title={t("arena.results.useAsSeedTitle")}
             >
               {t("arena.results.useAsSeed")}
@@ -185,7 +185,7 @@ export const ColumnCard = memo(function ColumnCard({
             <button
               type="button"
               className="btn-ghost column-stop-btn !h-7 !px-2 text-[11px]"
-              onClick={() => onStop(col.label)}
+              onClick={() => { onStop(col.label); }}
               disabled={stopping}
               title={t("arena.results.stopColumnTitle")}
               aria-label={t("arena.results.stopColumnTitle")}
