@@ -81,7 +81,7 @@ describe("roots/list serving", () => {
           void request;
         },
         async *messages(): AsyncGenerator<string> {
-          return;
+          yield* [];
         },
         kill(): void {},
         exited: async () => ({ code: 0, signal: null }),

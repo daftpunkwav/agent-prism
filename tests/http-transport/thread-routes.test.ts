@@ -9,7 +9,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { AppError } from "@agentprism/application";
-import { buildTestApp, mockDeps } from "./mock-deps.js";
+import { buildTestApp } from "./mock-deps.js";
 import type { HttpApplicationDeps } from "@agentprism/http-runtime";
 
 type ThreadsDeps = HttpApplicationDeps["threads"];
@@ -30,9 +30,12 @@ function threadDouble(overrides: Partial<ThreadsDeps> = {}): ThreadsDeps {
 
 describe("http-app thread run streaming", () => {
   it("surfaces in-stream run faults on the thread SSE channel", async () => {
-    const run = vi.fn(() => (async function* () {
-      throw new Error("thread boom");
-    })());
+    const run = vi.fn(() => (
+      // biome-ignore lint/correctness/useYield: the stream faults before emitting any event
+      async function* () {
+        throw new Error("thread boom");
+      }
+    )());
     const app = buildTestApp({ threads: threadDouble({ run }) } as Partial<HttpApplicationDeps>);
 
     const res = await app.request("/api/threads/t1/run", {

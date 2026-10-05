@@ -23,7 +23,12 @@ import { THREAD_BASELINE_FIELDS, ThreadService, type ThreadWorkspaces } from "..
 
 const clock: Clock = { now: () => 1_700_000_000_000 };
 let idCounter = 0;
-const ids: IdGenerator = { next: () => `id${(idCounter += 1).toString().padStart(4, "0")}` };
+const ids: IdGenerator = {
+  next: () => {
+    idCounter += 1;
+    return `id${idCounter.toString().padStart(4, "0")}`;
+  },
+};
 
 function tempFile(): string {
   return join(mkdtempSync(join(tmpdir(), "thread-svc-")), `${randomUUID()}.json`);
@@ -193,7 +198,7 @@ describe("ThreadService.run (resume path)", () => {
 
     // A pinned value keeps every resumed turn on the same custom axis: the record
     // travels in the wire baseline and passes the creation-time replay validation.
-    expect((requests[0]?.baseline as Record<string, unknown>).custom).toEqual({ summary_budget: "8000" });
+    expect((requests[0]?.baseline as Record<string, unknown> | undefined)?.custom).toEqual({ summary_budget: "8000" });
     expect(validations[0]?.baseline.custom).toEqual({ summary_budget: "8000" });
   });
 

@@ -16,7 +16,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface NumberInputProps {
   value: number;
@@ -55,17 +55,17 @@ export function NumberInput({
   const valueRef = useRef(value);
   valueRef.current = value;
 
-  const writeText = (next: string) => {
+  const writeText = useCallback((next: string) => {
     textRef.current = next;
     setText(next);
-  };
+  }, []);
 
   // Sync on actual value changes only. A rejected edit leaves the external
   // value untouched, so this effect does not erase the text the user is fixing.
   useEffect(() => {
     writeText(String(value));
     setInvalid(false);
-  }, [value]);
+  }, [value, writeText]);
 
   const commit = () => {
     const current = valueRef.current;

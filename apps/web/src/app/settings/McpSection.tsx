@@ -173,6 +173,8 @@ function ServerForm({
           onChange={(event) => { patch({ toolsText: event.target.value }); }}
         />
       </div>
+      {/* The label deliberately forwards clicks to the embedded switch button. */}
+      {/* biome-ignore lint/a11y/noLabelWithoutControl: click-anywhere toggle row around a button control */}
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
         <Toggle checked={draft.enabled} onChange={(next) => patch({ enabled: next })} label={t("settings.mcp.enabledAria")} />
         {t("settings.mcp.enabledLabel")}

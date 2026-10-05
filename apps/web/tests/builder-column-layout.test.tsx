@@ -20,7 +20,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import type { BuilderCatalog } from "@agentprism/client";
 import { I18nProvider } from "@/i18n/I18nProvider";
-import { getCatalog } from "@/i18n/catalogs";
 import { BuilderClient } from "../src/app/builder/BuilderClient.js";
 
 vi.mock("@agentprism/client", async (importOriginal) => ({
@@ -36,7 +35,6 @@ const SESSIONS = [{ id: "s1", name: "My agent", running: false, turn_count: 0, w
 const DETAIL = { session: { id: "s1", name: "My agent", composition: COMPOSITION, history: [], workspace: "" }, records: [] };
 
 const LAYOUT_KEY = "agentprism.builder.layout";
-const en = () => getCatalog("en").builder;
 
 /** jsdom reports no layout: the shell's column area is stubbed for the clamp math. */
 function stubColumnWidth(px: number): void {
@@ -87,7 +85,6 @@ const handleFor = (side: "left" | "right"): Element => {
 };
 
 const boardColumn = (): Element | null => document.querySelector(".builder-col-board");
-const traceColumn = (): Element | null => document.querySelector(".builder-col-trace");
 
 /** Press, move, release on one handle as a single gesture (one pointer, primary button). */
 function drag(side: "left" | "right", fromX: number, toX: number, options: { release?: boolean } = {}): void {

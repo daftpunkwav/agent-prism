@@ -77,6 +77,7 @@ function captureDriver(onContext: (ctx: AgentExecutionContext) => void): AgentDr
     displayName: "Stub",
     async *run(ctx: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
       onContext(ctx);
+      yield* [];
     },
   };
 }
@@ -141,6 +142,7 @@ describe("custom dimension runs", () => {
       displayName: "Stub",
       async *run(): AsyncGenerator<ArenaEvent> {
         driverRan = true;
+        yield* [];
       },
     };
     const logged: string[] = [];

@@ -153,6 +153,7 @@ describe("DeepAgentsDriver", () => {
       invoke: async () => {
         throw new Error("model exploded with credentials");
       },
+      // biome-ignore lint/correctness/useYield: the stream faults before emitting any event
       stream: async function* () {
         throw new Error("model exploded with credentials");
       },

@@ -56,9 +56,7 @@ function blend(fg: string, bg: string, alpha: number): string {
 /** Extracts flat `selector { decl; ... }` blocks with custom properties only. */
 function extractBlocks(css: string): Map<string, Record<string, string>> {
   const blocks = new Map<string, Record<string, string>>();
-  const re = /([^{}]+)\{([^{}]*)\}/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(css)) !== null) {
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const sel = (m[1] ?? "").trim().replace(/\s+/g, " ");
     const vars: Record<string, string> = {};
     for (const decl of (m[2] ?? "").split(";")) {

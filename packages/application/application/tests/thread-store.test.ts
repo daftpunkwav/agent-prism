@@ -22,7 +22,12 @@ const ids = createIdSequence();
 
 function createIdSequence(): IdGenerator {
   let n = 0;
-  return { next: () => `id${(n += 1).toString().padStart(4, "0")}` };
+  return {
+    next: () => {
+      n += 1;
+      return `id${n.toString().padStart(4, "0")}`;
+    },
+  };
 }
 
 function tempFilePath(): string {

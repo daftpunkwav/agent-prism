@@ -167,6 +167,7 @@ function SharedPrefixSummary({ columns, prefix, diverged }: { columns: TraceComp
       </div>
       <ol className="space-y-0.5 pt-1">
         {columns[0]?.toolCalls.slice(0, prefix).map((call, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: append-only trace render, positional identity is exact
           <li key={index} className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
             <span className="w-5 shrink-0 text-right">{t("arena.diff.sharedPrefixStep", { index: index + 1, tool: call.tool, detail: call.detail })}</span>
           </li>
@@ -235,6 +236,7 @@ function ColumnCompareCard({
               const diverged = divergeIndex >= 0 && index >= divergeIndex;
               return (
                 <li
+                  // biome-ignore lint/suspicious/noArrayIndexKey: append-only trace render; tool disambiguates
                   key={`${index}-${call.tool}`}
                   className={
                     "flex items-center gap-1.5 font-mono text-[11px] " +

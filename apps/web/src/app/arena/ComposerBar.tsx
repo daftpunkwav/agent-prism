@@ -236,9 +236,9 @@ export function ComposerBar({
         </div>
       </div>
       {attachments.length > 0 && (
-        <div className="composer-attachments" role="list" aria-label={t("arena.attach.label")}>
+        <ul className="composer-attachments" aria-label={t("arena.attach.label")}>
           {attachments.map((file) => (
-            <span key={file.name} className="composer-attachment-chip" role="listitem">
+            <li key={file.name} className="composer-attachment-chip">
               <span className="composer-attachment-name">{file.name}</span>
               <span className="composer-attachment-size">{(file.content.length / 1024).toFixed(1)} KB</span>
               <button
@@ -249,9 +249,9 @@ export function ComposerBar({
               >
                 <X className="h-2.5 w-2.5" aria-hidden />
               </button>
-            </span>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
       <div className="arena-run-strip">
         <button

@@ -3,16 +3,18 @@
  * @description Locks pre-paint parity: the inline snippet agrees with normalizeLocale and embeds storage keys.
  */
 
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { normalizeLocale } from "../src/i18n/locale.js";
 import { LOCALE_PICK_SNIPPET, localeBootstrapScript } from "../src/i18n/bootstrapScript.js";
 import { LOCALE_COOKIE_NAME, LOCALE_STORAGE_KEY } from "../src/i18n/constants.js";
 
 describe("pre-paint pick() parity", () => {
-  const makePick = new Function(
-    `${LOCALE_PICK_SNIPPET}; return __pickLocale;`,
-  ) as () => (raw: string | null | undefined) => string;
-  const pick = makePick();
+  // Executes the shipped snippet in a throwaway VM context: the test asserts the
+  // real inline script, not a reimplementation of it.
+  const pick = runInNewContext(`${LOCALE_PICK_SNIPPET}; __pickLocale;`, {}) as (
+    raw: string | null | undefined,
+  ) => string;
 
   /** Shared decision table — any new alias/rule must appear here for both implementations. */
   const table: Array<[string | null | undefined, string]> = [

@@ -144,7 +144,7 @@ export function runProcess(options: ProcessOptions): Promise<ProcessResult> {
   // cannot fake a setup failure (only the helper knows the nonce).
   const sandboxNonce = sandbox === undefined ? "" : createSandboxNonce();
   return new Promise((resolve) => {
-    let child;
+    let child: ChildProcess | undefined;
     try {
       const effectiveArgv = sandbox === undefined ? argv : sandboxSpawnTransform()(argv, cwd, sandbox, sandboxNonce);
       child = spawn(effectiveArgv[0] ?? "", effectiveArgv.slice(1), {

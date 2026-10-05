@@ -1,0 +1,16 @@
+---
+# Static-analysis file scoping.
+#
+# Test fixtures and build scripts intentionally contain dangerous-looking
+# content (fake credentials, traversal strings, adversarial regex corpora);
+# they are exercised by the repo's own CI (vitest, typecheck, lint), not by
+# SAST pattern matching. SECURITY.md publishes the security contact address
+# on purpose. Generated lockfiles are audited by the CI dependency gate.
+exclude_paths:
+  - "tests/**"
+  - "**/tests/**"
+  - "scripts/**"
+  - "**/scripts/**"
+  - "SECURITY.md"
+
+

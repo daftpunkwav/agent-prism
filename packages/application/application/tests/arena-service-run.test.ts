@@ -121,9 +121,9 @@ describe("ArenaService.run ledger isolation", () => {
     try {
       const runner = mockRunner();
       runner.acquireSlot = vi.fn().mockResolvedValue(vi.fn());
+      // biome-ignore lint/correctness/useYield: the stream faults before emitting any event
       async function* failingStream(): AsyncGenerator<never> {
         throw new Error("LLM failure");
-        yield undefined as never;
       }
       runner.streamParallel = vi.fn().mockReturnValue(failingStream());
       const service = new ArenaService({

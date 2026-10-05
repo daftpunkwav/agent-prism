@@ -26,6 +26,7 @@ export const CodeView = memo(function CodeView({ path, content }: { path: string
           token.kind === null ? (
             token.text
           ) : (
+            // biome-ignore lint/suspicious/noArrayIndexKey: stateless display tokens; positional identity is exact
             <span key={index} className={`hl-${token.kind}`}>
               {token.text}
             </span>

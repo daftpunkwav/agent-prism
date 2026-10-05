@@ -141,7 +141,7 @@ describe("ModelModal thinking cluster", () => {
     fireEvent.click(thinkingToggle());
     // "medium" exists in the standard option set, so that is the first pick.
     fireEvent.click(saveButton());
-    expect((onSave.mock.calls[0]?.[0] as ModelSlot).thinking_level).toBe("medium");
+    expect((onSave.mock.calls[0]?.[0] as ModelSlot | undefined)?.thinking_level).toBe("medium");
   });
 
   it("clearing the capability resets the level to off", () => {
@@ -149,7 +149,7 @@ describe("ModelModal thinking cluster", () => {
     fireEvent.click(thinkingToggle());
     fireEvent.click(thinkingToggle());
     fireEvent.click(saveButton());
-    expect((onSave.mock.calls[0]?.[0] as ModelSlot).thinking_level).toBe("off");
+    expect((onSave.mock.calls[0]?.[0] as ModelSlot | undefined)?.thinking_level).toBe("off");
   });
 
   it("drops the level to off when the capability is cleared even if a vendor level was chosen", () => {
@@ -157,7 +157,7 @@ describe("ModelModal thinking cluster", () => {
     const { onSave } = renderModal({ initial });
     fireEvent.click(thinkingToggle());
     fireEvent.click(saveButton());
-    expect((onSave.mock.calls[0]?.[0] as ModelSlot).thinking_level).toBe("off");
+    expect((onSave.mock.calls[0]?.[0] as ModelSlot | undefined)?.thinking_level).toBe("off");
   });
 
   it("switching to the budget tab applies budget mode and resets a level it cannot represent", () => {
@@ -346,7 +346,7 @@ describe("ModelModal thinking cluster", () => {
     const { onSave } = renderModal({ initial });
     fireEvent.click(saveButton());
     // "ghost" is not offered by the saved level list, so the selection cannot survive.
-    expect((onSave.mock.calls[0]?.[0] as ModelSlot).thinking_level).toBe("off");
+    expect((onSave.mock.calls[0]?.[0] as ModelSlot | undefined)?.thinking_level).toBe("off");
   });
 });
 

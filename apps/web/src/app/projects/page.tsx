@@ -31,7 +31,7 @@ export default function ProjectsPage() {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    (async () => {
+    void (async () => {
       try {
         const data = await listProjects(ac.signal);
         setProjects(data);
@@ -156,7 +156,7 @@ export default function ProjectsPage() {
                 <button
                   type="button"
                   className="btn-ghost !h-8 !w-8 !p-0 shrink-0 opacity-60 group-hover:opacity-100"
-                  onClick={() => onDelete(project.id)}
+                  onClick={() => void onDelete(project.id)}
                   disabled={deleting === project.id}
                   aria-label={t("projects.deleteAria", { name: project.name })}
                 >

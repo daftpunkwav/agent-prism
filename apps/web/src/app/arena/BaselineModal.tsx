@@ -357,6 +357,8 @@ export function BaselineModal({
                               onCommit: (next: string) => { onBaselineFieldChange(field.field, next); },
                             };
                             return (
+                              // The control branches below render the field's input: valid implicit label.
+                              // biome-ignore lint/a11y/noLabelWithoutControl: control arrives via the editor below (implicit labeling)
                               <label
                                 key={field.field}
                                 className="baseline-field"

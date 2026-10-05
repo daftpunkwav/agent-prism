@@ -58,10 +58,8 @@ function provider(endpoints: LlmEndpoint[], defaultEndpointId = ""): ProviderCon
 let server: Server | null = null;
 let serverUrl = "http://127.0.0.1:9/v1";
 const started = createServer((req, res) => {
-  let body = "";
-  req.on("data", (chunk) => {
-    body += chunk;
-  });
+  // The probe bodies are never inspected; the data handler just drains the request.
+  req.on("data", () => {});
   req.on("end", () => {
     res.setHeader("Content-Type", "application/json");
     if (req.url !== undefined && req.url.includes("/responses")) {

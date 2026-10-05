@@ -222,7 +222,10 @@ function makeService(
       },
       idGenerator: { next: (() => {
         let n = 0;
-        return () => `id-${(n += 1).toString(16)}`;
+        return () => {
+          n += 1;
+          return `id-${n.toString(16)}`;
+        };
       })() },
       clock: { now: () => 1_790_000_000_000 },
     }),
@@ -242,7 +245,10 @@ function makeService(
     workspaceRegistry: new WorkspaceRegistry({ runsRoot, clock: { now: () => 0 } }),
     idGenerator: { next: (() => {
       let n = 100;
-      return () => `run-${(n += 1).toString(16)}`;
+      return () => {
+        n += 1;
+        return `run-${n.toString(16)}`;
+      };
     })() },
     clock: { now: () => 1_790_000_000_000 },
     endpoints: () => [{ id: "ep1", name: "MiniMax", model: "abab", api_format: "openai_chat", thinking_capable: true, default: true }],
@@ -557,6 +563,7 @@ describe("BuilderService execution ledger", () => {
       get: () => ({
         frameworkId: "fake",
         displayName: "fake",
+        // biome-ignore lint/correctness/useYield: the stream faults before emitting any event
         async *run(): AsyncGenerator<ArenaEvent> {
           throw new Error("mid-turn boom");
         },

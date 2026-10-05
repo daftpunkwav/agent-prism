@@ -224,7 +224,11 @@ export class ArenaRunner {
           continue;
         }
         const event = item.value;
-        const bucket = (eventsByPipeline[event.pipeline] ??= []);
+        let bucket = eventsByPipeline[event.pipeline];
+        if (bucket === undefined) {
+          bucket = [];
+          eventsByPipeline[event.pipeline] = bucket;
+        }
         bucket.push(event);
         // Raw-log tail for the logs-comparison page: the exact stream the SSE
         // consumer sees, attributed per column by the event's pipeline label.

@@ -352,6 +352,8 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 <div className="space-y-2">
                   <p className="eyebrow">{t("settings.model.customLevels")}</p>
                   {draft.thinking_levels.map((lv, index) => (
+                    // Fully controlled inputs: no per-row local state, so positional keys cannot bleed state.
+                    // biome-ignore lint/suspicious/noArrayIndexKey: controlled rows without per-row state
                     <div key={index} className="flex items-center gap-2">
                       <input
                         className="form-input font-mono text-sm"
@@ -407,6 +409,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                     <span />
                   </div>
                   {budgetPairs.map((pair, index) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: controlled rows without per-row state
                     <div key={index} className="grid grid-cols-[1fr_7rem_7rem_2rem] items-center gap-2">
                       <input
                         className="form-input font-mono text-sm"

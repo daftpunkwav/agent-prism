@@ -14,7 +14,7 @@
  * already baked into the configured model, so request.modelSettings is not re-applied.
  */
 
-import type { LlmAdapter, LlmMessage, LlmToolCall, ToolDefinition } from "@agentprism/contracts";
+import type { LlmAdapter, LlmInvokeResult, LlmMessage, LlmToolCall, ToolDefinition } from "@agentprism/contracts";
 import { extractLlmUsage } from "@agentprism/harness";
 import type { AgentOutputItem, Model, ModelRequest, ModelResponse, StreamEvent } from "@openai/agents";
 import { Usage } from "@openai/agents";
@@ -166,7 +166,7 @@ export class ArenaModel implements Model {
   async getResponse(request: ModelRequest): Promise<ModelResponse> {
     const tools = toolDefinitions(request, this.resolveTool);
     this.hooks.onRequestStart?.();
-    let result;
+    let result: LlmInvokeResult;
     try {
       result = await this.llm.invoke(requestMessages(request), {
         ...(tools.length > 0 ? { tools } : {}),

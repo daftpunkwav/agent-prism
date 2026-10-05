@@ -98,6 +98,8 @@ export default function SettingsPage() {
     abortRef.current = ac;
     load(ac.signal);
     return () => { ac.abort(); };
+    // reloadNonce is the manual reload trigger, not a body read.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: re-fetch on manual reload
   }, [load, reloadNonce]);
 
   const flash = useCallback((msg: string) => {

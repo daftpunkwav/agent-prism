@@ -136,12 +136,15 @@ export function UiSelect({ value, onChange, options, disabled = false, ariaLabel
     if (top < 8) top = 8;
     if (left !== pos.left || top !== pos.top) setPos({ left, top, width: pos.width });
     pop.focus({ preventScroll: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pos must not re-trigger: this effect writes pos and would loop
+    // biome-ignore lint/correctness/useExhaustiveDependencies: same clamp-on-open contract as the react-hooks rule above
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     popRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+    // `active` is a trigger, not a read: the DOM node is located via data-active.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: re-run scrolls the newly active option into view
   }, [active, open]);
 
   const commit = useCallback(
@@ -243,6 +246,7 @@ export function UiSelect({ value, onChange, options, disabled = false, ariaLabel
             {options.map((entry) => {
               if (isGroup(entry)) {
                 return (
+                  // biome-ignore lint/a11y/useSemanticElements: ARIA listbox option groups have no HTML element equivalent
                   <div key={`group:${entry.group}`} role="group" aria-label={entry.group}>
                     <p className="ui-select-group-label">{entry.group}</p>
                     {entry.options.map((option) => {

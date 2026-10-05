@@ -128,6 +128,7 @@ describe("runAgentExecution cancellation", () => {
     const driver: AgentDriver = {
       frameworkId: "plain-failure",
       displayName: "PlainFailure",
+      // biome-ignore lint/correctness/useYield: the stream faults before emitting any event
       async *run(): AsyncGenerator<ArenaEvent> {
         throw new Error("boom");
       },

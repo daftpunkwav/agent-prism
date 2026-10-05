@@ -60,6 +60,7 @@ export default function LearnPage() {
 
             <ul className="space-y-1.5 text-xs">
               {step.items.map((item, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static never-reordered list
                 <li key={i} className="flex items-start gap-1.5">
                   <span className="mt-1.5 h-1 w-1 rounded-full bg-muted-foreground/50 shrink-0" aria-hidden />
                   <span className="text-muted-foreground leading-relaxed">{item}</span>

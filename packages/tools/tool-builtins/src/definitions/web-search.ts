@@ -97,7 +97,7 @@ async function executeWebSearch(
     return { result: setupHint(provider), fileDiff: null, ok: false, code: "workspace_error" };
   }
   const apiKey = String(env.SEARCH_API_KEY ?? "").trim();
-  if (apiKey === "") {
+  if (apiKey.length === 0) {
     return { result: setupHint(provider), fileDiff: null, ok: false, code: "workspace_error" };
   }
   const count = Math.min(MAX_COUNT, Math.max(1, readInt(args, "count", DEFAULT_COUNT)));

@@ -10,7 +10,13 @@
  * LangChain-free; used by the native driver and the autogen/crewai backends.
  */
 
-import type { ArenaEvent, LlmAssistantMessage, LlmMessage, LlmToolMessage } from "@agentprism/contracts";
+import type {
+  ArenaEvent,
+  LlmAssistantMessage,
+  LlmMessage,
+  LlmToolMessage,
+  ToolExecutionResult,
+} from "@agentprism/contracts";
 import { OBSERVATION_MAX_CHARS, sanitizeErrorMessage } from "@agentprism/contracts";
 import { blockedToolMessageContent, type AgentExecutionContext } from "@agentprism/harness";
 import { eventOf, emitToolOutcomeEvents, normalizeActionArgs, canonicalToolName } from "./event-translation.js";
@@ -76,7 +82,7 @@ export async function* executeToolCalls(
     stats.step += 1;
     yield eventOf({ type: "action", pipeline: label, step: stats.step, tool: name, args: normalizeActionArgs(name, args), workspace: workspaceName });
 
-    let execution;
+    let execution: ToolExecutionResult;
     try {
       execution = await tools.execute(name, args, { signal: context.signal });
     } catch (error) {

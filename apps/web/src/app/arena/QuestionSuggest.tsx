@@ -43,6 +43,8 @@ export function QuestionSuggest({ anchorRef, items, activeIndex, ariaLabel, onPi
     if (!rect) return;
     anchorRectRef.current = rect;
     setPos({ left: rect.left, top: rect.bottom + 4, width: rect.width });
+    // items is the re-measure trigger (open / query edits), not a body read.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: recompute anchor geometry when the list changes
   }, [items, anchorRef]);
 
   // Flip above the anchor when the list would run past the viewport bottom.

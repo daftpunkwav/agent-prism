@@ -24,8 +24,8 @@ const GROUP_KEYS = GROUPS.map((group) => group.key);
 function message(locale: "en" | "zh-CN", key: string): string | null {
   let node: unknown = getCatalog(locale);
   for (const part of key.split(".")) {
-    if (typeof node !== "object" || node === null) return null;
-    node = (node as Record<string, unknown>)[part];
+    if (typeof node !== "object" || node === null || !Object.hasOwn(node, part)) return null;
+    node = Reflect.get(node, part);
   }
   return typeof node === "string" ? node : null;
 }

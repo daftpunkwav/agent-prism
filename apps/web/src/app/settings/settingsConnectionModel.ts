@@ -11,7 +11,7 @@ import type { LlmEndpointUpdate, ProviderConfig } from "@agentprism/client";
 import { effectiveThinkingLevel, servableThinkingLevels } from "@agentprism/client";
 
 /** Displayed in place of a stored API key; never enters form state (empty means "keep stored"). */
-export const API_KEY_SENTINEL = "****************";
+export const API_KEY_SENTINEL = "*".repeat(16);
 
 /** Budget pairs exist only on anthropic_messages. Every other format stays on level mapping. */
 export function appliedThinkingMode(apiFormat: string, mode: string | undefined): "levels" | "budget" {

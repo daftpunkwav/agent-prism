@@ -131,6 +131,8 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
       writeAbortRef.current?.abort();
       writeAbortRef.current = null;
     };
+    // workspaceName is the switch trigger: the cleanup aborts the outgoing workspace's requests.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: cleanup runs on workspace change only
   }, [workspaceName]);
 
   const newListAbort = useCallback(() => {
@@ -240,7 +242,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
           setSelectedFile(null);
           setContent("");
         }
-        loadFiles();
+        await loadFiles();
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           showToast(t("arena.ws.deleteFailed", { message: (err as Error).message }));
@@ -262,13 +264,13 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
     loadFiles();
     // pollInterval <= 0: pause polling while the drawer is closed, avoiding background API hits
     if (pollInterval <= 0) return;
-    const timer = setInterval(loadFiles, pollInterval);
+    const timer = setInterval(() => void loadFiles(), pollInterval);
     return () => clearInterval(timer);
   }, [workspaceName, pollInterval, loadFiles]);
 
   useEffect(() => {
     if (refreshToken > 0 && workspaceName) {
-      loadFiles();
+      void loadFiles();
     }
   }, [refreshToken, workspaceName, loadFiles]);
 
@@ -360,7 +362,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
           <button
             type="button"
             className="btn-ghost !h-7 !w-7 !p-0"
-            onClick={loadFiles}
+            onClick={() => void loadFiles()}
             aria-label={t("arena.ws.refreshAria")}
             title={t("arena.ws.refreshTitle")}
           >
@@ -381,7 +383,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
                 </span>
                 <div className="flex items-center gap-0.5 shrink-0">
                   {markdownFile && !editing && (
-                    <span className="ws-view-toggle inline-flex items-center rounded-[var(--radius-sm)] border border-border overflow-hidden" role="group" aria-label={t("arena.ws.viewToggleAria")}>
+                    <fieldset className="ws-view-toggle inline-flex min-w-0 items-center rounded-[var(--radius-sm)] border border-border overflow-hidden" aria-label={t("arena.ws.viewToggleAria")}>
                       <button
                         type="button"
                         className="btn-ghost !h-6 !px-1.5 !rounded-none text-[11px]"
@@ -404,14 +406,14 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
                         <FileCode2 className="h-3 w-3" />
                         {t("arena.ws.sourceView")}
                       </button>
-                    </span>
+                    </fieldset>
                   )}
                   {editing ? (
                     <>
                       <button
                         type="button"
                         className="btn-ghost !h-7 !px-2 text-[11px]"
-                        onClick={saveFile}
+                        onClick={() => void saveFile()}
                         disabled={saving}
                       >
                         {saving ? (
@@ -452,7 +454,9 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
                       <button
                         type="button"
                         className="btn-ghost !h-7 !px-2 text-[11px]"
-                        onClick={() => selectedFile && deleteFile(selectedFile)}
+                        onClick={() => {
+                          if (selectedFile) void deleteFile(selectedFile);
+                        }}
                         aria-label={t("arena.ws.deleteAria")}
                         title={t("arena.ws.deleteTitle")}
                       >
@@ -512,6 +516,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
         </div>
 
         {/* Divider: drag to reallocate width between the two panes */}
+        {/* biome-ignore lint/a11y/useSemanticElements: interactive splitter; <hr> is a non-interactive thematic break */}
         <div
           className="ws-divider shrink-0 cursor-col-resize"
           role="separator"
@@ -531,6 +536,8 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
           <div className="soft-collapse shrink-0" data-open={showNewFile ? "true" : undefined}>
             <div className="soft-collapse-inner">
               <div className="px-2 py-1.5 border-b border-border flex items-center gap-1">
+                {/* The input appears with the new-file row and must take focus immediately. */}
+                {/* biome-ignore lint/a11y/noAutofocus: focus-on-mount is the create-file affordance */}
                 <input
                   autoFocus={showNewFile}
                   className="flex-1 h-7 px-2 text-xs bg-input border border-border rounded-none font-mono min-w-0"
@@ -546,7 +553,7 @@ export function WorkspacePanel({ workspaceName, pollInterval = 2000, refreshToke
                 <button
                   type="button"
                   className="btn-ghost !h-7 !px-2 text-[11px]"
-                  onClick={createFile}
+                  onClick={() => void createFile()}
                   tabIndex={showNewFile ? 0 : -1}
                 >
                   {t("arena.ws.create")}

@@ -64,13 +64,14 @@ export function ComparisonReport({
       ),
     [columnList],
   );
+  // cols is derived per render; memo on the underlying record instead of the array identity.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: columns is the record the cols projection derives from; memoizing on the array identity would recompute on every render
   const answers = useMemo(
     () =>
       cols.map((col) => ({
         label: col.label,
         text: extractFinalAnswer(col.events),
       })),
-    // cols is derived per render; memo on the underlying record instead of the array identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [columns],
   );

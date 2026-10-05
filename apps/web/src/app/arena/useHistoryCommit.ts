@@ -19,14 +19,13 @@ import { useT } from "@/i18n/useT";
 export function useHistoryCommit(options: {
   running: boolean;
   allSettled: boolean;
-  columns: Record<string, ColumnState>;
   columnList: ColumnState[];
   pushColumnTurn: (label: string, question: string, answer: string, toolRounds?: ToolRound[]) => void;
   rememberWorkspace: (label: string, workspace: string) => void;
   /** Post-commit coordination (upstream clears the input box). */
   onCommitted: () => void;
 }) {
-  const { running, allSettled, columns, columnList, pushColumnTurn, rememberWorkspace, onCommitted } = options;
+  const { running, allSettled, columnList, pushColumnTurn, rememberWorkspace, onCommitted } = options;
   const t = useT();
   const [historySeedLabel, setHistorySeedLabel] = useState<string | null>(null);
   /** Per-column turn numbers of the pending run (same formula the backend annotates events with). */
@@ -55,7 +54,9 @@ export function useHistoryCommit(options: {
       if (col.workspace) rememberWorkspace(col.label, col.workspace);
     }
     onCommitted();
-  }, [running, allSettled, columns, columnList, pushColumnTurn, rememberWorkspace, onCommitted, t]);
+    // columnList is memoized from the columns record upstream, so it already
+    // carries every settle-state change.
+  }, [running, allSettled, columnList, pushColumnTurn, rememberWorkspace, onCommitted, t]);
 
   return { historySeedLabel, setHistorySeedLabel, beginTurn, cancelTurn };
 }

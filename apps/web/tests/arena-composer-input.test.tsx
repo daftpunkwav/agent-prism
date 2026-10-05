@@ -14,7 +14,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ArenaEvent, ArenaMeta, TaskTemplate } from "@agentprism/client";
-import { fetchArenaMeta, fetchTemplates, judgeAnswers, streamArenaRun } from "@agentprism/client";
+import { judgeAnswers, streamArenaRun } from "@agentprism/client";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
 import { ArenaClient } from "../src/app/arena/ArenaClient.js";

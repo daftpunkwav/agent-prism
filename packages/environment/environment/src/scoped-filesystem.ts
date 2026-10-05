@@ -19,6 +19,7 @@ import {
   readdirSync,
   realpathSync,
   statSync,
+  type Stats,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -69,6 +70,8 @@ export class WorkspaceError extends Error {
 }
 
 const WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i;
+// Deliberate: this pattern exists to DETECT control characters in requested paths.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: detection pattern, control chars are the subject
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 
 /**
@@ -217,7 +220,7 @@ export class ScopedFileSystem {
     } catch {
       return [];
     }
-    let baseStat;
+    let baseStat: Stats;
     try {
       baseStat = statSync(base);
     } catch {
@@ -236,7 +239,7 @@ export class ScopedFileSystem {
         }
         for (const entry of entries) {
           const full = path.join(dir, entry);
-          let stat;
+          let stat: Stats;
           try {
             stat = lstatSync(full);
           } catch {

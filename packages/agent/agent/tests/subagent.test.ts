@@ -84,6 +84,7 @@ describe("runAgentExecution subagent delegation", () => {
         } else {
           throw new Error("boom");
         }
+        yield* [];
       },
     };
     const deps = testDeps();

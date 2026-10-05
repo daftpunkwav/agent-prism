@@ -70,6 +70,10 @@ describe("exportRegistryToMcp", () => {
     expect(exported).toHaveLength(2);
     expect(exported[0]?.name).toBe("alpha_tool");
     expect(exported[1]?.name).toBe("zeta_tool");
-    expect(() => exported.forEach((t) => McpToolSchema.parse(t))).not.toThrow();
+    expect(() =>
+      exported.forEach((t) => {
+        McpToolSchema.parse(t);
+      }),
+    ).not.toThrow();
   });
 });

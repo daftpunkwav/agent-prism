@@ -94,7 +94,9 @@ describe("attachRemoteMcpServers", () => {
     // The disabled entry must not spawn a process; the enabled one still attaches.
     expect(spawned).toBe(1);
     expect(clients).toHaveLength(1);
-    clients.forEach((client) => client.close());
+    clients.forEach((client) => {
+      client.close();
+    });
   });
 });
 
@@ -107,6 +109,7 @@ describe("runAgentExecution remote MCP toolset gate", () => {
       displayName: "Stub",
       async *run(ctx: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
         seen.push([...ctx.tools.names]);
+        yield* [];
       },
     };
     const deps = testDeps();
@@ -160,6 +163,7 @@ describe("runAgentExecution remote MCP wiring", () => {
     const driver = {
       frameworkId: "stub",
       displayName: "Stub",
+      // biome-ignore lint/correctness/useYield: the stub faults before emitting any event
       async *run(): AsyncGenerator<ArenaEvent> {
         throw new Error("driver exploded");
       },

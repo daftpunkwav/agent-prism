@@ -91,6 +91,7 @@ export function captureDriver(
     async *run(ctx: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
       onContext(ctx);
       if (failure !== undefined) throw failure;
+      yield* [];
     },
   };
 }
