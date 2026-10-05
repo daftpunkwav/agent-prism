@@ -31,7 +31,13 @@ describe("staticDefaultRuntimeKnobs", () => {
     for (const field of RUNTIME_KNOB_FIELDS) {
       const parts = field.key.split(".");
       let value: unknown = knobs;
-      for (const part of parts) value = (value as Record<string, unknown>)[part];
+      for (const part of parts) {
+        if (typeof value !== "object" || value === null || !Object.hasOwn(value, part)) {
+          value = undefined;
+          break;
+        }
+        value = Reflect.get(value, part);
+      }
       expect(value, `static default for ${field.key}`).toBe(field.default);
     }
   });

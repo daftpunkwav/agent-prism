@@ -38,6 +38,7 @@ describe("runAgentExecution session_query tool", () => {
         results.push((await ctx.tools.execute("session_query", { action: "read", id: "s1" })).result);
         results.push((await ctx.tools.execute("session_query", { action: "read", id: "nope" })).result);
         results.push((await ctx.tools.execute("session_query", { action: "bogus" })).result);
+        yield* [];
       },
     };
     await collect(testDeps(), testSpec(driver, { sessions: port() }));

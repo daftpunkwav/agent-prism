@@ -175,7 +175,7 @@ export function parseProviderConfig(raw: unknown, seed: LlmEnvSeed, ids: IdGener
 
 /** API key masking: empty stays empty; ≤8 chars always <short>; otherwise first/last 4. */
 export function maskApiKey(apiKey: string): string {
-  if (apiKey === "") return "";
+  if (apiKey.length === 0) return "";
   // A reference preview would otherwise leak the variable NAME (first/last 4
   // chars); references resolve at use time and are never secret themselves.
   if (CREDENTIAL_REFERENCE_PATTERN.test(apiKey.trim())) return "<env>";

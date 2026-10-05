@@ -70,7 +70,12 @@ function makeRunner(overrides?: {
     },
     idGenerator: (() => {
       let n = 0;
-      return { next: () => `id-${(n += 1)}` };
+      return {
+        next: () => {
+          n += 1;
+          return `id-${n}`;
+        },
+      };
     })(),
     clock: { now: () => 1_700_000_000_000 },
     maxConcurrentRuns: 2,

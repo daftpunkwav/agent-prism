@@ -51,7 +51,7 @@ export function resolveClaudeTransport(llmVendor: unknown, fallbackModel: string
         "the endpoint itself. Select a provider whose api_format is anthropic_messages for this column",
     );
   }
-  if (apiKey === "") {
+  if (apiKey.length === 0) {
     throw new ConfigurationError(
       "Claude Agent SDK needs the column's provider API Key: set it in Provider settings first",
     );

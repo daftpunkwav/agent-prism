@@ -263,13 +263,21 @@ function onChatModelStream(state: RunState, data: Record<string, unknown>): Aren
   const { thinking, text } = extractChunkParts(data.chunk);
   if (thinking !== "") {
     if (state.thinkingStep === null) {
-      state.thinkingStep = state.pendingStep ?? (state.step += 1);
+      state.thinkingStep = state.pendingStep;
+      if (state.thinkingStep === null) {
+        state.step += 1;
+        state.thinkingStep = state.step;
+      }
     }
     events.push(eventOf({ type: "thinking", pipeline: label, step: state.thinkingStep, content: thinking }));
   }
   if (text !== "") {
     if (state.streamingStep === null) {
-      state.streamingStep = state.pendingStep ?? (state.step += 1);
+      state.streamingStep = state.pendingStep;
+      if (state.streamingStep === null) {
+        state.step += 1;
+        state.streamingStep = state.step;
+      }
     }
     events.push(eventOf({ type: "thought_delta", pipeline: label, step: state.streamingStep, content: text }));
   }

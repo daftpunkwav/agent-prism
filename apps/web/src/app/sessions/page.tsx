@@ -46,7 +46,7 @@ export default function SessionsPage() {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    (async () => {
+    void (async () => {
       try {
         const [listed, fetchedStats] = await Promise.all([
           listSessions(
@@ -72,7 +72,7 @@ export default function SessionsPage() {
     return () => ac.abort();
   }, [kindFilter, statusFilter]);
 
-  const onToggleEntries = async (id: string) => {
+  const onToggleEntries = async (id: string): Promise<void> => {
     if (expanded === id) {
       setExpanded(null);
       return;
@@ -247,7 +247,7 @@ export default function SessionsPage() {
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-foreground"
-                      onClick={() => onToggleEntries(session.id)}
+                      onClick={() => void onToggleEntries(session.id)}
                       aria-expanded={expanded === session.id}
                     >
                       <ChevronDown
@@ -290,7 +290,7 @@ export default function SessionsPage() {
                   <button
                     type="button"
                     className="btn-ghost !h-8 !w-8 !p-0"
-                    onClick={() => onExport(session)}
+                    onClick={() => void onExport(session)}
                     aria-label={t("sessions.exportAria", { name: session.title })}
                     title={t("sessions.exportAction")}
                   >
@@ -299,7 +299,7 @@ export default function SessionsPage() {
                   <button
                     type="button"
                     className="btn-ghost !h-8 !w-8 !p-0"
-                    onClick={() => onDelete(session.id)}
+                    onClick={() => void onDelete(session.id)}
                     disabled={deleting === session.id}
                     aria-label={t("sessions.deleteAria", { name: session.title })}
                   >

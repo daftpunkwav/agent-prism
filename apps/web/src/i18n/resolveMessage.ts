@@ -16,8 +16,8 @@ import type { MessageKey, MessageParams } from "./catalogs/types";
 function lookup(catalog: unknown, key: string): string | null {
   let node: unknown = catalog;
   for (const part of key.split(".")) {
-    if (typeof node !== "object" || node === null) return null;
-    node = (node as Record<string, unknown>)[part];
+    if (typeof node !== "object" || node === null || !Object.hasOwn(node, part)) return null;
+    node = Reflect.get(node, part);
   }
   return typeof node === "string" ? node : null;
 }

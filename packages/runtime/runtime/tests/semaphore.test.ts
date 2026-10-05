@@ -44,7 +44,9 @@ describe("Semaphore", () => {
       releases.push(await Promise.race([semaphore.acquire(), failAfter(1000)]));
     }
     await expect(Promise.race([semaphore.acquire(), failAfter(100)])).rejects.toThrow("acquire timed out");
-    releases.forEach((release) => release());
+    releases.forEach((release) => {
+      release();
+    });
   });
 
   it("repeated release returns a permit only once", async () => {

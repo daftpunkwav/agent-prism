@@ -137,7 +137,7 @@ function crossSiteGuard(allowedOrigins: string[]): MiddlewareHandler {
 /** API token auth: /api/health and /health are exempt. */
 function apiTokenMiddleware(token: string): MiddlewareHandler {
   return async (c, next) => {
-    if (token === "") return next();
+    if (token.length === 0) return next();
     const path = new URL(c.req.url).pathname;
     if (path === "/api/health" || path === "/health") return next();
     const authorization = c.req.header("Authorization") ?? "";

@@ -141,6 +141,7 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
   );
 
   const urlPrefilledRef = useRef(false);
+  const servedDimensions = meta?.dimensions;
   useEffect(() => {
     if (urlPrefilledRef.current || metaLoading) return;
     const tid = searchParams.get("template");
@@ -158,7 +159,7 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
     // registered custom dimensions. Unknown ids still fall back to the default.
     if (dim && (DIMENSION_IDS as readonly string[]).includes(dim)) {
       setDimension(dim as DimensionId);
-    } else if (dim && meta?.dimensions.some((entry) => entry.id === dim)) {
+    } else if (dim && servedDimensions?.some((entry) => entry.id === dim)) {
       setDimension(dim as DimensionId);
     }
     const sel = searchParams.get("selections");
@@ -170,7 +171,7 @@ export function useArenaConfig(setError: (msg: string | null) => void) {
           .filter(Boolean),
       );
     }
-  }, [searchParams, metaLoading, templates, templatesLoaded, applyTemplate]);
+  }, [searchParams, metaLoading, templates, templatesLoaded, applyTemplate, servedDimensions]);
 
   const baselinePayload = useMemo(() => {
     // The compared dimension's own field is pinned by the axis, not the baseline:

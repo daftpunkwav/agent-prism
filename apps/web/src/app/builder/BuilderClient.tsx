@@ -153,6 +153,8 @@ export function BuilderClient() {
   const [wsRefresh, setWsRefresh] = useState(0);
   const [running, setRunning] = useState(false);
   const [layout, setLayout] = useState<BuilderLayout>(DEFAULT_LAYOUT);
+  /** Live column-area total (0 until first client measurement); anchors the splitter's percent value. */
+  const [shellTotal, setShellTotal] = useState(0);
   const layoutLoadedRef = useRef(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -208,9 +210,11 @@ export function BuilderClient() {
   }, [layout]);
 
   // A width valid at one window size can breach the fraction bounds at another;
-  // re-clamp open side widths whenever the viewport changes.
+  // re-clamp open side widths whenever the viewport changes. The measured total
+  // also anchors the splitter's percentage value for assistive technology.
   useEffect(() => {
-    const onViewportResize = () => { setLayout(clampLayout); };
+    const onViewportResize = () => { setLayout(clampLayout); setShellTotal(shellColumnWidth()); };
+    setShellTotal(shellColumnWidth());
     window.addEventListener("resize", onViewportResize);
     return () => { window.removeEventListener("resize", onViewportResize); };
   }, []);
@@ -680,6 +684,8 @@ export function BuilderClient() {
                 <Bot size={13} />
                 {renamingId === session.id ? (
                   <span className="builder-session-rename">
+                    {/* Inline rename must take focus on mount: the user just clicked rename. */}
+                    {/* biome-ignore lint/a11y/noAutofocus: focus-on-mount is the rename affordance */}
                     <input
                       autoFocus
                       className="builder-rename-input"
@@ -772,12 +778,16 @@ export function BuilderClient() {
         ) : (
           <div className="builder-trace-empty">{t("builder.noSession")}</div>
         )}
+        {/* biome-ignore lint/a11y/useSemanticElements: interactive splitter; <hr> is a non-interactive thematic break */}
         <div
           className="builder-resize-handle"
           data-side="left"
           role="separator"
           aria-orientation="vertical"
           aria-label={t("builder.boardHandle")}
+          aria-valuenow={shellTotal > 0 ? Math.round((layout.leftW / shellTotal) * 100) : 0}
+          aria-valuemin={0}
+          aria-valuemax={100}
           tabIndex={0}
           onPointerDown={startGesture("left")}
           onKeyDown={resizeByKeyboard("left")}
@@ -823,6 +833,9 @@ export function BuilderClient() {
           role="separator"
           aria-orientation="vertical"
           aria-label={t("builder.traceHandle")}
+          aria-valuenow={shellTotal > 0 ? Math.round(((shellTotal - layout.rightW) / shellTotal) * 100) : 0}
+          aria-valuemin={0}
+          aria-valuemax={100}
           tabIndex={0}
           onPointerDown={startGesture("right")}
           onKeyDown={resizeByKeyboard("right")}

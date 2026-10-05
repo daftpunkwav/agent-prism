@@ -153,6 +153,7 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
         <span className="eyebrow">{t("builder.boardTitle")}</span>
         <div className="builder-assembled">
           {assembled.map((part, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static render; content may repeat so index disambiguates
             <span key={`${part}-${index}`} className="builder-assembled-item">
               {part}
             </span>
@@ -326,6 +327,8 @@ export function BlockBoard({ catalog, composition, onChange, onApplySwap, onRest
 
       <Slot title={t("builder.slotDecode")}>
         <div className="builder-decode">
+          {/* NumberInput renders the field's <input>: valid implicit label. */}
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: control arrives via NumberInput (implicit labeling) */}
           <label>
             <span>{t("builder.temperature")}</span>
             <NumberInput

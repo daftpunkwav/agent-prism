@@ -98,7 +98,7 @@ describe("extractToolRounds", () => {
     ];
     const rounds = extractToolRounds(events);
     expect(rounds).toHaveLength(1);
-    const preview = (rounds[0]?.args as { preview?: string }).preview;
+    const preview = (rounds[0]?.args as { preview?: string } | undefined)?.preview;
     expect(typeof preview).toBe("string");
     expect((preview as string).length).toBe(TOOL_ROUND_ARGS_MAX_CHARS);
     // Small args pass through untouched.

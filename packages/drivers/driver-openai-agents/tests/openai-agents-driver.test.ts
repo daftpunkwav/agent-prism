@@ -164,6 +164,7 @@ describe("OpenAIAgentsDriver", () => {
   it("converges model failure into an error event followed by an unsuccessful complete", { timeout: 60_000 }, async () => {
     const driver = new OpenAIAgentsDriver();
     const exploding: LlmAdapter = {
+      // biome-ignore lint/correctness/useYield: the stream faults before emitting any event
       stream: async function* () {
         throw new Error("model exploded with credentials");
       },

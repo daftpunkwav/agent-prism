@@ -46,6 +46,7 @@ const explodingModel = {
   invoke: async () => {
     throw new Error("model exploded");
   },
+  // biome-ignore lint/correctness/useYield: the stream faults before emitting any event
   stream: async function* () {
     throw new Error("model exploded");
   },

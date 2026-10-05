@@ -247,6 +247,7 @@ function LogTab({ trace, turns, events }: { trace: BuilderTraceEntry[]; turns: T
         <p className="builder-log-capped">{t("builder.logCapped", { shown: visible.length, total: rows.length })}</p>
       )}
       {visible.map((row, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: append-only log render, positional identity is exact
         <details key={index} className="builder-log-row">
           <summary className="builder-log-summary">
             <span className="builder-log-kind" style={{ color: row.source === "trace" ? traceAccent(row.entry.kind) : undefined }}>

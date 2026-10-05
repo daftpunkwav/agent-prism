@@ -101,6 +101,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ro.disconnect();
       window.removeEventListener("resize", update);
     };
+    // pathname is the route-change trigger: the active tab moves without a track resize.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure the indicator on navigation
   }, [pathname]);
 
   return (

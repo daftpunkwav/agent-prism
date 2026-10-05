@@ -85,40 +85,40 @@ function FieldMatrixTable() {
   const t = useT();
   const { fieldMatrix } = useGuideContent();
   return (
-    <div className="guide-ledger" role="table" aria-label={t("guide.table.aria")}>
-      <div className="guide-ledger-head" role="row">
-        <span role="columnheader">{t("guide.table.dimension")}</span>
-        <span role="columnheader">{t("guide.table.field")}</span>
-        <span role="columnheader">{t("guide.table.type")}</span>
-        <span role="columnheader">{t("guide.table.defaultValue")}</span>
-        <span role="columnheader">{t("guide.table.locked")}</span>
-      </div>
-      {fieldMatrix.map((row, i) => (
-        <a
-          key={row.dimension}
-          href={`#${row.dimension}`}
-          className="guide-ledger-row"
-          data-lane={i % 5}
-        >
-          {/* No table roles here: role="row" would override the link semantics. */}
-          <span className="guide-ledger-dim">
-            <code>{row.dimension}</code>
-          </span>
-          <span>
-            <code>{DIMENSION_FIELD[row.dimension]}</code>
-          </span>
-          <span className="guide-ledger-muted">
-            {row.type}
-          </span>
-          <span className="guide-ledger-muted">
-            {row.defaultValue}
-          </span>
-          <span className="guide-ledger-muted">
-            {row.lockedWhen}
-          </span>
-        </a>
-      ))}
-    </div>
+    <table className="guide-ledger" aria-label={t("guide.table.aria")}>
+      <thead>
+        <tr className="guide-ledger-head">
+          <th scope="col">{t("guide.table.dimension")}</th>
+          <th scope="col">{t("guide.table.field")}</th>
+          <th scope="col">{t("guide.table.type")}</th>
+          <th scope="col">{t("guide.table.defaultValue")}</th>
+          <th scope="col">{t("guide.table.locked")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {fieldMatrix.map((row, i) => (
+          <tr key={row.dimension} className="guide-ledger-row" data-lane={i % 5}>
+            <td className="guide-ledger-dim">
+              <a href={`#${row.dimension}`}>
+                <code>{row.dimension}</code>
+              </a>
+            </td>
+            <td>
+              <code>{DIMENSION_FIELD[row.dimension]}</code>
+            </td>
+            <td className="guide-ledger-muted">
+              {row.type}
+            </td>
+            <td className="guide-ledger-muted">
+              {row.defaultValue}
+            </td>
+            <td className="guide-ledger-muted">
+              {row.lockedWhen}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -144,8 +144,10 @@ function GuideBlockView({ block }: { block: GuideBlock }) {
   switch (block.kind) {
     case "formula":
       return (
-        <div className="guide-formula" aria-label={t("guide.blocks.formulaAria")}>
+        <figure className="guide-formula" aria-label={t("guide.blocks.formulaAria")}>
           {block.cards.map((card, i) => (
+            // Static catalog content, never reordered: positional identity is exact.
+            // biome-ignore lint/suspicious/noArrayIndexKey: static never-reordered list
             <Fragment key={i}>
               {i > 0 && (
                 <span className="guide-formula-plus" aria-hidden>
@@ -162,7 +164,7 @@ function GuideBlockView({ block }: { block: GuideBlock }) {
               </div>
             </Fragment>
           ))}
-        </div>
+        </figure>
       );
     case "note":
       return (
@@ -176,6 +178,7 @@ function GuideBlockView({ block }: { block: GuideBlock }) {
           <h3>{block.heading}</h3>
           <ol className="guide-path-list">
             {block.items.map((item, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static never-reordered list
               <li key={i}>
                 <DocText text={item} />
               </li>
@@ -189,6 +192,7 @@ function GuideBlockView({ block }: { block: GuideBlock }) {
           <h3>{block.heading}</h3>
           <ul className="guide-code-list">
             {block.items.map((item, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static never-reordered list
               <li key={i}>
                 <DocText text={item} />
               </li>
@@ -213,6 +217,7 @@ function GuideBlockView({ block }: { block: GuideBlock }) {
       return (
         <div className="guide-rule-grid">
           {block.items.map((row, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static never-reordered list
             <article key={i} className="guide-rule-card" data-lane={i % 5}>
               <h3>{row.title}</h3>
               <p>
@@ -226,6 +231,7 @@ function GuideBlockView({ block }: { block: GuideBlock }) {
       return (
         <ol className="guide-stages">
           {block.items.map((stage, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static never-reordered list
             <li key={i} data-lane={i % 5}>
               <span className="guide-stage-index" aria-hidden>
                 {String(i + 1).padStart(2, "0")}
@@ -265,6 +271,7 @@ function GuideSectionView({ section }: { section: GuideSection }) {
         </p>
       )}
       {section.blocks.map((block, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static never-reordered list
         <GuideBlockView key={i} block={block} />
       ))}
     </section>

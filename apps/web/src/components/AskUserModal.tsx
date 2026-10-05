@@ -161,11 +161,12 @@ export function AskUserModal({ pending, submitting, onAnswer, onClose, variant =
     onClose();
   };
 
+  // Escape-to-skip is a window-modal affordance only: inline (per-column) dialogs
+  // must not let a global keypress skip a batch the user is answering elsewhere.
+  // `answered` stays in the deps so Escape reads the current flags: a stale set
+  // would re-submit "" over answers the user already gave.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: same current-flags contract as the comment below
   useEffect(() => {
-    // Escape-to-skip is a window-modal affordance only: inline (per-column) dialogs
-    // must not let a global keypress skip a batch the user is answering elsewhere.
-    // `answered` stays in the deps so Escape reads the current flags: a stale set
-    // would re-submit "" over answers the user already gave.
     if (pending === null || variant !== "centered") return;
     dialogRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {

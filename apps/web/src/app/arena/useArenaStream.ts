@@ -267,7 +267,7 @@ export function useArenaStream() {
         return false;
       }
     },
-    [setError],
+    [],
   );
 
   /**

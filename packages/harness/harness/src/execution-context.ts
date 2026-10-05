@@ -19,7 +19,6 @@ import type {
   ModelCallOutcome,
   PipelineConfig,
   ToolAccess,
-  ToolExecutionResult,
   ToolRegistry,
 } from "@agentprism/contracts";
 import type { ContextAnalytics } from "./context/analytics.js";

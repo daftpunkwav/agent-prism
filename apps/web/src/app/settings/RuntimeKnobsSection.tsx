@@ -88,7 +88,13 @@ function flatten(knobs: RuntimeKnobsPayload["knobs"], fields: readonly RuntimeKn
   for (const meta of fields) {
     const parts = meta.key.split(".");
     let value: unknown = knobs as unknown as Record<string, unknown>;
-    for (const part of parts) value = (value as Record<string, unknown>)[part];
+    for (const part of parts) {
+      if (typeof value !== "object" || value === null || !Object.hasOwn(value, part)) {
+        value = undefined;
+        break;
+      }
+      value = Reflect.get(value, part);
+    }
     draft[meta.key] = typeof value === "number" || typeof value === "string" ? value : meta.default;
   }
   return draft;

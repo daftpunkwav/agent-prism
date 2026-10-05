@@ -111,7 +111,7 @@ function liveSessionQueryTool(sessions: SessionQueryPort): ToolDefinition {
       const action = String(args.action ?? "").trim().toLowerCase();
       if (action === "list") {
         const limit = readLimit(args, "limit");
-        let records;
+        let records: Awaited<ReturnType<SessionQueryPort["listSessions"]>>;
         try {
           records = await sessions.listSessions({ limit });
         } catch (error) {
@@ -129,7 +129,7 @@ function liveSessionQueryTool(sessions: SessionQueryPort): ToolDefinition {
           return { result: "Error: read needs an id from the list", fileDiff: null, ok: false, code: "workspace_error" };
         }
         const limit = readLimit(args, "limit");
-        let detail;
+        let detail: Awaited<ReturnType<SessionQueryPort["getSession"]>>;
         try {
           detail = await sessions.getSession(id);
         } catch (error) {

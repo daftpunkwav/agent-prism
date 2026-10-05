@@ -92,9 +92,11 @@ describe("runAgentExecution scatter fan-out", () => {
       async *run(ctx: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
         if (!ctx.identity.agentId.includes("/scatter-")) {
           state.bad = ctx.tools.execute("scatter", { tasks: ["only one"] });
+          yield* [];
           return;
         }
         state.deep = ctx.tools.execute("subagent", { task: "deeper" });
+        yield* [];
       },
     };
     await collect(testDeps(), testSpec(driver, {}, ));

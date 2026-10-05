@@ -102,7 +102,7 @@ export function TraceView({
   const liveId = running && segments.length > 0 ? segments[segments.length - 1]!.id : null;
 
   const turns = useMemo(() => {
-    const ids = [...new Set(segments.map((s) => s.turn).filter((turn) => turn > 0))];
+    const ids = [...new Set(segments.map((s) => Number(s.turn)))].filter((turn) => turn > 0);
     return ids.sort((a, b) => a - b);
   }, [segments]);
   const multiTurn = turns.length > 1 || (turns.length === 1 && turns[0]! > 1);
@@ -141,19 +141,19 @@ export function TraceView({
                   <div className="trace-turn-label">{t("arena.trace.turn", { turn })}</div>
                   <div className="trace-timeline">
                     {segments
-                      .filter((s) => s.turn === turn)
+                      .filter((s) => Number(s.turn) === turn)
                       .map((seg) => (
                         <TraceStep key={seg.id} seg={seg} accentColor={accentColor} live={seg.id === liveId} t={t} />
                       ))}
                   </div>
                 </div>
               ))}
-              {segments.some((s) => s.turn === 0) && (
+              {segments.some((s) => Number(s.turn) === 0) && (
                 <div className="trace-turn">
                   <div className="trace-turn-label">{t("arena.trace.unlabeledTurn")}</div>
                   <div className="trace-timeline">
                     {segments
-                      .filter((s) => s.turn === 0)
+                      .filter((s) => Number(s.turn) === 0)
                       .map((seg) => (
                         <TraceStep key={seg.id} seg={seg} accentColor={accentColor} live={seg.id === liveId} t={t} />
                       ))}

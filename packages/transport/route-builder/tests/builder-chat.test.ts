@@ -116,9 +116,9 @@ describe("builder chat route", () => {
   });
 
   it("delivers a BuilderError detail as a fatal error chunk", async () => {
+    // biome-ignore lint/correctness/useYield: the double faults before emitting any event
     async function* turns(): AsyncGenerator<unknown> {
       throw BuilderError.invalid("turn boom");
-      yield { stream: "trace" };
     }
     const app = buildBuilderTestApp(mockDeps(vi.fn().mockImplementation(() => turns())));
     const res = await app.request("/api/builder/sessions/s1/chat", chatRequest("hello"));

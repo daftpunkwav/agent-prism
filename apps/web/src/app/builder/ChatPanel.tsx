@@ -186,6 +186,7 @@ function TodoPreview({ items }: { items: TodoItem[] }) {
   return (
     <ul className="builder-todo-list">
       {items.map((item, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static todo render, positional identity is exact
         <li key={index} className="builder-todo-item" data-status={item.status}>
           {item.status === "completed" ? (
             <CheckCircle2 size={12} aria-hidden />

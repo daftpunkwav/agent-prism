@@ -82,7 +82,7 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
   // connection tests which delegate with an explicit apiKey override); stored values keep
   // their reference form so secrets never persist resolved.
   const apiKey = resolveCredentialReference(overrides.apiKey ?? endpoint?.api_key ?? provider.api_key);
-  if (apiKey === "") {
+  if (apiKey.length === 0) {
     throw new ConfigurationError("API Key is not configured; set it in Provider settings first");
   }
   const baseUrlRaw = overrides.baseUrl ?? endpoint?.base_url ?? provider.base_url;

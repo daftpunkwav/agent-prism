@@ -18,6 +18,7 @@ describe("runAgentExecution repeat guard", () => {
           // ls on the workspace root always succeeds: only ok executions count.
           results.push((await ctx.tools.execute("ls", { path: "." })).result);
         }
+        yield* [];
       },
     };
     await collect(testDeps(), testSpec(driver));

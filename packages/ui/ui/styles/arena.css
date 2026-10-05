@@ -286,13 +286,14 @@ a.panel-surface:hover,
   color: var(--muted-foreground);
 }
 
-/* Attachment chips between history and the run strip */
+/* Attachment chips between history and the run strip (a real <ul>: strip list chrome) */
 .composer-attachments {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
   padding: 0 0.1rem;
-  margin-bottom: 0.35rem;
+  margin: 0 0 0.35rem;
+  list-style: none;
 }
 
 .composer-attachment-chip {

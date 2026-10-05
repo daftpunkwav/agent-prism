@@ -13,6 +13,7 @@ import type {
   IdGenerator,
   LlmEndpointUpdateInput,
   ProviderCommand,
+  ProviderConfig,
   ProviderConfigPublic,
   ProviderConfigRepository,
   ProviderConfigUpdate,
@@ -71,7 +72,7 @@ export class ProviderService {
 
     const merged = command.mergeEndpointKeys(endpoints, current.endpoints);
 
-    let config;
+    let config: ProviderConfig;
     try {
       config = command.parseConfig(
         {

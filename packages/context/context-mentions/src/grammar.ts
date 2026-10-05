@@ -52,9 +52,7 @@ function withoutTrailingPunct(text: string): string {
  */
 export function parseMentions(text: string): FileMention[] {
   const out: FileMention[] = [];
-  const pattern = /(^|[\s([{"'])(@"([^"\n]*?)"|@([^\s"'`]+))/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text)) !== null) {
+  for (const match of text.matchAll(/(^|[\s([{"'])(@"([^"\n]*?)"|@([^\s"'`]+))/g)) {
     const opener = match[1] ?? "";
     const quotedBody = match[3];
     const plainBody = match[4];

@@ -28,14 +28,12 @@ export const TEXT_OVERLAP = 200;
 /** Yields non-empty paragraphs with source offsets. */
 function paragraphs(text: string): Array<{ content: string; start: number }> {
   const out: Array<{ content: string; start: number }> = [];
-  const pattern = /\n\s*\n/g;
   let start = 0;
-  let match: RegExpExecArray | null;
   const flush = (end: number): void => {
     const content = text.slice(start, end);
     if (content.trim() !== "") out.push({ content, start });
   };
-  while ((match = pattern.exec(text)) !== null) {
+  for (const match of text.matchAll(/\n\s*\n/g)) {
     flush(match.index);
     start = match.index + match[0].length;
   }
@@ -46,11 +44,9 @@ function paragraphs(text: string): Array<{ content: string; start: number }> {
 /** Splits one over-long paragraph into sentence-bounded pieces with offsets. */
 function sentences(paragraph: string, base: number, maxChars: number): TextChunk[] {
   const out: TextChunk[] = [];
-  const ender = /([。！？.!?]["')」』]?\s*)/g;
   let current = "";
   let currentStart = 0;
   let cursor = 0;
-  let match: RegExpExecArray | null;
   const pushCurrent = (): void => {
     if (current === "") return;
     // Hard-cut pathological single sentences (never drop content).
@@ -62,7 +58,7 @@ function sentences(paragraph: string, base: number, maxChars: number): TextChunk
       out.push({ content: current.slice(at, at + maxChars), start: base + currentStart + at, end: base + currentStart + Math.min(current.length, at + maxChars) });
     }
   };
-  while ((match = ender.exec(paragraph)) !== null) {
+  for (const match of paragraph.matchAll(/([。！？.!?]["')」』]?\s*)/g)) {
     const end = match.index + match[0].length;
     const sentence = paragraph.slice(cursor, end);
     if ((current + sentence).length <= maxChars || current === "") {

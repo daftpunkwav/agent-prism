@@ -127,6 +127,7 @@ export function AnswerAlignment({
           <ul className="answer-align-list mt-2">
             {pairwise[0]?.rows.map((row, index) => (
               <AlignedRow
+                // biome-ignore lint/suspicious/noArrayIndexKey: alignment rows are positional by definition
                 key={index}
                 row={row}
                 labelA={resolveLabel(reference.label)}

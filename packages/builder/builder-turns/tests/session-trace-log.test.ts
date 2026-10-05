@@ -13,7 +13,10 @@ import { SessionTraceLog } from "../src/session-trace-log.js";
 const clock: Clock = { now: () => 1_000 };
 const idGenerator: IdGenerator = { next: (() => {
   let n = 0;
-  return () => `id-${(n += 1)}`;
+  return () => {
+    n += 1;
+    return `id-${n}`;
+  };
 })() };
 
 describe("SessionTraceLog", () => {
@@ -33,7 +36,7 @@ describe("SessionTraceLog", () => {
     const entry = log.append("llm_request", "big", { messages: huge });
     expect(appended).toEqual([entry]);
     // Full-fidelity capture: the journal receives the payload unclipped.
-    expect((appended[0]?.data.messages as string).length).toBe(80_000);
+    expect((appended[0]?.data.messages as string | undefined)?.length).toBe(80_000);
   });
 
   it("carries turn and duration fields", () => {

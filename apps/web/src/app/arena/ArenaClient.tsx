@@ -165,7 +165,6 @@ export function ArenaClient() {
   const { historySeedLabel, setHistorySeedLabel, beginTurn, cancelTurn } = useHistoryCommit({
     running,
     allSettled,
-    columns,
     columnList,
     pushColumnTurn,
     rememberWorkspace,
@@ -193,6 +192,7 @@ export function ArenaClient() {
   );
 
   // Abort in-flight Arena requests on unmount to avoid lingering connections (state updates settle inside the hooks)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: unmount-only cleanup; re-running on stopStream identity change would abort mid-flight runs
   useEffect(() => {
     return () => {
       stopStream();
@@ -278,7 +278,7 @@ export function ArenaClient() {
     setLastRunQuestion("");
     resetJudge();
     setAttachments([]);
-  }, [running, resetHistory, resetColumns, setHistorySeedLabel, cancelTurn, setQuestion, setLastRunQuestion, resetJudge]);
+  }, [running, resetHistory, resetColumns, setHistorySeedLabel, cancelTurn, setQuestion, resetJudge]);
 
   /** Mirrors the attachments state so the async reader validates against fresh data. */
   const attachmentsRef = useRef<RunAttachment[]>([]);
@@ -356,7 +356,7 @@ export function ArenaClient() {
         if (text.trim() !== canonical && text.trim() !== displayed) setActiveTemplateId(null);
       }
     },
-    [activeTemplateId, templates, setQuestion, t],
+    [activeTemplateId, templates, setQuestion, setActiveTemplateId, t],
   );
 
   // Template suggests a dimension change: reset old experiment state first, then write the
@@ -438,7 +438,7 @@ export function ArenaClient() {
           question={question}
           onQuestionChange={handleQuestionChange}
           attachments={attachments}
-          onAttachFiles={handleAttachFiles}
+          onAttachFiles={(files) => void handleAttachFiles(files)}
           onRemoveAttachment={handleRemoveAttachment}
           activeSelectionCount={activeSelections.length}
           onRequestRun={() => void runArena()}

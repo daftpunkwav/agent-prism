@@ -56,10 +56,10 @@ describe("createLlmWireTraceHandler", () => {
     const request = records[0];
     const response = records[1];
     expect(request?.kind).toBe("llm_request");
-    expect((request?.data as { model: string }).model).toBe("test-model");
-    expect((request?.data as { tools: string[] }).tools).toEqual(["read"]);
+    expect((request?.data as { model: string } | undefined)?.model).toBe("test-model");
+    expect((request?.data as { tools: string[] } | undefined)?.tools).toEqual(["read"]);
     expect(response?.kind).toBe("llm_response");
-    expect((response?.data as { usage: { total_tokens: number } }).usage.total_tokens).toBe(10);
+    expect((response?.data as { usage?: { total_tokens: number } })?.usage?.total_tokens).toBe(10);
     expect(response?.durationMs).toBe(500);
   });
 
@@ -82,11 +82,11 @@ describe("createLlmWireTraceHandler", () => {
       },
     );
     const request = records[0];
-    const params = (request?.data as { params: Record<string, unknown> }).params;
-    expect(params.temperature).toBe(0.5);
-    expect(params.top_p).toBe(0.9);
-    expect(params.max_tokens).toBe(64000);
-    expect((params.tools as unknown[]).length).toBe(1);
+    const params = (request?.data as { params: Record<string, unknown> } | undefined)?.params;
+    expect(params?.temperature).toBe(0.5);
+    expect(params?.top_p).toBe(0.9);
+    expect(params?.max_tokens).toBe(64000);
+    expect((params?.tools as unknown[] | undefined)?.length).toBe(1);
   });
 
   it("backfills sampling params the SDK snapshot omitted (temperature=0 is legal)", () => {
@@ -106,11 +106,11 @@ describe("createLlmWireTraceHandler", () => {
       undefined,
       { invocation_params: { model: "test-model", stream: false } },
     );
-    const params = (records[0]?.data as { params: Record<string, unknown> }).params;
-    expect(params.temperature).toBe(0);
-    expect(params.top_p).toBe(1);
-    expect(params.max_tokens).toBe(64000);
-    expect(params.stream).toBe(false);
+    const params = (records[0]?.data as { params: Record<string, unknown> } | undefined)?.params;
+    expect(params?.temperature).toBe(0);
+    expect(params?.top_p).toBe(1);
+    expect(params?.max_tokens).toBe(64000);
+    expect(params?.stream).toBe(false);
   });
 
   it("never clips oversized message content (full-fidelity capture)", () => {
@@ -122,9 +122,10 @@ describe("createLlmWireTraceHandler", () => {
       [[new HumanMessage(huge)]],
       "run-big",
     );
-    const messages = (records[0]?.data as { messages: Array<{ content: string; truncated: boolean }> }).messages;
-    expect(messages[0]?.content).toHaveLength(40_000);
-    expect(messages[0]?.truncated).toBe(false);
+    const messages = (records[0]?.data as { messages: Array<{ content: string; truncated: boolean }> } | undefined)
+      ?.messages;
+    expect(messages?.[0]?.content).toHaveLength(40_000);
+    expect(messages?.[0]?.truncated).toBe(false);
   });
 
   it("captures LLM errors without throwing into the loop", () => {
@@ -132,7 +133,7 @@ describe("createLlmWireTraceHandler", () => {
     const handler = createLlmWireTraceHandler({ sink: collect(records), now: () => 0 });
     expect(() => handler.handleLLMError?.(new Error("boom"), "run-2")).not.toThrow();
     expect(records[0]?.kind).toBe("llm_error");
-    expect((records[0]?.data as { error: string }).error).toBe("boom");
+    expect((records[0]?.data as { error: string } | undefined)?.error).toBe("boom");
   });
 
   it("records the per-call streaming mode over the constructor-params snapshot", () => {

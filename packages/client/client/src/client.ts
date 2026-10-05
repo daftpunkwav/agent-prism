@@ -19,7 +19,6 @@ import type {
   McpServerConfigView,
   ProviderConfigUpdateInput,
   RunAttachment,
-  RuntimeKnobs,
 } from "@agentprism/contracts";
 import type {
   ArenaEvent,
