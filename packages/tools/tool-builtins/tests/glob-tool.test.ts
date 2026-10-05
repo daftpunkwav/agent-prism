@@ -92,6 +92,14 @@ describe("globTool", () => {
     expect(GLOB_MAX_UNBOUNDED_GROUPS).toBe(3);
   });
 
+  it("rejects overlapping single-star runs in one segment", () => {
+    // Each `a*` compiles to a separator-bounded run, but adjacent runs overlap
+    // on the literal `a`, so the backtrack tree still grows combinatorially.
+    expect(() => globToRegExp(`${"a*".repeat(24)}z`)).toThrow(RangeError);
+    // Single stars separated by literal slashes are disjoint per segment: legal.
+    expect(globToRegExp("*/*/*/*/*/*.ts").test("a/b/c/d/e/f.ts")).toBe(true);
+  });
+
   it("surfaces the complexity cap as a tool error, not a thrown exception", async () => {
     const ws = tempWorkspace();
     try {

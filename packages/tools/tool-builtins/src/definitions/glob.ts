@@ -24,15 +24,18 @@ export const GLOB_JSON_SCHEMA: Record<string, unknown> = {
 };
 
 /**
- * Upper bound on unbounded quantifier groups in the compiled pattern: the
- * "any run" group (from a bare double star) and the "zero or more path
- * segments" group (from a double star followed by a slash). Separated
- * cross-segment stars make the backtracker explore every split of the
- * subject: measured V8 cost is ~0.5s per path at four groups on a
- * 300-character path and ~7s at six on 120 characters, so a crafted pattern
- * could pin the tool for minutes per file. Legitimate globs stay far below
- * the cap because a single star compiles to the linear "any run except
- * separator" class.
+ * Upper bound on quantified wildcard groups the compiler tolerates, counted
+ * two ways during the build: `unbounded` (cross-segment groups — "any run"
+ * from a bare double star, "zero or more segments" from a double star plus
+ * slash) and `segmentRuns` (consecutive quantified groups without an
+ * intervening literal separator). The second counter exists because overlap,
+ * not unboundedness, drives backtracking: `a*a*a*` compiles to overlapping
+ * "run except separator" groups whose backtrack tree grows like
+ * C(subject length, group count). Measured V8 cost is ~0.5s per path at four
+ * groups on a 300-character path and ~7s at six on 120 characters, so the
+ * caps reject a hostile pattern before compilation instead of pinning the
+ * tool for minutes per file. Legitimate globs stay far below both caps: one
+ * star is one group, and a literal slash starts a fresh run.
  */
 export const GLOB_MAX_UNBOUNDED_GROUPS = 3;
 
@@ -41,14 +44,21 @@ export const GLOB_MAX_UNBOUNDED_GROUPS = 3;
  * `*` (any run except `/`), `?` (single char except `/`), `[abc]` classes,
  * and `{a,b}` alternation. Everything else is literal.
  *
- * Adjacent unbounded groups are collapsed to one — a bare double star, two
- * adjacent double stars, or a double star plus a slash all match the same
- * strings — and the total is capped at {@link GLOB_MAX_UNBOUNDED_GROUPS};
- * exceeding the cap throws before compilation so a hostile pattern fails as a
- * tool error instead of as a backtracking hang.
+ * During the build the wildcard counters of {@link GLOB_MAX_UNBOUNDED_GROUPS}
+ * are charged per group and throw as soon as a cap is exceeded, so a hostile
+ * pattern fails as a tool error instead of as a backtracking hang. After the
+ * build, adjacent groups that are mutually subsuming are collapsed to one:
+ * two adjacent "any run" groups, two adjacent "zero or more segments" groups,
+ * and either of them followed by or preceded by an "any run" group each match
+ * exactly what their single-group form matches. A standalone "double star
+ * plus slash" is not subsumed — it can only match strings whose wildcard
+ * portion ends in a separator — so it survives a collapse with no adjacent
+ * group to absorb it.
  */
 export function globToRegExp(pattern: string): RegExp {
   let regex = "";
+  let unbounded = 0;
+  let segmentRuns = 0;
   for (let i = 0; i < pattern.length; i += 1) {
     const ch = pattern[i] ?? "";
     if (ch === "*") {
@@ -56,13 +66,22 @@ export function globToRegExp(pattern: string): RegExp {
         // `**/` matches zero or more path segments; a bare trailing `**` matches everything
         if (pattern[i + 2] === "/") {
           regex += "(?:.*/)?";
+          unbounded += 1;
           i += 2;
         } else {
           regex += ".*";
+          unbounded += 1;
           i += 1;
         }
+        segmentRuns += 1;
       } else {
         regex += "[^/]*";
+        segmentRuns += 1;
+      }
+      if (unbounded > GLOB_MAX_UNBOUNDED_GROUPS || segmentRuns > GLOB_MAX_UNBOUNDED_GROUPS) {
+        throw new RangeError(
+          `glob pattern too complex (${Math.max(unbounded, segmentRuns)} wildcard runs, max ${GLOB_MAX_UNBOUNDED_GROUPS})`,
+        );
       }
     } else if (ch === "?") {
       regex += "[^/]";
@@ -84,6 +103,8 @@ export function globToRegExp(pattern: string): RegExp {
       regex += `(?:${parts.map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`;
       i = end;
     } else {
+      // A literal separator ends the current run of adjacent quantified groups.
+      if (ch === "/") segmentRuns = 0;
       regex += ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
     }
   }
@@ -98,10 +119,6 @@ export function globToRegExp(pattern: string): RegExp {
       .replaceAll("(?:.*/)?(?:.*/)?", "(?:.*/)?")
       .replaceAll(".*(?:.*/)?", ".*")
       .replaceAll("(?:.*/)?.*", ".*");
-  }
-  const unbounded = regex.match(/\.\*|\(\?:\.\*\/\)\?/g)?.length ?? 0;
-  if (unbounded > GLOB_MAX_UNBOUNDED_GROUPS) {
-    throw new RangeError(`glob pattern too complex (${unbounded} wildcard runs, max ${GLOB_MAX_UNBOUNDED_GROUPS})`);
   }
   return new RegExp(`^${regex}$`);
 }
