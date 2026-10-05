@@ -144,7 +144,7 @@ function GuideBlockView({ block }: { block: GuideBlock }) {
   switch (block.kind) {
     case "formula":
       return (
-        <div className="guide-formula" role="group" aria-label={t("guide.blocks.formulaAria")}>
+        <div className="guide-formula" aria-label={t("guide.blocks.formulaAria")}>
           {block.cards.map((card, i) => (
             <Fragment key={i}>
               {i > 0 && (

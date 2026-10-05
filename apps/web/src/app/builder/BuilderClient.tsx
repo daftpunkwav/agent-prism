@@ -515,7 +515,7 @@ export function BuilderClient() {
    * that travels drags — resizing an open column, or pulling a collapsed one
    * open at the dragged width. Teardown covers pointercancel and unmount. */
   const startGesture = useCallback(
-    (side: "left" | "right") => (event: React.PointerEvent<HTMLDivElement>) => {
+    (side: "left" | "right") => (event: React.PointerEvent<HTMLElement>) => {
       // Only the primary pointer with the primary button starts a gesture:
       // right/middle clicks and extra touch fingers must be ignored.
       if (event.button !== 0 || !event.isPrimary) return;
@@ -762,18 +762,16 @@ export function BuilderClient() {
           onKeyDown={resizeByKeyboard("left")}
         />
       </aside>
-      ) : (
-        <div
-          className="builder-edge-line"
-          data-side="left"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={t("builder.expandBoard")}
-          tabIndex={0}
-          onPointerDown={startGesture("left")}
-          onKeyDown={resizeByKeyboard("left")}
-        />
-      )}
+        ) : (
+          <button
+            type="button"
+            className="builder-edge-line"
+            data-side="left"
+            aria-label={t("builder.expandBoard")}
+            onPointerDown={startGesture("left")}
+            onKeyDown={resizeByKeyboard("left")}
+          />
+        )}
 
       <section className="builder-col builder-col-chat">
         <ChatPanel
@@ -809,15 +807,14 @@ export function BuilderClient() {
         />
       </aside>
       ) : (
-        <div
+        // Collapsed state: the handle only expands the pane (Enter/Space toggle,
+        // arrows are inert), so a real button is the honest semantics; a
+        // focusable separator would additionally require value attributes.
+        <button
+          type="button"
           className="builder-edge-line"
           data-side="right"
-          // Collapsed state: the handle only expands the pane (Enter/Space toggle,
-          // arrows are inert), so button semantics fit; a focusable separator would
-          // additionally require value attributes this collapsed handle has none of.
-          role="button"
           aria-label={t("builder.expandTrace")}
-          tabIndex={0}
           onPointerDown={startGesture("right")}
           onKeyDown={resizeByKeyboard("right")}
         />

@@ -173,13 +173,10 @@ function ServerForm({
           onChange={(event) => patch({ toolsText: event.target.value })}
         />
       </div>
-      {/* The Toggle carries its own switch semantics and aria-label, which win
-          the accessible name over any wrapping <label>; the label text would
-          never be announced, so the row is a plain div. */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
         <Toggle checked={draft.enabled} onChange={(next) => patch({ enabled: next })} label={t("settings.mcp.enabledAria")} />
         {t("settings.mcp.enabledLabel")}
-      </div>
+      </label>
       {error !== null && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" className="btn-ghost" onClick={onCancel}>

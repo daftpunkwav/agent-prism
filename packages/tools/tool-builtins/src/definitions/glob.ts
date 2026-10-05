@@ -90,21 +90,20 @@ export function globToRegExp(pattern: string): RegExp {
   // Collapse to a fixpoint: merging one pair can create a new adjacency
   // (`.*(?:.*/)?.*` → `.*.*` → `.*`), and every rule strictly shortens the
   // string, so the loop runs at most a few times.
-  let collapsed = regex;
   let previous = "";
-  while (collapsed !== previous) {
-    previous = collapsed;
-    collapsed = collapsed
+  while (regex !== previous) {
+    previous = regex;
+    regex = regex
       .replaceAll(".*.*", ".*")
       .replaceAll("(?:.*/)?(?:.*/)?", "(?:.*/)?")
       .replaceAll(".*(?:.*/)?", ".*")
       .replaceAll("(?:.*/)?.*", ".*");
   }
-  const unbounded = collapsed.match(/\.\*|\(\?:\.\*\/\)\?/g)?.length ?? 0;
+  const unbounded = regex.match(/\.\*|\(\?:\.\*\/\)\?/g)?.length ?? 0;
   if (unbounded > GLOB_MAX_UNBOUNDED_GROUPS) {
     throw new RangeError(`glob pattern too complex (${unbounded} wildcard runs, max ${GLOB_MAX_UNBOUNDED_GROUPS})`);
   }
-  return new RegExp(`^${collapsed}$`);
+  return new RegExp(`^${regex}$`);
 }
 
 async function executeGlob(workspace: ToolWorkspace, args: ToolArgs): Promise<ToolExecutionResult> {
