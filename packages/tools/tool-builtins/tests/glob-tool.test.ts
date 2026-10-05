@@ -100,6 +100,14 @@ describe("globTool", () => {
     expect(globToRegExp("*/*/*/*/*/*.ts").test("a/b/c/d/e/f.ts")).toBe(true);
   });
 
+  it("compounds overlap charges across segments", () => {
+    // Each segment is within the per-segment cap, but a failed match multiplies
+    // every run's split count, so the cumulative overlap charges must cap too.
+    expect(() => globToRegExp(`${"a*a*a*a*/".repeat(4)}z`)).toThrow(RangeError);
+    // Runs of one group per segment add no ambiguity: still legal.
+    expect(globToRegExp("a*/b*/c*/d*/e*/f.ts").test("a1/b2/c3/d4/e5/f.ts")).toBe(true);
+  });
+
   it("surfaces the complexity cap as a tool error, not a thrown exception", async () => {
     const ws = tempWorkspace();
     try {

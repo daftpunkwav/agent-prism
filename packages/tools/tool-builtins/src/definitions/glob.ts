@@ -25,17 +25,21 @@ export const GLOB_JSON_SCHEMA: Record<string, unknown> = {
 
 /**
  * Upper bound on quantified wildcard groups the compiler tolerates, counted
- * two ways during the build: `unbounded` (cross-segment groups — "any run"
+ * three ways during the build: `unbounded` (cross-segment groups — "any run"
  * from a bare double star, "zero or more segments" from a double star plus
- * slash) and `segmentRuns` (consecutive quantified groups without an
- * intervening literal separator). The second counter exists because overlap,
- * not unboundedness, drives backtracking: `a*a*a*` compiles to overlapping
- * "run except separator" groups whose backtrack tree grows like
- * C(subject length, group count). Measured V8 cost is ~0.5s per path at four
- * groups on a 300-character path and ~7s at six on 120 characters, so the
- * caps reject a hostile pattern before compilation instead of pinning the
- * tool for minutes per file. Legitimate globs stay far below both caps: one
- * star is one group, and a literal slash starts a fresh run.
+ * slash), `segmentRuns` (consecutive quantified groups without an
+ * intervening literal separator), and `overlappingRuns` (the cumulative
+ * number of groups charged past the first one of their run, across all
+ * segments). The run counters exist because overlap, not unboundedness,
+ * drives backtracking: `a*a*a*` compiles to overlapping "run except
+ * separator" groups, and on a failed overall match the engine multiplies the
+ * split counts of every run, so runs in successive segments compound even
+ * when each segment is individually within the per-segment cap. Measured V8
+ * cost is ~0.5s per path at four groups on a 300-character path and ~7s at
+ * six on 120 characters, so the caps reject a hostile pattern before
+ * compilation instead of pinning the tool for minutes per file. Legitimate
+ * globs stay far below all caps: one star is one group, and a literal slash
+ * starts a fresh run.
  */
 export const GLOB_MAX_UNBOUNDED_GROUPS = 3;
 
@@ -59,6 +63,7 @@ export function globToRegExp(pattern: string): RegExp {
   let regex = "";
   let unbounded = 0;
   let segmentRuns = 0;
+  let overlappingRuns = 0;
   for (let i = 0; i < pattern.length; i += 1) {
     const ch = pattern[i] ?? "";
     if (ch === "*") {
@@ -78,9 +83,19 @@ export function globToRegExp(pattern: string): RegExp {
         regex += "[^/]*";
         segmentRuns += 1;
       }
-      if (unbounded > GLOB_MAX_UNBOUNDED_GROUPS || segmentRuns > GLOB_MAX_UNBOUNDED_GROUPS) {
+      // On a failed overall match the engine multiplies the split counts of
+      // every run, so runs in different segments compound too: a*a*a*/b*b*b*/
+      // ... stays inside the per-segment cap while the product still stalls.
+      // A lone group in its segment (like every `*` in `*/*/*.ts`) adds no
+      // ambiguity and must not charge the cumulative counter.
+      if (segmentRuns > 1) overlappingRuns += 1;
+      if (
+        unbounded > GLOB_MAX_UNBOUNDED_GROUPS ||
+        segmentRuns > GLOB_MAX_UNBOUNDED_GROUPS ||
+        overlappingRuns > GLOB_MAX_UNBOUNDED_GROUPS
+      ) {
         throw new RangeError(
-          `glob pattern too complex (${Math.max(unbounded, segmentRuns)} wildcard runs, max ${GLOB_MAX_UNBOUNDED_GROUPS})`,
+          `glob pattern too complex (${Math.max(unbounded, segmentRuns, overlappingRuns)} wildcard runs, max ${GLOB_MAX_UNBOUNDED_GROUPS})`,
         );
       }
     } else if (ch === "?") {

@@ -517,12 +517,12 @@ export function BuilderClient() {
   const edgeGestureClick = useRef(false);
   const startGesture = useCallback(
     (side: "left" | "right") => (event: React.PointerEvent<HTMLElement>) => {
-      // The click this gesture dispatches after pointerup must not re-toggle
-      // (onUp already did); only gesture-free clicks fall through to onClick.
-      edgeGestureClick.current = true;
       // Only the primary pointer with the primary button starts a gesture:
       // right/middle clicks and extra touch fingers must be ignored.
       if (event.button !== 0 || !event.isPrimary) return;
+      // The click this gesture dispatches after pointerup must not re-toggle
+      // (onUp already did); only gesture-free clicks fall through to onClick.
+      edgeGestureClick.current = true;
       const pointerId = event.pointerId;
       const startX = event.clientX;
       const startY = event.clientY;
