@@ -83,8 +83,11 @@ export function alignAnswers(a: string, b: string): AlignedUnit[] {
   // dp[i][j] = LCS length of au[i..] / bu[j..]
   const dp: Uint32Array[] = Array.from({ length: an.length + 1 }, () => new Uint32Array(bn.length + 1));
   for (let i = an.length - 1; i >= 0; i--) {
+    const row = dp[i];
+    const nextRow = dp[i + 1];
+    if (row === undefined || nextRow === undefined) continue;
     for (let j = bn.length - 1; j >= 0; j--) {
-      dp[i]![j] = an[i] === bn[j] ? (dp[i + 1]![j + 1] ?? 0) + 1 : Math.max(dp[i + 1]![j] ?? 0, dp[i]![j + 1] ?? 0);
+      row[j] = an[i] === bn[j] ? (nextRow[j + 1] ?? 0) + 1 : Math.max(nextRow[j] ?? 0, row[j + 1] ?? 0);
     }
   }
   const rows: AlignedUnit[] = [];

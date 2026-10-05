@@ -27,7 +27,7 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
           void navigator.clipboard.writeText(text).then(
             () => {
               setCopied(true);
-              setTimeout(() => setCopied(false), 1200);
+              setTimeout(() => { setCopied(false); }, 1200);
             },
             () => undefined,
           );

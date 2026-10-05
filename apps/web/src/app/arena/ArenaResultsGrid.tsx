@@ -86,7 +86,7 @@ export function ArenaResultsGrid(props: {
               running={running}
               showStop={running && !col.metrics && col.events.length > 0}
               onStop={onStopColumn}
-              stopping={stoppingLabels[col.label] === true}
+              stopping={stoppingLabels[col.label]}
               lane={idx}
               isHistorySeed={historySeedLabel === col.label}
               onUseAsSeed={onUseAsSeed}

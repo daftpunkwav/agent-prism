@@ -109,8 +109,8 @@ export function RuntimeKnobsSection({ onFlash }: { onFlash(message: string): voi
         setFields(payload.fields);
         setDraft(flatten(payload.knobs, payload.fields));
       })
-      .catch((err: Error) => setLoadError(err.message))
-      .finally(() => setLoading(false));
+      .catch((err: Error) => { setLoadError(err.message); })
+      .finally(() => { setLoading(false); });
   }, []);
 
   const save = async (): Promise<void> => {
@@ -158,7 +158,7 @@ export function RuntimeKnobsSection({ onFlash }: { onFlash(message: string): voi
                       <UiSelect
                         className="w-full"
                         value={String(draft[meta.key] ?? meta.default)}
-                        onChange={(value) => setDraft((d) => ({ ...d, [meta.key]: value }))}
+                        onChange={(value) => { setDraft((d) => ({ ...d, [meta.key]: value })); }}
                         ariaLabel={label}
                         options={(meta.options ?? []).map((option) => ({ value: option, label: option }))}
                       />
@@ -178,7 +178,7 @@ export function RuntimeKnobsSection({ onFlash }: { onFlash(message: string): voi
                           className="btn-ghost !h-9 !w-9 !p-0 shrink-0"
                           title={t("settings.runtime.resetTitle")}
                           aria-label={t("settings.runtime.resetTitle")}
-                          onClick={() => setDraft((d) => ({ ...d, [meta.key]: meta.default as number }))}
+                          onClick={() => { setDraft((d) => ({ ...d, [meta.key]: meta.default as number })); }}
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                         </button>

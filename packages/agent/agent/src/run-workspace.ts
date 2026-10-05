@@ -76,7 +76,7 @@ export function createRunWorkspace(
   manager: WorkspaceRegistry,
   options: { question: string; label: string; runId?: string; clock?: Clock; idGenerator?: IdGenerator },
 ): CreatedRunWorkspace {
-  const runId = options.runId || newRunId(options.idGenerator);
+  const runId = options.runId ?? newRunId(options.idGenerator);
   const name = newWorkspaceName(options.label, options.clock, options.idGenerator);
   manager.protect(name);
   try {

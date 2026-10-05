@@ -100,7 +100,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
   const pairLowBudget = budgetPairs.some((pair) => pair.budget_tokens > 0 && pair.budget_tokens < BUDGET_FLOOR);
   const canSave = draft.model.trim() !== "" && !pairError;
 
-  const patch = (p: Partial<ModelSlot>) => setDraft((d) => ({ ...d, ...p }));
+  const patch = (p: Partial<ModelSlot>) => { setDraft((d) => ({ ...d, ...p })); };
 
   const setLevels = (levels: string[]) => {
     const cleaned = levels.map((l) => l.slice(0, 32));
@@ -195,7 +195,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 value={draft.label}
                 placeholder={t("settings.model.labelPlaceholder")}
                 aria-label={t("settings.model.labelAria", { index: 1 })}
-                onChange={(e) => patch({ label: e.target.value })}
+                onChange={(e) => { patch({ label: e.target.value }); }}
               />
             </Field>
             <Field label="model id">
@@ -205,7 +205,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 required
                 placeholder="model id"
                 aria-label={t("settings.model.modelIdAria", { index: 1 })}
-                onChange={(e) => patch({ model: e.target.value })}
+                onChange={(e) => { patch({ model: e.target.value }); }}
               />
             </Field>
           </div>
@@ -218,7 +218,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 min={1024}
                 value={draft.context_window}
                 invalidMessage={t("settings.model.invalidNumber")}
-                onChange={(context_window) => patch({ context_window })}
+                onChange={(context_window) => { patch({ context_window }); }}
               />
             </Field>
             <Field label={t("settings.model.maxInput")}>
@@ -228,7 +228,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 min={256}
                 value={draft.max_input_tokens}
                 invalidMessage={t("settings.model.invalidNumber")}
-                onChange={(max_input_tokens) => patch({ max_input_tokens })}
+                onChange={(max_input_tokens) => { patch({ max_input_tokens }); }}
               />
             </Field>
             <Field label={t("settings.model.maxOutput")}>
@@ -238,7 +238,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 min={64}
                 value={draft.max_output_tokens}
                 invalidMessage={t("settings.model.invalidNumber")}
-                onChange={(max_output_tokens) => patch({ max_output_tokens })}
+                onChange={(max_output_tokens) => { patch({ max_output_tokens }); }}
               />
             </Field>
           </div>
@@ -250,7 +250,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 type="checkbox"
                 className="accent-[var(--primary)]"
                 checked={draft.image_input}
-                onChange={(e) => patch({ image_input: e.target.checked })}
+                onChange={(e) => { patch({ image_input: e.target.checked }); }}
               />
               {t("settings.model.imageInput")}
             </label>
@@ -267,8 +267,8 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
               <input
                 type="checkbox"
                 className="accent-[var(--primary)]"
-                checked={draft.enabled !== false}
-                onChange={(e) => patch({ enabled: e.target.checked })}
+                checked={draft.enabled}
+                onChange={(e) => { patch({ enabled: e.target.checked }); }}
               />
               {t("settings.model.enabledLabel")}
             </label>
@@ -280,7 +280,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                   type="checkbox"
                   className="accent-[var(--primary)]"
                   checked={draft.id === defaultEndpointId}
-                  onChange={() => onSetDefault(draft.id)}
+                  onChange={() => { onSetDefault(draft.id); }}
                 />
                 {t("settings.model.setDefaultTitle")}
               </label>
@@ -344,7 +344,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                   <UiSelect
                     className="w-full"
                     value={draft.thinking_level}
-                    onChange={(value) => patch({ thinking_level: value })}
+                    onChange={(value) => { patch({ thinking_level: value }); }}
                     ariaLabel={t("settings.model.defaultThinkingLevel")}
                     options={options}
                   />
@@ -368,7 +368,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                         type="button"
                         className="btn-ghost !h-8 !w-8 !p-0 shrink-0"
                         aria-label={t("settings.model.customLevelRemoveAria", { index: index + 1 })}
-                        onClick={() => setLevels(draft.thinking_levels.filter((_, i) => i !== index))}
+                        onClick={() => { setLevels(draft.thinking_levels.filter((_, i) => i !== index)); }}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -378,7 +378,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                     type="button"
                     className="btn-ghost !h-8 text-xs"
                     disabled={draft.thinking_levels.length >= 16}
-                    onClick={() => setLevels([...draft.thinking_levels, ""])}
+                    onClick={() => { setLevels([...draft.thinking_levels, ""]); }}
                   >
                     <Plus className="h-3.5 w-3.5" />
                     {t("settings.model.customLevelAdd")}
@@ -449,7 +449,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                         type="button"
                         className="btn-ghost !h-8 !w-8 !p-0 shrink-0"
                         aria-label={t("settings.model.budgetPairRemoveAria", { index: index + 1 })}
-                        onClick={() => setPairs(budgetPairs.filter((_, i) => i !== index))}
+                        onClick={() => { setPairs(budgetPairs.filter((_, i) => i !== index)); }}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

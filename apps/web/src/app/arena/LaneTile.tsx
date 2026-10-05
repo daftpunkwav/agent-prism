@@ -39,7 +39,7 @@ export function LaneTile({
   return (
     <button
       type="button"
-      onClick={() => onToggle(option.value)}
+      onClick={() => { onToggle(option.value); }}
       disabled={disabled}
       data-selected={selected}
       data-lane={lane % 4}

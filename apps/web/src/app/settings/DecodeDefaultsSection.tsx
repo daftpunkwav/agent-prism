@@ -42,7 +42,7 @@ export function DecodeDefaultsSection({ form, onChange }: DecodeDefaultsSectionP
             max={DECODE_FIELD_RANGES.temperature.max}
             value={form.temperature}
             invalidMessage={t("settings.decode.invalidNumber")}
-            onChange={(temperature) => onChange({ temperature })}
+            onChange={(temperature) => { onChange({ temperature }); }}
           />
         </Field>
         <Field label="Top P">
@@ -52,7 +52,7 @@ export function DecodeDefaultsSection({ form, onChange }: DecodeDefaultsSectionP
             max={DECODE_FIELD_RANGES.top_p.max}
             value={form.top_p}
             invalidMessage={t("settings.decode.invalidNumber")}
-            onChange={(top_p) => onChange({ top_p })}
+            onChange={(top_p) => { onChange({ top_p }); }}
           />
         </Field>
         <Field label={t("settings.decode.maxOutput")}>
@@ -63,7 +63,7 @@ export function DecodeDefaultsSection({ form, onChange }: DecodeDefaultsSectionP
             max={DECODE_FIELD_RANGES.max_output_tokens.max}
             value={form.max_output_tokens}
             invalidMessage={t("settings.decode.invalidNumber")}
-            onChange={(max_output_tokens) => onChange({ max_output_tokens })}
+            onChange={(max_output_tokens) => { onChange({ max_output_tokens }); }}
           />
         </Field>
       </div>
@@ -77,7 +77,7 @@ export function DecodeDefaultsSection({ form, onChange }: DecodeDefaultsSectionP
             className="form-input"
             placeholder={t("settings.decode.notesPlaceholder")}
             value={form.notes}
-            onChange={(e) => onChange({ notes: e.target.value })}
+            onChange={(e) => { onChange({ notes: e.target.value }); }}
           />
         </div>
       </details>

@@ -166,7 +166,7 @@ function SharedPrefixSummary({ columns, prefix, diverged }: { columns: TraceComp
         )}
       </div>
       <ol className="space-y-0.5 pt-1">
-        {columns[0]!.toolCalls.slice(0, prefix).map((call, index) => (
+        {columns[0]?.toolCalls.slice(0, prefix).map((call, index) => (
           <li key={index} className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
             <span className="w-5 shrink-0 text-right">{t("arena.diff.sharedPrefixStep", { index: index + 1, tool: call.tool, detail: call.detail })}</span>
           </li>
@@ -311,7 +311,7 @@ export function TraceDiff({ columns, resolveLabel }: TraceDiffProps) {
   );
   const single = comparison.columns.length === 1;
   const identical = single || (comparison.commonToolPrefix >= Math.max(...comparison.columns.map((c) => c.toolCalls.length), 0) &&
-    comparison.columns.every((c) => c.toolCalls.length === comparison.columns[0]!.toolCalls.length));
+    comparison.columns.every((c) => c.toolCalls.length === comparison.columns[0]?.toolCalls.length));
   const divergeIndex = identical ? -1 : comparison.commonToolPrefix;
 
   if (comparison.columns.length < 1) {

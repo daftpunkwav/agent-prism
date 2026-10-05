@@ -134,7 +134,7 @@ export function ConnectionsSection({
             website_url: c.website_url,
             thinking_capable: slot.thinking_capable,
             thinking_level: slot.thinking_level,
-            enabled: slot.enabled !== false,
+            enabled: slot.enabled,
           },
         ],
         api_key: c.api_key,
@@ -300,14 +300,14 @@ export function ConnectionsSection({
         {connections.map((c) => {
           const active = c.key === selectedKey;
           const hasKey = c.api_key_set === true || c.api_key.trim() !== "";
-          const usable = hasKey && c.models.some((m) => m.enabled !== false);
+          const usable = hasKey && c.models.some((m) => m.enabled);
           return (
             <button
               key={c.key}
               type="button"
               role="tab"
               aria-selected={active}
-              onClick={() => onSelect(c.key)}
+              onClick={() => { onSelect(c.key); }}
               className={
                 "shrink-0 flex items-center gap-2 rounded-[var(--radius-sm)] border px-3 py-2 text-sm transition-colors text-left " +
                 (active
@@ -387,7 +387,7 @@ export function ConnectionsSection({
                       <UiSelect
                         className="w-full"
                         value={c.api_format}
-                        onChange={(value) => onUpdateConn(c.key, { api_format: value })}
+                        onChange={(value) => { onUpdateConn(c.key, { api_format: value }); }}
                         ariaLabel={t("settings.connection.apiFormat")}
                         options={[
                           { value: "anthropic_messages", label: "Anthropic Messages" },
@@ -406,13 +406,13 @@ export function ConnectionsSection({
                     <input
                       className="form-input font-mono text-sm"
                       value={c.base_url}
-                      onChange={(e) => onUpdateConn(c.key, { base_url: e.target.value })}
+                      onChange={(e) => { onUpdateConn(c.key, { base_url: e.target.value }); }}
                     />
                     <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                       <input
                         type="checkbox"
                         checked={c.use_full_url}
-                        onChange={(e) => onUpdateConn(c.key, { use_full_url: e.target.checked })}
+                        onChange={(e) => { onUpdateConn(c.key, { use_full_url: e.target.checked }); }}
                         className="accent-[var(--primary)]"
                       />
                       {t("settings.connection.fullUrl")}
@@ -461,7 +461,7 @@ export function ConnectionsSection({
                         className="form-input"
                         value={c.website_url}
                         placeholder={t("settings.connection.optional")}
-                        onChange={(e) => onUpdateConn(c.key, { website_url: e.target.value })}
+                        onChange={(e) => { onUpdateConn(c.key, { website_url: e.target.value }); }}
                       />
                       <a
                         href={safeHttpUrl(c.website_url) ?? undefined}
@@ -487,9 +487,9 @@ export function ConnectionsSection({
                       <button
                         type="button"
                         className="btn-ghost !h-8 text-[11px]"
-                        aria-pressed={c.models.every((m) => m.enabled !== false)}
+                        aria-pressed={c.models.every((m) => m.enabled)}
                         onClick={() => {
-                          const enable = !c.models.every((m) => m.enabled !== false);
+                          const enable = !c.models.every((m) => m.enabled);
                           onUpdateConn(c.key, {
                             models: c.models.map((m) => ({ ...m, enabled: enable })),
                           });
@@ -503,7 +503,7 @@ export function ConnectionsSection({
                         type="button"
                         className="btn-ghost !h-8 !px-2 text-xs"
                         disabled={modelCount >= 12}
-                        onClick={() => setModelModal({ connKey: c.key, draft: blankModel(), isNew: true })}
+                        onClick={() => { setModelModal({ connKey: c.key, draft: blankModel(), isNew: true }); }}
                       >
                         <Plus className="h-3.5 w-3.5" />
                         {t("settings.connection.addModel")}
@@ -513,7 +513,7 @@ export function ConnectionsSection({
 
                   <ul className="space-y-1.5">
                     {c.models.map((m) => {
-                      const enabled = m.enabled !== false;
+                      const enabled = m.enabled;
                       const isDefault = m.id === defaultEndpointId;
                       const resultKey = `${c.key}:${m.id}`;
                       const outcome = outcomes[resultKey];
@@ -609,7 +609,7 @@ export function ConnectionsSection({
                                   "relative h-5 w-9 rounded-full transition-colors " +
                                   (enabled ? "bg-primary" : "bg-muted-foreground/40")
                                 }
-                                onClick={() => onUpdateModel(c.key, m.id, { enabled: !enabled })}
+                                onClick={() => { onUpdateModel(c.key, m.id, { enabled: !enabled }); }}
                               >
                                 <span
                                   className={
@@ -664,12 +664,12 @@ export function ConnectionsSection({
                       <textarea
                         className="form-input font-mono text-xs min-h-[220px]"
                         value={jsonDraft}
-                        onChange={(e) => setJsonDraft(e.target.value)}
+                        onChange={(e) => { setJsonDraft(e.target.value); }}
                         spellCheck={false}
                       />
                       <p className="text-[11px] text-muted-foreground">{t("settings.config.hint")}</p>
                       <div className="flex gap-2">
-                        <button type="button" className="btn-primary !h-9 text-xs" onClick={() => applyGroupJson(c)}>
+                        <button type="button" className="btn-primary !h-9 text-xs" onClick={() => { applyGroupJson(c); }}>
                           {t("settings.config.apply")}
                         </button>
                         <button
@@ -697,7 +697,7 @@ export function ConnectionsSection({
                     apiFormat={c.api_format}
                     defaultEndpointId={defaultEndpointId}
                     onSetDefault={onSetDefault}
-                    onClose={() => setModelModal(null)}
+                    onClose={() => { setModelModal(null); }}
                     onSave={(draft) => {
                       if (modelModal.isNew) {
                         onAddModel(modelModal.connKey, draft);

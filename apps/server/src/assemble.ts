@@ -429,7 +429,7 @@ export async function assemble(): Promise<RuntimeComponents> {
   const runtimeKnobsStore = new RuntimeKnobsStore(
     new AtomicJsonFile(RUNTIME_KNOBS_PATH),
     defaultRuntimeKnobs(settings),
-    (knobs) => applyRuntimeKnobs(knobs),
+    (knobs) => { applyRuntimeKnobs(knobs); },
   );
   // Operator-tuned runtime knobs: file-backed overrides over the env defaults.
   // The store's onUpdate hot-applies the values (shared ContextTuning/harness

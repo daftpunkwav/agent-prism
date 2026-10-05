@@ -97,7 +97,7 @@ export default function SettingsPage() {
     const ac = new AbortController();
     abortRef.current = ac;
     load(ac.signal);
-    return () => ac.abort();
+    return () => { ac.abort(); };
   }, [load, reloadNonce]);
 
   const flash = useCallback((msg: string) => {
@@ -140,8 +140,8 @@ export default function SettingsPage() {
       const saved = await saveProvider({
         notes: form.notes,
         website_url:
-          form.connections.find((c) => c.models.some((m) => m.id === defId))?.website_url ||
-          form.connections[0]?.website_url ||
+          form.connections.find((c) => c.models.some((m) => m.id === defId))?.website_url ??
+          form.connections[0]?.website_url ??
           "",
         default_endpoint_id: isLocalModelId(defId) ? "" : defId,
         temperature: form.temperature,
@@ -201,7 +201,7 @@ export default function SettingsPage() {
       {loadError !== null && (
         <div className="panel-surface settings-panel flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <p className="text-xs text-destructive">{loadError}</p>
-          <button type="button" className="btn-ghost !h-8 text-xs" onClick={() => setReloadNonce((n) => n + 1)}>
+          <button type="button" className="btn-ghost !h-8 text-xs" onClick={() => { setReloadNonce((n) => n + 1); }}>
             {t("settings.page.retry")}
           </button>
         </div>
@@ -217,7 +217,7 @@ export default function SettingsPage() {
               key={id}
               type="button"
               aria-current={section === id ? "true" : undefined}
-              onClick={() => setSection(id)}
+              onClick={() => { setSection(id); }}
               className={
                 "shrink-0 flex items-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-sm text-left transition-colors " +
                 (section === id
@@ -246,7 +246,7 @@ export default function SettingsPage() {
                 onSelect={setSelectedConnKey}
                 onUpdateConn={updateConn}
                 onUpdateModel={updateModel}
-                onSetDefault={(modelId) => setForm((f) => ({ ...f, default_endpoint_id: modelId }))}
+                onSetDefault={(modelId) => { setForm((f) => ({ ...f, default_endpoint_id: modelId })); }}
                 onDeleteModel={(connKey, modelId) => {
                   setForm((f) => {
                     const target = f.connections.find((c) => c.key === connKey);

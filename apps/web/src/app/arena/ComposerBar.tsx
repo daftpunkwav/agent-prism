@@ -258,7 +258,7 @@ export function ComposerBar({
           type="button"
           className="chip-toggle chip-toggle-strip"
           data-open={hasSessions && historyOpen ? "true" : undefined}
-          onClick={() => setHistoryOpen((v) => !v)}
+          onClick={() => { setHistoryOpen((v) => !v); }}
           disabled={!hasSessions}
           aria-expanded={hasSessions ? historyOpen : undefined}
           title={t("arena.history.title")}
@@ -312,7 +312,7 @@ export function ComposerBar({
             onFocus={() => openSuggestions()}
             onBlur={() => {
               if (blurTimerRef.current !== null) clearTimeout(blurTimerRef.current);
-              blurTimerRef.current = setTimeout(() => setSuggestOpen(false), 120);
+              blurTimerRef.current = setTimeout(() => { setSuggestOpen(false); }, 120);
             }}
             onKeyDown={onInputKeyDown}
             disabled={running}

@@ -98,7 +98,7 @@ export function StepRows({
 }) {
   const t = useT();
   const steps = flatSteps(segments);
-  const liveId = autoExpandTail && segments.length > 0 ? segments[segments.length - 1]!.id : null;
+  const liveId = autoExpandTail && segments.length > 0 ? segments[segments.length - 1]?.id : null;
   return (
     <ul className="builder-step-list">
       {steps.map((segment) => {
@@ -168,7 +168,7 @@ interface TodoItem {
 
 /** Extracts the todo list from todo_write args; null when the shape is not a todo batch. */
 function todoItems(args: Record<string, unknown> | undefined): TodoItem[] | null {
-  const raw = (args ?? {})["todos"];
+  const raw = args?.["todos"];
   if (!Array.isArray(raw) || raw.length === 0) return null;
   const items = raw.map((item) => {
     const record = item !== null && typeof item === "object" ? (item as Record<string, unknown>) : {};
@@ -211,7 +211,7 @@ function TodoPreview({ items }: { items: TodoItem[] }) {
 /** Live/rich segment list (also reused by the trace timeline tab). */
 export function SegmentList({ segments, running }: { segments: DisplaySegment[]; running: boolean }) {
   const t = useT();
-  const liveId = running && segments.length > 0 ? segments[segments.length - 1]!.id : null;
+  const liveId = running && segments.length > 0 ? segments[segments.length - 1]?.id : null;
   return (
     <div className="builder-segments">
       {segments.map((segment) => (
@@ -604,7 +604,7 @@ export function ChatPanel({ history, hasSession, running, liveSegments, onSend, 
           value={draft}
           placeholder={t("builder.chatPlaceholder")}
           disabled={running}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => { setDraft(event.target.value); }}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
