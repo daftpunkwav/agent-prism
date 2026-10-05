@@ -101,9 +101,11 @@ describe("globTool", () => {
   });
 
   it("compounds overlap charges across segments", () => {
-    // Each segment is within the per-segment cap, but a failed match multiplies
-    // every run's split count, so the cumulative overlap charges must cap too.
-    expect(() => globToRegExp(`${"a*a*a*a*/".repeat(4)}z`)).toThrow(RangeError);
+    // Two runs per segment stay under the per-segment cap, so only the
+    // cumulative counter can reject the fourth charged segment; a failed
+    // match multiplies every run's split count across segments.
+    expect(globToRegExp(`${"a*a*/".repeat(3)}z`).test("a1a2/a3a4/a5a6/z")).toBe(true);
+    expect(() => globToRegExp(`${"a*a*/".repeat(GLOB_MAX_UNBOUNDED_GROUPS + 1)}z`)).toThrow(RangeError);
     // Runs of one group per segment add no ambiguity: still legal.
     expect(globToRegExp("a*/b*/c*/d*/e*/f.ts").test("a1/b2/c3/d4/e5/f.ts")).toBe(true);
   });
