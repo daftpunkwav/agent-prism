@@ -37,8 +37,15 @@ ignoredOptionalDependencies:
   - '@anthropic-ai/claude-agent-sdk-win32-x64'
 
 # Accepted advisories (pnpm's native audit ignore). GHSA-vfj7-8cjw-p6xm
-# (braces ReDoS) is a build-time transitive of the lint toolchain with no
-# runtime entry point; re-check on the next eslint bump. See also
+# (CVE-2026-93687, high, braces stack-exhaustion DoS on deeply nested
+# patterns) has no patched release - braces@3.0.3 is the latest - and both
+# micromatch consumers keep requiring it, so it cannot be dropped from the
+# tree. It
+# arrives via micromatch@4 from deepagents (production, through the Deep
+# Agents driver) and the web lint toolchain (dev, via fast-glob). braces()
+# only sees internally configured glob patterns (deepagents file matching,
+# lint-time glob walking); no request-controlled pattern reaches it. Re-check
+# on any braces, micromatch, deepagents, or eslint-config-next bump. See also
 # scripts/ci/dependency-policy.json for the never-wanted-package denylist.
 auditConfig:
   ignoreGhsas:
