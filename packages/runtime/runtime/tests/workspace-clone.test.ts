@@ -69,7 +69,8 @@ describe("WorkspaceRegistry.clone", () => {
   it("fails loudly when the quota is full of pinned workspaces (never evicts pins)", async () => {
     const registry = makeRegistry(2);
     const a = registry.create("ws-a");
-    const b = registry.create("ws-b");
+    // Created for its pin/quota side effect only; the assertions address it by name.
+    registry.create("ws-b");
     registry.pin("ws-a");
     registry.pin("ws-b");
     await expect(registry.clone("ws-b", "ws-c")).rejects.toThrow(/quota full/);

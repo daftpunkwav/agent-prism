@@ -20,7 +20,6 @@ import { describe, expect, it } from "vitest";
 import type { SessionStore } from "@agentprism/contracts";
 import { SessionNotFoundError, SessionValidationError } from "@agentprism/contracts";
 import {
-  InMemoryBlobStore,
   MAX_ENTRIES_PER_SESSION,
   MAX_SESSIONS_PER_STORE,
   MAX_SESSION_TITLE_CHARS,

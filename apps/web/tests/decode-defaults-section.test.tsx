@@ -6,7 +6,6 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { DECODE_FIELD_RANGES } from "@agentprism/client";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
 import type { SettingsForm } from "../src/app/settings/settingsConnectionModel.js";

@@ -11,15 +11,12 @@ import { describe, expect, it } from "vitest";
 import { createHttpApplication, type HttpApplicationDeps } from "@agentprism/http-runtime";
 import { registerThreadRoutes } from "../src/threads.js";
 import { AppError, FileThreadStore, ThreadService, type ArenaService } from "@agentprism/application";
-import type { ArenaEvent, ArenaRunRequest, PipelineConfig } from "@agentprism/contracts";
-import { PipelineConfigSchema } from "@agentprism/contracts";
+import type { ArenaEvent, ArenaRunRequest } from "@agentprism/contracts";
 import { AtomicJsonFile } from "@agentprism/persistence";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-
-const CONFIG: PipelineConfig = PipelineConfigSchema.parse({ label: "col" });
 
 function scriptedArena(events: ArenaEvent[]): ArenaService {
   return {

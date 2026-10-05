@@ -20,13 +20,13 @@ function llmReplying(text: string) {
 describe("proposeHarnessEdit", () => {
   it("returns the parsed prompt additions and reasoning", async () => {
     const llm = llmReplying('{"prompt_additions": ["always show units"], "reasoning": "unit drift"}');
-    const proposal = await proposeHarnessEdit("q", "41", "missing units", "base prompt", llm as never);
+    const proposal = await proposeHarnessEdit("q", "missing units", "base prompt", llm as never);
     expect(proposal).toEqual({ prompt_additions: ["always show units"], reasoning: "unit drift" });
   });
 
   it("returns empty additions when the proposal fails to parse or the model errors", async () => {
     const bad = llmReplying("not json");
-    expect(await proposeHarnessEdit("q", "41", "r", "p", bad as never)).toEqual({
+    expect(await proposeHarnessEdit("q", "r", "p", bad as never)).toEqual({
       prompt_additions: [],
       reasoning: "Self-evolve parse failed",
     });
@@ -37,7 +37,7 @@ describe("proposeHarnessEdit", () => {
       }),
       stream: vi.fn(),
     };
-    expect(await proposeHarnessEdit("q", "41", "r", "p", failing as never)).toEqual({
+    expect(await proposeHarnessEdit("q", "r", "p", failing as never)).toEqual({
       prompt_additions: [],
       reasoning: "Self-evolve parse failed",
     });
@@ -50,6 +50,6 @@ describe("proposeHarnessEdit", () => {
       }),
       stream: vi.fn(),
     };
-    await expect(proposeHarnessEdit("q", "41", "r", "p", aborting as never)).rejects.toThrow("stop now");
+    await expect(proposeHarnessEdit("q", "r", "p", aborting as never)).rejects.toThrow("stop now");
   });
 });

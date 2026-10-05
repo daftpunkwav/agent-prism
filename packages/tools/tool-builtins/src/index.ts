@@ -15,7 +15,7 @@ export { editTool } from "./definitions/edit.js";
 export { lsTool } from "./definitions/ls.js";
 export { bashTool } from "./definitions/bash.js";
 export { applyPatchTool, parseV4aPatch, applyChunks } from "./definitions/apply-patch.js";
-export { globTool, globToRegExp } from "./definitions/glob.js";
+export { globTool, globToRegExp, GLOB_MAX_UNBOUNDED_GROUPS } from "./definitions/glob.js";
 export { readInt } from "./definitions/caps.js";
 export { safeFetchText, resolveCharset, readBodyCapped, CHARSET_SNIFF_BYTES } from "./definitions/safe-fetch.js";
 export { boundText, utf8Bytes, SPILL_DIR, SPILL_THRESHOLD_BYTES, MAX_SPILL_FILES } from "./definitions/spill.js";

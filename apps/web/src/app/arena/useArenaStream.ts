@@ -393,7 +393,7 @@ export function useArenaStream() {
         }
       }
     },
-    [applyEvent],
+    [applyEvent, t],
   );
 
   /** Clears columns and errors (dimension switch / new conversation). */

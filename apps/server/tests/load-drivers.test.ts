@@ -127,7 +127,8 @@ describe("selectDriverLoaders", () => {
   it("fails fast naming DRIVERS when the filter selects zero known loaders", async () => {
     const saved = process.env["DRIVERS"];
     process.env["DRIVERS"] = "bogus_only";
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    // The spy's only job is silencing the expected failure log; the mock record is never read.
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
       await expect(registerFrameworkDrivers()).rejects.toThrow(/DRIVERS=.*selected zero known drivers/);
     } finally {

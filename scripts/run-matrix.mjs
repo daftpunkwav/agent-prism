@@ -9,9 +9,10 @@
  * Usage: `pnpm dev:server` in one shell, then
  * `node scripts/run-matrix.mjs [--base http://localhost:8281] [--out matrix.md]
  *   [--templates mcp_fs_probe,skill_commit_format] [--timeout-ms 600000]`
- * Without --templates, all scored ablation templates run. Each cell posts one
- * /api/arena/run SSE stream, extracts per-column answers with the same
- * last-thought/observation priority as the harness extractor, then judges.
+ * Without --templates, all scored ablation templates run. The script posts one
+ * /api/arena/matrix SSE stream; the server runs each cell, extracts
+ * per-column answers, and judges them, and this script prints the final
+ * scoreboard.
  * Requires a configured provider (runs spend real model calls).
  */
 
@@ -21,31 +22,6 @@ function argValue(name, fallback) {
   const index = process.argv.indexOf(name);
   if (index === -1 || index + 1 >= process.argv.length) return fallback;
   return process.argv[index + 1] ?? fallback;
-}
-
-/** Mirrors harness extractAnswerFromEvents (last thought wins, else last observation). */
-function extractAnswer(events) {
-  let lastThought = "";
-  let streaming = "";
-  let lastObs = "";
-  for (const event of events) {
-    if (event.type === "thought") {
-      if (typeof event.content === "string" && event.content.startsWith("[")) continue;
-      streaming = event.content ?? "";
-      lastThought = streaming;
-    } else if (event.type === "thought_delta") {
-      const chunk = event.content ?? "";
-      if (chunk === "") continue;
-      streaming += chunk;
-      lastThought = streaming;
-    } else if (event.type === "thought_end") {
-      lastThought = event.content ? event.content : streaming;
-      streaming = "";
-    } else if (event.type === "observation") {
-      lastObs = event.result ?? "";
-    }
-  }
-  return (lastThought || lastObs).slice(0, 2000).trim();
 }
 
 async function fetchJson(url, options = {}) {

@@ -37,7 +37,6 @@ function compile(rules: Array<[string, CodeTokenKind]>): LanguageSpec {
 const STRINGS =
   "(?:[rRbBfFuU]{0,2}\"\"\"[\\s\\S]*?\"\"\"|[rRbBfFuU]{0,2}'''[\\s\\S]*?'''|`(?:\\\\[\\s\\S]|[^`\\\\])*`|\"(?:\\\\[\\s\\S]|[^\\\"\\\\\\\\])*\"|'(?:\\\\[\\s\\S]|[^'\\\\\\\\])*')";
 const NUMBERS = "(?:0[xXbBoO][0-9a-fA-F_]+|\\d[\\d_]*(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)";
-const IDENT = "[A-Za-z_$][\\w$]*";
 
 /** Python: # comments, triple-quoted strings, decorated identifiers. */
 const PYTHON = compile([

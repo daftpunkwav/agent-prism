@@ -19,7 +19,6 @@ import type {
   ModelCallOutcome,
   PipelineConfig,
   ToolAccess,
-  ToolExecuteOptions,
   ToolExecutionResult,
   ToolRegistry,
 } from "@agentprism/contracts";

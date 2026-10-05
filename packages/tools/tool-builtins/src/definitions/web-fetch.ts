@@ -15,7 +15,6 @@ import { MAX_OUTPUT, readInt } from "./caps.js";
 import { toolTuningValue } from "../tuning.js";
 import { safeFetchText } from "./safe-fetch.js";
 import { boundText } from "./spill.js";
-import { asWorkspaceView } from "./workspace-view.js";
 
 export const WEB_FETCH_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",

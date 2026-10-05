@@ -87,7 +87,7 @@ describe("ArenaService.run contract", () => {
 
 describe("ArenaService.run ledger isolation", () => {
   it("streams and completes when the ledger is sick", async () => {
-    const warn = (...args: unknown[]) => {};
+    const warn = (..._args: unknown[]) => {};
     const originalWarn = console.warn;
     console.warn = warn as typeof console.warn;
     try {

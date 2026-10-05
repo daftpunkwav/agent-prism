@@ -234,7 +234,6 @@ export class WorkspaceRegistry {
     } catch {
       return [];
     }
-    const resolvedRunsRoot = path.resolve(this.runsRoot);
     const found: Array<{ dir: string; mtime: number }> = [];
     for (const entry of entries) {
       if (!entry.isDirectory() || !isSafeWorkspaceSegment(entry.name)) continue;

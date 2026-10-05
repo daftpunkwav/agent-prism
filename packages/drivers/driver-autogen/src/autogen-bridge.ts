@@ -26,7 +26,7 @@
  * (coder/reviewer thought+reflect here vs crewai reflect-only).
  */
 
-import type { ArenaEvent, LlmAssistantMessage, ToolDefinition } from "@agentprism/contracts";
+import type { ArenaEvent, LlmAssistantMessage } from "@agentprism/contracts";
 import { arenaErrorEvent, completeEvent, sanitizeErrorMessage, tokenUpdateEvent } from "@agentprism/contracts";
 import { buildMetrics } from "@agentprism/telemetry";
 import type { AgentExecutionContext } from "@agentprism/harness";

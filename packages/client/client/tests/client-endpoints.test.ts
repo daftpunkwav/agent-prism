@@ -251,6 +251,23 @@ describe("client REST endpoints", () => {
     expect(seen[1]?.url).toContain("/api/settings/memory/clear");
   });
 
+  it("forwards the caller's abort signal to the memory clear request", async () => {
+    const controller = new AbortController();
+    const seen: Array<AbortSignal | null | undefined> = [];
+    vi.stubGlobal(
+      "fetch",
+      stubFetch((_url, init) => {
+        seen.push(init?.signal);
+        return jsonResponse({ episodic: 0, semantic: 0 });
+      }),
+    );
+    await clearMemory({ signal: controller.signal });
+    // apiFetch combines the caller's signal with its timeout signal, so the
+    // fetch-visible signal is a composite that aborts with the caller's.
+    controller.abort();
+    expect(seen[0]?.aborted).toBe(true);
+  });
+
   it("maps HTTP failures of GET endpoints to ApiError with the status", async () => {
     vi.stubGlobal("fetch", stubFetch(() => jsonResponse({ detail: "boom" }, 500)));
     for (const call of [fetchArenaMeta, fetchProvider, fetchRuntimeKnobs, fetchMemoryStatus, listProjects]) {

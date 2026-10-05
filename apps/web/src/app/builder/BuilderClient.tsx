@@ -455,7 +455,7 @@ export function BuilderClient() {
           }
         });
     },
-    [activeId, composition, refreshSessions, sessionName, t],
+    [activeId, composition, refreshSessions, sessionName, t, locale],
   );
 
   const handleStop = useCallback(() => {
@@ -812,8 +812,10 @@ export function BuilderClient() {
         <div
           className="builder-edge-line"
           data-side="right"
-          role="separator"
-          aria-orientation="vertical"
+          // Collapsed state: the handle only expands the pane (Enter/Space toggle,
+          // arrows are inert), so button semantics fit; a focusable separator would
+          // additionally require value attributes this collapsed handle has none of.
+          role="button"
           aria-label={t("builder.expandTrace")}
           tabIndex={0}
           onPointerDown={startGesture("right")}

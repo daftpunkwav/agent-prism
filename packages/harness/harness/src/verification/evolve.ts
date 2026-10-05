@@ -17,7 +17,6 @@ import { recordAdapterUsage } from "../usage.js";
 /** Self-evolution: proposes prompt modifications. */
 export async function proposeHarnessEdit(
   question: string,
-  answer: string,
   reflection: string,
   currentPrompt: string,
   llm: LlmAdapter,

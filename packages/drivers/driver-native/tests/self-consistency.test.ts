@@ -3,7 +3,7 @@
  * @description Locks the native SC loop: fresh attempts, vote tally, winner thought.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmMessage, LlmStreamPart } from "@agentprism/contracts";
+import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmStreamPart } from "@agentprism/contracts";
 import { extractAnswerFromEvents, PipelineConfigSchema } from "@agentprism/contracts";
 import { RagStoreCache } from "@agentprism/harness";
 import { assessToolRelevance, type AgentExecutionContext } from "@agentprism/harness";

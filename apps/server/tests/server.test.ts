@@ -242,7 +242,7 @@ describe("startServer", () => {
     const originalListen = HttpServer.prototype.listen;
     HttpServer.prototype.listen = function listenFails(
       this: import("node:http").Server,
-      ...args: unknown[]
+      ..._args: unknown[]
     ) {
       // Never bind: surface the async listen error the race window produces.
       setImmediate(() => {

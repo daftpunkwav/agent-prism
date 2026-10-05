@@ -1,10 +1,11 @@
 /**
  * @file glob tool tests
- * @description Locks glob matching: nested patterns, stability, brace alternation.
+ * @description Locks glob matching: nested patterns, stability, brace alternation, wildcard-run guard.
  */
 
 import { describe, expect, it } from "vitest";
 import {
+  GLOB_MAX_UNBOUNDED_GROUPS,
   globToRegExp,
   globTool,
 } from "@agentprism/tool-builtins";
@@ -68,5 +69,39 @@ describe("globTool", () => {
     expect(globToRegExp("a+b.txt").test("aab.txt")).toBe(false);
     // Unclosed `{` stays literal.
     expect(globToRegExp("a{b").test("a{b")).toBe(true);
+  });
+
+  it("collapses adjacent wildcard runs without changing what matches", () => {
+    // `****`, `**/**`, and `**` are equivalent; the compiled regex must carry a
+    // single unbounded group either way so backtracking stays linear.
+    const forms = ["**", "****", "**/**", "**/**/**"];
+    for (const form of forms) {
+      const regex = globToRegExp(`${form}.ts`);
+      expect(regex.test("a.ts"), form).toBe(true);
+      expect(regex.test("x/y/a.ts"), form).toBe(true);
+      expect(regex.source.match(/\.\*/g)?.length ?? 0, form).toBe(1);
+    }
+  });
+
+  it("rejects patterns with more wildcard runs than the fail-closed cap", () => {
+    // Three separated `**` groups stay legal and still match.
+    expect(globToRegExp("**/a/**/b/**/*.ts").test("x/a/y/b/z/w.ts")).toBe(true);
+    const pattern = ["**", "a", "**", "b", "**", "c", "**", "d.ts"].join("");
+    expect(() => globToRegExp(pattern)).toThrow(RangeError);
+    expect(() => globToRegExp(pattern)).toThrow(/too complex/);
+    expect(GLOB_MAX_UNBOUNDED_GROUPS).toBe(3);
+  });
+
+  it("surfaces the complexity cap as a tool error, not a thrown exception", async () => {
+    const ws = tempWorkspace();
+    try {
+      const pattern = "**/a/**/b/**/c/**/d.ts";
+      const outcome = await globTool.execute(ws, { pattern });
+      expect(outcome.ok).toBe(false);
+      expect(outcome.code).toBe("workspace_error");
+      expect(outcome.result).toContain("too complex");
+    } finally {
+      ws.cleanup();
+    }
   });
 });

@@ -27,7 +27,7 @@ import {
   ThinkingModeSchema,
   ToolsetIdSchema,
 } from "./enums.js";
-import { PipelineMetricsSchema, TokenStatsSchema } from "./events.js";
+import { PipelineMetricsSchema } from "./events.js";
 import { CUSTOM_DIMENSION_ID_MAX, CUSTOM_DIMENSION_ID_RE, CUSTOM_DIMENSION_VALUE_MAX } from "./custom-dimension.js";
 import { ToolRoundSchema, type ToolRound } from "./history-mode.js";
 

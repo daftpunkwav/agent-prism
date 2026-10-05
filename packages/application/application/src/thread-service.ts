@@ -16,7 +16,6 @@
 import type { ArenaEvent, Clock, ThreadCreateRequest, ThreadForkRequest, ThreadRunRequest, ThreadView } from "@agentprism/contracts";
 import type { ArenaRunRequest, PipelineConfig, ToolRound } from "@agentprism/contracts";
 import { clampToolRoundsForWire, extractAnswerFromEvents, extractToolRounds } from "@agentprism/contracts";
-import type { WorkspaceRegistry } from "@agentprism/runtime";
 import { isSafeWorkspaceSegment, sanitizeErrorMessage } from "@agentprism/contracts";
 import type { ArenaService } from "./arena-service.js";
 import { AppError } from "./errors.js";

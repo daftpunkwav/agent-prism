@@ -8,9 +8,9 @@
  *              script relative to the caller's module URL.
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
-import type { ArenaEvent, LlmAdapter, LlmCallOptions, LlmInvokeResult, LlmMessage, ToolDefinition } from "@agentprism/contracts";
+import type { ArenaEvent, LlmAdapter, LlmCallOptions, LlmMessage, ToolDefinition } from "@agentprism/contracts";
 import { PipelineConfigSchema } from "@agentprism/contracts";
 import { RagStoreCache, createContextAnalytics, type AgentExecutionContext } from "@agentprism/harness";
 import { MapToolRegistry } from "@agentprism/tool-registry";

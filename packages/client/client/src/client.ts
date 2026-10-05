@@ -19,7 +19,6 @@ import type {
   McpServerConfigView,
   ProviderConfigUpdateInput,
   RunAttachment,
-  RuntimeKnobFieldMeta,
   RuntimeKnobs,
 } from "@agentprism/contracts";
 import type {
@@ -475,6 +474,7 @@ export async function clearMemory(options?: { signal?: AbortSignal }): Promise<M
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: "{}",
+    signal: options?.signal,
   });
   if (!res.ok) throw new ApiError("Failed to clear memory", "http", res.status);
   return res.json();
