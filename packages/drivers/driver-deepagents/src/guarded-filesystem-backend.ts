@@ -21,10 +21,10 @@
  * into a cartesian explosion (measured: "{a,b}" x 20 = 1,048,576 expansions
  * in 860 ms, well within the length cap; "{1..999}" pairs likewise). The
  * expansion count treats groups in sequence as a product and alternatives
- * within a group as a sum, counts each range at its cardinality (capped at
- * braces' own fail-fast range ceiling), skips escaped braces, and sits
- * orders of magnitude below any legitimate glob need. grep's literal pattern
- * arg never reaches braces and stays unguarded.
+ * within a group as a sum, counts each range (signed, stepped included) at
+ * its true cardinality, skips escaped braces, and sits orders of magnitude
+ * below any legitimate glob need. grep's literal pattern arg never reaches
+ * braces and stays unguarded.
  */
 
 import { FilesystemBackend, type GlobResult, type GrepResult } from "deepagents";
@@ -39,24 +39,28 @@ export const PATTERN_GUARD_MAX_DEPTH = 32;
 export const PATTERN_GUARD_MAX_EXPANSION = 1024;
 
 /**
- * Cardinality ceiling for a single `{a..b}` range. braces errors out on
- * ranges past its own range limit, so anything unparseable or larger counts
- * at this ceiling rather than exploding.
+ * Conservative cardinality for a `{a..b}`-shaped pair that does not parse
+ * as a numeric or same-case alphabetic range (braces would treat it as a
+ * literal, but the guard assumes the worst rather than bet on that).
  */
 const MAX_RANGE_CARDINALITY = 1000;
 
 /** Cardinality of a braces range pair, conservative when unparseable. */
-function rangeCardinality(startStr: string, endStr: string): number {
-  const capped = (n: number) => Math.max(1, Math.min(n, MAX_RANGE_CARDINALITY));
+function rangeCardinality(startStr: string, endStr: string, stepStr: string): number {
   if (startStr === "" || endStr === "") return 1;
-  if (/^[0-9]+$/.test(startStr) && /^[0-9]+$/.test(endStr)) {
-    return capped(Math.abs(Number(endStr) - Number(startStr)) + 1);
+  const applyStep = (span: number): number => {
+    if (stepStr === "") return span;
+    if (!/^-?[0-9]+$/.test(stepStr) || Number(stepStr) === 0) return MAX_RANGE_CARDINALITY;
+    return Math.ceil(span / Math.abs(Number(stepStr)));
+  };
+  if (/^-?[0-9]+$/.test(startStr) && /^-?[0-9]+$/.test(endStr)) {
+    return applyStep(Math.abs(Number(endStr) - Number(startStr)) + 1);
   }
   if (startStr.length === 1 && endStr.length === 1) {
     const sameCase =
       (startStr === startStr.toLowerCase()) === (endStr === endStr.toLowerCase());
     if (sameCase && /[a-zA-Z]/.test(startStr) && /[a-zA-Z]/.test(endStr)) {
-      return capped(Math.abs(endStr.charCodeAt(0) - startStr.charCodeAt(0)) + 1);
+      return applyStep(Math.abs(endStr.charCodeAt(0) - startStr.charCodeAt(0)) + 1);
     }
   }
   return MAX_RANGE_CARDINALITY;
@@ -111,16 +115,30 @@ export function patternGuardRejection(pattern: string): string | null {
         frame.current = 1;
       }
     } else if (ch === "." && pattern[i + 1] === ".") {
-      // A `{a..b}` range multiplies the current alternative by its
-      // cardinality; outside any group it is a literal and braces ignores it.
+      // A `{a..b}` (optionally `{a..b..step}`) range multiplies the current
+      // alternative by its cardinality; outside any group it is a literal
+      // and braces ignores it. The whole expression is consumed so its
+      // inner tokens (including a second "..") cannot re-trigger here.
       const frame = stack[stack.length - 1];
       if (frame !== undefined) {
-        const alnum = /[0-9a-zA-Z]/;
+        const token = /[0-9a-zA-Z-]/;
+        const readToken = (from: number): [string, number] => {
+          let j = from;
+          while (j < pattern.length && token.test(pattern[j] ?? "")) j += 1;
+          return [pattern.slice(from, j), j];
+        };
         let start = i;
-        while (start > 0 && alnum.test(pattern[start - 1] ?? "")) start -= 1;
-        let end = i + 2;
-        while (end < pattern.length && alnum.test(pattern[end] ?? "")) end += 1;
-        frame.current *= rangeCardinality(pattern.slice(start, i), pattern.slice(i + 2, end));
+        while (start > 0 && token.test(pattern[start - 1] ?? "")) start -= 1;
+        const [endStr, afterEnd] = readToken(i + 2);
+        let stepStr = "";
+        let rangeEnd = afterEnd;
+        if (pattern[afterEnd] === "." && pattern[afterEnd + 1] === ".") {
+          const [step, afterStep] = readToken(afterEnd + 2);
+          stepStr = step;
+          rangeEnd = afterStep;
+        }
+        frame.current *= rangeCardinality(pattern.slice(start, i), endStr, stepStr);
+        i = rangeEnd - 1;
       }
     }
   }

@@ -60,8 +60,18 @@ describe("patternGuardRejection", () => {
     // Two sequential ranges multiply far past the bound.
     expect(patternGuardRejection("{1..999}{1..999}")).toContain("more than 1024 combinations");
     expect(patternGuardRejection("{1..999}{a,b}")).toContain("more than 1024 combinations");
-    // Ranges past braces' own fail-fast range ceiling cap at the ceiling.
-    expect(patternGuardRejection("{1..999999}")).toBeNull();
+    // Signed bounds count their real cardinality (the sign must not be
+    // dropped, which would collapse {-5..5} to cardinality 1).
+    expect(patternGuardRejection("{-5..5}")).toBeNull();
+    expect(patternGuardRejection("{-5..5}".repeat(3))).toContain("more than 1024 combinations");
+    expect(patternGuardRejection("{-3..3}{-3..3}")).toBeNull();
+    // Stepped ranges count their stepped cardinality, not the raw span.
+    expect(patternGuardRejection("{1..10..2}")).toBeNull();
+    expect(patternGuardRejection("{1..2048..2}")).toBeNull();
+    expect(patternGuardRejection("{1..4097..2}")).toContain("more than 1024 combinations");
+    // True cardinality: a single huge range is rejected outright instead of
+    // being left for braces to fail on.
+    expect(patternGuardRejection("{1..999999}")).toContain("more than 1024 combinations");
     // A lone range never trips the bound; ../ in paths is not a range.
     expect(patternGuardRejection("../src/*.{ts,tsx}")).toBeNull();
   });
@@ -179,6 +189,10 @@ describe("GuardedFilesystemBackend", () => {
       const literalJson = JSON.stringify(literal);
       expect(literalJson).toContain("needle-content marker");
       expect(literalJson).toContain("other.log");
+      // A literal far past every guard bound must still flow through
+      // unguarded - guarding it would break legitimate literal searches.
+      const heavy = await guarded.grep("{".repeat(64), ".");
+      expect(heavy.error).toBeUndefined();
     } finally {
       guarded.cleanup();
     }
