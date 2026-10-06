@@ -50,9 +50,10 @@ ignoredOptionalDependencies:
 # instance deepagents shares between the root agent and every generated
 # subagent, because root custom middleware is not merged into subagents and
 # a middleware-level guard would not cover delegation. Bounds: <= 1024 chars,
-# <= 32 brace-nesting depth. Re-check on any braces, micromatch, deepagents,
-# or eslint-config-next bump, and if the guard no longer covers the
-# framework's pattern entry points. See also
+# <= 32 brace-nesting depth, <= 1024 brace expansions (sequential groups
+# multiply, alternatives add; escaped braces are not structure). Re-check on
+# any braces, micromatch, deepagents, or eslint-config-next bump, and if the
+# guard no longer covers the framework's pattern entry points. See also
 # scripts/ci/dependency-policy.json for the never-wanted-package denylist.
 auditConfig:
   ignoreGhsas:
