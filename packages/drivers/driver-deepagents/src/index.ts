@@ -7,3 +7,4 @@
  */
 
 export * from "./deepagents-driver.js";
+export * from "./guarded-filesystem-backend.js";

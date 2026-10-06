@@ -7,6 +7,8 @@
  * - Run the real createDeepAgent middleware stack over the Arena model port
  * - Drop registry tools whose names the framework reserves, and keep the
  *   framework's own filesystem tools read-only and confined to the workspace
+ * - Reject model-supplied patterns too complex for the micromatch/braces
+ *   matcher at the shared backend boundary (root agent and subagents alike)
  * - Keep the shared context pipeline and tool drift guard on every model call
  * - Translate the framework's LangGraph event stream into ArenaEvents
  * - Translate a cancelled run (a normally-ended graph stream) into AbortError
@@ -51,7 +53,8 @@ import {
   type BindableToolAccess,
 } from "@agentprism/driver-langchain";
 import type { ToolAccess } from "@agentprism/harness";
-import { FilesystemBackend, createDeepAgent, createFilesystemMiddleware } from "deepagents";
+import { createDeepAgent, createFilesystemMiddleware } from "deepagents";
+import { GuardedFilesystemBackend } from "./guarded-filesystem-backend.js";
 
 /**
  * Built-in tool names deepagents reserves: createDeepAgent rejects any supplied
@@ -183,7 +186,12 @@ export class DeepAgentsDriver implements AgentDriver {
             // framework's own read tools accept absolute paths (and resolve relative
             // ones against the host process cwd), reading files outside the Arena
             // workspace and bypassing the scoped tool filesystem entirely.
-            backend: new FilesystemBackend({ rootDir: context.workspace.cwd(), virtualMode: true }),
+            // GuardedFilesystemBackend is also the pattern guard's choke point:
+            // deepagents hands this one backend instance to the root agent AND to
+            // every generated subagent's own filesystem middleware, while root
+            // custom middleware is not merged into subagents — so the guard has
+            // to live here to cover delegated glob/grep calls too.
+            backend: new GuardedFilesystemBackend({ rootDir: context.workspace.cwd(), virtualMode: true }),
             tools: [...READ_ONLY_FILESYSTEM_TOOLS],
           }),
         ],
