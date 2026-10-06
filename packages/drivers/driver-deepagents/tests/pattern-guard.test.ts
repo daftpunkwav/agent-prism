@@ -80,6 +80,11 @@ describe("patternGuardRejection", () => {
     // Mixed-case and digit/letter single-char pairs expand across charCodes.
     expect(patternGuardRejection("{a..B}")).toBeNull();
     expect(patternGuardRejection("{1..b}")).toBeNull();
+    // Scientific-notation endpoints are numerically expanded by fill-range
+    // ({9e2..1e2} = 801 values), so the guard must count them numerically.
+    expect(patternGuardRejection("{9e2..1e2}")).toBeNull();
+    expect(patternGuardRejection("{9e2..1e2}".repeat(3))).toContain("more than 1024 combinations");
+    expect(patternGuardRejection("{-1e1..1e1}")).toBeNull();
     // A lone range never trips the bound; ../ in paths is not a range.
     expect(patternGuardRejection("../src/*.{ts,tsx}")).toBeNull();
   });

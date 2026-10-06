@@ -49,20 +49,23 @@ const MAX_RANGE_CARDINALITY = 1000;
 
 /**
  * Cardinality of a braces range expression, mirroring its measured behavior:
- * numeric pairs expand numerically, single-character pairs expand across
- * char codes (mixed case and digit/letter pairs included), anything else
- * stays a literal. Non-finite spans and zero-expanding steps return
- * Infinity so the caller rejects instead of letting a NaN/0 slip past the
- * product bound.
+ * numeric-shaped pairs expand numerically (fill-range parses scientific
+ * notation like 9e2, so the guard must too), single-character pairs expand
+ * across char codes (mixed case and digit/letter pairs included), anything
+ * else stays a literal. Shaped-numeric values that are not finite integers
+ * (overflowing digits, NaN) return Infinity so the caller rejects instead of
+ * letting a NaN/0 slip past the product bound.
  */
+const NUMERIC_SHAPE = /^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/;
+
 function rangeCardinality(startStr: string, endStr: string, stepStr: string): number {
   if (startStr === "" || endStr === "") return 1;
   const spanOf = (a: number, b: number) => Math.abs(b - a) + 1;
   let span: number;
-  if (/^-?[0-9]+$/.test(startStr) && /^-?[0-9]+$/.test(endStr)) {
+  if (NUMERIC_SHAPE.test(startStr) && NUMERIC_SHAPE.test(endStr)) {
     const a = Number(startStr);
     const b = Number(endStr);
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return Number.POSITIVE_INFINITY;
+    if (!Number.isInteger(a) || !Number.isInteger(b)) return Number.POSITIVE_INFINITY;
     span = spanOf(a, b);
   } else if (startStr.length === 1 && endStr.length === 1) {
     span = spanOf(startStr.charCodeAt(0), endStr.charCodeAt(0));
@@ -70,7 +73,9 @@ function rangeCardinality(startStr: string, endStr: string, stepStr: string): nu
     return 1;
   }
   if (stepStr === "") return span;
-  if (!/^-?[0-9]+$/.test(stepStr)) return Number.POSITIVE_INFINITY;
+  if (!/^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/.test(stepStr)) {
+    return Number.POSITIVE_INFINITY;
+  }
   const step = Math.abs(Number(stepStr));
   if (!Number.isFinite(step) || step === 0) return Number.POSITIVE_INFINITY;
   return Math.max(1, Math.ceil(span / step));
