@@ -15,16 +15,16 @@
  * be: deepagents gives the root agent and every generated subagent their own
  * filesystem middleware sharing this one backend instance, while root custom
  * middleware is not merged into subagents. braces@3.0.3 caps input at 10,000
- * chars and numeric ranges at its own range limit, but has no nesting-depth
- * or expansion guard (GHSA-vfj7-8cjw-p6xm): deep patterns burn unbounded
- * event-loop time inside the synchronous tool call and can exhaust the call
- * stack, and sequential alternatives multiply into a cartesian explosion
- * (measured: "{a,b}" x 20 = 1,048,576 expansions in 860 ms, well within the
- * length cap). The expansion count treats groups in sequence as a product
- * and alternatives within a group as a sum, escaped braces are not counted
- * as structure, and all bounds sit orders of magnitude below any legitimate
- * glob need. grep's literal pattern arg never reaches braces and stays
- * unguarded.
+ * chars but has no nesting-depth or expansion guard (GHSA-vfj7-8cjw-p6xm):
+ * deep patterns burn unbounded event-loop time inside the synchronous tool
+ * call and can exhaust the call stack, and sequential alternatives multiply
+ * into a cartesian explosion (measured: "{a,b}" x 20 = 1,048,576 expansions
+ * in 860 ms, well within the length cap; "{1..999}" pairs likewise). The
+ * expansion count treats groups in sequence as a product and alternatives
+ * within a group as a sum, counts each range at its cardinality (capped at
+ * braces' own fail-fast range ceiling), skips escaped braces, and sits
+ * orders of magnitude below any legitimate glob need. grep's literal pattern
+ * arg never reaches braces and stays unguarded.
  */
 
 import { FilesystemBackend, type GlobResult, type GrepResult } from "deepagents";
@@ -37,6 +37,30 @@ export const PATTERN_GUARD_MAX_DEPTH = 32;
 
 /** Max brace expansions (cartesian product of sequential groups) accepted. */
 export const PATTERN_GUARD_MAX_EXPANSION = 1024;
+
+/**
+ * Cardinality ceiling for a single `{a..b}` range. braces errors out on
+ * ranges past its own range limit, so anything unparseable or larger counts
+ * at this ceiling rather than exploding.
+ */
+const MAX_RANGE_CARDINALITY = 1000;
+
+/** Cardinality of a braces range pair, conservative when unparseable. */
+function rangeCardinality(startStr: string, endStr: string): number {
+  const capped = (n: number) => Math.max(1, Math.min(n, MAX_RANGE_CARDINALITY));
+  if (startStr === "" || endStr === "") return 1;
+  if (/^[0-9]+$/.test(startStr) && /^[0-9]+$/.test(endStr)) {
+    return capped(Math.abs(Number(endStr) - Number(startStr)) + 1);
+  }
+  if (startStr.length === 1 && endStr.length === 1) {
+    const sameCase =
+      (startStr === startStr.toLowerCase()) === (endStr === endStr.toLowerCase());
+    if (sameCase && /[a-zA-Z]/.test(startStr) && /[a-zA-Z]/.test(endStr)) {
+      return capped(Math.abs(endStr.charCodeAt(0) - startStr.charCodeAt(0)) + 1);
+    }
+  }
+  return MAX_RANGE_CARDINALITY;
+}
 
 /**
  * Rejection reason for an over-complex pattern, or null when it is
@@ -85,6 +109,18 @@ export function patternGuardRejection(pattern: string): string | null {
       if (frame !== undefined) {
         frame.sum += frame.current;
         frame.current = 1;
+      }
+    } else if (ch === "." && pattern[i + 1] === ".") {
+      // A `{a..b}` range multiplies the current alternative by its
+      // cardinality; outside any group it is a literal and braces ignores it.
+      const frame = stack[stack.length - 1];
+      if (frame !== undefined) {
+        const alnum = /[0-9a-zA-Z]/;
+        let start = i;
+        while (start > 0 && alnum.test(pattern[start - 1] ?? "")) start -= 1;
+        let end = i + 2;
+        while (end < pattern.length && alnum.test(pattern[end] ?? "")) end += 1;
+        frame.current *= rangeCardinality(pattern.slice(start, i), pattern.slice(i + 2, end));
       }
     }
   }
