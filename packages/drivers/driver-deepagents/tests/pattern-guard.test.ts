@@ -85,15 +85,41 @@ describe("patternGuardRejection", () => {
     expect(patternGuardRejection("{9e2..1e2}")).toBeNull();
     expect(patternGuardRejection("{9e2..1e2}".repeat(3))).toContain("more than 1024 combinations");
     expect(patternGuardRejection("{-1e1..1e1}")).toBeNull();
+    // Signed/exponent-decorated endpoints and steps parse numerically too.
+    expect(patternGuardRejection("{1e+2..2e+2}")).toBeNull();
+    expect(patternGuardRejection("{1..10..+2}")).toBeNull();
+    // Punctuation pairs expand across char codes (measured: {!..~} = 94).
+    expect(patternGuardRejection("{!..~}")).toBeNull();
+    expect(patternGuardRejection("{!..~}{!..~}")).toContain("more than 1024 combinations");
+    // A comma splits the group: braces then keeps range syntax inside the
+    // alternatives literal (measured: {foo,1..600} = 2 entries), so the
+    // guard must not count the range - the whole point of {foo,1..600}{a,b}
+    // is its four real matches.
+    expect(patternGuardRejection("{foo,1..600}")).toBeNull();
+    expect(patternGuardRejection("{foo,1..600}{a,b}")).toBeNull();
+    // Quoted spans and closed bracket expressions stay literal (measured),
+    // so their braces must not be counted as structure.
+    expect(patternGuardRejection('"{a,b}"')).toBeNull();
+    expect(patternGuardRejection('"}"')).toBeNull();
+    expect(patternGuardRejection("[{a,b}]")).toBeNull();
+    // Space-bearing endpoints stay literal.
+    expect(patternGuardRejection("{a b..c}")).toBeNull();
+    // Path dots inside alternatives are literals, not ranges.
+    expect(patternGuardRejection("{../x,../y}")).toBeNull();
+    // Endpoints beyond Number.MAX_SAFE_INTEGER make fill-range burn seconds
+    // of synchronous CPU before throwing; reject them outright.
+    expect(patternGuardRejection("{9007199254740992..9007199254740994}")).toContain(
+      "range spans more than 1000",
+    );
     // A lone range never trips the bound; ../ in paths is not a range.
     expect(patternGuardRejection("../src/*.{ts,tsx}")).toBeNull();
   });
 
   it("never lets non-finite range math slip past the product bound", () => {
-    // 400-digit step: Number(step) is Infinity; a naive span/step yields 0,
-    // which would zero the whole product and smuggle the rest through. The
-    // unbounded step is rejected as an over-ceiling range.
-    const zeroStep = "{1..9.." + "0".repeat(400) + "}{1..999}{1..999}";
+    // 400-digit nonzero step: Number(step) is Infinity; a naive span/step
+    // yields 0, which would zero the whole product and smuggle the rest
+    // through. The unbounded step is rejected as an over-ceiling range.
+    const zeroStep = "{1..9.." + "9".repeat(400) + "}{1..999}{1..999}";
     expect(patternGuardRejection(zeroStep)).toContain("range spans more than 1000");
     // 310-digit endpoints: Number(endpoint) is Infinity; a naive span is
     // NaN, and NaN comparisons never trip the limit.

@@ -41,22 +41,18 @@ export const PATTERN_GUARD_MAX_EXPANSION = 1024;
 
 /**
  * Upper cardinality braces itself accepts for one range: past 1000 items it
- * throws a RangeError instead of expanding. The guard rejects ranges beyond
- * this so the model gets a controlled error, and treats anything unbounded
- * (overflowing endpoints or steps) the same way.
+ * throws a RangeError instead of expanding. Endpoints beyond the safe
+ * integer range are also rejected here: fill-range cannot advance such a
+ * range and burns seconds of synchronous CPU before failing.
  */
 const MAX_RANGE_CARDINALITY = 1000;
 
 /**
- * Cardinality of a braces range expression, mirroring its measured behavior:
- * numeric-shaped pairs expand numerically (fill-range parses scientific
- * notation like 9e2, so the guard must too), single-character pairs expand
- * across char codes (mixed case and digit/letter pairs included), anything
- * else stays a literal. Shaped-numeric values that are not finite integers
- * (overflowing digits, NaN) return Infinity so the caller rejects instead of
- * letting a NaN/0 slip past the product bound.
+ * Numeric endpoint/step shape: fill-range parses plain integers, decimals
+ * and scientific notation (with sign), counting them by value, so the guard
+ * must recognize the same forms.
  */
-const NUMERIC_SHAPE = /^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/;
+const NUMERIC_SHAPE = /^[+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/;
 
 function rangeCardinality(startStr: string, endStr: string, stepStr: string): number {
   if (startStr === "" || endStr === "") return 1;
@@ -65,17 +61,29 @@ function rangeCardinality(startStr: string, endStr: string, stepStr: string): nu
   if (NUMERIC_SHAPE.test(startStr) && NUMERIC_SHAPE.test(endStr)) {
     const a = Number(startStr);
     const b = Number(endStr);
-    if (!Number.isInteger(a) || !Number.isInteger(b)) return Number.POSITIVE_INFINITY;
+    // Non-integers, infinities and beyond-safe-integer endpoints either
+    // throw inside braces after burning seconds of CPU or do not expand at
+    // all: reject them here as unbounded.
+    if (
+      !Number.isInteger(a) ||
+      !Number.isInteger(b) ||
+      Math.abs(a) > Number.MAX_SAFE_INTEGER ||
+      Math.abs(b) > Number.MAX_SAFE_INTEGER
+    ) {
+      return Number.POSITIVE_INFINITY;
+    }
     span = spanOf(a, b);
   } else if (startStr.length === 1 && endStr.length === 1) {
+    // Any single-character pair (punctuation included) expands across char
+    // codes: {!..~} yields the 94 printable-ASCII punctuation values.
     span = spanOf(startStr.charCodeAt(0), endStr.charCodeAt(0));
   } else {
+    // Multi-character non-numeric endpoints stay literal (measured:
+    // {foo..bar}, {a..alk}, {a b..c} each expand to themselves).
     return 1;
   }
   if (stepStr === "") return span;
-  if (!/^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/.test(stepStr)) {
-    return Number.POSITIVE_INFINITY;
-  }
+  if (!NUMERIC_SHAPE.test(stepStr)) return Number.POSITIVE_INFINITY;
   const step = Math.abs(Number(stepStr));
   if (!Number.isFinite(step) || step === 0) return Number.POSITIVE_INFINITY;
   return Math.max(1, Math.ceil(span / step));
@@ -96,16 +104,34 @@ export function patternGuardRejection(pattern: string): string | null {
   let deepest = 0;
   let total = 1;
   // Frames per open group: sum = expansions of finished alternatives,
-  // current = expansion product of the alternative being scanned.
-  const stack: Array<{ sum: number; current: number }> = [];
+  // current = expansion product of the alternative being scanned, and
+  // whether a top-level comma split the group (braces then treats range
+  // syntax inside the alternatives as literal text, measured:
+  // {foo,1..600} expands to exactly two entries).
+  const stack: Array<{ sum: number; current: number; seenComma: boolean }> = [];
   for (let i = 0; i < pattern.length; i++) {
     const ch = pattern[i];
     if (ch === "\\") {
       i += 1;
       continue;
     }
+    if (ch === '"' || ch === "'") {
+      // Braces assigns no meaning to quotes; a closed quoted span stays
+      // literal, so skip it whole. An unmatched quote falls through as an
+      // ordinary character (over-counting is the safe direction).
+      const close = pattern.indexOf(ch, i + 1);
+      if (close !== -1) i = close;
+      continue;
+    }
+    if (ch === "[") {
+      // Measured: a closed bracket expression keeps its content literal
+      // ([{a,b}] expands to itself). Unmatched "[" scans on as a literal.
+      const close = pattern.indexOf("]", i + 1);
+      if (close !== -1) i = close;
+      continue;
+    }
     if (ch === "{") {
-      stack.push({ sum: 0, current: 1 });
+      stack.push({ sum: 0, current: 1, seenComma: false });
       depth += 1;
       if (depth > deepest) deepest = depth;
     } else if (ch === "}") {
@@ -128,15 +154,21 @@ export function patternGuardRejection(pattern: string): string | null {
       if (frame !== undefined) {
         frame.sum += frame.current;
         frame.current = 1;
+        frame.seenComma = true;
       }
     } else if (ch === "." && pattern[i + 1] === ".") {
       // A `{a..b}` (optionally `{a..b..step}`) range multiplies the current
-      // alternative by its cardinality; outside any group it is a literal
-      // and braces ignores it. The whole expression is consumed so its
-      // inner tokens (including a second "..") cannot re-trigger here.
+      // alternative by its cardinality - but only while the group holds a
+      // single alternative, since braces then treats range syntax as
+      // literal text. Outside any group it is a literal too. The whole
+      // expression is consumed so its inner tokens (including a second
+      // "..") cannot re-trigger here.
       const frame = stack[stack.length - 1];
-      if (frame !== undefined) {
-        const token = /[0-9a-zA-Z-]/;
+      if (frame !== undefined && !frame.seenComma) {
+        // Endpoints/steps collect every non-structural character: braces
+        // expands punctuation pairs ({!..~}) and fill-range parses signs
+        // and exponents ({1e+2..2e+2}), so the guard must see them too.
+        const token = /[^{},]/;
         const readToken = (from: number): [string, number] => {
           let j = from;
           while (j < pattern.length && token.test(pattern[j] ?? "")) j += 1;
@@ -144,14 +176,17 @@ export function patternGuardRejection(pattern: string): string | null {
         };
         let start = i;
         while (start > 0 && token.test(pattern[start - 1] ?? "")) start -= 1;
-        const [endStr, afterEnd] = readToken(i + 2);
+        const [collected, afterEnd] = readToken(i + 2);
+        // The collected span may ride through the ".." that starts the step
+        // (both are non-structural): split end and step at the first one.
+        let endStr = collected;
         let stepStr = "";
-        let rangeEnd = afterEnd;
-        if (pattern[afterEnd] === "." && pattern[afterEnd + 1] === ".") {
-          const [step, afterStep] = readToken(afterEnd + 2);
-          stepStr = step;
-          rangeEnd = afterStep;
+        const stepIdx = collected.indexOf("..");
+        if (stepIdx !== -1) {
+          endStr = collected.slice(0, stepIdx);
+          stepStr = collected.slice(stepIdx + 2);
         }
+        let rangeEnd = afterEnd;
         const cardinality = rangeCardinality(pattern.slice(start, i), endStr, stepStr);
         if (cardinality > MAX_RANGE_CARDINALITY) {
           // Beyond braces' own per-range ceiling it throws instead of
