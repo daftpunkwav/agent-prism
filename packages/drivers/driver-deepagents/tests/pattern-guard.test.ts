@@ -67,13 +67,33 @@ describe("patternGuardRejection", () => {
     expect(patternGuardRejection("{-3..3}{-3..3}")).toBeNull();
     // Stepped ranges count their stepped cardinality, not the raw span.
     expect(patternGuardRejection("{1..10..2}")).toBeNull();
-    expect(patternGuardRejection("{1..2048..2}")).toBeNull();
-    expect(patternGuardRejection("{1..4097..2}")).toContain("more than 1024 combinations");
-    // True cardinality: a single huge range is rejected outright instead of
-    // being left for braces to fail on.
-    expect(patternGuardRejection("{1..999999}")).toContain("more than 1024 combinations");
+    expect(patternGuardRejection("{1..2000..2}")).toBeNull();
+    expect(patternGuardRejection("{1..4097..2}")).toContain("range spans more than 1000");
+    // Ranges beyond braces' own 1000-item ceiling are rejected with a
+    // controlled error instead of letting braces throw a RangeError.
+    expect(patternGuardRejection("{1..1001}")).toContain("range spans more than 1000");
+    expect(patternGuardRejection("{1..999999}")).toContain("range spans more than 1000");
+    expect(patternGuardRejection("{1..1000}{1..1000}")).toContain("more than 1024 combinations");
+    // Shapes braces keeps literal (measured) count as 1, not a penalty.
+    expect(patternGuardRejection("{a..alk}")).toBeNull();
+    expect(patternGuardRejection("{foo..bar}")).toBeNull();
+    // Mixed-case and digit/letter single-char pairs expand across charCodes.
+    expect(patternGuardRejection("{a..B}")).toBeNull();
+    expect(patternGuardRejection("{1..b}")).toBeNull();
     // A lone range never trips the bound; ../ in paths is not a range.
     expect(patternGuardRejection("../src/*.{ts,tsx}")).toBeNull();
+  });
+
+  it("never lets non-finite range math slip past the product bound", () => {
+    // 400-digit step: Number(step) is Infinity; a naive span/step yields 0,
+    // which would zero the whole product and smuggle the rest through. The
+    // unbounded step is rejected as an over-ceiling range.
+    const zeroStep = "{1..9.." + "0".repeat(400) + "}{1..999}{1..999}";
+    expect(patternGuardRejection(zeroStep)).toContain("range spans more than 1000");
+    // 310-digit endpoints: Number(endpoint) is Infinity; a naive span is
+    // NaN, and NaN comparisons never trip the limit.
+    const nanSpan = "{" + "9".repeat(310) + ".." + "9".repeat(310) + "}{1..999}{1..999}";
+    expect(patternGuardRejection(nanSpan)).toContain("range spans more than 1000");
   });
 
   it("does not let unmatched closers offset later openings", () => {
@@ -89,7 +109,10 @@ describe("patternGuardRejection", () => {
     // nets to zero but actually push the nesting to 35.
     const hidden = "{".repeat(20) + "\\}{".repeat(15);
     expect(patternGuardRejection(hidden)).toContain("nests braces 35 deep");
-    // Escaped openers must not inflate the depth either.
+    // An escaped opener must not push past the limit either: 32 real opens
+    // stay legal, while a scanner counting the escaped "{" would see 33.
+    expect(patternGuardRejection("{".repeat(32) + "\\{")).toBeNull();
+    // Escaped openers must not inflate smaller patterns' depth either.
     expect(patternGuardRejection("{a,\\{,b}")).toBeNull();
   });
 });
@@ -191,7 +214,12 @@ describe("GuardedFilesystemBackend", () => {
       expect(literalJson).toContain("other.log");
       // A literal far past every guard bound must still flow through
       // unguarded - guarding it would break legitimate literal searches.
+      // The spy proves the heavy literal actually reached the base backend
+      // instead of being short-circuited into an empty success.
+      const matcher = vi.spyOn(FilesystemBackend.prototype, "grep");
       const heavy = await guarded.grep("{".repeat(64), ".");
+      expect(heavy.error).toBeUndefined();
+      expect(matcher).toHaveBeenCalledWith("{".repeat(64), ".", undefined, undefined);
       expect(heavy.error).toBeUndefined();
     } finally {
       guarded.cleanup();

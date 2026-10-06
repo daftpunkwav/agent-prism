@@ -22,9 +22,10 @@
  * in 860 ms, well within the length cap; "{1..999}" pairs likewise). The
  * expansion count treats groups in sequence as a product and alternatives
  * within a group as a sum, counts each range (signed, stepped included) at
- * its true cardinality, skips escaped braces, and sits orders of magnitude
- * below any legitimate glob need. grep's literal pattern arg never reaches
- * braces and stays unguarded.
+ * its true cardinality bounded by braces' own 1000-item per-range ceiling,
+ * skips escaped braces, and sits orders of magnitude below any legitimate
+ * glob need. grep's literal pattern arg never reaches braces and stays
+ * unguarded.
  */
 
 import { FilesystemBackend, type GlobResult, type GrepResult } from "deepagents";
@@ -39,31 +40,40 @@ export const PATTERN_GUARD_MAX_DEPTH = 32;
 export const PATTERN_GUARD_MAX_EXPANSION = 1024;
 
 /**
- * Conservative cardinality for a `{a..b}`-shaped pair that does not parse
- * as a numeric or same-case alphabetic range (braces would treat it as a
- * literal, but the guard assumes the worst rather than bet on that).
+ * Upper cardinality braces itself accepts for one range: past 1000 items it
+ * throws a RangeError instead of expanding. The guard rejects ranges beyond
+ * this so the model gets a controlled error, and treats anything unbounded
+ * (overflowing endpoints or steps) the same way.
  */
 const MAX_RANGE_CARDINALITY = 1000;
 
-/** Cardinality of a braces range pair, conservative when unparseable. */
+/**
+ * Cardinality of a braces range expression, mirroring its measured behavior:
+ * numeric pairs expand numerically, single-character pairs expand across
+ * char codes (mixed case and digit/letter pairs included), anything else
+ * stays a literal. Non-finite spans and zero-expanding steps return
+ * Infinity so the caller rejects instead of letting a NaN/0 slip past the
+ * product bound.
+ */
 function rangeCardinality(startStr: string, endStr: string, stepStr: string): number {
   if (startStr === "" || endStr === "") return 1;
-  const applyStep = (span: number): number => {
-    if (stepStr === "") return span;
-    if (!/^-?[0-9]+$/.test(stepStr) || Number(stepStr) === 0) return MAX_RANGE_CARDINALITY;
-    return Math.ceil(span / Math.abs(Number(stepStr)));
-  };
+  const spanOf = (a: number, b: number) => Math.abs(b - a) + 1;
+  let span: number;
   if (/^-?[0-9]+$/.test(startStr) && /^-?[0-9]+$/.test(endStr)) {
-    return applyStep(Math.abs(Number(endStr) - Number(startStr)) + 1);
+    const a = Number(startStr);
+    const b = Number(endStr);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return Number.POSITIVE_INFINITY;
+    span = spanOf(a, b);
+  } else if (startStr.length === 1 && endStr.length === 1) {
+    span = spanOf(startStr.charCodeAt(0), endStr.charCodeAt(0));
+  } else {
+    return 1;
   }
-  if (startStr.length === 1 && endStr.length === 1) {
-    const sameCase =
-      (startStr === startStr.toLowerCase()) === (endStr === endStr.toLowerCase());
-    if (sameCase && /[a-zA-Z]/.test(startStr) && /[a-zA-Z]/.test(endStr)) {
-      return applyStep(Math.abs(endStr.charCodeAt(0) - startStr.charCodeAt(0)) + 1);
-    }
-  }
-  return MAX_RANGE_CARDINALITY;
+  if (stepStr === "") return span;
+  if (!/^-?[0-9]+$/.test(stepStr)) return Number.POSITIVE_INFINITY;
+  const step = Math.abs(Number(stepStr));
+  if (!Number.isFinite(step) || step === 0) return Number.POSITIVE_INFINITY;
+  return Math.max(1, Math.ceil(span / step));
 }
 
 /**
@@ -137,7 +147,13 @@ export function patternGuardRejection(pattern: string): string | null {
           stepStr = step;
           rangeEnd = afterStep;
         }
-        frame.current *= rangeCardinality(pattern.slice(start, i), endStr, stepStr);
+        const cardinality = rangeCardinality(pattern.slice(start, i), endStr, stepStr);
+        if (cardinality > MAX_RANGE_CARDINALITY) {
+          // Beyond braces' own per-range ceiling it throws instead of
+          // expanding; rejecting here keeps the error a controlled one.
+          return `range spans more than ${MAX_RANGE_CARDINALITY} items (limit ${MAX_RANGE_CARDINALITY})`;
+        }
+        frame.current *= cardinality;
         i = rangeEnd - 1;
       }
     }
