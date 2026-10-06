@@ -70,25 +70,26 @@ class ScriptedChatModel extends BaseChatModel {
   }
 }
 
-/**
- * Scripted model for one guarded tool call: turn 1 streams a tool_call chunk
- * (the deepagents agent consumes the streaming path, so tool calls must ride
- * tool_call_chunks to survive aggregation), later turns stream the final text.
- * Every invocation's message list is recorded.
- */
-class GlobCallChatModel extends BaseChatModel {
-  readonly seen: BaseMessage[][] = [];
-  private turns = 0;
+/** One scripted model turn: either a tool call or a final text answer. */
+type ScriptedTurn = { toolCall?: { id: string; name: string; args: Record<string, unknown> }; text?: string };
 
-  constructor(
-    private readonly toolCall: { id: string; name: string; args: Record<string, unknown> },
-    private readonly finalText: string,
-  ) {
+/**
+ * Scripted model for multi-turn agent (and subagent) runs: each turn streams
+ * either a tool_call chunk or text — the deepagents agent consumes the
+ * streaming path, so tool calls must ride tool_call_chunks to survive
+ * aggregation. Turns past the last scripted step repeat it. Every
+ * invocation's message list is recorded.
+ */
+class ScriptedTurnsChatModel extends BaseChatModel {
+  readonly seen: BaseMessage[][] = [];
+  private turn = 0;
+
+  constructor(private readonly steps: ScriptedTurn[]) {
     super({});
   }
 
   override _llmType(): string {
-    return "glob-call";
+    return "scripted-turns";
   }
 
   /** The deep-agent middleware binds tools; identity binding suffices for a script. */
@@ -96,28 +97,37 @@ class GlobCallChatModel extends BaseChatModel {
     return this;
   }
 
+  private current(): ScriptedTurn {
+    return this.steps[Math.min(this.turn, this.steps.length - 1)]!;
+  }
+
+  private messageFor(step: ScriptedTurn): AIMessage {
+    return step.toolCall
+      ? new AIMessage({ content: "", tool_calls: [{ ...step.toolCall, type: "tool_call" }] })
+      : new AIMessage(step.text ?? "");
+  }
+
   override async _generate(messages: BaseMessage[], _options?: Record<string, unknown>): Promise<ChatResult> {
     this.seen.push([...messages]);
-    const message =
-      this.turns === 0
-        ? new AIMessage({ content: "", tool_calls: [{ ...this.toolCall, type: "tool_call" }] })
-        : new AIMessage(this.finalText);
-    this.turns += 1;
+    const step = this.current();
+    this.turn += 1;
+    const message = this.messageFor(step);
     return { generations: [{ text: String(message.content ?? ""), message }] };
   }
 
   override async *_streamResponseChunks(messages: BaseMessage[]): AsyncGenerator<ChatGenerationChunk> {
     this.seen.push([...messages]);
-    if (this.turns === 0) {
-      this.turns += 1;
+    const step = this.current();
+    this.turn += 1;
+    if (step.toolCall) {
       yield new ChatGenerationChunk({
         message: new AIMessageChunk({
           content: "",
           tool_call_chunks: [
             {
-              id: this.toolCall.id,
-              name: this.toolCall.name,
-              args: JSON.stringify(this.toolCall.args),
+              id: step.toolCall.id,
+              name: step.toolCall.name,
+              args: JSON.stringify(step.toolCall.args),
               index: 0,
               type: "tool_call_chunk",
             },
@@ -127,10 +137,8 @@ class GlobCallChatModel extends BaseChatModel {
       });
       return;
     }
-    yield new ChatGenerationChunk({
-      message: new AIMessageChunk({ content: this.finalText }),
-      text: this.finalText,
-    });
+    const text = step.text ?? "";
+    yield new ChatGenerationChunk({ message: new AIMessageChunk({ content: text }), text });
   }
 }
 
@@ -214,16 +222,55 @@ describe("DeepAgentsDriver", () => {
     // staying far under the length bound, so no pattern that could actually
     // exhaust a stack is needed to pin the guard.
     const deep = "{a,".repeat(40) + "b" + "}".repeat(40);
-    const model = new GlobCallChatModel(
-      { id: "call_1", name: "glob", args: { pattern: deep } },
-      "The glob found nothing usable; done.",
-    );
+    const model = new ScriptedTurnsChatModel([
+      { toolCall: { id: "call_1", name: "glob", args: { pattern: deep } } },
+      { text: "The glob found nothing usable; done." },
+    ]);
     const context = executionContext(model);
     try {
       const events = await collect(driver.run(context));
       expect(events.some((event) => event.type === "error")).toBe(false);
       const rejection = model.seen
         .flat()
+        .filter((message): message is ToolMessage => message instanceof ToolMessage)
+        .find((message) => String(message.content).includes("[pattern guard]"));
+      expect(rejection).toBeDefined();
+      expect(String(rejection?.content)).toContain('glob arg "pattern"');
+      expect(String(rejection?.content)).toContain("nests braces 40 deep");
+      const terminal = events.at(-1);
+      expect(terminal?.type).toBe("complete");
+      expect((terminal as ArenaEvent & { metrics: { success: boolean } }).metrics.success).toBe(true);
+    } finally {
+      context.cleanup();
+    }
+  });
+
+  it("applies the pattern guard to delegated subagent glob calls too", { timeout: 60_000 }, async () => {
+    const driver = new DeepAgentsDriver();
+    const deep = "{a,".repeat(40) + "b" + "}".repeat(40);
+    const model = new ScriptedTurnsChatModel([
+      // Root turn: delegate to the framework's default general-purpose subagent.
+      {
+        toolCall: {
+          id: "call_root",
+          name: "task",
+          args: { description: "Search the workspace for anything matching the pattern.", subagent_type: "general-purpose" },
+        },
+      },
+      // Subagent turn: the delegated over-complex glob call.
+      { toolCall: { id: "call_sub", name: "glob", args: { pattern: deep } } },
+      // Subagent final turn, then the root final turn.
+      { text: "Nothing to report." },
+      { text: "Delegated search done." },
+    ]);
+    const context = executionContext(model);
+    try {
+      const events = await collect(driver.run(context));
+      expect(events.some((event) => event.type === "error")).toBe(false);
+      // The rejection must reach the SUBAGENT's model (third invocation), proving
+      // the guard holds inside delegated runs where root middleware never lands.
+      const subagentMessages = model.seen[2] ?? [];
+      const rejection = subagentMessages
         .filter((message): message is ToolMessage => message instanceof ToolMessage)
         .find((message) => String(message.content).includes("[pattern guard]"));
       expect(rejection).toBeDefined();
