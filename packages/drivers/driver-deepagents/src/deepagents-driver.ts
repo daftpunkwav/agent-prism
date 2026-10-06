@@ -7,6 +7,8 @@
  * - Run the real createDeepAgent middleware stack over the Arena model port
  * - Drop registry tools whose names the framework reserves, and keep the
  *   framework's own filesystem tools read-only and confined to the workspace
+ * - Reject model-supplied patterns too complex for the micromatch/braces
+ *   matcher (the framework's glob pattern and grep glob filter)
  * - Keep the shared context pipeline and tool drift guard on every model call
  * - Translate the framework's LangGraph event stream into ArenaEvents
  * - Translate a cancelled run (a normally-ended graph stream) into AbortError
@@ -46,6 +48,7 @@ import {
 import {
   bindRegistryTools,
   contextPolicyMiddleware,
+  createPatternGuardMiddleware,
   requireChatModel,
   toLcMessages,
   type BindableToolAccess,
@@ -170,6 +173,11 @@ export class DeepAgentsDriver implements AgentDriver {
         // next major release), so the string form is the durable spelling.
         systemPrompt: system,
         middleware: [
+          // Model-supplied patterns reach braces through the framework's own
+          // glob tool (pattern arg) and grep tool (glob filter); braces has no
+          // nesting-depth guard (GHSA-vfj7-8cjw-p6xm), so over-complex patterns
+          // are rejected with a ToolMessage before any matcher runs.
+          createPatternGuardMiddleware({ glob: ["pattern"], grep: ["glob"] }),
           contextPolicyMiddleware(
             config.context,
             question,

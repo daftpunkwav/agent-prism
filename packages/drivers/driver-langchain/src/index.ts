@@ -14,3 +14,4 @@ export * from "./bind-tools-safe.js";
 export * from "./llm-message-bridge.js";
 export * from "./require-chat-model.js";
 export * from "./stream-to-message.js";
+export * from "./pattern-guard-middleware.js";

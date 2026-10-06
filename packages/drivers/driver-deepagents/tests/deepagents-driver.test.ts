@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { BaseMessage } from "@langchain/core/messages";
-import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
+import { AIMessage, AIMessageChunk, ToolMessage } from "@langchain/core/messages";
 import { ChatGenerationChunk, type ChatResult } from "@langchain/core/outputs";
 import type { Runnable } from "@langchain/core/runnables";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -66,6 +66,70 @@ class ScriptedChatModel extends BaseChatModel {
     yield new ChatGenerationChunk({
       message: new AIMessageChunk({ content: message.content }),
       text: String(message.content ?? ""),
+    });
+  }
+}
+
+/**
+ * Scripted model for one guarded tool call: turn 1 streams a tool_call chunk
+ * (the deepagents agent consumes the streaming path, so tool calls must ride
+ * tool_call_chunks to survive aggregation), later turns stream the final text.
+ * Every invocation's message list is recorded.
+ */
+class GlobCallChatModel extends BaseChatModel {
+  readonly seen: BaseMessage[][] = [];
+  private turns = 0;
+
+  constructor(
+    private readonly toolCall: { id: string; name: string; args: Record<string, unknown> },
+    private readonly finalText: string,
+  ) {
+    super({});
+  }
+
+  override _llmType(): string {
+    return "glob-call";
+  }
+
+  /** The deep-agent middleware binds tools; identity binding suffices for a script. */
+  override bindTools(): Runnable {
+    return this;
+  }
+
+  override async _generate(messages: BaseMessage[], _options?: Record<string, unknown>): Promise<ChatResult> {
+    this.seen.push([...messages]);
+    const message =
+      this.turns === 0
+        ? new AIMessage({ content: "", tool_calls: [{ ...this.toolCall, type: "tool_call" }] })
+        : new AIMessage(this.finalText);
+    this.turns += 1;
+    return { generations: [{ text: String(message.content ?? ""), message }] };
+  }
+
+  override async *_streamResponseChunks(messages: BaseMessage[]): AsyncGenerator<ChatGenerationChunk> {
+    this.seen.push([...messages]);
+    if (this.turns === 0) {
+      this.turns += 1;
+      yield new ChatGenerationChunk({
+        message: new AIMessageChunk({
+          content: "",
+          tool_call_chunks: [
+            {
+              id: this.toolCall.id,
+              name: this.toolCall.name,
+              args: JSON.stringify(this.toolCall.args),
+              index: 0,
+              type: "tool_call_chunk",
+            },
+          ],
+        }),
+        text: "",
+      });
+      return;
+    }
+    yield new ChatGenerationChunk({
+      message: new AIMessageChunk({ content: this.finalText }),
+      text: this.finalText,
     });
   }
 }
@@ -136,6 +200,35 @@ describe("DeepAgentsDriver", () => {
         .join("");
       expect(streamed).toContain("The answer is 4.");
       expect(events.some((event) => event.type === "error")).toBe(false);
+      const terminal = events.at(-1);
+      expect(terminal?.type).toBe("complete");
+      expect((terminal as ArenaEvent & { metrics: { success: boolean } }).metrics.success).toBe(true);
+    } finally {
+      context.cleanup();
+    }
+  });
+
+  it("rejects a stack-exhausting model-supplied glob pattern before the matcher runs", { timeout: 60_000 }, async () => {
+    const driver = new DeepAgentsDriver();
+    // Short but 40 levels deep: trips the depth bound specifically while
+    // staying far under the length bound, so no pattern that could actually
+    // exhaust a stack is needed to pin the guard.
+    const deep = "{a,".repeat(40) + "b" + "}".repeat(40);
+    const model = new GlobCallChatModel(
+      { id: "call_1", name: "glob", args: { pattern: deep } },
+      "The glob found nothing usable; done.",
+    );
+    const context = executionContext(model);
+    try {
+      const events = await collect(driver.run(context));
+      expect(events.some((event) => event.type === "error")).toBe(false);
+      const rejection = model.seen
+        .flat()
+        .filter((message): message is ToolMessage => message instanceof ToolMessage)
+        .find((message) => String(message.content).includes("[pattern guard]"));
+      expect(rejection).toBeDefined();
+      expect(String(rejection?.content)).toContain('glob arg "pattern"');
+      expect(String(rejection?.content)).toContain("nests braces 40 deep");
       const terminal = events.at(-1);
       expect(terminal?.type).toBe("complete");
       expect((terminal as ArenaEvent & { metrics: { success: boolean } }).metrics.success).toBe(true);
