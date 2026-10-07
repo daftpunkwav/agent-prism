@@ -1,7 +1,9 @@
 # Quality gates
 
-All gates are plain npm scripts. No pre-commit hooks are wired in the repository. Run
-them manually or in CI. The standard full sweep is:
+The local gates are plain npm scripts. No pre-commit hooks are wired in the
+repository. Run them manually or in CI. What blocks a merge is a separate layer —
+the branch ruleset's required checks and review requirements, documented in
+[CI merge gates](#ci-merge-gates) below. The standard full sweep is:
 
 ```bash
 pnpm verify    # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
@@ -47,8 +49,8 @@ reports a required check. The docs-only path of the `ci.yml` diff classifier
 skips the build, test, and smoke jobs on documentation changes; workflow-lint
 is skipped too unless something under `.github/` changed — a Markdown edit
 there still triggers it. The `gate` job still runs — it passes only when the
-checks that still run pass: the PR title convention, plus workflow-lint when
-the change touches `.github/`.
+checks that still run pass: the PR title convention, the path classification
+itself, and workflow-lint when the change touches `.github/`.
 
 ## Conventions the gates assume
 

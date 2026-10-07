@@ -2,8 +2,9 @@
 
 > 语言：**简体中文** | [English](quality-gates.md)
 
-所有门禁都是普通 npm script。仓库中未接入任何 pre-commit hook。手动或 CI 运行它们。
-标准的全量扫描为：
+本地门禁都是普通 npm script。仓库中未接入任何 pre-commit hook。手动或 CI 运行它们。
+阻止合并的是另一层——分支 ruleset 的必需检查与 review 要求，见下方
+[CI 合并门禁](#ci-合并门禁)。标准的全量扫描为：
 
 ```bash
 pnpm verify    # 构建 + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
@@ -46,7 +47,7 @@ pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文�
 `ci.yml` 的 diff 分类器对纯文档改动走 docs-only 路径，跳过构建、测试与 smoke；
 workflow-lint 同样跳过，除非 `.github/` 下有改动——在那里改一个 Markdown 文件
 也足以触发它。`gate` 仍会运行，只有仍在运行的检查全部通过才会通过：PR 标题
-约定，以及触及 `.github/` 时的 workflow-lint。
+约定、路径分类本身，以及触及 `.github/` 时的 workflow-lint。
 
 ## 门禁假定的约定
 
