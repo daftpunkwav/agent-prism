@@ -44,9 +44,11 @@ threads, and a branch that is up to date with `main`. Merging is squash-only.
 
 Two review bots comment on pull requests (CodeRabbit and Sourcery). Neither
 reports a required check. The docs-only path of the `ci.yml` diff classifier
-skips the build, test, smoke, and workflow-lint jobs on documentation changes;
-the `gate` job still runs — it passes only when the checks that still run
-pass; on a docs-only change that means the PR title convention.
+skips the build, test, and smoke jobs on documentation changes; workflow-lint
+is skipped too unless something under `.github/` changed — a Markdown edit
+there still triggers it. The `gate` job still runs — it passes only when the
+checks that still run pass; on a docs-only change that means the PR title
+convention.
 
 ## Conventions the gates assume
 
