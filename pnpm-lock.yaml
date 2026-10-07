@@ -163,7 +163,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  sharp: '>=0.35.5 <1'
+  sharp: '>=0.35.5 <0.36'
   '@modelcontextprotocol/client': '>=2.2.0 <3'
 
 importers:
