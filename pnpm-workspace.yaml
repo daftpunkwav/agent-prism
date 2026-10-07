@@ -58,3 +58,20 @@ ignoredOptionalDependencies:
 auditConfig:
   ignoreGhsas:
     - GHSA-vfj7-8cjw-p6xm
+
+# Security floors over transitive pins (pnpm overrides). The floors lift two
+# high advisories that the declaring packages' ranges do not reach on their own:
+# - sharp >=0.35.5 (GHSA-wq5f-xc86-pv6w, high): vulnerability in a librsvg
+#   dependency of the prebuilt binaries; arrives through next's optional
+#   dependency in apps/web (image optimization is the only consumer).
+# - @modelcontextprotocol/client >=2.2.0 (GHSA-6qxp-vccf-f47h, high): OAuth
+#   client could send credentials to an authorization server chosen by the
+#   MCP server; arrives via @openai/agents-core in the openai-agents driver.
+# Upper bounds keep a later lockfile re-resolution inside the consumers'
+# declared ranges (next pins ^0.35.4, @openai/agents-core a 2.x client), not
+# merely below a breaking major. Re-check both floors on any next or
+# @openai/agents bump, and drop them once the declaring packages reach the
+# patched ranges on their own.
+overrides:
+  sharp: ">=0.35.5 <0.36"
+  '@modelcontextprotocol/client': ">=2.2.0 <3"

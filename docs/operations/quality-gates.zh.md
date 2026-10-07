@@ -2,8 +2,9 @@
 
 > 语言：**简体中文** | [English](quality-gates.md)
 
-所有门禁都是普通 npm script。仓库中未接入任何 pre-commit hook。手动或 CI 运行它们。
-标准的全量扫描为：
+本地门禁都是普通 npm script。仓库中未接入任何 pre-commit hook。手动或 CI 运行它们。
+阻止合并的是另一层——分支 ruleset 的必需检查与 review 要求，见下方
+[CI 合并门禁](#ci-合并门禁)。标准的全量扫描为：
 
 ```bash
 pnpm verify    # 构建 + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
@@ -27,6 +28,29 @@ pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文�
 不变量为：`contracts` 是零依赖 leaf；drivers、tools、providers 等 plugin 绝不向上
 触达 composer 或 providers；transport shell 绝不反向依赖 routes；`apps/web` 只依赖
 `client`、`ui`、`arena-view`。
+
+## CI 合并门禁
+
+真正阻止合并到 `main` 的不是上面的 npm script，而是分支 ruleset。GitHub Actions 的两个聚合
+检查（`ci.yml` 的 `gate`、`security.yml` 的 `security-gate`）是必需项，与之并列的还有托管的
+`Codacy Static Code Analysis` 检查、两个 approving review、全部 resolved 的 review thread，
+以及与 `main` 保持同步。合并只允许 squash。
+
+| 检查 | 来源 | 覆盖 |
+|---|---|---|
+| `gate` | `ci.yml` | PR 标题约定、构建、typecheck、web lint、i18n、带覆盖率阈值的测试、import 边界、依赖卫生、导出测试覆盖、启动 smoke 探测、workflow lint（actionlint + zizmor） |
+| `security-gate` | `security.yml` | 全历史 secret 扫描（gitleaks）、依赖审计与策略 denylist |
+| CodeQL | GitHub Advanced Security | actions、javascript-typescript、python 三种语言的安全分析 |
+| Codacy Static Code Analysis | Codacy 云端 | 托管静态分析，范围由 `.codacy.yml` 划定 |
+
+两个 review bot（CodeRabbit 与 Sourcery）会在 PR 上评论。两者都不报告必需检查。
+`ci.yml` 的 diff 分类器把所有 `*.md` 路径连同 `.gitignore`、`.gitattributes`、
+`LICENSE` 都视为 docs-only，对这些改动跳过构建、测试与 smoke；workflow-lint
+同样跳过，除非 `.github/` 下有改动——在那里改一个 Markdown 文件也足以触发它。
+`gate` 仍会运行，只有仍在运行的检查全部通过才会通过：PR 标题约定、路径分类
+本身，以及触及 `.github/` 时的 workflow-lint。安全工作流则完全没有路径过滤：
+`security-gate` 在每个 PR 上都运行，依赖审计或 secret 扫描失败对 docs-only
+改动的阻断与代码改动完全相同。
 
 ## 门禁假定的约定
 

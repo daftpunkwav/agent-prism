@@ -1,7 +1,9 @@
 # Quality gates
 
-All gates are plain npm scripts. No pre-commit hooks are wired in the repository. Run
-them manually or in CI. The standard full sweep is:
+The local gates are plain npm scripts. No pre-commit hooks are wired in the
+repository. Run them manually or in CI. What blocks a merge is a separate layer —
+the branch ruleset's required checks and review requirements, documented in
+[CI merge gates](#ci-merge-gates) below. The standard full sweep is:
 
 ```bash
 pnpm verify    # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
@@ -26,6 +28,33 @@ which is the single source of truth. The headline invariants are: `contracts` is
 zero-dependency leaf; plugins such as drivers, tools, and providers never reach upward to
 composers or providers; the transport shell never depends back on routes; and `apps/web`
 depends only on `client`, `ui`, and `arena-view`.
+
+## CI merge gates
+
+What blocks a merge on `main` is enforced by the branch ruleset, not by the npm
+scripts above. The two aggregate checks from GitHub Actions (`gate` from `ci.yml`,
+`security-gate` from `security.yml`) are required, alongside the hosted
+`Codacy Static Code Analysis` check, two approving reviews, resolved review
+threads, and a branch that is up to date with `main`. Merging is squash-only.
+
+| Check | Source | Covers |
+|---|---|---|
+| `gate` | `ci.yml` | PR title conventions, build, typecheck, web lint, i18n, tests with coverage thresholds, import boundaries, dependency hygiene, export-test coverage, boot smoke probe, workflow lint (actionlint + zizmor) |
+| `security-gate` | `security.yml` | Full-history secret scan (gitleaks), dependency audit and policy denylist |
+| CodeQL | GitHub Advanced Security | Security analysis for actions, javascript-typescript, and python |
+| Codacy Static Code Analysis | Codacy cloud | Hosted static analysis, scoped by `.codacy.yml` |
+
+Two review bots comment on pull requests (CodeRabbit and Sourcery). Neither
+reports a required check. The docs-only path of the `ci.yml` diff classifier
+treats every `*.md` path, plus `.gitignore`, `.gitattributes`, and `LICENSE`,
+as docs-only and skips the build, test, and smoke jobs for those changes;
+workflow-lint is skipped too unless something under `.github/` changed — a
+Markdown edit there still triggers it. The `gate` job still runs — it passes
+only when the checks that still run pass: the PR title convention, the path
+classification itself, and workflow-lint when the change touches `.github/`.
+The security workflow has no path filtering at all: `security-gate` runs on
+every pull request, so a dependency-audit or secret-scan failure blocks a
+docs-only change exactly as it would a code change.
 
 ## Conventions the gates assume
 
