@@ -69,8 +69,10 @@ auditConfig:
 # - @modelcontextprotocol/client >=2.2.0 (GHSA-6qxp-vccf-f47h, high): OAuth
 #   client could send credentials to an authorization server chosen by the
 #   MCP server; arrives via @openai/agents-core in the openai-agents driver.
-# Re-check both floors on any next or @openai/agents bump, and drop them once
-# the declaring packages reach the patched ranges on their own.
+# Upper bounds keep a later lockfile re-resolution from jumping a breaking
+# major the consumers were never built against. Re-check both floors on any
+# next or @openai/agents bump, and drop them once the declaring packages
+# reach the patched ranges on their own.
 overrides:
-  sharp: ">=0.35.5"
-  '@modelcontextprotocol/client': ">=2.2.0"
+  sharp: ">=0.35.5 <1"
+  '@modelcontextprotocol/client': ">=2.2.0 <3"
