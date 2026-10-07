@@ -28,6 +28,24 @@ pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文�
 触达 composer 或 providers；transport shell 绝不反向依赖 routes；`apps/web` 只依赖
 `client`、`ui`、`arena-view`。
 
+## CI 合并门禁
+
+真正阻止合并到 `main` 的不是上面的 npm script，而是分支 ruleset。GitHub Actions 的两个聚合
+检查（`ci.yml` 的 `gate`、`security.yml` 的 `security-gate`）是必需项，与之并列的还有托管的
+`Codacy Static Code Analysis` 检查、两个 approving review、全部 resolved 的 review thread，
+以及与 `main` 保持同步。合并只允许 squash。
+
+| 检查 | 来源 | 覆盖 |
+|---|---|---|
+| `gate` | `ci.yml` | PR 标题约定、构建、typecheck、web lint、i18n、带覆盖率阈值的测试、import 边界、依赖卫生、导出测试覆盖、启动 smoke 探测、workflow lint（actionlint + zizmor） |
+| `security-gate` | `security.yml` | 全历史 secret 扫描（gitleaks）、依赖审计与策略 denylist |
+| CodeQL | GitHub Advanced Security | actions、javascript-typescript、python 三种语言的安全分析 |
+| Codacy Static Code Analysis | Codacy 云端 | 托管静态分析，范围由 `.codacy.yml` 划定 |
+
+两个 review bot（CodeRabbit 与 Sourcery）会在 PR 上评论。两者都不报告必需检查。
+`ci.yml` 的 diff 分类器对纯文档改动走 docs-only 路径，跳过构建、测试、smoke 与
+workflow-lint；`gate` 仍然运行并直接通过。
+
 ## 门禁假定的约定
 
 - Conventional Commits，形式为 `<type>: <subject>`，type 为 `feat`、`fix`、`docs`、

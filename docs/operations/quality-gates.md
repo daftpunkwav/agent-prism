@@ -27,6 +27,26 @@ zero-dependency leaf; plugins such as drivers, tools, and providers never reach 
 composers or providers; the transport shell never depends back on routes; and `apps/web`
 depends only on `client`, `ui`, and `arena-view`.
 
+## CI merge gates
+
+What blocks a merge on `main` is enforced by the branch ruleset, not by the npm
+scripts above. The two aggregate checks from GitHub Actions (`gate` from `ci.yml`,
+`security-gate` from `security.yml`) are required, alongside the hosted
+`Codacy Static Code Analysis` check, two approving reviews, resolved review
+threads, and a branch that is up to date with `main`. Merging is squash-only.
+
+| Check | Source | Covers |
+|---|---|---|
+| `gate` | `ci.yml` | PR title conventions, build, typecheck, web lint, i18n, tests with coverage thresholds, import boundaries, dependency hygiene, export-test coverage, boot smoke probe, workflow lint (actionlint + zizmor) |
+| `security-gate` | `security.yml` | Full-history secret scan (gitleaks), dependency audit and policy denylist |
+| CodeQL | GitHub Advanced Security | Security analysis for actions, javascript-typescript, and python |
+| Codacy Static Code Analysis | Codacy cloud | Hosted static analysis, scoped by `.codacy.yml` |
+
+Two review bots comment on pull requests (CodeRabbit and Sourcery). Neither
+reports a required check. The docs-only path of the `ci.yml` diff classifier
+skips the build, test, smoke, and workflow-lint jobs on documentation changes;
+the `gate` job still runs and passes.
+
 ## Conventions the gates assume
 
 - Conventional Commits with the form `<type>: <subject>`, where type is `feat`, `fix`,
