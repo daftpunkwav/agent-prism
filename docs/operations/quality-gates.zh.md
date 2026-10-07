@@ -45,8 +45,8 @@ pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文�
 两个 review bot（CodeRabbit 与 Sourcery）会在 PR 上评论。两者都不报告必需检查。
 `ci.yml` 的 diff 分类器对纯文档改动走 docs-only 路径，跳过构建、测试与 smoke；
 workflow-lint 同样跳过，除非 `.github/` 下有改动——在那里改一个 Markdown 文件
-也足以触发它。`gate` 仍会运行，只有仍在运行的检查全部通过才会通过——对
-docs-only 改动即 PR 标题约定。
+也足以触发它。`gate` 仍会运行，只有仍在运行的检查全部通过才会通过：PR 标题
+约定，以及触及 `.github/` 时的 workflow-lint。
 
 ## 门禁假定的约定
 

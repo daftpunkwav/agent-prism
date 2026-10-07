@@ -47,8 +47,8 @@ reports a required check. The docs-only path of the `ci.yml` diff classifier
 skips the build, test, and smoke jobs on documentation changes; workflow-lint
 is skipped too unless something under `.github/` changed — a Markdown edit
 there still triggers it. The `gate` job still runs — it passes only when the
-checks that still run pass; on a docs-only change that means the PR title
-convention.
+checks that still run pass: the PR title convention, plus workflow-lint when
+the change touches `.github/`.
 
 ## Conventions the gates assume
 
