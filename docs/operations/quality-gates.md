@@ -52,6 +52,9 @@ workflow-lint is skipped too unless something under `.github/` changed — a
 Markdown edit there still triggers it. The `gate` job still runs — it passes
 only when the checks that still run pass: the PR title convention, the path
 classification itself, and workflow-lint when the change touches `.github/`.
+The security workflow has no path filtering at all: `security-gate` runs on
+every pull request, so a dependency-audit or secret-scan failure blocks a
+docs-only change exactly as it would a code change.
 
 ## Conventions the gates assume
 

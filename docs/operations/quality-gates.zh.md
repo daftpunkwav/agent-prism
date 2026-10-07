@@ -48,7 +48,9 @@ pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文�
 `LICENSE` 都视为 docs-only，对这些改动跳过构建、测试与 smoke；workflow-lint
 同样跳过，除非 `.github/` 下有改动——在那里改一个 Markdown 文件也足以触发它。
 `gate` 仍会运行，只有仍在运行的检查全部通过才会通过：PR 标题约定、路径分类
-本身，以及触及 `.github/` 时的 workflow-lint。
+本身，以及触及 `.github/` 时的 workflow-lint。安全工作流则完全没有路径过滤：
+`security-gate` 在每个 PR 上都运行，依赖审计或 secret 扫描失败对 docs-only
+改动的阻断与代码改动完全相同。
 
 ## 门禁假定的约定
 
