@@ -373,9 +373,6 @@ importers:
         specifier: ^4.0.1
         version: 4.0.1(supports-color@7.2.0)
     devDependencies:
-      '@agentprism/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts/contracts
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3

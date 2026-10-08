@@ -6,10 +6,13 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import type { ArenaEvent } from "@agentprism/contracts";
 import type { ColumnState } from "@agentprism/arena-view";
 import { parseViewMode, PAGE_SIZE_OPTIONS, useViewMode, VIEW_MODES } from "../src/app/arena/useViewMode.js";
 import { columnRibbons, metricRows, ribbonCategory, runnerStates, summarizeColumns } from "../src/app/arena/viewData.js";
+
+/** apps/web must not import @agentprism/contracts (boundary rule): derive the
+ *  event type from the ColumnState shape instead of importing it directly. */
+type ArenaEvent = ColumnState["events"][number];
 
 afterEach(() => {
   window.localStorage.clear();

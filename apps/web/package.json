@@ -25,7 +25,6 @@
     "eslint-config-next": "^16.3.8"
   },
   "devDependencies": {
-    "@agentprism/contracts": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24",
     "@types/react": "^19.2.17",

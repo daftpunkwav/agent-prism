@@ -4,9 +4,14 @@
  *
  * Responsibilities:
  * - Render one lane-colored ribbon per column from merged event segments
- * - Bucket segments into coarse categories (thought/action/observation/verify/error)
- * - Hover a segment for its details: category, event count, share, time span,
- *   tools used, and a text sample
+ * - Bucket segments into coarse categories (thought/action/observation/verify/error/other)
+ * - Hover or focus a segment for its details: category, event count, share,
+ *   time span, tools used, and a text sample
+ *
+ * Accessibility: the band is a list of listitems (never role="img" — its
+ * children would be presentational and the tooltip facts unreachable); each
+ * segment names its category in an sr-only label and points at its tooltip
+ * through aria-describedby.
  */
 
 "use client";
@@ -32,11 +37,11 @@ function formatSpan(ms: number): string {
 }
 
 /** One segment's hover tooltip: coarse category facts plus a text sample. */
-function SegmentTooltip({ seg, colLabel }: { seg: ReturnType<typeof columnRibbons>[number]["segments"][number]; colLabel: string }) {
+function SegmentTooltip({ seg, colLabel, descId }: { seg: ReturnType<typeof columnRibbons>[number]["segments"][number]; colLabel: string; descId: string }) {
   const t = useT();
   const span = formatSpan(seg.spanMs);
   return (
-    <span className="arena-ribbon-tooltip" role="tooltip">
+    <span className="arena-ribbon-tooltip" role="tooltip" id={descId}>
       <span className="arena-ribbon-tooltip-title font-mono">
         {t(`arena.view.ribbonCat.${seg.category}` as "arena.view.ribbonCat.thought")}
         {` · ×${seg.count} · ${Math.round(seg.widthPct)}%`}
@@ -77,7 +82,7 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
       </span>
       <div
         className="arena-ribbon-band"
-        role="img"
+        role="list"
         aria-label={t("arena.view.ribbonAria", { name: display })}
       >
         {ribbon.segments.map((seg, idx) => (
@@ -85,9 +90,14 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
             key={idx}
             className={`arena-ribbon-seg ${CATEGORY_CLASS[seg.category]}`}
             style={{ width: `${seg.widthPct}%` }}
-            tabIndex={0}
+            role="listitem"
+            aria-describedby={`ribbon-seg-${idx}-${ribbon.label}`}
           >
-            <SegmentTooltip seg={seg} colLabel={display} />
+            <SegmentTooltip seg={seg} colLabel={display} descId={`ribbon-seg-${idx}-${ribbon.label}`} />
+            <span className="sr-only">
+              {t(`arena.view.ribbonCat.${seg.category}` as "arena.view.ribbonCat.thought")}
+              {` ×${seg.count}`}
+            </span>
           </span>
         ))}
       </div>

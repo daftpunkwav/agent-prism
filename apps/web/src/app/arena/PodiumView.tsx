@@ -76,7 +76,9 @@ function TrackLane({ runner, lane, display }: { runner: RunnerState; lane: numbe
           </span>
         )}
         {!waiting && (
-          <div className="arena-track-bubble" role="status">
+          // No role="status": several lanes updating independently would spam
+          // screen readers; the race hint below is the single live region.
+          <div className="arena-track-bubble">
             <ActivityIcon kind={runner.activityKind} tool={runner.tool} />
             <span className="arena-track-bubble-text">{bubbleText}</span>
           </div>
@@ -166,10 +168,12 @@ export function PodiumView({ columnList, running, resolveDisplayLabel }: {
   resolveDisplayLabel: (label: string) => string;
 }) {
   const t = useT();
-  // A 1s clock only while anything is unsettled: elapsed times tick and the
-  // runner dots re-derive without waiting for stream events.
+  // A 1s clock only while the run is streaming with unsettled columns: elapsed
+  // times tick and the runner dots re-derive without waiting for stream events.
+  // A stop/cancel sets running=false with metrics absent — the clock must not
+  // keep ticking then.
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const anyUnsettled = columnList.some((col) => col.metrics === undefined);
+  const anyUnsettled = running && columnList.some((col) => col.metrics === undefined);
   useEffect(() => {
     if (!anyUnsettled) return;
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -202,7 +206,9 @@ export function PodiumView({ columnList, running, resolveDisplayLabel }: {
       </div>
       {allSettled && <FinishedPodium ranked={[...summaries].sort(rankCompare)} resolveDisplayLabel={resolveDisplayLabel} />}
       {!allSettled && (
-        <p className="arena-race-hint text-[11px] text-muted-foreground">
+        // Single polite live region for the whole race: lane bubbles update
+        // visually only, so assistive tech gets one summary, not a chorus.
+        <p className="arena-race-hint text-[11px] text-muted-foreground" aria-live="polite">
           {running ? t("arena.view.raceHintRunning") : t("arena.view.raceHintWaiting")}
         </p>
       )}
