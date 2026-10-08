@@ -13,7 +13,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, FileJson, GitCompare, Terminal } from "lucide-react";
-import type { RunAttachment } from "@agentprism/client";
 import type { DimensionId } from "@agentprism/client";
 import { ComparisonReport } from "./ComparisonReport";
 import { MatrixPanel } from "./MatrixPanel";
@@ -28,6 +27,7 @@ import { useColumnSessions } from "./useColumnSessions";
 import { useArenaConfig } from "./useArenaConfig";
 import { useArenaAutoJudge } from "./useArenaAutoJudge";
 import { useHistoryCommit } from "./useHistoryCommit";
+import { useArenaAttachments } from "./useArenaAttachments";
 import { useProjectSave } from "./useProjectSave";
 import { ArenaResultsGrid } from "./ArenaResultsGrid";
 import { ViewModeSwitcher } from "./ViewModeSwitcher";
@@ -42,11 +42,6 @@ import type { TaskTemplate } from "@agentprism/client";
 import { pipelineDisplayLabel } from "./dimensionLabels";
 import { templateQuestion } from "./templateLabels";
 
-/** Attachment limits: mirrored by the server-side RunAttachmentSchema (defense in depth). */
-const MAX_ATTACHMENTS = 5;
-const MAX_ATTACHMENT_BYTES = 64 * 1024;
-const MAX_ATTACHMENT_CHARS = 64 * 1024;
-
 /** Arena container: layout (tabs/drawers), run orchestration guards, and hook wiring only; follow-up commits and project saving are hooks of their own. */
 export function ArenaClient() {
   const t = useT();
@@ -58,8 +53,6 @@ export function ArenaClient() {
   const [mainTab, setMainTab] = useState<MainTab>("results");
   /** Baseline settings live in a modal so the setup strip never changes size */
   const [baselineOpen, setBaselineOpen] = useState(false);
-  /** Text files seeded into the columns' fresh workspaces for the next run */
-  const [attachments, setAttachments] = useState<RunAttachment[]>([]);
   /** The question of the most recent successful run (still usable for saving a project after history-commit clears the input) */
   const [lastRunQuestion, setLastRunQuestion] = useState("");
   const {
@@ -158,6 +151,14 @@ export function ArenaClient() {
     setAllPageSize: setViewAllPageSize,
     setPagedPageSize: setViewPagedPageSize,
   } = useViewMode();
+
+  // Composer attachments: validated file reads seeded into the next run's workspaces.
+  const {
+    attachments,
+    handleAttachFiles,
+    handleRemoveAttachment,
+    clearAttachments,
+  } = useArenaAttachments(setError, t);
 
   const hasMetrics = columnList.some((c) => c.metrics);
   const allSettled = columnList.length >= 1 && columnList.every((c) => c.metrics || c.error);
@@ -281,7 +282,7 @@ export function ArenaClient() {
       return;
     }
     // Settled run: attachments are seeded into the workspaces; drop them from the composer
-    setAttachments([]);
+    clearAttachments();
   };
 
   const clearConversation = useCallback(() => {
@@ -293,48 +294,8 @@ export function ArenaClient() {
     setQuestion("");
     setLastRunQuestion("");
     resetJudge();
-    setAttachments([]);
-  }, [running, resetHistory, resetColumns, setHistorySeedLabel, cancelTurn, setQuestion, resetJudge]);
-
-  /** Mirrors the attachments state so the async reader validates against fresh data. */
-  const attachmentsRef = useRef<RunAttachment[]>([]);
-  useEffect(() => {
-    attachmentsRef.current = attachments;
-  }, [attachments]);
-
-  /** Reads picked files as text into attachments; validation failures surface via the run error banner. */
-  const handleAttachFiles = useCallback(
-    async (files: File[]) => {
-      setError(null);
-      for (const file of files) {
-        if (attachmentsRef.current.length >= MAX_ATTACHMENTS) {
-          setError(t("arena.attach.tooMany"));
-          break;
-        }
-        if (attachmentsRef.current.some((a) => a.name === file.name)) continue;
-        if (file.size > MAX_ATTACHMENT_BYTES) {
-          setError(t("arena.attach.tooLarge", { name: file.name }));
-          continue;
-        }
-        try {
-          const content = (await file.text()).slice(0, MAX_ATTACHMENT_CHARS);
-          if (attachmentsRef.current.some((a) => a.name === file.name) || attachmentsRef.current.length >= MAX_ATTACHMENTS) {
-            continue;
-          }
-          const next = [...attachmentsRef.current, { name: file.name, content }];
-          attachmentsRef.current = next;
-          setAttachments(next);
-        } catch (error) {
-          console.warn(`[arena] Attachment read failed: ${file.name}`, error);
-        }
-      }
-    },
-    [setError, t],
-  );
-
-  const handleRemoveAttachment = useCallback((name: string) => {
-    setAttachments((prev) => prev.filter((a) => a.name !== name));
-  }, []);
+    clearAttachments();
+  }, [running, resetHistory, resetColumns, setHistorySeedLabel, cancelTurn, setQuestion, resetJudge, clearAttachments]);
 
   /**
    * Switches the comparison dimension: column selections/sessions belong to the old
