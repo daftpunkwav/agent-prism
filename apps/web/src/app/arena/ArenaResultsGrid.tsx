@@ -1,10 +1,11 @@
 /**
  * @file ArenaResultsGrid
- * @description The results stage's column grid.
+ * @description The results stage's view router and column grid.
  *
  * Responsibilities:
+ * - Route to the selected alternative view (paged / podium / stats / gallery / timeline)
+ * - Render the default column grid capped at the configured page size
  * - Render placeholders for selected lanes before events arrive
- * - Render run cards once events arrive
  */
 
 "use client";
@@ -14,10 +15,16 @@ import type { DimensionMeta } from "@agentprism/client";
 import type { ColumnState } from "@agentprism/arena-view";
 import type { PendingAskBatch } from "@/components/AskUserModal";
 import { ColumnCard, ColumnPlaceholder } from "./ColumnCard";
+import { PagedResultsView } from "./PagedResultsView";
+import { PodiumView } from "./PodiumView";
+import { StatsOverviewView } from "./StatsOverviewView";
+import { AnswerGalleryView } from "./AnswerGalleryView";
+import { TimelineRibbonView } from "./TimelineRibbonView";
 import { useT } from "@/i18n/useT";
 import { dimOptionLabel } from "./dimensionLabels";
+import type { ViewMode } from "./useViewMode";
 
-/** Results-stage column grid: placeholders before events, run cards after. */
+/** Results-stage view router: alternative views plus the default column grid. */
 export function ArenaResultsGrid(props: {
   activeDim: DimensionMeta | null;
   activeSelections: string[];
@@ -36,6 +43,12 @@ export function ArenaResultsGrid(props: {
   askSubmitting: boolean;
   onAskAnswer: (agentId: string, questionId: string, answer: string) => Promise<boolean>;
   onAskDismiss: (agentId: string) => void;
+  /** Selected results view id. */
+  viewMode: ViewMode;
+  /** Default view only: cap on simultaneously rendered columns. */
+  pageSize: number;
+  /** Locale-resolved display label for a pipeline label. */
+  resolveDisplayLabel: (label: string) => string;
 }) {
   const {
     activeDim,
@@ -54,8 +67,50 @@ export function ArenaResultsGrid(props: {
     askSubmitting,
     onAskAnswer,
     onAskDismiss,
+    viewMode,
+    pageSize,
+    resolveDisplayLabel,
   } = props;
   const t = useT();
+
+  const cardProps = {
+    running,
+    historySeedLabel,
+    onStopColumn,
+    stoppingLabels,
+    onUseAsSeed,
+    workspaceRefreshToken,
+    pendingAsksByLabel,
+    askSubmitting,
+    onAskAnswer,
+    onAskDismiss,
+  };
+
+  if (viewMode === "podium") {
+    return <PodiumView columnList={columnList} resolveDisplayLabel={resolveDisplayLabel} />;
+  }
+  if (viewMode === "stats") {
+    return <StatsOverviewView columnList={columnList} resolveDisplayLabel={resolveDisplayLabel} />;
+  }
+  if (viewMode === "gallery") {
+    return <AnswerGalleryView columnList={columnList} resolveDisplayLabel={resolveDisplayLabel} />;
+  }
+  if (viewMode === "timeline") {
+    return <TimelineRibbonView columnList={columnList} resolveDisplayLabel={resolveDisplayLabel} />;
+  }
+  if (viewMode === "paged") {
+    return (
+      <PagedResultsView
+        activeDim={activeDim}
+        activeSelections={activeSelections}
+        columns={columns}
+        columnList={columnList}
+        placeholderLabels={placeholderLabels}
+        resolveDisplayLabel={resolveDisplayLabel}
+        {...cardProps}
+      />
+    );
+  }
 
   if (activeDim) {
     const selectedOptions = activeDim.options.filter((o) =>
@@ -74,28 +129,26 @@ export function ArenaResultsGrid(props: {
         </div>
       );
     }
+    // The page-size cap truncates the rendered columns; the rest stays reachable
+    // through the grid's horizontal scroll (same as before, wider runs wrap).
+    const visible = selectedOptions.slice(0, Math.max(pageSize, 1));
     return (
-      <div className="arena-columns" data-count={Math.min(Math.max(selectedOptions.length, 1), 4)}>
-        {selectedOptions.map((opt, idx) => {
+      <div className="arena-columns" data-count={Math.min(Math.max(visible.length, 1), pageSize)}>
+        {visible.map((opt, idx) => {
           const col = columns[opt.label];
           const displayName = dimOptionLabel(t, activeDim.id, opt.value, opt.label);
           return col ? (
             <ColumnCard
               key={opt.value}
               col={col}
-              running={running}
-              showStop={running && !col.metrics && col.events.length > 0}
+              {...cardProps}
               onStop={onStopColumn}
+              showStop={running && !col.metrics && col.events.length > 0}
               stopping={stoppingLabels[col.label]}
               lane={idx}
               isHistorySeed={historySeedLabel === col.label}
-              onUseAsSeed={onUseAsSeed}
               displayLabel={displayName}
-              workspaceRefreshToken={workspaceRefreshToken}
               pendingAsk={pendingAsksByLabel[col.label] ?? null}
-              askSubmitting={askSubmitting}
-              onAskAnswer={onAskAnswer}
-              onAskDismiss={onAskDismiss}
             />
           ) : (
             <ColumnPlaceholder key={opt.value} name={displayName} lane={idx} />
@@ -105,33 +158,30 @@ export function ArenaResultsGrid(props: {
     );
   }
   if (columnList.length === 0 && !running) {
+    const visibleCount = Math.min(columnCount, pageSize);
     return (
-      <div className="arena-columns" data-count={Math.min(columnCount, 4)}>
-        {placeholderLabels.slice(0, columnCount).map((name, idx) => (
+      <div className="arena-columns" data-count={visibleCount}>
+        {placeholderLabels.slice(0, visibleCount).map((name, idx) => (
           <ColumnPlaceholder key={name} name={name} lane={idx} />
         ))}
       </div>
     );
   }
 
+  const visible = columnList.slice(0, Math.max(pageSize, 1));
   return (
-    <div className="arena-columns" data-count={Math.min(Math.max(columnList.length, 1), 4)}>
-      {columnList.map((col, idx) => (
+    <div className="arena-columns" data-count={Math.min(Math.max(visible.length, 1), pageSize)}>
+      {visible.map((col, idx) => (
         <ColumnCard
           key={col.label}
           col={col}
-          running={running}
-          showStop={running && !col.metrics && col.events.length > 0}
+          {...cardProps}
           onStop={onStopColumn}
+          showStop={running && !col.metrics && col.events.length > 0}
           stopping={stoppingLabels[col.label] === true}
           lane={idx}
           isHistorySeed={historySeedLabel === col.label}
-          onUseAsSeed={onUseAsSeed}
-          workspaceRefreshToken={workspaceRefreshToken}
           pendingAsk={pendingAsksByLabel[col.label] ?? null}
-          askSubmitting={askSubmitting}
-          onAskAnswer={onAskAnswer}
-          onAskDismiss={onAskDismiss}
         />
       ))}
     </div>

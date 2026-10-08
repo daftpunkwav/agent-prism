@@ -30,6 +30,8 @@ import { useArenaAutoJudge } from "./useArenaAutoJudge";
 import { useHistoryCommit } from "./useHistoryCommit";
 import { useProjectSave } from "./useProjectSave";
 import { ArenaResultsGrid } from "./ArenaResultsGrid";
+import { ViewModeSwitcher } from "./ViewModeSwitcher";
+import { useViewMode } from "./useViewMode";
 import { MainTabButton } from "./MainTabButton";
 import { ArenaSetupModule } from "./ArenaSetupModule";
 import { ComposerBar } from "./ComposerBar";
@@ -142,6 +144,15 @@ export function ArenaClient() {
       activeDim ? pipelineDisplayLabel(t, activeDim.id, label, activeDim.options) : label,
     [activeDim, t],
   );
+
+  /** Locale overlay for pipeline labels, shared by the grid and the alternative views. */
+  const resolveDisplayLabel = useCallback(
+    (label: string) => resolvePipelineLabel(label),
+    [resolvePipelineLabel],
+  );
+
+  // Results view mode (default grid / paged / fun overviews), persisted locally.
+  const { prefs: viewPrefs, setMode: setViewMode, setPageSize: setViewPageSize } = useViewMode();
 
   const hasMetrics = columnList.some((c) => c.metrics);
   const allSettled = columnList.length >= 1 && columnList.every((c) => c.metrics || c.error);
@@ -491,6 +502,11 @@ export function ArenaClient() {
                 label={t("arena.tab.matrix")}
               />
             </div>
+            <ViewModeSwitcher
+              prefs={viewPrefs}
+              onModeChange={setViewMode}
+              onPageSizeChange={setViewPageSize}
+            />
           </div>
 
           <div className="arena-stage-body">
@@ -513,6 +529,9 @@ export function ArenaClient() {
                   askSubmitting={askSubmitting}
                   onAskAnswer={answerAsk}
                   onAskDismiss={clearPendingAsk}
+                  viewMode={viewPrefs.mode}
+                  pageSize={viewPrefs.pageSize}
+                  resolveDisplayLabel={resolveDisplayLabel}
                 />
               </div>
             ) : (

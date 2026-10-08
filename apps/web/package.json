@@ -24,6 +24,7 @@
     "@agentprism/arena-view": "workspace:*"
   },
   "devDependencies": {
+    "@agentprism/contracts": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24",
     "@types/react": "^19.2.17",
