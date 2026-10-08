@@ -76,26 +76,22 @@ export function metricRows(summaries: ColumnSummary[]): MetricRow[] {
 /** Coarse timeline buckets (the ribbon's segment categories). */
 export type RibbonCategory = "thought" | "action" | "observation" | "verify" | "error" | "other";
 
+/** Merge-pass segment kind → ribbon bucket; anything unmapped lands in "other". */
+const RIBBON_KIND_TO_CATEGORY: Readonly<Record<string, RibbonCategory>> = {
+  thought: "thought",
+  thinking: "thought",
+  action: "action",
+  observation: "observation",
+  tool_progress: "observation",
+  verify: "verify",
+  reflect: "verify",
+  harness_edit: "verify",
+  error: "error",
+};
+
 /** Maps a merge-pass segment kind to its ribbon bucket. */
 export function ribbonCategory(kind: string): RibbonCategory {
-  switch (kind) {
-    case "thought":
-    case "thinking":
-      return "thought";
-    case "action":
-      return "action";
-    case "observation":
-    case "tool_progress":
-      return "observation";
-    case "verify":
-    case "reflect":
-    case "harness_edit":
-      return "verify";
-    case "error":
-      return "error";
-    default:
-      return "other";
-  }
+  return RIBBON_KIND_TO_CATEGORY[kind] ?? "other";
 }
 
 /** One column's ribbon: ordered category runs with relative widths (percent). */
