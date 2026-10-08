@@ -85,6 +85,7 @@ export const arena = {
     removeAria: "Remove attachment {name}",
     tooLarge: "File too large (64KB limit): {name}",
     tooMany: "At most 5 attachments",
+    nameTooLong: "File name exceeds the {count} character limit",
   },
   action: {
     run: "Run",

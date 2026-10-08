@@ -84,6 +84,7 @@ export const arena = {
     removeAria: "移除附件 {name}",
     tooLarge: "文件过大（上限 64KB）: {name}",
     tooMany: "最多附加 5 个文件",
+    nameTooLong: "文件名超过 {count} 字符上限",
   },
   action: {
     run: "运行",
