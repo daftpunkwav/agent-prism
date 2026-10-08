@@ -252,23 +252,18 @@ function runnerRaw(col: ColumnState, nowMs: number): RunnerRaw {
 }
 
 /**
- * Progress estimate for one column: the settled columns' step counts define the
- * race distance, so a running column's progress is its step count relative to
- * the leader's steps (capped just before the line). Settled columns map to the
- * full distance regardless of their step count, keeping finished order honest.
+ * Progress estimate for one column: a saturating curve over the runner's OWN
+ * step count, strictly increasing, so a runner never moves backward when
+ * someone else gains a step (a shared distance denominator would shrink every
+ * other runner's fraction). Settled columns cross the line (progress 1).
  */
 export function runnerStates(columnList: ColumnState[], nowMs: number): RunnerState[] {
   const raws = columnList.map((col) => runnerRaw(col, nowMs));
 
-  // Race distance: the leader's step count (settled runners set the distance,
-  // running runners chase it). The floors keep division safe on empty races.
-  const settledSteps = raws.filter((s) => s.settled).map((s) => s.steps);
-  const distance = Math.max(1, ...settledSteps, ...raws.map((s) => s.steps));
-
   return raws.map((s) => {
-    // Running runners chase distance+1 so the current leader never sits exactly
-    // on the finish line (it has not crossed yet); settled runners map to 100%.
-    const progress = s.settled ? 1 : Math.min(s.steps / (distance + 1), 0.99);
+    // 4 is the comfort constant: 1 step ≈ 0.2, 4 ≈ 0.5, 12 ≈ 0.75 — mid-race
+    // runners sit visibly mid-track and only settle onto the finish line.
+    const progress = s.settled ? 1 : Math.min(s.steps / (s.steps + 4), 0.99);
     // Bubble text: the current segment's opening line, trimmed for a speech bubble.
     const raw = (s.lastText || "").replace(/\s+/g, " ").trim();
     const activity = s.settled

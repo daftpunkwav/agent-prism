@@ -4,10 +4,10 @@
  * @description Locks the view-mode hook (persistence, clamping) and the shared view data derivations.
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
 import type { ColumnState } from "@agentprism/arena-view";
-import { parseViewMode, PAGE_SIZE_OPTIONS, useViewMode, VIEW_MODES } from "../src/app/arena/useViewMode.js";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { PAGE_SIZE_OPTIONS, parseViewMode, useViewMode, VIEW_MODES } from "../src/app/arena/useViewMode.js";
 import { columnRibbons, metricRows, ribbonCategory, runnerStates, summarizeColumns } from "../src/app/arena/viewData.js";
 
 /** apps/web must not import @agentprism/contracts (boundary rule): derive the
@@ -165,6 +165,18 @@ describe("runnerStates", () => {
     const done = settled("D", { events: col.events });
     const [settledRunner] = runnerStates([done], 7000);
     expect(settledRunner?.elapsedMs).toBe(1000);
+  });
+
+  it("never moves a runner backward when another runner gains a step", () => {
+    const eventsOf = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ type: "thought", pipeline: "R", step: i + 1, content: `step ${i}` }));
+    const a = { label: "A", frameworkId: "native", events: eventsOf(2) } as unknown as ColumnState;
+    const [solo] = runnerStates([a], 1000);
+    expect(solo?.progress).toBe(2 / 6);
+    // B racing alongside with more steps must not change A's rendered progress.
+    const b = { label: "B", frameworkId: "native", events: eventsOf(9) } as unknown as ColumnState;
+    const [withRival] = runnerStates([a, b], 1000);
+    expect(withRival?.progress).toBe(2 / 6);
   });
 });
 

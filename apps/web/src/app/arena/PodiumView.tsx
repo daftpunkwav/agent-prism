@@ -60,7 +60,11 @@ function TrackBody({ runner, waiting, bubbleText }: { runner: RunnerState; waiti
       {!waiting && (
         // No role="status": several lanes updating independently would spam
         // screen readers; the race hint below is the single live region.
-        <div className="arena-track-bubble">
+        // The bubble glides with its runner; the clamp keeps it inside the lane.
+        <div
+          className="arena-track-bubble"
+          style={{ left: `clamp(12rem, ${Math.min(runner.progress * 100, 100)}%, calc(100% - 12rem))` }}
+        >
           <ActivityIcon kind={runner.activityKind} tool={runner.tool} />
           <span className="arena-track-bubble-text">{bubbleText}</span>
         </div>
@@ -186,8 +190,8 @@ export function PodiumView({ columnList, running, resolveDisplayLabel }: {
     return () => window.clearInterval(timer);
   }, [anyUnsettled]);
 
-  const runners = runnerStates(columnList, nowMs);
-  const summaries = summarizeColumns(columnList);
+      const runners = runnerStates(columnList, nowMs);
+      const summaries = summarizeColumns(columnList);
   const allSettled = columnList.length > 0 && columnList.every((col) => col.metrics !== undefined);
 
   if (columnList.length === 0) {
