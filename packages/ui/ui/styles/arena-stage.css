@@ -231,7 +231,9 @@
   scrollbar-width: thin;
 }
 
-/* Result columns: equal share when wide; horizontal scroll when narrow/zoomed, scroll inside each column */
+/* Result columns: equal share when wide; horizontal scroll when narrow/zoomed, scroll inside each column.
+   data-count = the per-page visible-column cap (1–4): each column's min-width makes
+   exactly that many fit one screen; more columns overflow into horizontal scroll. */
 .arena-columns {
   display: flex;
   gap: 0.65rem;
@@ -258,6 +260,10 @@
 .arena-columns > *:nth-child(2) { animation-delay: 50ms; }
 .arena-columns > *:nth-child(3) { animation-delay: 100ms; }
 .arena-columns > *:nth-child(4) { animation-delay: 150ms; }
+
+.arena-columns[data-count="1"] > * {
+  min-width: max(16rem, 100%);
+}
 
 .arena-columns[data-count="2"] > * {
   min-width: max(16rem, calc((100% - 0.65rem) / 2));
@@ -640,4 +646,584 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* --- Results view modes -------------------------------------------------- */
+
+/* Toolbar cluster: view-mode dropdown (+ page-size cap for the default view). */
+.arena-view-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.arena-view-mode,
+.arena-view-pagesize {
+  width: auto;
+  min-width: 8.5rem;
+  max-width: 100%;
+}
+
+/* Paged view: fixed two-column grid plus a pager strip. */
+.arena-paged {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 0.45rem;
+}
+
+.arena-paged-grid {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.arena-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  padding: 0.15rem 0 0.2rem;
+}
+
+.arena-pager-btn {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.arena-pager-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.arena-pager-position {
+  min-width: 4.5rem;
+  text-align: center;
+  user-select: none;
+}
+
+/* Podium view: ranked cards with lane accents. */
+.arena-podium-top {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.65rem;
+  align-items: stretch;
+}
+
+.arena-podium-card {
+  --lane: var(--spectrum-1);
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+  min-width: 0;
+}
+
+.arena-podium-card[data-place="0"] {
+  --lane: var(--spectrum-1);
+  box-shadow: inset 0 3px 0 0 var(--lane), var(--shadow-sm);
+}
+
+.arena-podium-card[data-place="1"] {
+  --lane: var(--spectrum-2);
+  box-shadow: inset 0 3px 0 0 var(--lane), var(--shadow-xs);
+}
+
+.arena-podium-card[data-place="2"] {
+  --lane: var(--spectrum-3);
+  box-shadow: inset 0 3px 0 0 var(--lane), var(--shadow-xs);
+}
+
+.arena-podium-place {
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--lane);
+  flex-shrink: 0;
+}
+
+.arena-podium-card > div:last-child {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.arena-podium-meta {
+  margin-top: 0.2rem;
+}
+
+.arena-podium-verdict {
+  margin-top: 0.2rem;
+  color: var(--muted-foreground);
+}
+
+.arena-podium-rest {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.arena-podium-row {
+  --lane: var(--spectrum-4);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.8rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: inset 2px 0 0 0 var(--lane);
+  min-width: 0;
+}
+
+.arena-podium-row-place {
+  color: var(--lane);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.arena-podium-row .arena-podium-meta {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Stats overview: normalized bars per metric group. */
+.arena-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.6rem 0.15rem 0.7rem;
+  min-height: 0;
+}
+
+.arena-stats-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.arena-stats-group-title {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.arena-stats-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.arena-stats-row {
+  --lane: var(--spectrum-1);
+  display: grid;
+  grid-template-columns: minmax(6rem, 12rem) 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.arena-stats-row:nth-child(4n + 2) { --lane: var(--spectrum-2); }
+.arena-stats-row:nth-child(4n + 3) { --lane: var(--spectrum-3); }
+.arena-stats-row:nth-child(4n + 0) { --lane: var(--spectrum-4); }
+
+.arena-stats-label {
+  font-size: 0.75rem;
+  color: var(--foreground);
+}
+
+.arena-stats-bar {
+  height: 0.8rem;
+  min-width: 2px;
+  background: color-mix(in srgb, var(--lane) 55%, transparent);
+  border-inline-end: 2px solid var(--lane);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.arena-stats-row[data-best="true"] .arena-stats-value {
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Answer gallery: content cards without trace detail. */
+.arena-gallery {
+  padding: 0.5rem 0.15rem 0.7rem;
+  min-height: 0;
+}
+
+.arena-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(26rem, 100%), 1fr));
+  gap: 0.9rem;
+  align-items: stretch;
+}
+
+.arena-gallery-card {
+  --lane: var(--spectrum-1);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.arena-gallery-card[data-state="ok"] { --lane: var(--spectrum-1); }
+.arena-gallery-card[data-state="fail"] { --lane: var(--spectrum-4); }
+.arena-gallery-card[data-state="running"] { --lane: var(--spectrum-2); }
+
+.arena-gallery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--lane) 35%, var(--border));
+  box-shadow: inset 0 2px 0 0 var(--lane);
+}
+
+.arena-gallery-body {
+  padding: 0.7rem 0.9rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  /* Cards in a row stretch to equal height; long bodies scroll inside. */
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.arena-gallery-expander {
+  align-self: flex-start;
+  margin: 0 0.6rem 0.5rem;
+}
+
+.arena-gallery-judge-pass { color: var(--success); }
+.arena-gallery-judge-fail { color: var(--destructive); }
+
+/* Timeline ribbons: proportional event-category bands. */
+.arena-ribbons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.6rem 0.15rem 0.7rem;
+  min-height: 0;
+}
+
+.arena-ribbon-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+}
+
+.arena-ribbon-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.arena-ribbon-legend-swatch {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.5rem;
+}
+
+.arena-ribbon-row {
+  --lane: var(--spectrum-1);
+  display: grid;
+  grid-template-columns: minmax(6rem, 12rem) auto 1fr;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.arena-ribbon-row:nth-child(4n + 2) { --lane: var(--spectrum-2); }
+.arena-ribbon-row:nth-child(4n + 3) { --lane: var(--spectrum-3); }
+.arena-ribbon-row:nth-child(4n + 0) { --lane: var(--spectrum-4); }
+
+.arena-ribbon-status {
+  flex-shrink: 0;
+  min-width: 3.5rem;
+}
+
+.arena-ribbon-band {
+  /* fieldset reset: the semantic group element must not carry UA chrome */
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+  display: flex;
+  height: 1rem;
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+.arena-ribbon-seg {
+  height: 100%;
+  min-width: 2px;
+  /* The segment renders as a button for keyboard reach; strip the chrome. */
+  appearance: none;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: default;
+}
+
+.arena-ribbon-seg-thought { background: color-mix(in srgb, var(--spectrum-1) 65%, transparent); }
+.arena-ribbon-seg-action { background: color-mix(in srgb, var(--spectrum-2) 70%, transparent); }
+.arena-ribbon-seg-observation { background: color-mix(in srgb, var(--spectrum-3) 60%, transparent); }
+.arena-ribbon-seg-verify { background: color-mix(in srgb, var(--spectrum-5) 55%, transparent); }
+.arena-ribbon-seg-error { background: color-mix(in srgb, var(--destructive) 70%, transparent); }
+.arena-ribbon-seg-other { background: color-mix(in srgb, var(--muted-foreground) 45%, transparent); }
+
+@media (max-width: 900px) {
+  .arena-stats-row,
+  .arena-ribbon-row {
+    grid-template-columns: minmax(5rem, 8rem) 1fr auto;
+  }
+}
+
+/* Race view (podium mode): live tracks while running; podium after the race. */
+.arena-race {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.7rem 0.15rem 0.8rem;
+  min-height: 0;
+}
+
+.arena-race-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.arena-race-hint {
+  text-align: center;
+  padding-bottom: 0.2rem;
+}
+
+.arena-track-lane {
+  --lane: var(--spectrum-1);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+  padding: 0.55rem 0.8rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.arena-track-lane[data-lane="1"] { --lane: var(--spectrum-2); }
+.arena-track-lane[data-lane="2"] { --lane: var(--spectrum-3); }
+.arena-track-lane[data-lane="3"] { --lane: var(--spectrum-4); }
+
+.arena-track-lane[data-settled="ok"] { box-shadow: inset 3px 0 0 0 var(--success), var(--shadow-xs); }
+.arena-track-lane[data-settled="fail"] { box-shadow: inset 3px 0 0 0 var(--destructive), var(--shadow-xs); }
+
+.arena-track-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.arena-track {
+  position: relative;
+  height: 2.1rem;
+  /* Reserved headroom: the speech bubble floats above the track and must
+     never reach back into the lane's name row. */
+  margin-top: 3rem;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+  border: 1px solid var(--border);
+  overflow: visible;
+}
+
+.arena-track-surface {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-evenly;
+  pointer-events: none;
+}
+
+.arena-track-lane-line {
+  width: 1px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.arena-track-result {
+  position: absolute;
+  top: 50%;
+  right: 1.6rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.arena-track-bubble {
+  position: absolute;
+  bottom: calc(100% + 0.3rem);
+  /* The inline style anchors `left` to the runner (clamped); translateX(-50%)
+     centers the bubble over that anchor. */
+  transform: translateX(-50%);
+  max-width: min(24rem, 90%);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.3rem 0.55rem;
+  background: var(--popover, var(--card));
+  border: 1px solid color-mix(in srgb, var(--lane) 45%, var(--border));
+  border-radius: 0.6rem;
+  box-shadow: var(--shadow-sm);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--foreground);
+  animation: race-bubble-in var(--dur-panel) var(--ease-out) both;
+  transition: left 0.9s var(--ease-out);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.arena-track-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 0.32rem solid transparent;
+  border-top-color: color-mix(in srgb, var(--lane) 45%, var(--border));
+}
+
+.arena-track-bubble-text {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+
+@keyframes race-bubble-in {
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.arena-track-runner {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: left 0.9s var(--ease-out);
+  z-index: 1;
+}
+
+.arena-track-runner-body {
+  display: block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: var(--lane);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lane) 25%, transparent);
+  animation: race-bounce 0.9s ease-in-out infinite alternate;
+}
+
+.arena-track-lane[data-settled] .arena-track-runner-body {
+  animation: none;
+}
+
+@keyframes race-bounce {
+  from { transform: translateY(-2px); }
+  to { transform: translateY(2px); }
+}
+
+.arena-track-flag {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+}
+
+.arena-track-progress {
+  height: 0.25rem;
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+  overflow: hidden;
+}
+
+.arena-track-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--lane);
+  transition: width 0.9s var(--ease-out);
+}
+
+/* Podium reveal after the race. */
+.arena-race-podium-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: fade-up var(--dur-slow) var(--ease-out) both;
+}
+
+.arena-race-podium-title {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Ribbon segment hover tooltip: context facts above the hovered slice. */
+.arena-ribbon-seg {
+  position: relative;
+}
+
+.arena-ribbon-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 18rem;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--popover, var(--card));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--foreground);
+  z-index: 30;
+  pointer-events: none;
+  white-space: normal;
+}
+
+.arena-ribbon-seg:hover .arena-ribbon-tooltip,
+.arena-ribbon-seg:focus-visible .arena-ribbon-tooltip {
+  display: flex;
+}
+
+.arena-ribbon-tooltip-title {
+  font-weight: 600;
+}
+
+.arena-ribbon-tooltip-tools {
+  color: var(--lane, var(--foreground));
+}
+
+.arena-ribbon-tooltip-sample {
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.arena-ribbon-tooltip-col {
+  font-size: 0.62rem;
 }
