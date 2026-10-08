@@ -10,8 +10,8 @@
  *
  * Accessibility: the band is a list of listitems (never role="img" — its
  * children would be presentational and the tooltip facts unreachable); each
- * segment names its category in an sr-only label and points at its tooltip
- * through aria-describedby.
+ * segment is keyboard-focusable (revealing its describedby tooltip), names
+ * its category in an sr-only label, and never nests interactive content.
  */
 
 "use client";
@@ -91,6 +91,9 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
             className={`arena-ribbon-seg ${CATEGORY_CLASS[seg.category]}`}
             style={{ width: `${seg.widthPct}%` }}
             role="listitem"
+            // Keyboard users need focus to reveal the describedby tooltip; the
+            // repo lint enables no no-noninteractive-tabindex rule for this shape.
+            tabIndex={0}
             aria-describedby={`ribbon-seg-${idx}-${ribbon.label}`}
           >
             <SegmentTooltip seg={seg} colLabel={display} descId={`ribbon-seg-${idx}-${ribbon.label}`} />
