@@ -63,7 +63,7 @@ function TrackBody({ runner, waiting, bubbleText }: { runner: RunnerState; waiti
         // The bubble glides with its runner; the clamp keeps it inside the lane.
         <div
           className="arena-track-bubble"
-          style={{ left: `clamp(12rem, ${Math.min(runner.progress * 100, 100)}%, calc(100% - 12rem))` }}
+          style={{ left: `clamp(min(12rem, 50%), ${Math.min(runner.progress * 100, 100)}%, max(50%, calc(100% - 12rem)))` }}
         >
           <ActivityIcon kind={runner.activityKind} tool={runner.tool} />
           <span className="arena-track-bubble-text">{bubbleText}</span>

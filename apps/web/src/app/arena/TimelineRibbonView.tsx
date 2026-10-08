@@ -16,6 +16,7 @@
 
 "use client";
 
+import { useId } from "react";
 import type { ColumnState } from "@agentprism/arena-view";
 import { useT } from "@/i18n/useT";
 import { columnRibbons, type RibbonCategory } from "./viewData";
@@ -61,6 +62,7 @@ function SegmentTooltip({ seg, colLabel, descId }: { seg: ReturnType<typeof colu
 /** One column's ribbon row: label, status chip, and the proportional band. */
 function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbons>[number]; display: string }) {
   const t = useT();
+  const rowId = useId();
   return (
     <div className="arena-ribbon-row">
       <span className="arena-stats-label truncate" title={display}>
@@ -81,10 +83,7 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
       </span>
       <fieldset className="arena-ribbon-band" aria-label={t("arena.view.ribbonAria", { name: display })}>
         {ribbon.segments.map((seg, idx) => {
-          // Pipeline labels are free-form server data; whitespace inside an
-          // aria-describedby id would split the IDLIST reference, so keep the
-          // token space-free.
-          const descId = `ribbon-seg-${idx}-${ribbon.label.replace(/\s+/g, "-")}`;
+          const descId = `ribbon-seg-${rowId}-${idx}`;
           return (
             // A real button: the only shape that satisfies both keyboard reach
             // (CodeRabbit) and "tabIndex only on interactive elements" (S6845)
