@@ -79,11 +79,7 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
             ? t("arena.view.galleryOk")
             : t("arena.view.galleryFail")}
       </span>
-      <div
-        className="arena-ribbon-band"
-        role="group"
-        aria-label={t("arena.view.ribbonAria", { name: display })}
-      >
+      <fieldset className="arena-ribbon-band" aria-label={t("arena.view.ribbonAria", { name: display })}>
         {ribbon.segments.map((seg, idx) => (
           // A real button: the only shape that satisfies both keyboard reach
           // (CodeRabbit) and "tabIndex only on interactive elements" (S6845)
@@ -102,7 +98,7 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
             </span>
           </button>
         ))}
-      </div>
+      </fieldset>
     </div>
   );
 }

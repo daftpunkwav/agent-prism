@@ -10,13 +10,13 @@
 
 "use client";
 
-import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { DimensionMeta } from "@agentprism/client";
 import type { ColumnState } from "@agentprism/arena-view";
+import type { DimensionMeta } from "@agentprism/client";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import type { PendingAskBatch } from "@/components/AskUserModal";
-import { ColumnCard, ColumnPlaceholder } from "./ColumnCard";
 import { useT } from "@/i18n/useT";
+import { ColumnCard, ColumnPlaceholder } from "./ColumnCard";
 import { dimOptionLabel } from "./dimensionLabels";
 
 /** One paged entry: display label plus the live column state (undefined before events). */
@@ -65,7 +65,7 @@ function ArenaPager({ page, pageCount, onPageChange, pagerAria, prevAria, nextAr
   position: string;
 }) {
   return (
-    <div className="arena-pager" role="navigation" aria-label={pagerAria}>
+    <nav className="arena-pager" aria-label={pagerAria}>
       <button
         type="button"
         className="btn-ghost arena-pager-btn"
@@ -87,7 +87,7 @@ function ArenaPager({ page, pageCount, onPageChange, pagerAria, prevAria, nextAr
       >
         <ChevronRight className="h-3.5 w-3.5" aria-hidden />
       </button>
-    </div>
+    </nav>
   );
 }
 
