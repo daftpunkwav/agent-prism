@@ -58,6 +58,21 @@ describe("useViewMode", () => {
   it("keeps page-size options within the declared set", () => {
     expect([...PAGE_SIZE_OPTIONS]).toEqual([1, 2, 3, 4]);
   });
+
+  it("keeps in-session prefs when localStorage writes fail", () => {
+    const { result } = renderHook(() => useViewMode());
+    vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+    act(() => result.current.setMode("podium"));
+    // Private mode / quota: the choice still applies for this session.
+    expect(result.current.prefs.mode).toBe("podium");
+    vi.restoreAllMocks();
+    // A later successful write persists again.
+    act(() => result.current.setMode("gallery"));
+    expect(result.current.prefs.mode).toBe("gallery");
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "")).toMatchObject({ mode: "gallery" });
+  });
 });
 
 const settled = (label: string, over: Partial<ColumnState> = {}): ColumnState =>
@@ -128,6 +143,26 @@ describe("runnerStates", () => {
     expect(runner?.activity.length).toBeLessThanOrEqual(80);
     expect(runner?.activity.endsWith("…")).toBe(true);
   });
+
+  it("keeps a running column's elapsed clock ticking between events", () => {
+    const col = {
+      label: "R",
+      frameworkId: "native",
+      events: [
+        { type: "thought", pipeline: "R", timestamp: 1000 },
+        { type: "action", pipeline: "R", tool: "bash", timestamp: 2000 },
+      ],
+    } as unknown as ColumnState;
+    // The last event landed at t=2000; a later tick must measure from now, not freeze at 2000.
+    const [atLastEvent] = runnerStates([col], 2000);
+    const [afterTick] = runnerStates([col], 7000);
+    expect(atLastEvent?.elapsedMs).toBe(1000);
+    expect(afterTick?.elapsedMs).toBe(6000);
+    // Settled columns keep their true wall-clock span instead of following now.
+    const done = settled("D", { events: col.events });
+    const [settledRunner] = runnerStates([done], 7000);
+    expect(settledRunner?.elapsedMs).toBe(1000);
+  });
 });
 
 describe("columnRibbons", () => {
@@ -147,6 +182,31 @@ describe("columnRibbons", () => {
     // Tooltip facts: action run carries its tool; widths sum to 100%.
     const actionRun = ribbon?.segments.find((s) => s.category === "action");
     expect(actionRun?.tools).toContain("bash");
+  });
+
+  it("buckets step_start segments into the other category (regression: missing ribbonCat.other)", () => {
+    const events = [
+      { type: "step_start", pipeline: "A", step: 1 },
+      { type: "thought", pipeline: "A", step: 1 },
+    ] as unknown as ArenaEvent[];
+    const [ribbon] = columnRibbons([settled("A", { events })]);
+    // step_start survives the merge pass as a step segment, so "other" is reachable
+    // and the tooltip/legend need the ribbonCat.other key.
+    expect(ribbon?.segments.map((s) => s.category)).toContain("other");
+  });
+
+  it("sums a run's wall-clock span across segments when the opener has no timestamp", () => {
+    const events = [
+      // Streamed thought created before any timestamp arrived, then a stamped delta.
+      { type: "thought", pipeline: "A" },
+      { type: "thought_delta", pipeline: "A", content: "y", timestamp: 1000 },
+      { type: "thought_delta", pipeline: "A", content: "z", timestamp: 2500 },
+      { type: "action", pipeline: "A", tool: "bash", timestamp: 3000 },
+    ] as unknown as ArenaEvent[];
+    const [ribbon] = columnRibbons([settled("A", { events })]);
+    const thoughtRun = ribbon?.segments.find((s) => s.category === "thought");
+    // Span = 2500 - 1000, not 0: the opener's missing tsStart must not drop the run's timestamps.
+    expect(thoughtRun?.spanMs).toBe(1500);
   });
 
   it("maps kinds to buckets and marks running columns", () => {

@@ -180,6 +180,7 @@ export const arena = {
       observation: "观察",
       verify: "验证",
       error: "错误",
+      other: "其他",
     },
   },
   token: {

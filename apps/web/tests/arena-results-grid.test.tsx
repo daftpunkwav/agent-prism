@@ -64,6 +64,14 @@ describe("ArenaResultsGrid", () => {
     expect(container.querySelector(".arena-columns")).toBeNull();
   });
 
+  it("shows the empty-selection state in every view mode, not just the default grid", () => {
+    for (const viewMode of ["paged", "podium", "stats", "gallery", "timeline"] as const) {
+      const rendered = renderGrid({ activeDim: DIM, activeSelections: [], columns: {}, columnList: [], columnCount: 0, placeholderLabels: [], running: false, historySeedLabel: null, viewMode });
+      expect(screen.getByText(getCatalog("en").arena.results.emptySelection)).toBeDefined();
+      rendered.unmount();
+    }
+  });
+
   it("renders placeholders for selected options before events arrive", () => {
     const { container } = renderGrid({ activeDim: DIM, activeSelections: ["native", "langchain"], columns: {}, columnList: [], columnCount: 0, placeholderLabels: [], running: false, historySeedLabel: null });
     expect(container.querySelectorAll(".column-card-placeholder")).toHaveLength(2);

@@ -90,6 +90,22 @@ export function ArenaResultsGrid(props: {
     onAskDismiss,
   };
 
+  // No comparison items selected: every view defers to this shared guidance
+  // state; the overview views' own empty states only cover "no data yet".
+  if (activeDim && !activeDim.options.some((o) => activeSelections.includes(o.value))) {
+    return (
+      <div className="empty-state h-full">
+        <div className="empty-state-icon">
+          <Zap className="h-5 w-5" />
+        </div>
+        <p className="text-sm">{t("arena.results.emptySelection")}</p>
+        <p className="max-w-[22rem] text-xs leading-relaxed text-muted-foreground">
+          {t("arena.results.emptySelectionHint")}
+        </p>
+      </div>
+    );
+  }
+
   if (viewMode === "podium") {
     return <PodiumView columnList={columnList} running={running} resolveDisplayLabel={resolveDisplayLabel} />;
   }
@@ -121,19 +137,6 @@ export function ArenaResultsGrid(props: {
     const selectedOptions = activeDim.options.filter((o) =>
       activeSelections.includes(o.value),
     );
-    if (selectedOptions.length === 0) {
-      return (
-        <div className="empty-state h-full">
-          <div className="empty-state-icon">
-            <Zap className="h-5 w-5" />
-          </div>
-          <p className="text-sm">{t("arena.results.emptySelection")}</p>
-          <p className="max-w-[22rem] text-xs leading-relaxed text-muted-foreground">
-            {t("arena.results.emptySelectionHint")}
-          </p>
-        </div>
-      );
-    }
     // Every selected column renders; the per-page setting only decides how many
     // fit on one screen (min-width per column) — the rest horizontal-scrolls.
     return (

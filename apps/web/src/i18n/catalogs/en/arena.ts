@@ -181,6 +181,7 @@ export const arena = {
       observation: "Observation",
       verify: "Verify",
       error: "Error",
+      other: "Other",
     },
   },
   token: {

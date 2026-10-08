@@ -71,6 +71,9 @@ function parsePrefs(raw: string | null): ViewPrefs | null {
 /** localStorage snapshot cache: getSnapshot must return a stable identity per store state. */
 let cachedSnapshot: ViewPrefs = DEFAULT_PREFS;
 let cachedRaw: string | null = null;
+/** In-session override for when localStorage writes fail (private mode / quota):
+ *  the choice applies now but resets on the next visit. */
+let memoryPrefs: ViewPrefs | null = null;
 
 /** Reads and caches the stored prefs so identity stays stable between renders. */
 function snapshot(): ViewPrefs {
@@ -80,20 +83,28 @@ function snapshot(): ViewPrefs {
   } catch {
     raw = null;
   }
-  if (raw === cachedRaw) return cachedSnapshot;
-  cachedRaw = raw;
-  cachedSnapshot = parsePrefs(raw) ?? DEFAULT_PREFS;
-  return cachedSnapshot;
+  if (raw !== cachedRaw) {
+    cachedRaw = raw;
+    cachedSnapshot = parsePrefs(raw) ?? DEFAULT_PREFS;
+    // Another tab (or a cleared store) changed the raw value; the override no
+    // longer matches what was written, so stored prefs win again.
+    memoryPrefs = null;
+  }
+  return memoryPrefs ?? cachedSnapshot;
 }
 
 /** Writes through to localStorage and notifies subscribers (same tab + other tabs). */
 function store(prefs: ViewPrefs): void {
+  memoryPrefs = prefs;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    const serialized = JSON.stringify(prefs);
+    window.localStorage.setItem(STORAGE_KEY, serialized);
+    // getItem returns exactly the written string, so it can seed the cache
+    // directly instead of re-reading on the next snapshot.
+    cachedRaw = serialized;
   } catch {
-    // Private mode / quota: preferences simply reset next visit.
+    // Private mode / quota: keep memoryPrefs active; preferences reset next visit.
   }
-  cachedRaw = null;
   emitChange();
 }
 

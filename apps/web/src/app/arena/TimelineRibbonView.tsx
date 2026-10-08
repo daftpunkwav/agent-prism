@@ -118,7 +118,7 @@ export function TimelineRibbonView({ columnList, resolveDisplayLabel }: {
   return (
     <div className="arena-stage-scroll arena-ribbons">
       <div className="arena-ribbon-legend" aria-hidden>
-        {(["thought", "action", "observation", "verify", "error"] as const).map((cat) => (
+        {(["thought", "action", "observation", "verify", "error", "other"] as const).map((cat) => (
           <span key={cat} className="arena-ribbon-legend-item text-[11px] text-muted-foreground">
             <span className={`arena-ribbon-seg ${CATEGORY_CLASS[cat]} arena-ribbon-legend-swatch`} />
             {t(`arena.view.ribbonCat.${cat}` as "arena.view.ribbonCat.thought")}

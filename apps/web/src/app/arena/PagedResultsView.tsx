@@ -19,7 +19,7 @@ import { ColumnCard, ColumnPlaceholder } from "./ColumnCard";
 import { useT } from "@/i18n/useT";
 import { dimOptionLabel } from "./dimensionLabels";
 
-/** Two-column paged view: prev/next buttons over a paired run-card grid. */
+/** Paged run-card view: prev/next buttons over a fixed-size per-page card grid. */
 export function PagedResultsView(props: {
   activeDim: DimensionMeta | null;
   activeSelections: string[];

@@ -134,28 +134,35 @@ export function columnRibbons(columnList: ColumnState[]): ColumnRibbon[] {
     const spans = new Map<number, { start: number; end: number }>();
     for (const seg of segments) {
       const category = ribbonCategory(seg.kind);
-      const spanStart = seg.tsStart ?? 0;
-      const spanEnd = seg.tsEnd ?? seg.tsStart ?? 0;
+      // Normalize to a positive pair: tsEnd may exist while tsStart is absent
+      // (a streamed segment created before any timestamped event arrived).
+      const spanStart = seg.tsStart ?? seg.tsEnd ?? 0;
+      const spanEnd = Math.max(seg.tsEnd ?? 0, spanStart);
       const tool = seg.kind === "action" ? (seg.tool ?? "") : "";
       const last = runs[runs.length - 1];
       if (last && last.category === category) {
         last.count += 1;
-        const span = spans.get(runs.length - 1);
-        if (span && spanStart > 0) {
-          span.start = Math.min(span.start, spanStart);
-          span.end = Math.max(span.end, spanEnd);
-        }
         if (tool && !last.tools.includes(tool)) last.tools.push(tool);
       } else {
         runs.push({
           category,
           count: 1,
           widthPct: 0,
-          spanMs: spanEnd > 0 && spanStart > 0 ? Math.max(spanEnd - spanStart, 0) : 0,
+          spanMs: 0,
           sample: (seg.text ?? "").replace(/\s+/g, " ").trim().slice(0, 120),
           tools: tool ? [tool] : [],
         });
-        if (spanStart > 0) spans.set(runs.length - 1, { start: spanStart, end: Math.max(spanEnd, spanStart) });
+      }
+      // Merge into the run's span; the entry is created on the first timestamped
+      // segment even when the run's opening segment carried none.
+      if (spanEnd > 0) {
+        const span = spans.get(runs.length - 1);
+        if (span) {
+          span.start = Math.min(span.start, spanStart);
+          span.end = Math.max(span.end, spanEnd);
+        } else {
+          spans.set(runs.length - 1, { start: spanStart, end: spanEnd });
+        }
       }
     }
     const total = runs.reduce((sum, seg) => sum + seg.count, 0);
@@ -231,7 +238,9 @@ export function runnerStates(columnList: ColumnState[], nowMs: number): RunnerSt
       steps: segments.length,
       lastText: last?.text ?? "",
       startedAt: firstTs ?? 0,
-      endedAt: lastTs || (settled ? nowMs : 0),
+      // Running columns end "now" so the elapsed clock keeps ticking between
+      // events; settled columns keep their true last-timestamp end.
+      endedAt: !settled || !lastTs ? nowMs : lastTs,
     };
   });
 
