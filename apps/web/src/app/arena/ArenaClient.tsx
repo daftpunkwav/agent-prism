@@ -152,7 +152,12 @@ export function ArenaClient() {
   );
 
   // Results view mode (default grid / paged / fun overviews), persisted locally.
-  const { prefs: viewPrefs, setMode: setViewMode, setPageSize: setViewPageSize } = useViewMode();
+  const {
+    prefs: viewPrefs,
+    setMode: setViewMode,
+    setAllPageSize: setViewAllPageSize,
+    setPagedPageSize: setViewPagedPageSize,
+  } = useViewMode();
 
   const hasMetrics = columnList.some((c) => c.metrics);
   const allSettled = columnList.length >= 1 && columnList.every((c) => c.metrics || c.error);
@@ -505,13 +510,14 @@ export function ArenaClient() {
             <ViewModeSwitcher
               prefs={viewPrefs}
               onModeChange={setViewMode}
-              onPageSizeChange={setViewPageSize}
+              onAllPageSizeChange={setViewAllPageSize}
+              onPagedPageSizeChange={setViewPagedPageSize}
             />
           </div>
 
           <div className="arena-stage-body">
             {mainTab === "results" ? (
-              <div key="results" className="arena-tab-pane fade-in h-full min-h-0">
+              <div key="results" className="arena-tab-pane fade-in flex h-full min-h-0 flex-col">
                 <ArenaResultsGrid
                   activeDim={activeDim}
                   activeSelections={activeSelections}
@@ -530,7 +536,8 @@ export function ArenaClient() {
                   onAskAnswer={answerAsk}
                   onAskDismiss={clearPendingAsk}
                   viewMode={viewPrefs.mode}
-                  pageSize={viewPrefs.pageSize}
+                  allPageSize={viewPrefs.allPageSize}
+                  pagedPageSize={viewPrefs.pagedPageSize}
                   resolveDisplayLabel={resolveDisplayLabel}
                 />
               </div>

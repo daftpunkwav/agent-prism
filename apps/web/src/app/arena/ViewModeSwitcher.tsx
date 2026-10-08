@@ -3,7 +3,7 @@
  * @description Results-stage view selector in the stage toolbar.
  *
  * Responsibilities:
- * - Render the view-mode dropdown plus the default view's page-size control
+ * - Render the view-mode dropdown plus the active view's page-size control
  * - Translate mode ids into catalog labels; keep ids as stable values
  */
 
@@ -12,7 +12,7 @@
 import { LayoutGrid, Columns2, Trophy, Gauge, ScrollText, Activity } from "lucide-react";
 import { UiSelect } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
-import { PAGE_SIZE_OPTIONS, VIEW_MODES, type ViewMode, type ViewPrefs } from "./useViewMode";
+import { PAGE_SIZE_OPTIONS, VIEW_MODES, type PageSize, type ViewMode, type ViewPrefs } from "./useViewMode";
 
 /** Mode id → toolbar icon. */
 const MODE_ICONS: Record<ViewMode, React.ReactNode> = {
@@ -24,19 +24,26 @@ const MODE_ICONS: Record<ViewMode, React.ReactNode> = {
   timeline: <Activity className="h-3.5 w-3.5" />,
 };
 
-/** View selector: the mode dropdown plus a per-page cap for the default view. */
-export function ViewModeSwitcher({ prefs, onModeChange, onPageSizeChange }: {
+/** Views whose toolbar shows a per-page selector (keyed by mode id). */
+const PAGED_MODES = new Set<ViewMode>(["all", "paged"]);
+
+/** View selector: the mode dropdown plus a per-page selector for paged modes. */
+export function ViewModeSwitcher({ prefs, onModeChange, onAllPageSizeChange, onPagedPageSizeChange }: {
   prefs: ViewPrefs;
   onModeChange: (mode: ViewMode) => void;
-  onPageSizeChange: (size: ViewPrefs["pageSize"]) => void;
+  onAllPageSizeChange: (size: PageSize) => void;
+  onPagedPageSizeChange: (size: PageSize) => void;
 }) {
   const t = useT();
+  const showPageSize = PAGED_MODES.has(prefs.mode);
+  const pageSize = prefs.mode === "paged" ? prefs.pagedPageSize : prefs.allPageSize;
+  const onPageSizeChange = prefs.mode === "paged" ? onPagedPageSizeChange : onAllPageSizeChange;
   return (
     <div className="arena-view-switcher">
-      {prefs.mode === "all" && (
+      {showPageSize && (
         <UiSelect
-          value={`${prefs.pageSize}`}
-          onChange={(v) => onPageSizeChange(Number(v) as ViewPrefs["pageSize"])}
+          value={`${pageSize}`}
+          onChange={(v) => onPageSizeChange(Number(v) as PageSize)}
           options={PAGE_SIZE_OPTIONS.map((size) => ({ value: `${size}`, label: t("arena.view.pageSizeOption", { count: size }) }))}
           ariaLabel={t("arena.view.pageSizeAria")}
           className="arena-view-pagesize"

@@ -4,8 +4,9 @@
  *
  * Responsibilities:
  * - Hold the active results view mode id
- * - Hold the max columns per page for the default "all" view (3–6)
- * - Persist both to localStorage; corrupted storage falls back to defaults
+ * - Hold per-mode page sizes: the default view's visible-column cap and the
+ *   paged view's columns-per-page (both 1–4)
+ * - Persist to localStorage; corrupted storage falls back to defaults
  */
 
 "use client";
@@ -22,28 +23,46 @@ export function parseViewMode(raw: string): ViewMode | undefined {
   return (VIEW_MODES as readonly string[]).includes(raw) ? (raw as ViewMode) : undefined;
 }
 
-/** Allowed page sizes for the default view's "max columns per page" control. */
-export const PAGE_SIZE_OPTIONS = [3, 4, 5, 6] as const;
+/** Allowed per-page counts: "at most N columns on one page" (1–4). */
+export const PAGE_SIZE_OPTIONS = [1, 2, 3, 4] as const;
+
+export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
 export type ViewPrefs = {
   mode: ViewMode;
-  /** Default view only: cap on simultaneously rendered columns; the rest horizontal-scrolls. */
-  pageSize: (typeof PAGE_SIZE_OPTIONS)[number];
+  /** Default view: max columns visible on one screen; the rest horizontal-scrolls. */
+  allPageSize: PageSize;
+  /** Paged view: columns rendered per page behind the pager controls. */
+  pagedPageSize: PageSize;
 };
 
 const STORAGE_KEY = "agentprism.arena.viewMode.v1";
 
-export const DEFAULT_PREFS: ViewPrefs = { mode: "all", pageSize: 4 };
+export const DEFAULT_PREFS: ViewPrefs = { mode: "all", allPageSize: 4, pagedPageSize: 2 };
 
-/** Parses raw prefs; null when absent or corrupted (unknown modes/sizes reject too). */
+/** Narrows a raw number to an allowed page size; null when out of set. */
+function parsePageSize(raw: unknown): PageSize | null {
+  return PAGE_SIZE_OPTIONS.find((size) => size === raw) ?? null;
+}
+
+/** Parses raw prefs; null when absent or corrupted (unknown modes reject too). */
 function parsePrefs(raw: string | null): ViewPrefs | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as { mode?: unknown; pageSize?: unknown };
+    const parsed = JSON.parse(raw) as {
+      mode?: unknown;
+      allPageSize?: unknown;
+      pagedPageSize?: unknown;
+      /** Legacy v1 field: a single shared page size. */
+      pageSize?: unknown;
+    };
     const mode = typeof parsed.mode === "string" ? parseViewMode(parsed.mode) : undefined;
     if (mode === undefined) return null;
-    const pageSize = PAGE_SIZE_OPTIONS.find((size) => size === parsed.pageSize) ?? DEFAULT_PREFS.pageSize;
-    return { mode, pageSize };
+    // Legacy single field seeds the default view's cap; unknown values fall to defaults.
+    const legacy = parsePageSize(parsed.pageSize);
+    const allPageSize = parsePageSize(parsed.allPageSize) ?? legacy ?? DEFAULT_PREFS.allPageSize;
+    const pagedPageSize = parsePageSize(parsed.pagedPageSize) ?? DEFAULT_PREFS.pagedPageSize;
+    return { mode, allPageSize, pagedPageSize };
   } catch {
     return null;
   }
@@ -98,11 +117,12 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-/** View mode state + persistence: mode and default-view page size, restored across visits. */
+/** View mode state + persistence: mode and per-mode page sizes, restored across visits. */
 export function useViewMode(): {
   prefs: ViewPrefs;
   setMode: (mode: ViewMode) => void;
-  setPageSize: (pageSize: ViewPrefs["pageSize"]) => void;
+  setAllPageSize: (size: PageSize) => void;
+  setPagedPageSize: (size: PageSize) => void;
 } {
   const prefs = useSyncExternalStore(subscribe, snapshot, () => SERVER_PREFS);
 
@@ -110,9 +130,13 @@ export function useViewMode(): {
     if (snapshot().mode !== mode) store({ ...snapshot(), mode });
   }, []);
 
-  const setPageSize = useCallback((pageSize: ViewPrefs["pageSize"]) => {
-    if (snapshot().pageSize !== pageSize) store({ ...snapshot(), pageSize });
+  const setAllPageSize = useCallback((allPageSize: PageSize) => {
+    if (snapshot().allPageSize !== allPageSize) store({ ...snapshot(), allPageSize });
   }, []);
 
-  return { prefs, setMode, setPageSize };
+  const setPagedPageSize = useCallback((pagedPageSize: PageSize) => {
+    if (snapshot().pagedPageSize !== pagedPageSize) store({ ...snapshot(), pagedPageSize });
+  }, []);
+
+  return { prefs, setMode, setAllPageSize, setPagedPageSize };
 }

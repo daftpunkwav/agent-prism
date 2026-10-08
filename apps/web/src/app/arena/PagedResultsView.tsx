@@ -1,9 +1,9 @@
 /**
  * @file PagedResultsView
- * @description Two-columns-per-page results view with paging controls.
+ * @description Fixed-size page results view with paging controls.
  *
  * Responsibilities:
- * - Render at most two run cards per page (or placeholders before events arrive)
+ * - Render at most N run cards per page (or placeholders before events arrive)
  * - Provide prev/next paging plus a page-position indicator
  * - Clamp the page index when the column count shrinks mid-run
  */
@@ -18,9 +18,6 @@ import type { PendingAskBatch } from "@/components/AskUserModal";
 import { ColumnCard, ColumnPlaceholder } from "./ColumnCard";
 import { useT } from "@/i18n/useT";
 import { dimOptionLabel } from "./dimensionLabels";
-
-/** Columns shown per page — the whole point of this view. */
-const COLUMNS_PER_PAGE = 2;
 
 /** Two-column paged view: prev/next buttons over a paired run-card grid. */
 export function PagedResultsView(props: {
@@ -41,6 +38,8 @@ export function PagedResultsView(props: {
   onAskDismiss: (agentId: string) => void;
   /** Locale-resolved display label for a pipeline label. */
   resolveDisplayLabel: (label: string) => string;
+  /** Columns rendered per page (1–4). */
+  perPage: number;
 }) {
   const {
     activeDim,
@@ -59,6 +58,7 @@ export function PagedResultsView(props: {
     onAskAnswer,
     onAskDismiss,
     resolveDisplayLabel,
+    perPage,
   } = props;
   const t = useT();
 
@@ -78,14 +78,15 @@ export function PagedResultsView(props: {
           col,
         }));
 
-  const pageCount = Math.max(Math.ceil(entries.length / COLUMNS_PER_PAGE), 1);
+  const columnsPerPage = Math.max(perPage, 1);
+  const pageCount = Math.max(Math.ceil(entries.length / columnsPerPage), 1);
   const [pageRaw, setPage] = useState(0);
   // Render-time clamp: when columns shrink (dimension switch, cleared selection) the
   // stored page index would point past the last page; clamping here needs no effect.
   const page = Math.min(pageRaw, pageCount - 1);
 
-  const pageStart = page * COLUMNS_PER_PAGE;
-  const pageEntries = entries.slice(pageStart, pageStart + COLUMNS_PER_PAGE);
+  const pageStart = page * columnsPerPage;
+  const pageEntries = entries.slice(pageStart, pageStart + columnsPerPage);
 
   const renderEntry = (entry: (typeof entries)[number], idx: number) =>
     entry.col ? (
@@ -112,11 +113,11 @@ export function PagedResultsView(props: {
 
   return (
     <div className="arena-paged">
-      <div className="arena-columns arena-paged-grid" data-count={COLUMNS_PER_PAGE}>
+      <div className="arena-columns arena-paged-grid" data-count={columnsPerPage}>
         {pageEntries.length > 0 ? (
           pageEntries.map(renderEntry)
         ) : (
-          placeholderLabels.slice(0, COLUMNS_PER_PAGE).map((name, idx) => (
+          placeholderLabels.slice(0, columnsPerPage).map((name, idx) => (
             <ColumnPlaceholder key={name} name={resolveDisplayLabel(name)} lane={idx} />
           ))
         )}

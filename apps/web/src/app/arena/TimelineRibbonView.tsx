@@ -5,7 +5,8 @@
  * Responsibilities:
  * - Render one lane-colored ribbon per column from merged event segments
  * - Bucket segments into coarse categories (thought/action/observation/verify/error)
- * - Show progress as proportions only; never render event text
+ * - Hover a segment for its details: category, event count, share, time span,
+ *   tools used, and a text sample
  */
 
 "use client";
@@ -23,6 +24,34 @@ const CATEGORY_CLASS: Record<RibbonCategory, string> = {
   error: "arena-ribbon-seg-error",
   other: "arena-ribbon-seg-other",
 };
+
+/** Formats a millisecond span for the tooltip ("1.2s", "850ms"). */
+function formatSpan(ms: number): string {
+  if (ms <= 0) return "";
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
+}
+
+/** One segment's hover tooltip: coarse category facts plus a text sample. */
+function SegmentTooltip({ seg, colLabel }: { seg: ReturnType<typeof columnRibbons>[number]["segments"][number]; colLabel: string }) {
+  const t = useT();
+  const span = formatSpan(seg.spanMs);
+  return (
+    <span className="arena-ribbon-tooltip" role="tooltip">
+      <span className="arena-ribbon-tooltip-title font-mono">
+        {t(`arena.view.ribbonCat.${seg.category}` as "arena.view.ribbonCat.thought")}
+        {` · ×${seg.count} · ${Math.round(seg.widthPct)}%`}
+        {span ? ` · ${span}` : ""}
+      </span>
+      {seg.tools.length > 0 && (
+        <span className="arena-ribbon-tooltip-tools font-mono">{seg.tools.join(", ")}</span>
+      )}
+      {seg.sample && (
+        <span className="arena-ribbon-tooltip-sample">{seg.sample}</span>
+      )}
+      <span className="arena-ribbon-tooltip-col text-muted-foreground">{colLabel}</span>
+    </span>
+  );
+}
 
 /** One column's ribbon row: label, status chip, and the proportional band. */
 function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbons>[number]; display: string }) {
@@ -56,15 +85,17 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
             key={idx}
             className={`arena-ribbon-seg ${CATEGORY_CLASS[seg.category]}`}
             style={{ width: `${seg.widthPct}%` }}
-            title={`${seg.category} ×${seg.count}`}
-          />
+            tabIndex={0}
+          >
+            <SegmentTooltip seg={seg} colLabel={display} />
+          </span>
         ))}
       </div>
     </div>
   );
 }
 
-/** Event-rhythm view: compare how columns spend their steps, content-free. */
+/** Event-rhythm view: compare how columns spend their steps, content-free until hover. */
 export function TimelineRibbonView({ columnList, resolveDisplayLabel }: {
   columnList: ColumnState[];
   /** Locale-resolved display label for a pipeline label. */
@@ -90,7 +121,8 @@ export function TimelineRibbonView({ columnList, resolveDisplayLabel }: {
         {(["thought", "action", "observation", "verify", "error"] as const).map((cat) => (
           <span key={cat} className="arena-ribbon-legend-item text-[11px] text-muted-foreground">
             <span className={`arena-ribbon-seg ${CATEGORY_CLASS[cat]} arena-ribbon-legend-swatch`} />
-            {t(`arena.view.ribbonCat.${cat}` as "arena.view.ribbonCat.thought")}          </span>
+            {t(`arena.view.ribbonCat.${cat}` as "arena.view.ribbonCat.thought")}
+          </span>
         ))}
       </div>
       {ribbons.map((ribbon) => (

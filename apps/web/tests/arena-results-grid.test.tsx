@@ -40,7 +40,8 @@ function baseProps(): GridProps {
     onAskAnswer: vi.fn(async () => true),
     onAskDismiss: vi.fn(),
     viewMode: "all",
-    pageSize: 4,
+    allPageSize: 4,
+    pagedPageSize: 2,
     resolveDisplayLabel: (label: string) => label,
   } as unknown as GridProps;
 }
@@ -66,7 +67,8 @@ describe("ArenaResultsGrid", () => {
   it("renders placeholders for selected options before events arrive", () => {
     const { container } = renderGrid({ activeDim: DIM, activeSelections: ["native", "langchain"], columns: {}, columnList: [], columnCount: 0, placeholderLabels: [], running: false, historySeedLabel: null });
     expect(container.querySelectorAll(".column-card-placeholder")).toHaveLength(2);
-    expect(container.querySelector(".arena-columns")?.getAttribute("data-count")).toBe("2");
+    // data-count carries the per-page cap (default 4), not the selected count.
+    expect(container.querySelector(".arena-columns")?.getAttribute("data-count")).toBe("4");
   });
 
   it("renders run cards for columns keyed by option label", () => {
@@ -130,7 +132,7 @@ describe("ArenaResultsGrid", () => {
     expect(screen.getByRole("dialog", { name: getCatalog("en").common.askTitle })).toBeDefined();
   });
 
-  it("caps the default grid at the configured page size", () => {
+  it("renders every column in the default grid; the page size only drives widths", () => {
     const { container } = renderGrid({
       activeDim: null,
       activeSelections: [],
@@ -140,12 +142,13 @@ describe("ArenaResultsGrid", () => {
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,
-      pageSize: 2,
+      allPageSize: 2,
     });
-    expect(container.querySelectorAll(".column-card")).toHaveLength(2);
+    expect(container.querySelectorAll(".column-card")).toHaveLength(3);
+    expect(container.querySelector(".arena-columns")?.getAttribute("data-count")).toBe("2");
   });
 
-  it("renders the paged view with exactly two cards and a pager", () => {
+  it("renders the paged view with the configured per-page cards and a pager", () => {
     const { container } = renderGrid({
       activeDim: null,
       activeSelections: [],
@@ -156,6 +159,7 @@ describe("ArenaResultsGrid", () => {
       running: false,
       historySeedLabel: null,
       viewMode: "paged",
+      pagedPageSize: 2,
     });
     expect(container.querySelectorAll(".arena-paged")).toHaveLength(1);
     expect(container.querySelectorAll(".column-card")).toHaveLength(2);
@@ -163,20 +167,43 @@ describe("ArenaResultsGrid", () => {
     expect(screen.getByText(getCatalog("en").arena.view.pagePosition.replace("{current}", "1").replace("{total}", "2"))).toBeDefined();
   });
 
-  it("renders the podium view ranked cards instead of the grid", () => {
-    const { container } = renderGrid({
+  it("hides the race podium until every column settles, then reveals ranked cards", () => {
+    const settled = (label: string): ColumnState =>
+      ({
+        label,
+        frameworkId: "native",
+        events: [],
+        metrics: { success: true, duration_ms: 100, input_tokens: 1, output_tokens: 1, total_tokens: 10, tool_calls: 1, steps: 1, context_window: 1, max_input_tokens: 1, max_output_tokens: 1, context_usage_pct: 0, input_usage_pct: 0 },
+      }) as ColumnState;
+    const racing = renderGrid({
       activeDim: null,
       activeSelections: [],
       columns: {},
-      columnList: [colCard("A"), colCard("B")],
+      columnList: [colCard("A"), settled("B")],
+      columnCount: 2,
+      placeholderLabels: [],
+      running: true,
+      historySeedLabel: null,
+      viewMode: "podium",
+    });
+    // While one column is still racing: tracks render, no ranked podium cards.
+    expect(racing.container.querySelectorAll(".arena-track-lane")).toHaveLength(2);
+    expect(racing.container.querySelectorAll(".arena-podium-card")).toHaveLength(0);
+    racing.unmount();
+
+    const finished = renderGrid({
+      activeDim: null,
+      activeSelections: [],
+      columns: {},
+      columnList: [settled("A"), settled("B")],
       columnCount: 2,
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,
       viewMode: "podium",
     });
-    expect(container.querySelector(".arena-columns")).toBeNull();
-    expect(container.querySelectorAll(".arena-podium-card")).toHaveLength(2);
+    expect(finished.container.querySelector(".arena-columns")).toBeNull();
+    expect(finished.container.querySelectorAll(".arena-podium-card")).toHaveLength(2);
   });
 
   it("renders the stats view with one group per metric", () => {

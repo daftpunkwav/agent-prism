@@ -4,7 +4,8 @@
  *
  * Responsibilities:
  * - Route to the selected alternative view (paged / podium / stats / gallery / timeline)
- * - Render the default column grid capped at the configured page size
+ * - Render the default column grid with every selected column; the per-page
+ *   setting controls how wide each column may get (the rest scrolls)
  * - Render placeholders for selected lanes before events arrive
  */
 
@@ -22,7 +23,7 @@ import { AnswerGalleryView } from "./AnswerGalleryView";
 import { TimelineRibbonView } from "./TimelineRibbonView";
 import { useT } from "@/i18n/useT";
 import { dimOptionLabel } from "./dimensionLabels";
-import type { ViewMode } from "./useViewMode";
+import type { PageSize, ViewMode } from "./useViewMode";
 
 /** Results-stage view router: alternative views plus the default column grid. */
 export function ArenaResultsGrid(props: {
@@ -30,7 +31,8 @@ export function ArenaResultsGrid(props: {
   activeSelections: string[];
   columns: Record<string, ColumnState>;
   columnList: ColumnState[];
-  columnCount: number;
+  /** Unused since the per-page cap became a width hint; kept out of the destructure. */
+  columnCount?: number;
   placeholderLabels: string[];
   running: boolean;
   historySeedLabel: string | null;
@@ -45,8 +47,10 @@ export function ArenaResultsGrid(props: {
   onAskDismiss: (agentId: string) => void;
   /** Selected results view id. */
   viewMode: ViewMode;
-  /** Default view only: cap on simultaneously rendered columns. */
-  pageSize: number;
+  /** Default view: at-most-N columns visible per screen; extra columns scroll. */
+  allPageSize: PageSize;
+  /** Paged view: columns rendered per page behind the pager controls. */
+  pagedPageSize: PageSize;
   /** Locale-resolved display label for a pipeline label. */
   resolveDisplayLabel: (label: string) => string;
 }) {
@@ -55,7 +59,6 @@ export function ArenaResultsGrid(props: {
     activeSelections,
     columns,
     columnList,
-    columnCount,
     placeholderLabels,
     running,
     historySeedLabel,
@@ -68,7 +71,8 @@ export function ArenaResultsGrid(props: {
     onAskAnswer,
     onAskDismiss,
     viewMode,
-    pageSize,
+    allPageSize,
+    pagedPageSize,
     resolveDisplayLabel,
   } = props;
   const t = useT();
@@ -87,7 +91,7 @@ export function ArenaResultsGrid(props: {
   };
 
   if (viewMode === "podium") {
-    return <PodiumView columnList={columnList} resolveDisplayLabel={resolveDisplayLabel} />;
+    return <PodiumView columnList={columnList} running={running} resolveDisplayLabel={resolveDisplayLabel} />;
   }
   if (viewMode === "stats") {
     return <StatsOverviewView columnList={columnList} resolveDisplayLabel={resolveDisplayLabel} />;
@@ -107,6 +111,7 @@ export function ArenaResultsGrid(props: {
         columnList={columnList}
         placeholderLabels={placeholderLabels}
         resolveDisplayLabel={resolveDisplayLabel}
+        perPage={pagedPageSize}
         {...cardProps}
       />
     );
@@ -129,12 +134,11 @@ export function ArenaResultsGrid(props: {
         </div>
       );
     }
-    // The page-size cap truncates the rendered columns; the rest stays reachable
-    // through the grid's horizontal scroll (same as before, wider runs wrap).
-    const visible = selectedOptions.slice(0, Math.max(pageSize, 1));
+    // Every selected column renders; the per-page setting only decides how many
+    // fit on one screen (min-width per column) — the rest horizontal-scrolls.
     return (
-      <div className="arena-columns" data-count={Math.min(Math.max(visible.length, 1), pageSize)}>
-        {visible.map((opt, idx) => {
+      <div className="arena-columns" data-count={allPageSize}>
+        {selectedOptions.map((opt, idx) => {
           const col = columns[opt.label];
           const displayName = dimOptionLabel(t, activeDim.id, opt.value, opt.label);
           return col ? (
@@ -158,20 +162,18 @@ export function ArenaResultsGrid(props: {
     );
   }
   if (columnList.length === 0 && !running) {
-    const visibleCount = Math.min(columnCount, pageSize);
     return (
-      <div className="arena-columns" data-count={visibleCount}>
-        {placeholderLabels.slice(0, visibleCount).map((name, idx) => (
+      <div className="arena-columns" data-count={allPageSize}>
+        {placeholderLabels.map((name, idx) => (
           <ColumnPlaceholder key={name} name={name} lane={idx} />
         ))}
       </div>
     );
   }
 
-  const visible = columnList.slice(0, Math.max(pageSize, 1));
   return (
-    <div className="arena-columns" data-count={Math.min(Math.max(visible.length, 1), pageSize)}>
-      {visible.map((col, idx) => (
+    <div className="arena-columns" data-count={allPageSize}>
+      {columnList.map((col, idx) => (
         <ColumnCard
           key={col.label}
           col={col}

@@ -9,7 +9,7 @@ import { renderHook, act } from "@testing-library/react";
 import type { ArenaEvent } from "@agentprism/contracts";
 import type { ColumnState } from "@agentprism/arena-view";
 import { parseViewMode, PAGE_SIZE_OPTIONS, useViewMode, VIEW_MODES } from "../src/app/arena/useViewMode.js";
-import { columnRibbons, metricRows, ribbonCategory, summarizeColumns } from "../src/app/arena/viewData.js";
+import { columnRibbons, metricRows, ribbonCategory, runnerStates, summarizeColumns } from "../src/app/arena/viewData.js";
 
 afterEach(() => {
   window.localStorage.clear();
@@ -29,36 +29,34 @@ describe("parseViewMode", () => {
 describe("useViewMode", () => {
   it("starts with defaults and persists changes", () => {
     const { result } = renderHook(() => useViewMode());
-    expect(result.current.prefs).toEqual({ mode: "all", pageSize: 4 });
+    expect(result.current.prefs).toEqual({ mode: "all", allPageSize: 4, pagedPageSize: 2 });
     act(() => result.current.setMode("podium"));
-    act(() => result.current.setPageSize(6));
-    expect(result.current.prefs).toEqual({ mode: "podium", pageSize: 6 });
-    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "")).toEqual({ mode: "podium", pageSize: 6 });
+    act(() => result.current.setAllPageSize(1));
+    act(() => result.current.setPagedPageSize(4));
+    expect(result.current.prefs).toEqual({ mode: "podium", allPageSize: 1, pagedPageSize: 4 });
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "")).toEqual({ mode: "podium", allPageSize: 1, pagedPageSize: 4 });
   });
 
-  it("hydrates a stored preference after mount", () => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: "gallery", pageSize: 5 }));
+  it("hydrates a stored preference and migrates the legacy pageSize field", () => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: "gallery", pageSize: 3 }));
     const { result } = renderHook(() => useViewMode());
-    act(() => {
-      // flush the hydration effect
-    });
-    expect(result.current.prefs).toEqual({ mode: "gallery", pageSize: 5 });
+    expect(result.current.prefs).toEqual({ mode: "gallery", allPageSize: 3, pagedPageSize: 2 });
   });
 
   it("falls back to defaults on corrupted storage", () => {
     window.localStorage.setItem(STORAGE_KEY, "not json");
     const { result } = renderHook(() => useViewMode());
-    expect(result.current.prefs).toEqual({ mode: "all", pageSize: 4 });
+    expect(result.current.prefs).toEqual({ mode: "all", allPageSize: 4, pagedPageSize: 2 });
   });
 
   it("ignores unknown stored modes and page sizes", () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: "bogus", pageSize: 99 }));
     const { result } = renderHook(() => useViewMode());
-    expect(result.current.prefs).toEqual({ mode: "all", pageSize: 4 });
+    expect(result.current.prefs).toEqual({ mode: "all", allPageSize: 4, pagedPageSize: 2 });
   });
 
   it("keeps page-size options within the declared set", () => {
-    expect([...PAGE_SIZE_OPTIONS]).toEqual([3, 4, 5, 6]);
+    expect([...PAGE_SIZE_OPTIONS]).toEqual([1, 2, 3, 4]);
   });
 });
 
@@ -102,6 +100,36 @@ describe("metricRows", () => {
   });
 });
 
+describe("runnerStates", () => {
+  it("marks settled runners at full progress and running ones relative to the leader", () => {
+    const doneA = settled("A");
+    const doneB = settled("B");
+    const runningRunner = { label: "R", frameworkId: "native", events: [
+      { type: "thought", pipeline: "R", content: "thinking hard about the answer" },
+      { type: "action", pipeline: "R", tool: "bash" },
+      { type: "observation", pipeline: "R" },
+    ] } as unknown as ColumnState;
+    const waiting = { label: "W", frameworkId: "native", events: [] } as unknown as ColumnState;
+    const runners = runnerStates([doneA, doneB, runningRunner, waiting], 1000);
+    expect(runners[0]).toMatchObject({ label: "A", settled: true, success: true, progress: 1, activityKind: "done" });
+    expect(runners[2]).toMatchObject({ label: "R", settled: false, activityKind: "action" });
+    const runningRunnerState = runners[2];
+    expect(runningRunnerState?.progress).toBeGreaterThan(0);
+    expect(runningRunnerState?.progress).toBeLessThan(1);
+    expect(runningRunnerState?.tool).toBe("bash");
+    // A waiting column sits at the start line with no activity.
+    expect(runners[3]).toMatchObject({ label: "W", settled: false, progress: 0, activityKind: null });
+  });
+
+  it("clamps the bubble text to a short sample", () => {
+    const long = "x".repeat(200);
+    const col = { label: "R", frameworkId: "native", events: [{ type: "thought", pipeline: "R", content: long }] } as unknown as ColumnState;
+    const [runner] = runnerStates([col], 1000);
+    expect(runner?.activity.length).toBeLessThanOrEqual(80);
+    expect(runner?.activity.endsWith("…")).toBe(true);
+  });
+});
+
 describe("columnRibbons", () => {
   it("collapses consecutive same-category segments and normalizes widths", () => {
     const events = [
@@ -116,6 +144,9 @@ describe("columnRibbons", () => {
     expect(ribbon?.segments.map((s) => s.category)).toEqual(["thought", "action", "verify"]);
     const total = (ribbon?.segments ?? []).reduce((sum, s) => sum + s.widthPct, 0);
     expect(total).toBeCloseTo(100, 5);
+    // Tooltip facts: action run carries its tool; widths sum to 100%.
+    const actionRun = ribbon?.segments.find((s) => s.category === "action");
+    expect(actionRun?.tools).toContain("bash");
   });
 
   it("maps kinds to buckets and marks running columns", () => {
