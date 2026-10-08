@@ -138,7 +138,7 @@ export const arena = {
     mode: {
       all: "All columns",
       paged: "Paged",
-      podium: "Podium",
+      podium: "Race",
       stats: "Metrics glance",
       gallery: "Answer gallery",
       timeline: "Event rhythm",

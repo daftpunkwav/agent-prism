@@ -137,7 +137,7 @@ export const arena = {
     mode: {
       all: "全列视图",
       paged: "翻页视图",
-      podium: "领奖台",
+      podium: "竞速",
       stats: "指标速览",
       gallery: "答案画廊",
       timeline: "事件节奏",
