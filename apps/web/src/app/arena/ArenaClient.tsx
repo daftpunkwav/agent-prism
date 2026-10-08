@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, FileJson, GitCompare, Terminal } from "lucide-react";
-import type { DimensionId } from "@agentprism/client";
+import type { DimensionId, TaskTemplate } from "@agentprism/client";
 import { ComparisonReport } from "./ComparisonReport";
 import { MatrixPanel } from "./MatrixPanel";
 import { TraceDiff } from "./TraceDiff";
@@ -22,8 +22,7 @@ import { BaselineModal } from "./BaselineModal";
 import { WorkspaceExplorer } from "./WorkspaceExplorer";
 import type { PendingAskBatch } from "@/components/AskUserModal";
 import { useArenaStream } from "./useArenaStream";
-import { deriveTurn } from "./useColumnSessions";
-import { useColumnSessions } from "./useColumnSessions";
+import { deriveTurn, useColumnSessions } from "./useColumnSessions";
 import { useArenaConfig } from "./useArenaConfig";
 import { useArenaAutoJudge } from "./useArenaAutoJudge";
 import { useHistoryCommit } from "./useHistoryCommit";
@@ -38,7 +37,6 @@ import { ComposerBar } from "./ComposerBar";
 import { SaveProjectCard } from "./SaveProjectCard";
 import { useLocale, useT } from "@/i18n/useT";
 import type { MainTab } from "./arenaConstants";
-import type { TaskTemplate } from "@agentprism/client";
 import { pipelineDisplayLabel } from "./dimensionLabels";
 import { templateQuestion } from "./templateLabels";
 

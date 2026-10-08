@@ -67,10 +67,9 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
         {display}
       </span>
       <span
-        className={
-          "arena-ribbon-status font-mono text-[11px] " +
-          (ribbon.success === null ? "text-muted-foreground" : ribbon.success ? "text-success" : "text-destructive")
-        }
+        className={`arena-ribbon-status font-mono text-[11px] ${
+          ribbon.success === null ? "text-muted-foreground" : ribbon.success ? "text-success" : "text-destructive"
+        }`}
       >
         {ribbon.success === null
           ? ribbon.running

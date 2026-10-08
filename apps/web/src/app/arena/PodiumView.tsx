@@ -52,10 +52,7 @@ function TrackBody({ runner, waiting, bubbleText }: { runner: RunnerState; waiti
       </div>
       {runner.settled && (
         <span
-          className={
-            "arena-track-result font-mono text-[11px] " +
-            (runner.success ? "text-success" : "text-destructive")
-          }
+          className={`arena-track-result font-mono text-[11px] ${runner.success ? "text-success" : "text-destructive"}`}
         >
           {runner.success ? t("arena.view.galleryOk") : t("arena.view.galleryFail")}
         </span>
