@@ -967,6 +967,12 @@
 .arena-ribbon-seg {
   height: 100%;
   min-width: 2px;
+  /* The segment renders as a button for keyboard reach; strip the chrome. */
+  appearance: none;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: default;
 }
 
 .arena-ribbon-seg-thought { background: color-mix(in srgb, var(--spectrum-1) 65%, transparent); }

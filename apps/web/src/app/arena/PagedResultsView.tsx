@@ -115,7 +115,7 @@ export function PagedResultsView(props: {
     <div className="arena-paged">
       <div className="arena-columns arena-paged-grid" data-count={columnsPerPage}>
         {pageEntries.length > 0 ? (
-          pageEntries.map(renderEntry)
+          pageEntries.map((entry, idx) => renderEntry(entry, idx))
         ) : (
           placeholderLabels.slice(0, columnsPerPage).map((name, idx) => (
             <ColumnPlaceholder key={name} name={resolveDisplayLabel(name)} lane={idx} />

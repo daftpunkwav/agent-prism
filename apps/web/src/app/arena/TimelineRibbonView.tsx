@@ -8,10 +8,10 @@
  * - Hover or focus a segment for its details: category, event count, share,
  *   time span, tools used, and a text sample
  *
- * Accessibility: the band is a list of listitems (never role="img" — its
- * children would be presentational and the tooltip facts unreachable); each
- * segment is keyboard-focusable (revealing its describedby tooltip), names
- * its category in an sr-only label, and never nests interactive content.
+ * Accessibility: each segment is a real button — natively keyboard-reachable
+ * (CodeRabbit) and an interactive element, so the describedby tooltip hookup
+ * never needs a tabIndex on non-interactive content (S6845). The band is a
+ * labeled group; buttons never nest interactive content.
  */
 
 "use client";
@@ -82,18 +82,18 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
       </span>
       <div
         className="arena-ribbon-band"
-        role="list"
+        role="group"
         aria-label={t("arena.view.ribbonAria", { name: display })}
       >
         {ribbon.segments.map((seg, idx) => (
-          <span
+          // A real button: the only shape that satisfies both keyboard reach
+          // (CodeRabbit) and "tabIndex only on interactive elements" (S6845)
+          // while keeping the describedby tooltip hookup.
+          <button
             key={idx}
+            type="button"
             className={`arena-ribbon-seg ${CATEGORY_CLASS[seg.category]}`}
             style={{ width: `${seg.widthPct}%` }}
-            role="listitem"
-            // Keyboard users need focus to reveal the describedby tooltip; the
-            // repo lint enables no no-noninteractive-tabindex rule for this shape.
-            tabIndex={0}
             aria-describedby={`ribbon-seg-${idx}-${ribbon.label}`}
           >
             <SegmentTooltip seg={seg} colLabel={display} descId={`ribbon-seg-${idx}-${ribbon.label}`} />
@@ -101,7 +101,7 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
               {t(`arena.view.ribbonCat.${seg.category}` as "arena.view.ribbonCat.thought")}
               {` ×${seg.count}`}
             </span>
-          </span>
+          </button>
         ))}
       </div>
     </div>
