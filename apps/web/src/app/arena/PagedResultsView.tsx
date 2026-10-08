@@ -19,6 +19,78 @@ import { ColumnCard, ColumnPlaceholder } from "./ColumnCard";
 import { useT } from "@/i18n/useT";
 import { dimOptionLabel } from "./dimensionLabels";
 
+/** One paged entry: display label plus the live column state (undefined before events). */
+interface PageEntry {
+  key: string;
+  display: string;
+  col: ColumnState | undefined;
+}
+
+type TFn = ReturnType<typeof useT>;
+
+/** Display-ordered entries, shared by the placeholder and run-card paths. */
+function buildPageEntries(input: {
+  activeDim: DimensionMeta | null;
+  activeSelections: string[];
+  columns: Record<string, ColumnState>;
+  columnList: ColumnState[];
+  t: TFn;
+  resolveDisplayLabel: (label: string) => string;
+}): PageEntry[] {
+  const { activeDim, activeSelections, columns, columnList, t, resolveDisplayLabel } = input;
+  if (activeDim) {
+    return activeDim.options
+      .filter((o) => activeSelections.includes(o.value))
+      .map((opt) => ({
+        key: opt.value,
+        display: dimOptionLabel(t, activeDim.id, opt.value, opt.label),
+        col: columns[opt.label],
+      }));
+  }
+  return columnList.map((col) => ({
+    key: col.label,
+    display: resolveDisplayLabel(col.label),
+    col,
+  }));
+}
+
+/** Prev/next pager strip with a page-position caption. */
+function ArenaPager({ page, pageCount, onPageChange, pagerAria, prevAria, nextAria, position }: {
+  page: number;
+  pageCount: number;
+  onPageChange: (next: number) => void;
+  pagerAria: string;
+  prevAria: string;
+  nextAria: string;
+  position: string;
+}) {
+  return (
+    <div className="arena-pager" role="navigation" aria-label={pagerAria}>
+      <button
+        type="button"
+        className="btn-ghost arena-pager-btn"
+        onClick={() => onPageChange(Math.max(page - 1, 0))}
+        disabled={page === 0}
+        aria-label={prevAria}
+        title={prevAria}
+      >
+        <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+      </button>
+      <span className="arena-pager-position font-mono text-[11px] text-muted-foreground">{position}</span>
+      <button
+        type="button"
+        className="btn-ghost arena-pager-btn"
+        onClick={() => onPageChange(Math.min(page + 1, pageCount - 1))}
+        disabled={page >= pageCount - 1}
+        aria-label={nextAria}
+        title={nextAria}
+      >
+        <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+      </button>
+    </div>
+  );
+}
+
 /** Paged run-card view: prev/next buttons over a fixed-size per-page card grid. */
 export function PagedResultsView(props: {
   activeDim: DimensionMeta | null;
@@ -62,21 +134,7 @@ export function PagedResultsView(props: {
   } = props;
   const t = useT();
 
-  // Display-ordered entries, shared by both the placeholder and the run-card paths.
-  const entries: Array<{ key: string; display: string; col: ColumnState | undefined }> =
-    activeDim
-      ? activeDim.options
-          .filter((o) => activeSelections.includes(o.value))
-          .map((opt) => ({
-            key: opt.value,
-            display: dimOptionLabel(t, activeDim.id, opt.value, opt.label),
-            col: columns[opt.label],
-          }))
-      : columnList.map((col) => ({
-          key: col.label,
-          display: resolveDisplayLabel(col.label),
-          col,
-        }));
+  const entries = buildPageEntries({ activeDim, activeSelections, columns, columnList, t, resolveDisplayLabel });
 
   const columnsPerPage = Math.max(perPage, 1);
   const pageCount = Math.max(Math.ceil(entries.length / columnsPerPage), 1);
@@ -123,31 +181,15 @@ export function PagedResultsView(props: {
         )}
       </div>
       {pageCount > 1 && (
-        <div className="arena-pager" role="navigation" aria-label={t("arena.view.pagerAria")}>
-          <button
-            type="button"
-            className="btn-ghost arena-pager-btn"
-            onClick={() => setPage((p) => Math.max(p - 1, 0))}
-            disabled={page === 0}
-            aria-label={t("arena.view.prevPage")}
-            title={t("arena.view.prevPage")}
-          >
-            <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-          </button>
-          <span className="arena-pager-position font-mono text-[11px] text-muted-foreground">
-            {t("arena.view.pagePosition", { current: page + 1, total: pageCount })}
-          </span>
-          <button
-            type="button"
-            className="btn-ghost arena-pager-btn"
-            onClick={() => setPage((p) => Math.min(p + 1, pageCount - 1))}
-            disabled={page >= pageCount - 1}
-            aria-label={t("arena.view.nextPage")}
-            title={t("arena.view.nextPage")}
-          >
-            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-          </button>
-        </div>
+        <ArenaPager
+          page={page}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          pagerAria={t("arena.view.pagerAria")}
+          prevAria={t("arena.view.prevPage")}
+          nextAria={t("arena.view.nextPage")}
+          position={t("arena.view.pagePosition", { current: page + 1, total: pageCount })}
+        />
       )}
     </div>
   );

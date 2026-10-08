@@ -129,42 +129,7 @@ export interface RibbonSegment {
 export function columnRibbons(columnList: ColumnState[]): ColumnRibbon[] {
   return columnList.map((col) => {
     const segments = mergeEvents(col.events, col.frameworkId);
-    const runs: RibbonSegment[] = [];
-    // Run spans keyed by run index: start/end tracked outside the payload shape.
-    const spans = new Map<number, { start: number; end: number }>();
-    for (const seg of segments) {
-      const category = ribbonCategory(seg.kind);
-      // Normalize to a positive pair: tsEnd may exist while tsStart is absent
-      // (a streamed segment created before any timestamped event arrived).
-      const spanStart = seg.tsStart ?? seg.tsEnd ?? 0;
-      const spanEnd = Math.max(seg.tsEnd ?? 0, spanStart);
-      const tool = seg.kind === "action" ? (seg.tool ?? "") : "";
-      const last = runs[runs.length - 1];
-      if (last && last.category === category) {
-        last.count += 1;
-        if (tool && !last.tools.includes(tool)) last.tools.push(tool);
-      } else {
-        runs.push({
-          category,
-          count: 1,
-          widthPct: 0,
-          spanMs: 0,
-          sample: (seg.text ?? "").replace(/\s+/g, " ").trim().slice(0, 120),
-          tools: tool ? [tool] : [],
-        });
-      }
-      // Merge into the run's span; the entry is created on the first timestamped
-      // segment even when the run's opening segment carried none.
-      if (spanEnd > 0) {
-        const span = spans.get(runs.length - 1);
-        if (span) {
-          span.start = Math.min(span.start, spanStart);
-          span.end = Math.max(span.end, spanEnd);
-        } else {
-          spans.set(runs.length - 1, { start: spanStart, end: spanEnd });
-        }
-      }
-    }
+    const { runs, spans } = collectRuns(segments);
     const total = runs.reduce((sum, seg) => sum + seg.count, 0);
     for (const [idx, run] of runs.entries()) {
       run.widthPct = total > 0 ? (run.count / total) * 100 : 0;
@@ -179,6 +144,50 @@ export function columnRibbons(columnList: ColumnState[]): ColumnRibbon[] {
       segments: runs,
     };
   });
+}
+
+/** One pass over the merged segments: collapses runs and tracks each run's span. */
+function collectRuns(segments: ReturnType<typeof mergeEvents>): {
+  runs: RibbonSegment[];
+  spans: Map<number, { start: number; end: number }>;
+} {
+  const runs: RibbonSegment[] = [];
+  // Run spans keyed by run index: start/end tracked outside the payload shape.
+  const spans = new Map<number, { start: number; end: number }>();
+  for (const seg of segments) {
+    const category = ribbonCategory(seg.kind);
+    // Normalize to a positive pair: tsEnd may exist while tsStart is absent
+    // (a streamed segment created before any timestamped event arrived).
+    const spanStart = seg.tsStart ?? seg.tsEnd ?? 0;
+    const spanEnd = Math.max(seg.tsEnd ?? 0, spanStart);
+    const tool = seg.kind === "action" ? (seg.tool ?? "") : "";
+    const last = runs[runs.length - 1];
+    if (last && last.category === category) {
+      last.count += 1;
+      if (tool && !last.tools.includes(tool)) last.tools.push(tool);
+    } else {
+      runs.push({
+        category,
+        count: 1,
+        widthPct: 0,
+        spanMs: 0,
+        sample: (seg.text ?? "").replace(/\s+/g, " ").trim().slice(0, 120),
+        tools: tool ? [tool] : [],
+      });
+    }
+    // Merge into the run's span; the entry is created on the first timestamped
+    // segment even when the run's opening segment carried none.
+    if (spanEnd > 0) {
+      const span = spans.get(runs.length - 1);
+      if (span) {
+        span.start = Math.min(span.start, spanStart);
+        span.end = Math.max(span.end, spanEnd);
+      } else {
+        spans.set(runs.length - 1, { start: spanStart, end: spanEnd });
+      }
+    }
+  }
+  return { runs, spans };
 }
 
 /** One runner's live state on the race track. */
@@ -199,6 +208,53 @@ export interface RunnerState {
   elapsedMs: number;
 }
 
+/** Maps a settled/running cursor segment to the bubble's activity kind. */
+function activityKindOf(settled: boolean, success: boolean | null, cursor: ReturnType<typeof mergeEvents>[number] | undefined): RunnerState["activityKind"] {
+  if (settled) return success ? "done" : "error";
+  if (!cursor) return null;
+  if (cursor.kind === "action") return "action";
+  if (cursor.kind === "verify" || cursor.kind === "reflect" || cursor.kind === "harness_edit") return "verify";
+  return "thought";
+}
+
+/** One column's race state before the distance normalization. */
+interface RunnerRaw {
+  col: ColumnState;
+  settled: boolean;
+  success: boolean | null;
+  activityKind: RunnerState["activityKind"];
+  tool: string;
+  steps: number;
+  lastText: string;
+  startedAt: number;
+  endedAt: number;
+}
+
+/** Extracts one column's race state from its merged segments. */
+function runnerRaw(col: ColumnState, nowMs: number): RunnerRaw {
+  const segments = mergeEvents(col.events, col.frameworkId);
+  const metrics = col.metrics;
+  const firstTs = segments.find((seg) => seg.tsStart !== undefined)?.tsStart;
+  const lastTs = segments.reduce((acc, seg) => Math.max(acc, seg.tsEnd ?? seg.tsStart ?? 0), 0);
+  const last = segments[segments.length - 1];
+  const settled = metrics !== undefined;
+  const success = metrics ? metrics.success : null;
+  return {
+    col,
+    settled,
+    success,
+    // Activity: the newest segment (in flight while running, final once settled).
+    activityKind: activityKindOf(settled, success, last),
+    tool: last?.kind === "action" ? (last.tool ?? "") : "",
+    steps: segments.length,
+    lastText: last?.text ?? "",
+    startedAt: firstTs ?? 0,
+    // Running columns end "now" so the elapsed clock keeps ticking between
+    // events; settled columns keep their true last-timestamp end.
+    endedAt: !settled || !lastTs ? nowMs : lastTs,
+  };
+}
+
 /**
  * Progress estimate for one column: the settled columns' step counts define the
  * race distance, so a running column's progress is its step count relative to
@@ -206,54 +262,17 @@ export interface RunnerState {
  * full distance regardless of their step count, keeping finished order honest.
  */
 export function runnerStates(columnList: ColumnState[], nowMs: number): RunnerState[] {
-  const summaries = columnList.map((col) => {
-    const segments = mergeEvents(col.events, col.frameworkId);
-    const metrics = col.metrics;
-    const firstTs = segments.find((seg) => seg.tsStart !== undefined)?.tsStart;
-    const lastTs = segments.reduce((acc, seg) => Math.max(acc, seg.tsEnd ?? seg.tsStart ?? 0), 0);
-    const last = segments[segments.length - 1];
-    const settled = metrics !== undefined;
-    const success = metrics ? metrics.success : null;
-    // Activity: the newest segment (in flight while running, final once settled).
-    const cursor = last;
-    const activityKind: RunnerState["activityKind"] = settled
-      ? success
-        ? "done"
-        : "error"
-      : cursor
-        ? cursor.kind === "action"
-          ? "action"
-          : cursor.kind === "verify" || cursor.kind === "reflect" || cursor.kind === "harness_edit"
-            ? "verify"
-            : "thought"
-        : null;
-    const tool = cursor?.kind === "action" ? (cursor.tool ?? "") : "";
-    return {
-      col,
-      segments,
-      settled,
-      success,
-      activityKind,
-      tool,
-      steps: segments.length,
-      lastText: last?.text ?? "",
-      startedAt: firstTs ?? 0,
-      // Running columns end "now" so the elapsed clock keeps ticking between
-      // events; settled columns keep their true last-timestamp end.
-      endedAt: !settled || !lastTs ? nowMs : lastTs,
-    };
-  });
+  const raws = columnList.map((col) => runnerRaw(col, nowMs));
 
   // Race distance: the leader's step count (settled runners set the distance,
   // running runners chase it). The floors keep division safe on empty races.
-  const settledSteps = summaries.filter((s) => s.settled).map((s) => s.steps);
-  const distance = Math.max(1, ...settledSteps, ...summaries.map((s) => s.steps));
+  const settledSteps = raws.filter((s) => s.settled).map((s) => s.steps);
+  const distance = Math.max(1, ...settledSteps, ...raws.map((s) => s.steps));
 
-  return summaries.map((s) => {
+  return raws.map((s) => {
     // Running runners chase distance+1 so the current leader never sits exactly
     // on the finish line (it has not crossed yet); settled runners map to 100%.
-    const base = s.settled ? distance : s.steps;
-    const progress = s.settled ? 1 : Math.min(base / (distance + 1), 0.99);
+    const progress = s.settled ? 1 : Math.min(s.steps / (distance + 1), 0.99);
     // Bubble text: the current segment's opening line, trimmed for a speech bubble.
     const raw = (s.lastText || "").replace(/\s+/g, " ").trim();
     const activity = s.settled

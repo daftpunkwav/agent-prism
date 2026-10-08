@@ -133,12 +133,55 @@ export function ArenaResultsGrid(props: {
     );
   }
 
+  return (
+    <DefaultColumnsGrid
+      activeDim={activeDim}
+      activeSelections={activeSelections}
+      columns={columns}
+      columnList={columnList}
+      placeholderLabels={placeholderLabels}
+      allPageSize={allPageSize}
+      cardProps={cardProps}
+    />
+  );
+}
+
+/** Card callbacks shared by every grid branch (stable references from ArenaClient). */
+type GridCardProps = {
+  running: boolean;
+  historySeedLabel: string | null;
+  onStopColumn: (label: string) => void;
+  stoppingLabels: Record<string, boolean>;
+  onUseAsSeed: (label: string) => void;
+  workspaceRefreshToken: number;
+  pendingAsksByLabel: Record<string, PendingAskBatch>;
+  askSubmitting: boolean;
+  onAskAnswer: (agentId: string, questionId: string, answer: string) => Promise<boolean>;
+  onAskDismiss: (agentId: string) => void;
+};
+
+/**
+ * The default full-detail grid: selection-driven lanes, pre-run placeholders,
+ * or the live column list. Every selected column renders; the per-page setting
+ * only decides how many fit on one screen (min-width per column) — the rest
+ * horizontal-scrolls.
+ */
+function DefaultColumnsGrid(props: {
+  activeDim: DimensionMeta | null;
+  activeSelections: string[];
+  columns: Record<string, ColumnState>;
+  columnList: ColumnState[];
+  placeholderLabels: string[];
+  allPageSize: number;
+  cardProps: GridCardProps;
+}) {
+  const { activeDim, activeSelections, columns, columnList, placeholderLabels, allPageSize, cardProps } = props;
+  const t = useT();
+
   if (activeDim) {
     const selectedOptions = activeDim.options.filter((o) =>
       activeSelections.includes(o.value),
     );
-    // Every selected column renders; the per-page setting only decides how many
-    // fit on one screen (min-width per column) — the rest horizontal-scrolls.
     return (
       <div className="arena-columns" data-count={allPageSize}>
         {selectedOptions.map((opt, idx) => {
@@ -149,13 +192,13 @@ export function ArenaResultsGrid(props: {
               key={opt.value}
               col={col}
               {...cardProps}
-              onStop={onStopColumn}
-              showStop={running && !col.metrics && col.events.length > 0}
-              stopping={stoppingLabels[col.label]}
+              onStop={cardProps.onStopColumn}
+              showStop={cardProps.running && !col.metrics && col.events.length > 0}
+              stopping={cardProps.stoppingLabels[col.label]}
               lane={idx}
-              isHistorySeed={historySeedLabel === col.label}
+              isHistorySeed={cardProps.historySeedLabel === col.label}
               displayLabel={displayName}
-              pendingAsk={pendingAsksByLabel[col.label] ?? null}
+              pendingAsk={cardProps.pendingAsksByLabel[col.label] ?? null}
             />
           ) : (
             <ColumnPlaceholder key={opt.value} name={displayName} lane={idx} />
@@ -164,7 +207,7 @@ export function ArenaResultsGrid(props: {
       </div>
     );
   }
-  if (columnList.length === 0 && !running) {
+  if (columnList.length === 0 && !cardProps.running) {
     return (
       <div className="arena-columns" data-count={allPageSize}>
         {placeholderLabels.map((name, idx) => (
@@ -181,12 +224,12 @@ export function ArenaResultsGrid(props: {
           key={col.label}
           col={col}
           {...cardProps}
-          onStop={onStopColumn}
-          showStop={running && !col.metrics && col.events.length > 0}
-          stopping={stoppingLabels[col.label] === true}
+          onStop={cardProps.onStopColumn}
+          showStop={cardProps.running && !col.metrics && col.events.length > 0}
+          stopping={cardProps.stoppingLabels[col.label] === true}
           lane={idx}
-          isHistorySeed={historySeedLabel === col.label}
-          pendingAsk={pendingAsksByLabel[col.label] ?? null}
+          isHistorySeed={cardProps.historySeedLabel === col.label}
+          pendingAsk={cardProps.pendingAsksByLabel[col.label] ?? null}
         />
       ))}
     </div>

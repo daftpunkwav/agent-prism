@@ -20,6 +20,51 @@ import { summarizeColumns } from "./viewData";
 /** Answers longer than this render collapsed with an expander. */
 const PREVIEW_CHARS = 600;
 
+/** Status chip line: run state plus the judge verdict when one exists. */
+function GalleryStatus({ settled, success, judgePassed }: { settled: boolean; success: boolean; judgePassed: boolean | null }) {
+  const t = useT();
+  return (
+    <span className="font-mono text-[11px] text-muted-foreground">
+      {!settled
+        ? t("arena.view.galleryRunning")
+        : success
+          ? t("arena.view.galleryOk")
+          : t("arena.view.galleryFail")}
+      {judgePassed !== null && (
+        <span className={judgePassed ? "arena-gallery-judge-pass" : "arena-gallery-judge-fail"}>
+          {" · "}
+          {judgePassed ? t("arena.results.judgePass") : t("arena.results.judgeFail")}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** The expand/collapse control under a clamped answer body. */
+function GalleryExpander({ expanded, onToggle, answerLength }: { expanded: boolean; onToggle: () => void; answerLength: number }) {
+  const t = useT();
+  return (
+    <button
+      type="button"
+      className="btn-ghost arena-gallery-expander !h-7 !px-2 text-[11px]"
+      onClick={onToggle}
+      aria-expanded={expanded}
+    >
+      {expanded ? (
+        <>
+          <ChevronUp className="h-3 w-3" aria-hidden />
+          {t("arena.diff.collapse")}
+        </>
+      ) : (
+        <>
+          <ChevronDown className="h-3 w-3" aria-hidden />
+          {t("arena.diff.expand", { count: answerLength })}
+        </>
+      )}
+    </button>
+  );
+}
+
 /** One gallery card: header chips plus the answer body (clamped unless expanded). */
 function GalleryCard({ answer, settled, success, judgePassed, display }: {
   answer: string;
@@ -36,19 +81,7 @@ function GalleryCard({ answer, settled, success, judgePassed, display }: {
     <article className="arena-gallery-card" data-lane={0} data-state={settled ? (success ? "ok" : "fail") : "running"}>
       <header className="arena-gallery-head">
         <span className="column-title truncate">{display}</span>
-        <span className="font-mono text-[11px] text-muted-foreground">
-          {!settled
-            ? t("arena.view.galleryRunning")
-            : success
-              ? t("arena.view.galleryOk")
-              : t("arena.view.galleryFail")}
-          {judgePassed !== null && (
-            <span className={judgePassed ? "arena-gallery-judge-pass" : "arena-gallery-judge-fail"}>
-              {" · "}
-              {judgePassed ? t("arena.results.judgePass") : t("arena.results.judgeFail")}
-            </span>
-          )}
-        </span>
+        <GalleryStatus settled={settled} success={success} judgePassed={judgePassed} />
       </header>
       <div className="arena-gallery-body">
         {answer ? (
@@ -58,24 +91,7 @@ function GalleryCard({ answer, settled, success, judgePassed, display }: {
         )}
       </div>
       {clamped && (
-        <button
-          type="button"
-          className="btn-ghost arena-gallery-expander !h-7 !px-2 text-[11px]"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-        >
-          {expanded ? (
-            <>
-              <ChevronUp className="h-3 w-3" aria-hidden />
-              {t("arena.diff.collapse")}
-            </>
-          ) : (
-            <>
-              <ChevronDown className="h-3 w-3" aria-hidden />
-              {t("arena.diff.expand", { count: answer.length })}
-            </>
-          )}
-        </button>
+        <GalleryExpander expanded={expanded} onToggle={() => setExpanded((v) => !v)} answerLength={answer.length} />
       )}
     </article>
   );

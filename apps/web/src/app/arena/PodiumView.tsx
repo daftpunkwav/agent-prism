@@ -40,6 +40,42 @@ function ActivityIcon({ kind, tool }: { kind: RunnerState["activityKind"]; tool:
   return <BookOpenText className="h-3 w-3 shrink-0" aria-hidden />;
 }
 
+/** The runner dot, result chip, and speech bubble inside one track strip. */
+function TrackBody({ runner, waiting, bubbleText }: { runner: RunnerState; waiting: boolean; bubbleText: string }) {
+  const t = useT();
+  return (
+    <div className="arena-track">
+      <div className="arena-track-surface" aria-hidden>
+        <span className="arena-track-lane-line" />
+        <span className="arena-track-lane-line" />
+        <span className="arena-track-lane-line" />
+      </div>
+      {runner.settled && (
+        <span
+          className={
+            "arena-track-result font-mono text-[11px] " +
+            (runner.success ? "text-success" : "text-destructive")
+          }
+        >
+          {runner.success ? t("arena.view.galleryOk") : t("arena.view.galleryFail")}
+        </span>
+      )}
+      {!waiting && (
+        // No role="status": several lanes updating independently would spam
+        // screen readers; the race hint below is the single live region.
+        <div className="arena-track-bubble">
+          <ActivityIcon kind={runner.activityKind} tool={runner.tool} />
+          <span className="arena-track-bubble-text">{bubbleText}</span>
+        </div>
+      )}
+      <div className="arena-track-runner" style={{ left: `${Math.min(runner.progress * 100, 100)}%` }}>
+        <span className="arena-track-runner-body" aria-hidden />
+      </div>
+      <Flag className="arena-track-flag" size={14} aria-hidden />
+    </div>
+  );
+}
+
 /** One track lane: label, speech bubble, and the runner dot racing to the flag. */
 function TrackLane({ runner, lane, display }: { runner: RunnerState; lane: number; display: string }) {
   const t = useT();
@@ -49,6 +85,7 @@ function TrackLane({ runner, lane, display }: { runner: RunnerState; lane: numbe
       ? t("arena.view.raceFinished")
       : t("arena.view.raceFailed")
     : runner.activity || t("arena.view.racePreparing");
+  const progressPct = Math.min(runner.progress * 100, 100);
   return (
     <div className="arena-track-lane" data-lane={lane} data-settled={runner.settled ? (runner.success ? "ok" : "fail") : undefined}>
       <div className="arena-track-head">
@@ -59,37 +96,9 @@ function TrackLane({ runner, lane, display }: { runner: RunnerState; lane: numbe
           {runner.elapsedMs > 0 ? `${(runner.elapsedMs / 1000).toFixed(1)}s` : ""}
         </span>
       </div>
-      <div className="arena-track">
-        <div className="arena-track-surface" aria-hidden>
-          <span className="arena-track-lane-line" />
-          <span className="arena-track-lane-line" />
-          <span className="arena-track-lane-line" />
-        </div>
-        {runner.settled && (
-          <span
-            className={
-              "arena-track-result font-mono text-[11px] " +
-              (runner.success ? "text-success" : "text-destructive")
-            }
-          >
-            {runner.success ? t("arena.view.galleryOk") : t("arena.view.galleryFail")}
-          </span>
-        )}
-        {!waiting && (
-          // No role="status": several lanes updating independently would spam
-          // screen readers; the race hint below is the single live region.
-          <div className="arena-track-bubble">
-            <ActivityIcon kind={runner.activityKind} tool={runner.tool} />
-            <span className="arena-track-bubble-text">{bubbleText}</span>
-          </div>
-        )}
-        <div className="arena-track-runner" style={{ left: `${Math.min(runner.progress * 100, 100)}%` }}>
-          <span className="arena-track-runner-body" aria-hidden />
-        </div>
-        <Flag className="arena-track-flag" size={14} aria-hidden />
-      </div>
-      <div className="arena-track-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(runner.progress * 100)} aria-label={t("arena.view.raceProgressAria", { name: display })}>
-        <span style={{ width: `${Math.min(runner.progress * 100, 100)}%` }} />
+      <TrackBody runner={runner} waiting={waiting} bubbleText={bubbleText} />
+      <div className="arena-track-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progressPct)} aria-label={t("arena.view.raceProgressAria", { name: display })}>
+        <span style={{ width: `${progressPct}%` }} />
       </div>
     </div>
   );
