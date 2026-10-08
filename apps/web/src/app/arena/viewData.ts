@@ -3,7 +3,7 @@
  * @description Shared derivation for the alternative results views.
  *
  * Responsibilities:
- * - Extract settled per-column metrics and final answers in display order
+ * - Extract per-column metrics and final answers in display order
  * - Compute normalized metric bars and podium rankings
  * - Bucket merge-pass segments into the timeline ribbon's coarse categories
  *
@@ -61,7 +61,7 @@ export interface MetricRow {
 /** Lower-is-better metrics ranked in this order. */
 const METRIC_KEYS: MetricRow["key"][] = ["durationMs", "totalTokens", "toolCalls", "steps"];
 
-/** Builds one normalized row per metric over settled columns; null max keeps a bar empty. */
+/** Builds one normalized row per metric over settled columns; a zero max keeps a bar empty. */
 export function metricRows(summaries: ColumnSummary[]): MetricRow[] {
   const settled = summaries.filter((s) => s.settled);
   return METRIC_KEYS.map((key) => {
@@ -200,7 +200,7 @@ export interface RunnerState {
   /** Settled = crossed the finish line (success or failure). */
   settled: boolean;
   success: boolean | null;
-  /** Elapsed seconds since the column's first event (0 when no events). */
+  /** Elapsed milliseconds since the column's first event (0 when no events). */
   elapsedMs: number;
 }
 

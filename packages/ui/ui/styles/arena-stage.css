@@ -707,14 +707,6 @@
 }
 
 /* Podium view: ranked cards with lane accents. */
-.arena-podium {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-  padding: 0.5rem 0.15rem 0.6rem;
-  min-height: 0;
-}
-
 .arena-podium-top {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));

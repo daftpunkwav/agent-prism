@@ -5,7 +5,7 @@
  * Responsibilities:
  * - Render one grouped block per metric (duration / tokens / tools / steps)
  * - Draw each column as a lane-colored bar scaled to the group max
- * - Mark the best column per metric; hide the view's detail-free promise by
+ * - Mark the best column per metric; keep the view's detail-free promise by
  *   never rendering event text
  */
 
@@ -41,7 +41,7 @@ function MetricGroup({ row, resolveDisplayLabel }: { row: MetricRow; resolveDisp
         {row.values.map((v) => {
           const isBest = row.bestLabel === v.label && row.values.length > 1;
           return (
-            <div key={v.label} className="arena-stats-row" data-lane={0} data-best={isBest ? "true" : undefined}>
+            <div key={v.label} className="arena-stats-row" data-best={isBest ? "true" : undefined}>
               <span className="arena-stats-label truncate" title={resolveDisplayLabel(v.label)}>
                 {resolveDisplayLabel(v.label)}
               </span>

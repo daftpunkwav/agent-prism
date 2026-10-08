@@ -109,7 +109,6 @@ export function ArenaClient() {
     baselinePayload,
     activeDim,
     activeSelections,
-    columnCount,
     placeholderLabels,
     toggleSelection,
     resetDimensionState,
@@ -482,7 +481,6 @@ export function ArenaClient() {
                   activeSelections={activeSelections}
                   columns={columns}
                   columnList={columnList}
-                  columnCount={columnCount}
                   placeholderLabels={placeholderLabels}
                   running={running}
                   historySeedLabel={historySeedLabel}

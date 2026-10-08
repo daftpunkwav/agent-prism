@@ -59,21 +59,21 @@ const colCard = (label: string): ColumnState =>
 
 describe("ArenaResultsGrid", () => {
   it("shows the empty-selection state when nothing is selected", () => {
-    const { container } = renderGrid({ activeDim: DIM, activeSelections: [], columns: {}, columnList: [], columnCount: 0, placeholderLabels: [], running: false, historySeedLabel: null });
+    const { container } = renderGrid({ activeDim: DIM, activeSelections: [], columns: {}, columnList: [], placeholderLabels: [], running: false, historySeedLabel: null });
     expect(screen.getByText(getCatalog("en").arena.results.emptySelection)).toBeDefined();
     expect(container.querySelector(".arena-columns")).toBeNull();
   });
 
   it("shows the empty-selection state in every view mode, not just the default grid", () => {
     for (const viewMode of ["paged", "podium", "stats", "gallery", "timeline"] as const) {
-      const rendered = renderGrid({ activeDim: DIM, activeSelections: [], columns: {}, columnList: [], columnCount: 0, placeholderLabels: [], running: false, historySeedLabel: null, viewMode });
+      const rendered = renderGrid({ activeDim: DIM, activeSelections: [], columns: {}, columnList: [], placeholderLabels: [], running: false, historySeedLabel: null, viewMode });
       expect(screen.getByText(getCatalog("en").arena.results.emptySelection)).toBeDefined();
       rendered.unmount();
     }
   });
 
   it("renders placeholders for selected options before events arrive", () => {
-    const { container } = renderGrid({ activeDim: DIM, activeSelections: ["native", "langchain"], columns: {}, columnList: [], columnCount: 0, placeholderLabels: [], running: false, historySeedLabel: null });
+    const { container } = renderGrid({ activeDim: DIM, activeSelections: ["native", "langchain"], columns: {}, columnList: [], placeholderLabels: [], running: false, historySeedLabel: null });
     expect(container.querySelectorAll(".column-card-placeholder")).toHaveLength(2);
     // data-count carries the per-page cap (default 4), not the selected count.
     expect(container.querySelector(".arena-columns")?.getAttribute("data-count")).toBe("4");
@@ -85,7 +85,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: ["native", "langchain"],
       columns: { Native: colCard("Native") },
       columnList: [],
-      columnCount: 0,
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,
@@ -101,7 +100,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: [],
       columns: {},
       columnList: [colCard("Native"), colCard("LangChain")],
-      columnCount: 2,
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,
@@ -115,7 +113,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: [],
       columns: {},
       columnList: [],
-      columnCount: 2,
       placeholderLabels: ["Native", "LangChain"],
       running: false,
       historySeedLabel: null,
@@ -129,7 +126,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: ["native"],
       columns: { Native: colCard("Native") },
       columnList: [],
-      columnCount: 0,
       placeholderLabels: [],
       running: true,
       historySeedLabel: null,
@@ -146,7 +142,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: [],
       columns: {},
       columnList: [colCard("A"), colCard("B"), colCard("C")],
-      columnCount: 3,
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,
@@ -162,7 +157,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: [],
       columns: {},
       columnList: [colCard("A"), colCard("B"), colCard("C")],
-      columnCount: 3,
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,
@@ -188,7 +182,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: [],
       columns: {},
       columnList: [colCard("A"), settled("B")],
-      columnCount: 2,
       placeholderLabels: [],
       running: true,
       historySeedLabel: null,
@@ -204,7 +197,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: [],
       columns: {},
       columnList: [settled("A"), settled("B")],
-      columnCount: 2,
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,
@@ -227,7 +219,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: [],
       columns: {},
       columnList: [settled("A", 100), settled("B", 200)],
-      columnCount: 2,
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,
@@ -249,7 +240,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: [],
       columns: {},
       columnList: [withAnswer("A", "hello world")],
-      columnCount: 1,
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,
@@ -265,7 +255,6 @@ describe("ArenaResultsGrid", () => {
       activeSelections: [],
       columns: {},
       columnList: [colCard("A")],
-      columnCount: 1,
       placeholderLabels: [],
       running: false,
       historySeedLabel: null,

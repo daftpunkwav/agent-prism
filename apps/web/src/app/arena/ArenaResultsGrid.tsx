@@ -31,8 +31,6 @@ export function ArenaResultsGrid(props: {
   activeSelections: string[];
   columns: Record<string, ColumnState>;
   columnList: ColumnState[];
-  /** Unused since the per-page cap became a width hint; kept out of the destructure. */
-  columnCount?: number;
   placeholderLabels: string[];
   running: boolean;
   historySeedLabel: string | null;

@@ -24,8 +24,8 @@ const MODE_ICONS: Record<ViewMode, React.ReactNode> = {
   timeline: <Activity className="h-3.5 w-3.5" />,
 };
 
-/** Views whose toolbar shows a per-page selector (keyed by mode id). */
-const PAGED_MODES = new Set<ViewMode>(["all", "paged"]);
+/** Modes whose toolbar shows a per-page selector (keyed by mode id). */
+const PAGE_SIZE_MODES = new Set<ViewMode>(["all", "paged"]);
 
 /** View selector: the mode dropdown plus a per-page selector for paged modes. */
 export function ViewModeSwitcher({ prefs, onModeChange, onAllPageSizeChange, onPagedPageSizeChange }: {
@@ -35,7 +35,7 @@ export function ViewModeSwitcher({ prefs, onModeChange, onAllPageSizeChange, onP
   onPagedPageSizeChange: (size: PageSize) => void;
 }) {
   const t = useT();
-  const showPageSize = PAGED_MODES.has(prefs.mode);
+  const showPageSize = PAGE_SIZE_MODES.has(prefs.mode);
   const pageSize = prefs.mode === "paged" ? prefs.pagedPageSize : prefs.allPageSize;
   const onPageSizeChange = prefs.mode === "paged" ? onPagedPageSizeChange : onAllPageSizeChange;
   return (

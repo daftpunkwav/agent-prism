@@ -78,7 +78,7 @@ function GalleryCard({ answer, settled, success, judgePassed, display }: {
   const clamped = answer.length > PREVIEW_CHARS;
   const body = expanded || !clamped ? answer : answer.slice(0, PREVIEW_CHARS);
   return (
-    <article className="arena-gallery-card" data-lane={0} data-state={settled ? (success ? "ok" : "fail") : "running"}>
+    <article className="arena-gallery-card" data-state={settled ? (success ? "ok" : "fail") : "running"}>
       <header className="arena-gallery-head">
         <span className="column-title truncate">{display}</span>
         <GalleryStatus settled={settled} success={success} judgePassed={judgePassed} />

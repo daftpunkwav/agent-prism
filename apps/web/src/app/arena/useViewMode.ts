@@ -38,7 +38,7 @@ export type ViewPrefs = {
 
 const STORAGE_KEY = "agentprism.arena.viewMode.v1";
 
-export const DEFAULT_PREFS: ViewPrefs = { mode: "all", allPageSize: 4, pagedPageSize: 2 };
+const DEFAULT_PREFS: ViewPrefs = { mode: "all", allPageSize: 4, pagedPageSize: 2 };
 
 /** Narrows a raw number to an allowed page size; null when out of set. */
 function parsePageSize(raw: unknown): PageSize | null {

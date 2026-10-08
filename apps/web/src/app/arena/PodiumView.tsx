@@ -122,7 +122,7 @@ function FinishedPodium({ ranked, resolveDisplayLabel }: {
         {podium.map((summary, place) => {
           const placeLabel = t(`arena.view.podiumPlace${place + 1}` as "arena.view.podiumPlace1");
           return (
-            <div key={summary.label} className="arena-podium-card" data-place={place} data-lane={place}>
+            <div key={summary.label} className="arena-podium-card" data-place={place}>
               <div className="arena-podium-place font-mono" aria-hidden>
                 {place + 1}
               </div>
@@ -153,7 +153,7 @@ function FinishedPodium({ ranked, resolveDisplayLabel }: {
       {rest.length > 0 && (
         <ol className="arena-podium-rest">
           {rest.map((summary, idx) => (
-            <li key={summary.label} className="arena-podium-row" data-lane={(idx + 3) % 4}>
+            <li key={summary.label} className="arena-podium-row">
               <span className="arena-podium-row-place font-mono" aria-hidden>
                 {idx + 4}
               </span>
@@ -190,8 +190,8 @@ export function PodiumView({ columnList, running, resolveDisplayLabel }: {
     return () => window.clearInterval(timer);
   }, [anyUnsettled]);
 
-      const runners = runnerStates(columnList, nowMs);
-      const summaries = summarizeColumns(columnList);
+  const runners = runnerStates(columnList, nowMs);
+  const summaries = summarizeColumns(columnList);
   const allSettled = columnList.length > 0 && columnList.every((col) => col.metrics !== undefined);
 
   if (columnList.length === 0) {

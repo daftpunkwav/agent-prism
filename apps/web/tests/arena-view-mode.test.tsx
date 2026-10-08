@@ -119,7 +119,7 @@ describe("metricRows", () => {
 });
 
 describe("runnerStates", () => {
-  it("marks settled runners at full progress and running ones relative to the leader", () => {
+  it("marks settled runners at full progress and scales running ones by their own step count", () => {
     const doneA = settled("A");
     const doneB = settled("B");
     const runningRunner = { label: "R", frameworkId: "native", events: [

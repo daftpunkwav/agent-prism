@@ -62,7 +62,7 @@ function SegmentTooltip({ seg, colLabel, descId }: { seg: ReturnType<typeof colu
 function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbons>[number]; display: string }) {
   const t = useT();
   return (
-    <div className="arena-ribbon-row" data-lane={0}>
+    <div className="arena-ribbon-row">
       <span className="arena-stats-label truncate" title={display}>
         {display}
       </span>
@@ -80,24 +80,30 @@ function RibbonRow({ ribbon, display }: { ribbon: ReturnType<typeof columnRibbon
             : t("arena.view.galleryFail")}
       </span>
       <fieldset className="arena-ribbon-band" aria-label={t("arena.view.ribbonAria", { name: display })}>
-        {ribbon.segments.map((seg, idx) => (
-          // A real button: the only shape that satisfies both keyboard reach
-          // (CodeRabbit) and "tabIndex only on interactive elements" (S6845)
-          // while keeping the describedby tooltip hookup.
-          <button
-            key={idx}
-            type="button"
-            className={`arena-ribbon-seg ${CATEGORY_CLASS[seg.category]}`}
-            style={{ width: `${seg.widthPct}%` }}
-            aria-describedby={`ribbon-seg-${idx}-${ribbon.label}`}
-          >
-            <SegmentTooltip seg={seg} colLabel={display} descId={`ribbon-seg-${idx}-${ribbon.label}`} />
-            <span className="sr-only">
-              {t(`arena.view.ribbonCat.${seg.category}` as "arena.view.ribbonCat.thought")}
-              {` ×${seg.count}`}
-            </span>
-          </button>
-        ))}
+        {ribbon.segments.map((seg, idx) => {
+          // Pipeline labels are free-form server data; whitespace inside an
+          // aria-describedby id would split the IDLIST reference, so keep the
+          // token space-free.
+          const descId = `ribbon-seg-${idx}-${ribbon.label.replace(/\s+/g, "-")}`;
+          return (
+            // A real button: the only shape that satisfies both keyboard reach
+            // (CodeRabbit) and "tabIndex only on interactive elements" (S6845)
+            // while keeping the describedby tooltip hookup.
+            <button
+              key={idx}
+              type="button"
+              className={`arena-ribbon-seg ${CATEGORY_CLASS[seg.category]}`}
+              style={{ width: `${seg.widthPct}%` }}
+              aria-describedby={descId}
+            >
+              <SegmentTooltip seg={seg} colLabel={display} descId={descId} />
+              <span className="sr-only">
+                {t(`arena.view.ribbonCat.${seg.category}` as "arena.view.ribbonCat.thought")}
+                {` ×${seg.count}`}
+              </span>
+            </button>
+          );
+        })}
       </fieldset>
     </div>
   );
