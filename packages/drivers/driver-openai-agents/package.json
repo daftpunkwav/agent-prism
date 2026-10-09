@@ -21,7 +21,7 @@
     "@agentprism/contracts": "workspace:*",
     "@agentprism/driver-run-support": "workspace:*",
     "@agentprism/harness": "workspace:*",
-    "@openai/agents": "0.18.0",
+    "@openai/agents": "0.19.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

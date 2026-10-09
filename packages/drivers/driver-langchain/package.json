@@ -21,8 +21,8 @@
     "@agentprism/contracts": "workspace:*",
     "@agentprism/driver-run-support": "workspace:*",
     "@agentprism/harness": "workspace:*",
-    "@langchain/core": "^1.2.13",
-    "langchain": "^1.5.14"
+    "@langchain/core": "^1.2.16",
+    "langchain": "^1.5.15"
   },
   "devDependencies": {
     "@types/node": "^24",
