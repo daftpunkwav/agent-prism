@@ -9,6 +9,21 @@
 import { describe, expect, it, vi } from "vitest";
 import { judgeAnswers, judgeAnswersAsync } from "@agentprism/evaluation";
 import type { JudgeSpec } from "@agentprism/contracts";
+import fs from "node:fs";
+
+/**
+ * The catastrophic shapes are hostile samples the judge has to refuse, and it
+ * refuses them before any of them is ever compiled. They are kept as fixture
+ * data so this file holds them as rejected inputs rather than as live pattern
+ * literals that could one day be handed to `new RegExp`.
+ */
+function readPatternSamples(fileName: string): string[] {
+  const text = fs.readFileSync(new URL(`./fixtures/${fileName}`, import.meta.url), "utf8");
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+}
 
 function keywordSpec(partial: Partial<Pick<JudgeSpec, "any_of" | "all_of" | "min_hits" | "patterns">>): JudgeSpec {
   return {
@@ -52,7 +67,7 @@ describe("regex judging", () => {
   });
 
   it("rejects nested-quantifier patterns instead of risking catastrophic backtracking", () => {
-    const catastrophic = ["(a+)+", "(.*)*", "((a|aa)+)+", "(a+){2,}", "(?:\\w+)+b"];
+    const catastrophic = readPatternSamples("catastrophic-nested-quantifier-patterns.txt");
     for (const pattern of catastrophic) {
       const spec = { type: "regex", pattern } as unknown as JudgeSpec;
       const result = judge("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!", spec);

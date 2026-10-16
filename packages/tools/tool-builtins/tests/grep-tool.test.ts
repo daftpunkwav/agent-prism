@@ -15,6 +15,20 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+/**
+ * The catastrophic shapes are hostile samples the screen has to refuse, and the
+ * screen refuses them before any of them is ever compiled. They are kept as
+ * fixture data so this file holds them as rejected inputs rather than as live
+ * pattern literals that could one day be handed to `new RegExp`.
+ */
+function readPatternSamples(fileName: string): string[] {
+  const text = fs.readFileSync(new URL(`./fixtures/${fileName}`, import.meta.url), "utf8");
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+}
+
 function tempWorkspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-tools-ext-"));
   return {
@@ -67,15 +81,9 @@ describe("grep invalid glob parity", () => {
 });
 
 describe("grep nested-quantifier screen", () => {
-  it.each([
-    "(a+)+",
-    "(a*)*",
-    "(\\w+\\s*)*x",
-    "(\\d{1,3})*$",
-    "(?:x+)+",
-    "((a+)b)*c",
-    "(a|b+)+c",
-  ])("rejects the catastrophic shape %s", (pattern) => {
+  const catastrophicPatterns = readPatternSamples("catastrophic-nested-quantifier-patterns.txt");
+
+  it.each(catastrophicPatterns)("rejects the catastrophic shape %s", (pattern) => {
     expect(hasNestedQuantifier(pattern)).toBe(true);
   });
 
@@ -83,7 +91,7 @@ describe("grep nested-quantifier screen", () => {
     const ws = tempWorkspace();
     try {
       ws.fs.writeFile("a.py", `${"a".repeat(40)}b\n`);
-      const outcome = await grepTool.execute(ws, { pattern: "(a+)+b" });
+      const outcome = await grepTool.execute(ws, { pattern: catastrophicPatterns[0] });
       expect(outcome.ok).toBe(false);
       expect(outcome.result).toMatch(/nested quantifier/);
     } finally {
