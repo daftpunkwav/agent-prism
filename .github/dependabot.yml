@@ -17,7 +17,9 @@ updates:
     cooldown:
       default-days: 7
     commit-message:
-      prefix: "ci"
+      # "chore(ci)" rather than a bare "ci": the conventions job in ci.yml
+      # only allows feat/fix/docs/refactor/chore/test/perf as PR-title types.
+      prefix: "chore(ci)"
     labels:
       - "dependencies"
       - "github-actions"
