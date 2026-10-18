@@ -11,6 +11,11 @@ describe("toFileUri", () => {
     expect(toFileUri("/tmp/ws")).toBe("file:///tmp/ws");
     expect(toFileUri("my docs")).toBe("file:///my%20docs");
   });
+
+  it("normalizes Windows paths into usable root URIs", () => {
+    expect(toFileUri("C:\\work\\my ws")).toBe("file:///C%3A/work/my%20ws");
+    expect(toFileUri("D:/ws")).toBe("file:///D%3A/ws");
+  });
 });
 
 describe("roots/list serving", () => {

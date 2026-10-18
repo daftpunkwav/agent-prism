@@ -35,7 +35,11 @@ export interface McpRemoteTool {
 
 /** Converts a workspace path into a file:// URI for roots advertisement. */
 export function toFileUri(path: string): string {
-  const absolute = path.startsWith("/") ? path : `/${path}`;
+  // Windows absolute paths (C:\foo) normalize to forward slashes first: without
+  // this the whole path rides one segment (backslashes percent-encoded) and the
+  // advertised root URI is unusable for the server's path resolution.
+  const posix = path.replaceAll("\\", "/");
+  const absolute = posix.startsWith("/") ? posix : `/${posix}`;
   return `file://${absolute.split("/").map((segment) => encodeURIComponent(segment)).join("/")}`;
 }
 
