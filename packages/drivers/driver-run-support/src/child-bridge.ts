@@ -166,7 +166,13 @@ export function runChildBridge(options: ChildBridgeOptions): Promise<ChildBridge
         armIdleTimer();
         // The handler is async (it awaits tool executes); an unawaited rejection
         // here would surface as an unhandled rejection and take the process down.
-        void handleMessage(message).catch(() => {});
+        // The llm/tool handlers catch their own failures, so this guard only sees
+        // event-consumer crashes and bridge bugs — loud, never silent.
+        void handleMessage(message).catch((error: unknown) => {
+          console.warn(
+            `[child-bridge] message handler failed for ${message.type}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
       }
     });
 
