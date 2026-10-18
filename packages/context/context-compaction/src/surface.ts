@@ -80,7 +80,9 @@ export interface SpanOptions {
  *
  * Pair safety: a span never starts on a tool frame whose assistant turn sits
  * outside the span, and never ends between an assistant call and its tool
- * result. Pinned frames terminate spans. Returns null when nothing qualifies.
+ * results (an assistant turn requesting several tools owns a contiguous run of
+ * tool frames, so the span must extend past every one of them). Pinned frames
+ * terminate spans. Returns null when nothing qualifies.
  */
 export function selectSpan(
   frames: readonly SurfaceFrame[],
@@ -103,13 +105,16 @@ export function selectSpan(
     for (let end = start; end < frames.length; end += 1) {
       const frame = frames[end] as SurfaceFrame;
       if (!frame.compactable) break;
-      // Never end right after an assistant turn that requested tools when the
-      // matching tool frame is the next frame (it would strand the pair).
+      // Never end right before a tool result: whether the current frame is the
+      // requesting assistant or an earlier result of the same batch, ending here
+      // strands the next tool frame outside the span while its requester is
+      // condensed into the checkpoint (a multi-call assistant owns a contiguous
+      // run of tool frames, so the span must cover all of them).
       const next = frames[end + 1] as SurfaceFrame | undefined;
       tokens += frameTokens(frame, charsPerToken);
       weight += frameWeight(frame);
       ids.push(frame.id);
-      if (frame.role === "assistant" && next !== undefined && next.role === "tool" && next.compactable) {
+      if (next !== undefined && next.role === "tool") {
         continue;
       }
       if (tokens < targetTokens) continue;
