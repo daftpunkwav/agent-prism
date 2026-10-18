@@ -361,21 +361,47 @@ export class ScopedFileSystem {
   }
 
   writeFile(filePath: string, content: string): string {
+    return this.writeInsideRoot(filePath, content, false);
+  }
+
+  /**
+   * The existence pre-check goes through `this.exists` (overridable in tests) on
+   * purpose: the real race closing is the kernel-enforced exclusive open below,
+   * and keeping the pre-check on the public seam makes the check-to-use window
+   * observable without implementation coupling.
+   */
+  createFile(filePath: string, content = ""): string {
+    if (this.exists(filePath)) throw new WorkspaceError(`Error: file already exists: ${filePath}`);
+    return this.writeInsideRoot(filePath, content, true);
+  }
+
+  /**
+   * Shared write path behind writeFile/createFile. `exclusive` (the create path)
+   * opens with `wx`, so an entry planted at the target between the existence
+   * pre-check and the open — the check-to-use window a symlink race exploits —
+   * fails the create with EEXIST at the kernel boundary instead of being followed
+   * outside the root. The overwrite path keeps assert-before-write as its final
+   * containment check: a portable atomic replace does not exist for path-based
+   * writes, and the residual microsecond window is accepted (only a concurrent
+   * same-user process can win it, and it gains nothing the account cannot do
+   * directly).
+   */
+  private writeInsideRoot(filePath: string, content: string, exclusive: boolean): string {
     const target = this.canonicalize(filePath);
     if (target === null) throw new WorkspaceError("Error: invalid file path");
     this.assertWithinRootThroughLinks(target);
     mkdirSync(path.dirname(target), { recursive: true });
-    writeFileSync(target, content, "utf-8");
+    try {
+      writeFileSync(target, content, exclusive ? { encoding: "utf-8", flag: "wx" } : "utf-8");
+    } catch (error) {
+      if (exclusive && (error as NodeJS.ErrnoException)?.code === "EEXIST") {
+        throw new WorkspaceError(`Error: file already exists: ${filePath}`);
+      }
+      throw error;
+    }
     // Char-proxy token estimate (contracts single source), not bytes: the model and the
     // trace UI both reason in tokens, and char counts invite wrong-budget conclusions.
     return `Wrote: ${filePath} (~${estimateTokensFromChars(content.length)} tokens)`;
-  }
-
-  createFile(filePath: string, content = ""): string {
-    const target = this.canonicalize(filePath);
-    if (target === null) throw new WorkspaceError("Error: invalid file path");
-    if (exists(target)) throw new WorkspaceError(`Error: file already exists: ${filePath}`);
-    return this.writeFile(filePath, content);
   }
 
   editFile(filePath: string, oldText: string, newText: string): string {
@@ -399,7 +425,11 @@ export class ScopedFileSystem {
     // user text are replacement patterns to String.replace and would silently
     // corrupt the edited file (a literal dollar sequence in a shell script or
     // template must land verbatim).
-    writeFileSync(target, current.replace(oldText, () => newText), "utf-8");
+    // Write the resolved path the content was read from, not the requested name:
+    // re-traversing `target` after the assert would follow a link swapped in
+    // during the check-to-use window, while `real` is the fully resolved in-root
+    // path the edit was computed against.
+    writeFileSync(real, current.replace(oldText, () => newText), "utf-8");
     return `Edited: ${filePath}`;
   }
 
@@ -464,14 +494,5 @@ export class ScopedFileSystem {
       }
     }
     return out;
-  }
-}
-
-function exists(target: string): boolean {
-  try {
-    statSync(target);
-    return true;
-  } catch {
-    return false;
   }
 }
