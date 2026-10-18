@@ -90,9 +90,14 @@ export async function withTimeout<T>(
     rejectRace?.(aborted);
   };
   signal?.addEventListener("abort", onAbortTimer, { once: true });
+  const raced = task();
+  // The race may settle on the timer (or an abort) first; a rejection landing
+  // after that would surface as an unhandled rejection and crash the host. The
+  // detached handler only marks the rejection observed — the race still sees it.
+  raced.catch(() => undefined);
   try {
     return await Promise.race([
-      task(),
+      raced,
       new Promise<never>((_, reject) => {
         rejectRace = reject;
         timer = setTimeout(() => {
