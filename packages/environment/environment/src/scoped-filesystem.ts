@@ -395,7 +395,11 @@ export class ScopedFileSystem {
       throw new WorkspaceError(`Error: text to replace not found: ${oldText.slice(0, 80)}`);
     }
     this.assertWithinRootThroughLinks(target);
-    writeFileSync(target, current.replace(oldText, newText), "utf-8");
+    // Replacer function, not a replacement string: `$&`/`` $` ``/`$'`/`$$` in
+    // user text are replacement patterns to String.replace and would silently
+    // corrupt the edited file (a literal dollar sequence in a shell script or
+    // template must land verbatim).
+    writeFileSync(target, current.replace(oldText, () => newText), "utf-8");
     return `Edited: ${filePath}`;
   }
 
