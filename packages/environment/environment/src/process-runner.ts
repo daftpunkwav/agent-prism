@@ -511,7 +511,10 @@ export function splitShellCommand(command: string, posix: boolean): string[] {
   for (let i = 0; i < command.length; i += 1) {
     const ch = command[i];
     if (quote !== null) {
-      if (posix && ch === "\\" && i + 1 < command.length && (command[i + 1] === quote || command[i + 1] === "\\")) {
+      // POSIX: backslashes are literal inside single quotes (only the closing
+      // quote ends the token); inside double quotes a backslash escapes the
+      // quote and another backslash, per shell rules.
+      if (posix && quote === '"' && ch === "\\" && i + 1 < command.length && (command[i + 1] === quote || command[i + 1] === "\\")) {
         current += command[i + 1];
         i += 1;
         continue;
