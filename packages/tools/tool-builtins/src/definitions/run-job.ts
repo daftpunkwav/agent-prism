@@ -129,9 +129,14 @@ function renderPoll(
   // flooded job's buffer, so the sent/spilled cursors are rebased off it.
   const base = record.job.outputStart();
   const full = record.job.output();
+  // A cursor behind the buffer head means the cap already dropped output that
+  // neither this delta nor the spill file will ever show; report the gap loudly
+  // instead of letting the poll look like a clean continuation.
+  const dropped = Math.max(0, base - Math.min(record.sent, record.spilled));
   const delta = full.slice(Math.max(0, record.sent - base));
   record.sent = base + full.length;
   const head = `job ${record.id}: ${statusLine(record)}, ${base + full.length} chars total`;
+  const droppedNote = dropped > 0 ? `\n(${dropped} chars of earlier output scrolled out of the buffer before this poll)` : "";
   // Sandbox setup failure: the exit-3 sentinel is mapped to a readable note
   // instead of drowning in raw output, mirroring the bash tool.
   const setupFailure = record.job.sandboxSetupFailure();
@@ -139,8 +144,8 @@ function renderPoll(
     setupFailure === null || record.job.alive()
       ? ""
       : `\n(${setupFailure}; the job never started — check sandbox_mode or the workspace root)`;
-  if (delta === "" && setupNote === "") return `${head}\n(no new output)`;
-  if (delta === "") return `${head}${setupNote}`;
+  if (delta === "" && setupNote === "" && droppedNote === "") return `${head}\n(no new output)`;
+  if (delta === "") return `${head}${droppedNote}${setupNote}`;
   // Spill trigger keys on unspilled volume, not the single delta: streamed output
   // arrives in arbitrary chunks, so per-delta thresholds would rarely fire while the
   // middle still vanishes. Spilled files stay readable/greppable mid-run.
@@ -174,7 +179,7 @@ function renderPoll(
       spillNote = `\n(spill failed: ${error instanceof Error ? error.message : String(error)})`;
     }
   }
-  return `${head}\n${truncate(delta)}${spillNote}${setupNote}`;
+  return `${head}${droppedNote}\n${truncate(delta)}${spillNote}${setupNote}`;
 }
 
 async function executeRunJob(workspace: ToolWorkspace, args: ToolArgs): Promise<ToolExecutionResult> {

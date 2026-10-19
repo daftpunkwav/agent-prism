@@ -75,6 +75,21 @@ describe("runJobTool", { retry: 1 }, () => {
     }
   });
 
+  it("reports output the cap dropped between polls", async () => {
+    const ws = tempWorkspace();
+    try {
+      // 1.5MB crosses the 1M cap in one burst between start and the first poll:
+      // the head-trim drops the oldest span, and the poll must say so instead of
+      // reading like a clean continuation of output nobody ever saw.
+      const id = await start(ws, `${NODE} -e "process.stdout.write('x'.repeat(1500000)); console.log('TAIL-MARKER')"`);
+      const acc = await pollUntilDone(ws, id);
+      expect(acc).toContain("scrolled out of the buffer");
+      expect(acc).toContain("TAIL-MARKER");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("kills a hanging job", async () => {
     const ws = tempWorkspace();
     try {
