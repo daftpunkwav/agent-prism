@@ -72,6 +72,11 @@ export function useMatrixRun(setError: (message: string) => void) {
           } else if (item.type === "matrix_report" && item.report && typeof item.report === "object") {
             const report = item.report as { cells?: MatrixCellResultView[] };
             setCells(Array.isArray(report.cells) ? report.cells : []);
+          } else if (item.type === "error") {
+            // In-stream failures ride the same channel as a systemErrorEvent (same
+            // contract as the arena run stream): surface them instead of ending the
+            // run with an empty report and no explanation.
+            setError(item.message || "Matrix run failed");
           }
         },
       });
