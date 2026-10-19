@@ -80,6 +80,20 @@ export class WorkspaceRegistry {
   private static readonly DEFAULT_LRU_ACTIVE_WINDOW = 300;
   /** How long inactive before preferred eviction (seconds). */
   private readonly lruActiveWindowSeconds: number;
+  /**
+   * Cached scan results of traceDirsForWorkspace (workspace name → run trace
+   * dirs, oldest first). The scan stats every run directory under runsRoot —
+   * several stat calls each — and the logs page re-polls it every two seconds
+   * per live column, so an uncached scan turns polling into synchronous
+   * event-loop disk churn that grows with accumulated run directories. The dir
+   * list only changes through this registry's own mutations (create / clone /
+   * remove / associateTrace), which invalidate the entry; the TTL only bounds
+   * staleness against out-of-band disk changes (other processes, manual cleanup).
+   */
+  private static readonly TRACE_DIR_CACHE_TTL_SECONDS = 5;
+  /** Cached-name ceiling: the oldest queried name evicts first (readers poll a handful of workspaces). */
+  private static readonly TRACE_DIR_CACHE_MAX_ENTRIES = 64;
+  private readonly traceDirCache = new Map<string, { dirs: string[]; at: number }>();
 
   constructor(options: {
     maxWorkspaces?: number;
@@ -171,6 +185,7 @@ export class WorkspaceRegistry {
     const workspace = new Workspace(name, root, this.clock);
     this.workspaces.set(name, workspace);
     this.lastAccess.set(name, this.monotonicNow());
+    this.traceDirCache.delete(name);
     return workspace;
   }
 
@@ -224,10 +239,18 @@ export class WorkspaceRegistry {
    * FIRST run's directory) while each run appends observability streams beside
    * its own runId, so the log read side must merge across run directories. A run
    * with no workspace copy on disk is linked by its `associateTrace` marker.
-   * Stateless disk scan: correct after restarts, no registry bookkeeping to drift.
+   * The scan itself stays disk-based (correct after restarts, no registry
+   * bookkeeping to drift); results are cached per name and invalidated by this
+   * registry's own mutations, so polling readers do not re-stat every run
+   * directory on every request. The returned array is shared read-only.
    */
   traceDirsForWorkspace(name: string): string[] {
     if (!isSafeWorkspaceSegment(name)) return [];
+    const now = this.monotonicNow();
+    const cached = this.traceDirCache.get(name);
+    if (cached !== undefined && now - cached.at < WorkspaceRegistry.TRACE_DIR_CACHE_TTL_SECONDS) {
+      return cached.dirs;
+    }
     let entries: import("node:fs").Dirent[];
     try {
       entries = readdirSync(this.runsRoot, { withFileTypes: true });
@@ -251,7 +274,13 @@ export class WorkspaceRegistry {
       }
       found.push({ dir: traceDir, mtime });
     }
-    return found.sort((a, b) => a.mtime - b.mtime).map((f) => f.dir);
+    const dirs = found.sort((a, b) => a.mtime - b.mtime).map((f) => f.dir);
+    if (this.traceDirCache.size >= WorkspaceRegistry.TRACE_DIR_CACHE_MAX_ENTRIES) {
+      const oldest = this.traceDirCache.keys().next().value;
+      if (oldest !== undefined) this.traceDirCache.delete(oldest);
+    }
+    this.traceDirCache.set(name, { dirs, at: now });
+    return dirs;
   }
 
   /**
@@ -271,6 +300,8 @@ export class WorkspaceRegistry {
         // for this run, never the run itself.
       }
     }
+    // The marker changes which run directories the scan reports for this name.
+    this.traceDirCache.delete(workspaceName);
   }
 
   /**
@@ -379,6 +410,7 @@ export class WorkspaceRegistry {
     const workspace = new Workspace(newName, cloneRoot, this.clock);
     this.workspaces.set(newName, workspace);
     this.lastAccess.set(newName, this.monotonicNow());
+    this.traceDirCache.delete(newName);
     return workspace;
   }
 
@@ -387,6 +419,9 @@ export class WorkspaceRegistry {
     this.workspaces.delete(name);
     this.lastAccess.delete(name);
     this.protectedNames.delete(name);
+    // The workspace copy leaves the runs root; drop the cached scan even when a
+    // marker keeps the trace dir discoverable.
+    this.traceDirCache.delete(name);
     if (workspace !== undefined) {
       // Kill host resources first: after the directory is gone a still-running
       // job would be unreachable by name. The hook is host-wired and must never
