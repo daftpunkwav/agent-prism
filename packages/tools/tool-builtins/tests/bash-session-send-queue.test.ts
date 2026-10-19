@@ -16,6 +16,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // lives in vi.hoisted (vi.mock factories are hoisted above every import).
 const fake = vi.hoisted(() => ({
   buffer: "",
+  start: 0,
   writes: [] as string[],
   alive: true,
 }));
@@ -31,6 +32,7 @@ vi.mock("@agentprism/environment", async (importOriginal) => {
         fake.writes.push(data);
       },
       output: () => fake.buffer,
+      outputStart: () => fake.start,
       kill: () => {
         fake.alive = false;
       },
@@ -56,6 +58,7 @@ const MARKER_2 = "__AP_DONE_2__:0\n";
 describe("bashSessionTool send queue", () => {
   beforeEach(() => {
     fake.buffer = "";
+    fake.start = 0;
     fake.writes.length = 0;
     fake.alive = true;
   });

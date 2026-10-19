@@ -42,7 +42,10 @@ const POLL_MS = 20;
 
 interface ShellRecord {
   shell: PersistentShell;
-  /** Output offset already reported: each send reads from here to its sentinel. */
+  /**
+   * Absolute output offset already reported (shell.outputStart() rebases it onto
+   * the current buffer, whose head the cap may have trimmed).
+   */
   cursor: number;
   seq: number;
   /**
@@ -120,17 +123,24 @@ async function pollUntilSentinel(
   record.shell.write(`${command}\necho ${marker}:$?\n`);
   const deadline = Date.now() + timeoutSeconds * 1000;
   let output = "";
-  let foundAt = -1;
+  // Buffer coordinates of the freshest read window: base is the buffer's absolute
+  // stream offset (outputStart) and from is the cursor's buffer-local index. The
+  // cap head-trims the buffer as output floods, so the cursor is rebased each poll.
+  let base = 0;
+  let from = 0;
+  let markerAt = -1;
   let code: string | null = null;
   while (Date.now() < deadline) {
+    base = record.shell.outputStart();
     output = record.shell.output();
-    const fresh = output.slice(record.cursor);
+    from = Math.max(0, record.cursor - base);
+    const fresh = output.slice(from);
     const at = fresh.indexOf(`${marker}:`);
     if (at >= 0) {
       const tail = fresh.slice(at + marker.length + 1);
       const match = tail.match(/^(\d+)/);
       if (match !== null) {
-        foundAt = record.cursor + at;
+        markerAt = from + at;
         code = match[1] as string;
         break;
       }
@@ -148,7 +158,7 @@ async function pollUntilSentinel(
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }
-  if (foundAt < 0 && !record.shell.alive()) {
+  if (markerAt < 0 && !record.shell.alive()) {
     // Remove only our own record: a close+start during this send installs a
     // fresh shell whose record must survive this stale send's cleanup.
     if (SHELLS.get(root) === record) SHELLS.delete(root);
@@ -157,29 +167,30 @@ async function pollUntilSentinel(
         workspace,
         "bash_session",
         `Shell exited while the command ran; partial output:
-${output.slice(record.cursor)}`,
+${output.slice(from)}`,
       ),
       fileDiff: null,
       ok: true,
     };
   }
-  if (foundAt < 0) {
+  if (markerAt < 0) {
     return {
       result: boundText(
         workspace,
         "bash_session",
-        `Still running after ${timeoutSeconds}s (shell stays alive): output so far:\n${output.slice(record.cursor)}\n` +
+        `Still running after ${timeoutSeconds}s (shell stays alive): output so far:\n${output.slice(from)}\n` +
           "A later send may include this bleed-through; close+start resets clean.",
       ),
       fileDiff: null,
       ok: true,
     };
   }
-  const body = output.slice(record.cursor, foundAt).trimEnd();
-  record.cursor = foundAt + marker.length + 1 + (code?.length ?? 0);
+  const body = output.slice(from, markerAt).trimEnd();
+  const afterMarker = markerAt + marker.length + 1 + (code?.length ?? 0);
+  // The cursor is absolute: it survives later head trims via outputStart().
+  record.cursor = base + afterMarker;
   // Skip the marker line's trailing newline so the next read starts clean.
-  const rest = output.slice(record.cursor);
-  record.cursor += rest.startsWith("\n") ? 1 : 0;
+  if (output.slice(afterMarker).startsWith("\n")) record.cursor += 1;
   const shown = body === "" ? "(no output)" : body;
   return { result: boundText(workspace, "bash_session", `${shown}\n[exit ${code}]`), fileDiff: null, ok: true };
 }

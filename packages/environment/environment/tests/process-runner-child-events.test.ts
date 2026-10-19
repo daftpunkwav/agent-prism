@@ -468,6 +468,37 @@ describe("spawnPersistentShell off Windows", () => {
     vi.advanceTimersByTime(3_000);
     expect(child.signals).toEqual([undefined, "SIGKILL"]);
   });
+
+  it("head-trims a flooded buffer and advances outputStart (cursor consumers can rebase)", () => {
+    const shell = spawnPersistentShell({ cwd: "/work" });
+    expect(shell.outputStart()).toBe(0);
+    child.out("x".repeat(1_000_000));
+    // The overflowing chunk lands whole, then the head is trimmed back to the cap.
+    child.out("tail-marker");
+    expect(shell.output().length).toBe(1_000_000);
+    expect(shell.output().endsWith("tail-marker")).toBe(true);
+    expect(shell.outputStart()).toBe("tail-marker".length);
+    // Later output keeps landing on the trimmed buffer: the shell never goes mute.
+    child.out("newer");
+    expect(shell.output().endsWith("newer")).toBe(true);
+    expect(shell.output().length).toBe(1_000_000);
+    expect(shell.outputStart()).toBe("tail-marker".length + "newer".length);
+    shell.kill();
+  });
+});
+
+describe("long-lived handle output caps", () => {
+  it("background job: head-trims the combined buffer and advances outputStart", () => {
+    const job = spawnBackground({ argv: ["node"], cwd: "/work" });
+    expect(job.outputStart()).toBe(0);
+    child.out("x".repeat(1_000_000));
+    child.err("tail-marker");
+    expect(job.output().length).toBe(1_000_000);
+    expect(job.output().endsWith("tail-marker")).toBe(true);
+    expect(job.outputStart()).toBe("tail-marker".length);
+    child.close(0);
+    expect(job.exitCode()).toBe(0);
+  });
 });
 
 describe("StreamDecoder without GBK support", () => {

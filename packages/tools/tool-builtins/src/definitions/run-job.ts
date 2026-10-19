@@ -44,10 +44,14 @@ interface JobRecord {
   id: string;
   command: string;
   job: BackgroundJob;
-  /** Output chars already reported: polls return the delta, not the whole log. */
+  /**
+   * Absolute output offset already reported: polls return the delta, not the
+   * whole log. job.outputStart() rebases it onto the current buffer, whose head
+   * the cap may have trimmed.
+   */
   sent: number;
   killed: boolean;
-  /** Output chars already persisted to spill files (monotone; bounds disk writes). */
+  /** Absolute output offset already persisted to spill files (monotone; bounds disk writes). */
   spilled: number;
 }
 
@@ -118,10 +122,13 @@ function renderPoll(
   scope: JobScope,
   fs: { writeFile(path: string, content: string): unknown; deleteFile(path: string): unknown; listFiles(dir: string, options?: { recursive?: boolean }): string[] },
 ): string {
+  // Absolute stream offset of the buffer's first char: the cap head-trims a
+  // flooded job's buffer, so the sent/spilled cursors are rebased off it.
+  const base = record.job.outputStart();
   const full = record.job.output();
-  const delta = full.slice(record.sent);
-  record.sent = full.length;
-  const head = `job ${record.id}: ${statusLine(record)}, ${full.length} chars total`;
+  const delta = full.slice(Math.max(0, record.sent - base));
+  record.sent = base + full.length;
+  const head = `job ${record.id}: ${statusLine(record)}, ${base + full.length} chars total`;
   // Sandbox setup failure: the exit-3 sentinel is mapped to a readable note
   // instead of drowning in raw output, mirroring the bash tool.
   const setupFailure = record.job.sandboxSetupFailure();
@@ -134,7 +141,7 @@ function renderPoll(
   // Spill trigger keys on unspilled volume, not the single delta: streamed output
   // arrives in arbitrary chunks, so per-delta thresholds would rarely fire while the
   // middle still vanishes. Spilled files stay readable/greppable mid-run.
-  const unspilled = full.slice(record.spilled);
+  const unspilled = full.slice(Math.max(0, record.spilled - base));
   let spillNote = "";
   if (unspilled.length > SPILL_THRESHOLD_CHARS) {
     // The middle would otherwise vanish: persist the full span for read/grep,
@@ -147,7 +154,7 @@ function renderPoll(
           ? `${unspilled.slice(0, MAX_SPILL_BYTES)}\n…(spill capped, ${unspilled.length} chars total)`
           : unspilled;
       fs.writeFile(file, body);
-      record.spilled = full.length;
+      record.spilled = base + full.length;
       const spilled = fs
         .listFiles(SPILL_DIR, { recursive: false })
         .filter((entry) => entry.endsWith(".log"))
