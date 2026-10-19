@@ -33,7 +33,7 @@ out-of-box behavior equals the default column.
 | `LLM_MODEL` | `step-3.7-flash` | seed model |
 | `LLM_API_FORMAT` | `anthropic_messages` | `anthropic_messages`, `openai_chat`, or `openai_responses` |
 | `LLM_TEMPERATURE` | `0.0` | 0 to 2 |
-| `LLM_TIMEOUT_MS` | `120000` | per-call chat-model timeout, applied to column models, judge, narrative, and builder |
+| `LLM_TIMEOUT_MS` | `120000` | per-call chat-model timeout, applied to column models, judge, narrative, builder, and connection probes |
 | `LLM_MAX_RETRIES` | `2`, range 0 to 5 | SDK-level transient-failure retry count for chat models |
 | `LLM_RETRY_DELAY_MS` | `500`, range 0 to 10 000 | parsed but currently unused: retries ride the chat-model SDK (`LLM_MAX_RETRIES`), which manages its own backoff; kept for compatibility |
 

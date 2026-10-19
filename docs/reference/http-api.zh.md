@@ -12,7 +12,8 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
   `http://127.0.0.1:<FRONTEND_PORT>` 与 `CORS_ORIGINS` 条目构建。`*` 在 settings
   加载时被拒绝。方法为 `GET`、`POST`、`PUT`、`DELETE`、`OPTIONS`。头为
   `Content-Type`、`Authorization`、`X-API-Token`。
-- Auth。若 `API_TOKEN` 为空，所有请求通过。`/api/health` 与 `/health` 豁免。凭证为
+- Auth。若 `API_TOKEN` 为空，所有请求通过鉴权；请求仍可能被其他守卫拒绝（loopback
+  绑定下，非白名单的 `Host` 头返回 `403`）。`/api/health` 与 `/health` 豁免。凭证为
   `Authorization: Bearer <token>`，scheme 大小写不敏感；或 `X-API-Token: <token>`。
   失败返回 `401 {"detail": …}`。
 - Body 上限。`MAX_REQUEST_SIZE` 默认 10 MiB，在 `Content-Length` 上强制，并在流式

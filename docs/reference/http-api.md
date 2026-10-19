@@ -11,7 +11,9 @@ each section.
   `http://127.0.0.1:<FRONTEND_PORT>`, and `CORS_ORIGINS` entries. A `*` is rejected at
   settings load. Methods are `GET`, `POST`, `PUT`, `DELETE`, and `OPTIONS`. Headers are
   `Content-Type`, `Authorization`, and `X-API-Token`.
-- Auth. If `API_TOKEN` is empty, all requests pass. `/api/health` and `/health` are
+- Auth. If `API_TOKEN` is empty, every request passes auth; a request can still be
+  rejected by other guards (on a loopback bind, a non-allowlisted `Host` header
+  returns `403`). `/api/health` and `/health` are
   exempt. Credentials are `Authorization: Bearer <token>` with a case-insensitive scheme,
   or `X-API-Token: <token>`. Failure returns `401 {"detail": …}`.
 - Body limits. `MAX_REQUEST_SIZE` defaults to 10 MiB and is enforced on

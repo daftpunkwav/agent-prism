@@ -118,7 +118,7 @@ export function selectSpan(
         continue;
       }
       if (tokens < targetTokens) continue;
-      // Snapshot: the running  array keeps growing for longer spans below.
+      // Snapshot: the running ids array keeps growing for longer spans below.
       const span: CompactionSpan = { start, end, tokens, ids: [...ids] };
       if (best === null || isBetterSpan(span, weight, best, bestWeight)) {
         best = span;

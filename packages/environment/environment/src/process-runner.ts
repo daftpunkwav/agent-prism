@@ -302,9 +302,11 @@ export interface PersistentShell {
 
 /**
  * Spawns `bash --noprofile --norc -s` (POSIX only): hermetic, reads commands
- * from stdin, no prompt on pipes. Throws WorkspaceError when bash is missing
- * or the spawn itself fails. Windows callers must fail closed upstream —
- * interactive PowerShell framing is a separate backend, not a flag flip.
+ * from stdin, no prompt on pipes. Throws WorkspaceError when the spawn call
+ * itself fails; a missing bash binary is reported asynchronously through the
+ * returned handle (the child's error event marks it dead), not as a throw.
+ * Windows callers must fail closed upstream — interactive PowerShell framing
+ * is a separate backend, not a flag flip.
  *
  * @param options Working directory the shell starts in.
  * @returns Live shell handle (write/output/alive/kill); caller owns framing and lifetime.
