@@ -176,6 +176,12 @@ function loopbackHostGuard(allowedOrigins: string[]): MiddlewareHandler {
   return async (c, next) => {
     const raw = c.req.header("host");
     if (raw === undefined || raw === "") return next();
+    // URL delimiters are not part of a uri-host[:port] authority; URL parsing
+    // would silently absorb them (a trailing /?x lands in the pathname) and a
+    // delimiter in Host can change the URL the server constructs downstream.
+    if (/[/?#]/.test(raw)) {
+      return c.json({ detail: "Forbidden: host header is not allowed" }, 403);
+    }
     // Parse through URL so a bracketed IPv6 or a port suffix normalize to the
     // bare hostname the allowlist check expects. The value must be nothing but
     // `uri-host[:port]`: URL components that a Host header cannot carry

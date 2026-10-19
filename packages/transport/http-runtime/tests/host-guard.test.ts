@@ -73,6 +73,15 @@ describe("loopback host guard", () => {
     expect(res.status).toBe(403);
   });
 
+  it("rejects Host headers carrying URL delimiters", async () => {
+    // Parsing would absorb a trailing /?x into the pathname and pass the
+    // allowlisted hostname, but none of these values is a bare authority.
+    for (const host of ["localhost/", "localhost?x", "localhost#x"]) {
+      const res = await getWithHost("/api/sessions", host);
+      expect(res.status, host).toBe(403);
+    }
+  });
+
   it("does not register the guard on a non-loopback bind (deliberate exposure)", async () => {
     const app = testApp({ backendHost: "0.0.0.0" });
     const res = await app.request("/api/sessions", { headers: { host: "evil.example.com" } });
