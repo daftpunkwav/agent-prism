@@ -80,6 +80,12 @@ function markerFor(seq: number): string {
  * Queueing matches the shell's own ordering. Each queued send re-validates the
  * record because close/start may have replaced or removed it while the caller
  * waited.
+ *
+ * The caller's promise races the queue wait against its own abort signal: a
+ * cancelled queued send must reject promptly instead of waiting out the active
+ * send's full polling window. Queue order is untouched (the stored tail stays
+ * attached to `gate`); the aborted task still runs when its turn comes and its
+ * pre-abort check discards it without writing to the shell.
  */
 function enqueueSend(
   workspace: ToolWorkspace,
@@ -94,7 +100,19 @@ function enqueueSend(
   const gate = record.sendTail.then(task, task);
   // The stored tail swallows rejections so one aborted send never poisons the next.
   record.sendTail = gate.catch(() => undefined);
-  return gate;
+  if (signal === undefined) return gate;
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => {
+      const abortError = new Error("Aborted");
+      abortError.name = "AbortError";
+      reject(abortError);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  return Promise.race([gate, aborted]).finally(() => {
+    if (onAbort !== undefined) signal.removeEventListener("abort", onAbort);
+  });
 }
 
 /** Writes one framed command and polls for its sentinel (runs under the send queue). */
@@ -243,7 +261,10 @@ async function executeBashSession(workspace: ToolWorkspace, args: ToolArgs, sign
       Math.max(readInt(args, "timeout", toolTuningValue("runTimeoutDefaultS", 30)), 1),
       toolTuningValue("runTimeoutMaxS", 120),
     );
-    return enqueueSend(workspace, view.root, record, command, timeoutSeconds, signal);
+    // Awaited inside the try: a queued send's rejection (the shell dying between
+    // the identity check and the write) must reach this catch and convert to the
+    // workspace_error result instead of rejecting the tool call raw.
+    return await enqueueSend(workspace, view.root, record, command, timeoutSeconds, signal);
   } catch (error) {
     if (error instanceof WorkspaceError) {
       return { result: error.message, fileDiff: null, ok: false, code: "workspace_error" };

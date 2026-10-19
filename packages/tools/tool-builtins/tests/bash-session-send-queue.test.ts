@@ -23,12 +23,16 @@ const fake = vi.hoisted(() => ({
 
 vi.mock("@agentprism/environment", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@agentprism/environment")>();
+  const { WorkspaceError } = actual;
   return {
     ...actual,
     spawnPersistentShell: () => ({
       pid: 4242,
       alive: () => fake.alive,
       write: (data: string) => {
+        // Parity with the real handle: writing to a shell whose stdin already
+        // ended throws (the queued-send conversion test depends on the throw).
+        if (!fake.alive) throw new WorkspaceError("Error: persistent shell is closed");
         fake.writes.push(data);
       },
       output: () => fake.buffer,
@@ -133,5 +137,42 @@ describe("bashSessionTool send queue", () => {
     expect(slowRes.result).toContain("first-out");
     // The aborted queued send never wrote into the resident shell.
     expect(fake.writes).toHaveLength(1);
+  });
+
+  it("rejects an aborted queued send promptly, before the active send settles", async () => {
+    const ws = fakeWorkspace();
+    await bashSessionTool.execute(ws, { action: "start" });
+    const slow = bashSessionTool.execute(ws, { action: "send", command: "sleep 30; echo first", timeout: 20 });
+    await vi.waitFor(() => expect(fake.writes).toHaveLength(1));
+
+    const controller = new AbortController();
+    const queued = bashSessionTool.execute(ws, { action: "send", command: "echo second" }, controller.signal);
+    controller.abort();
+    // The rejection must not wait for the active send's polling window: it
+    // lands while the active send is still polling (no sentinel delivered yet).
+    await expect(queued).rejects.toMatchObject({ name: "AbortError" });
+    expect(fake.writes).toHaveLength(1);
+    fake.buffer += `first-out\n${MARKER_1}`;
+    const slowRes = await slow;
+    expect(slowRes.ok).toBe(true);
+  });
+
+  it("converts a queued send's dead-shell write failure into the workspace_error result", async () => {
+    const ws = fakeWorkspace();
+    await bashSessionTool.execute(ws, { action: "start" });
+    const slow = bashSessionTool.execute(ws, { action: "send", command: "sleep 5; echo first", timeout: 5 });
+    await vi.waitFor(() => expect(fake.writes).toHaveLength(1));
+
+    const queued = bashSessionTool.execute(ws, { action: "send", command: "echo second" });
+    // The shell dies after the queued send passed the entry liveness check but
+    // before its turn in the queue: the write inside the queued task throws.
+    fake.alive = false;
+    fake.buffer += `first-out\n${MARKER_1}`;
+    const [slowRes, queuedRes] = await Promise.all([slow, queued]);
+    expect(slowRes.ok).toBe(true);
+    // The tool call must observe the workspace_error contract, not a raw throw.
+    expect(queuedRes.ok).toBe(false);
+    expect(queuedRes.result).toContain("persistent shell is closed");
+    expect(queuedRes.code).toBe("workspace_error");
   });
 });
