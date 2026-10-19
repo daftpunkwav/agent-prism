@@ -16,6 +16,7 @@ import {
   streamMatrixRun,
   type MatrixStreamItem,
 } from "@agentprism/client";
+import { useT } from "@/i18n/useT";
 
 export type MatrixCellProgress = {
   templateId: string;
@@ -34,6 +35,7 @@ export type MatrixCellResultView = {
 };
 
 export function useMatrixRun(setError: (message: string) => void) {
+  const t = useT();
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<MatrixCellProgress[]>([]);
   const [cells, setCells] = useState<MatrixCellResultView[]>([]);
@@ -76,7 +78,7 @@ export function useMatrixRun(setError: (message: string) => void) {
             // In-stream failures ride the same channel as a systemErrorEvent (same
             // contract as the arena run stream): surface them instead of ending the
             // run with an empty report and no explanation.
-            setError(item.message || "Matrix run failed");
+            setError(item.message || t("arena.stream.matrixRunError"));
           }
         },
       });
@@ -89,7 +91,7 @@ export function useMatrixRun(setError: (message: string) => void) {
       setRunning(false);
       abortRef.current = null;
     }
-  }, [setError]);
+  }, [setError, t]);
 
   return { running, progress, cells, elapsedSecs, start, stop };
 }
