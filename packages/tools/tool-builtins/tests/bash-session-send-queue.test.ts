@@ -157,6 +157,23 @@ describe("bashSessionTool send queue", () => {
     expect(slowRes.ok).toBe(true);
   });
 
+  it("rejects a pre-aborted queued send immediately without touching the queue", async () => {
+    const ws = fakeWorkspace();
+    await bashSessionTool.execute(ws, { action: "start" });
+    const slow = bashSessionTool.execute(ws, { action: "send", command: "sleep 30; echo first", timeout: 20 });
+    await vi.waitFor(() => expect(fake.writes).toHaveLength(1));
+
+    // Already aborted at call time: the listener below would never fire.
+    const controller = new AbortController();
+    controller.abort();
+    const queued = bashSessionTool.execute(ws, { action: "send", command: "echo second" }, controller.signal);
+    await expect(queued).rejects.toMatchObject({ name: "AbortError" });
+    expect(fake.writes).toHaveLength(1);
+    fake.buffer += `first-out\n${MARKER_1}`;
+    const slowRes = await slow;
+    expect(slowRes.ok).toBe(true);
+  });
+
   it("converts a queued send's dead-shell write failure into the workspace_error result", async () => {
     const ws = fakeWorkspace();
     await bashSessionTool.execute(ws, { action: "start" });

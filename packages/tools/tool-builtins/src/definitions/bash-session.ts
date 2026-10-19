@@ -97,6 +97,14 @@ function enqueueSend(
 ): Promise<ToolExecutionResult> {
   const task = (): Promise<ToolExecutionResult> =>
     pollUntilSentinel(workspace, root, record, command, timeoutSeconds, signal);
+  // An already-aborted signal would never fire the listener attached below, so
+  // the caller would wait out the active send: reject up front. Nothing was
+  // queued, so queue order is unaffected.
+  if (signal?.aborted) {
+    const abortError = new Error("Aborted");
+    abortError.name = "AbortError";
+    return Promise.reject(abortError);
+  }
   const gate = record.sendTail.then(task, task);
   // The stored tail swallows rejections so one aborted send never poisons the next.
   record.sendTail = gate.catch(() => undefined);
