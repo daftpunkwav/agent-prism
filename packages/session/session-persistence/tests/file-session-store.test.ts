@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { AtomicJsonFile } from "@agentprism/persistence";
 import { InMemoryBlobStore } from "@agentprism/session";
 import { FileSessionStore } from "../src/index.js";
-import { runSessionStoreParityTests } from "./session-store-parity.harness.js";
+import { MemoryJsonFile, runSessionStoreParityTests } from "./session-store-parity.harness.js";
 
 function tempFile(): string {
   return path.join(fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-sessions-")), "sessions.json");
@@ -26,9 +26,12 @@ function testDeps(file: string) {
 
 // The JSONL backend promises to mirror this store's mutation semantics exactly
 // (see the JsonlSessionStore header); the shared suite is that mirror's guard.
+// The backing file is the in-memory double: the parity suite locks semantics,
+// and every mutation flushing a growing document through tmp+rename+bak made
+// the cap cases pay hundreds of real disk writes (3.3s alone, past the 30s
+// budget under full-suite load). Durability keeps its real-file tests below.
 runSessionStoreParityTests("FileSessionStore", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-parity-"));
-  const file = path.join(dir, "sessions.json");
+  const file = new MemoryJsonFile();
   // One blob sidecar shared across reopens: the sidecar is durable in
   // production, so spilled entries must survive an instance swap.
   const blobs = new InMemoryBlobStore();
@@ -37,12 +40,12 @@ runSessionStoreParityTests("FileSessionStore", () => {
   return {
     open: () =>
       new FileSessionStore({
-        file: new AtomicJsonFile(file),
+        file,
         idGenerator: { next: () => `parity-${++seq}` },
         clock: { now: () => (now += 1) },
         blobs,
       }),
-    dispose: () => fs.rmSync(dir, { recursive: true, force: true }),
+    dispose: () => {},
   };
 });
 
