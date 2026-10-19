@@ -34,7 +34,7 @@ export function runtimeFromEnv(value: string | undefined): BridgeRuntime {
  * transient (interpreter busy, EMFILE under load), and a permanent negative
  * cache would keep falling back to the TypeScript runtime until restart.
  */
-const PROBE_FAILURE_TTL_MS = 60_000;
+export const PROBE_FAILURE_TTL_MS = 60_000;
 
 /** Successful probes by `${interpreter}:${module}` (process lifetime). */
 const successCache = new Map<string, boolean>();
@@ -43,7 +43,7 @@ const failureCache = new Map<string, number>();
 /** In-flight probes by key, so concurrent callers share one spawn instead of stampeding the interpreter. */
 const inFlight = new Map<string, Promise<boolean>>();
 
-async function probeOnce(key: string, interpreter: string, moduleName: string): Promise<boolean> {
+async function probeOnce(key: string, interpreter: string, moduleName: string, now: () => number): Promise<boolean> {
   try {
     // Output is discarded either way: `python -c "import module"` prints
     // nothing on success, and the rejection path only reads the exit status.
@@ -53,7 +53,7 @@ async function probeOnce(key: string, interpreter: string, moduleName: string): 
     successCache.set(key, true);
     return true;
   } catch {
-    failureCache.set(key, Date.now());
+    failureCache.set(key, now());
     return false;
   }
 }
@@ -66,18 +66,25 @@ async function probeOnce(key: string, interpreter: string, moduleName: string): 
  * The probe is async on purpose: importing a heavy framework can take seconds,
  * and the first probe happens on the request path (a column's driver.run), so
  * a sync spawn would freeze the whole server event loop for that duration.
+ *
+ * @param now Failure-TTL clock; injectable so tests can age the cache without
+ *   waiting the real TTL out (defaults to the wall clock).
  */
-export async function canImport(interpreter: string, moduleName: string): Promise<boolean> {
+export async function canImport(
+  interpreter: string,
+  moduleName: string,
+  now: () => number = Date.now,
+): Promise<boolean> {
   const key = `${interpreter}:${moduleName}`;
   if (successCache.get(key) === true) return true;
   const failedAt = failureCache.get(key);
   if (failedAt !== undefined) {
-    if (Date.now() - failedAt < PROBE_FAILURE_TTL_MS) return false;
+    if (now() - failedAt < PROBE_FAILURE_TTL_MS) return false;
     failureCache.delete(key);
   }
   const pending = inFlight.get(key);
   if (pending !== undefined) return pending;
-  const probe = probeOnce(key, interpreter, moduleName);
+  const probe = probeOnce(key, interpreter, moduleName, now);
   inFlight.set(key, probe);
   try {
     return await probe;
