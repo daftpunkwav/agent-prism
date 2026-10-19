@@ -5,7 +5,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { fetchRuntimeKnobs, saveRuntimeKnobs, type RuntimeKnobsPayload } from "@agentprism/client";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
@@ -56,6 +56,12 @@ describe("RuntimeKnobsSection", () => {
     const context = await screen.findByLabelText(
       getCatalog("en").settings.runtime.fields.contextWindowMessages,
     ) as HTMLInputElement;
+    // NumberInput mirrors the external value into its local text through a
+    // passive effect; findBy can resolve while that effect is still pending, and
+    // a late flush would legally rewrite a just-typed keystroke back to the
+    // loaded value (the observed "200 became 160" flake). Drain effects before
+    // interacting so the typed text is the final state.
+    await act(async () => {});
     expect(context.value).toBe("160");
     // Nested key resolved through the dot path.
     const retries = screen.getByLabelText(getCatalog("en").settings.runtime.fields.llmMaxRetries) as HTMLInputElement;
@@ -96,6 +102,9 @@ describe("RuntimeKnobsSection", () => {
     const context = await screen.findByLabelText(
       getCatalog("en").settings.runtime.fields.contextWindowMessages,
     ) as HTMLInputElement;
+    // Same drain as "binds changes": a pending value-sync effect would revert the
+    // typed text before blur commits it, and the save would carry the loaded value.
+    await act(async () => {});
     fireEvent.focus(context);
     fireEvent.change(context, { target: { value: "200" } });
     fireEvent.blur(context);
