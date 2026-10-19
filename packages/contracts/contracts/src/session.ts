@@ -13,11 +13,20 @@
 import { z } from "zod";
 import type { Clock, IdGenerator } from "./ports.js";
 
-/** Execution-session origin: which subsystem owns the lifecycle. */
-export type SessionKind = "arena" | "agent" | "builder";
+/**
+ * Execution-session origin: which subsystem owns the lifecycle. Runtime array
+ * so validators, persistence schemas, and query filters enumerate one list.
+ */
+export const SESSION_KINDS = ["arena", "agent", "builder"] as const;
+export type SessionKind = (typeof SESSION_KINDS)[number];
 
-/** Lifecycle state: active until completed, failed, or cancelled by the requester. */
-export type SessionStatus = "active" | "completed" | "failed" | "cancelled";
+/**
+ * Lifecycle state: active until completed, failed, or cancelled by the
+ * requester. Runtime array so validators, persistence schemas, and query
+ * filters enumerate one list.
+ */
+export const SESSION_STATUSES = ["active", "completed", "failed", "cancelled"] as const;
+export type SessionStatus = (typeof SESSION_STATUSES)[number];
 
 /** Durable execution-session record. */
 export interface SessionRecord {
@@ -34,13 +43,16 @@ export interface SessionRecord {
   entryCount: number;
 }
 
+/** Milestone channel: lifecycle transitions, verdicts, operator notes. */
+export const SESSION_ENTRY_KINDS = ["lifecycle", "verdict", "note"] as const;
+export type SessionEntryKind = (typeof SESSION_ENTRY_KINDS)[number];
+
 /** Coarse milestone appended to a session (lifecycle markers, not event streams). */
 export interface SessionEntry {
   sessionId: string;
   seq: number;
   at: number;
-  /** Milestone channel: lifecycle transitions, verdicts, operator notes. */
-  kind: "lifecycle" | "verdict" | "note";
+  kind: SessionEntryKind;
   content: string;
 }
 

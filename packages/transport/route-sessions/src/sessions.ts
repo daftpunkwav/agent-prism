@@ -8,12 +8,16 @@
  */
 
 import { AppError } from "@agentprism/application";
-import { SessionExportRequestSchema, type SessionKind, type SessionStatus } from "@agentprism/contracts";
+import {
+  SESSION_KINDS,
+  SESSION_STATUSES,
+  SessionExportRequestSchema,
+  type SessionKind,
+  type SessionStatus,
+} from "@agentprism/contracts";
 import type { HttpApplicationDeps } from "@agentprism/http-runtime";
 import { parseJsonBody, type HttpApp } from "@agentprism/http-runtime";
 
-const SESSION_KINDS: readonly SessionKind[] = ["arena", "agent", "builder"];
-const SESSION_STATUSES: readonly SessionStatus[] = ["active", "completed", "failed", "cancelled"];
 const MAX_LIST_LIMIT = 200;
 const SORT_ORDERS: readonly string[] = ["newest", "oldest", "title"];
 

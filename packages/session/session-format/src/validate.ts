@@ -13,6 +13,7 @@
  * sparse seqs indicate lost or duplicated milestones.
  */
 
+import { SESSION_ENTRY_KINDS, SESSION_KINDS, SESSION_STATUSES } from "@agentprism/contracts";
 import { detectEnvelopeVersion, SESSION_ENVELOPE_VERSION } from "./envelope.js";
 
 /** One structural defect with a stable code. */
@@ -27,9 +28,11 @@ export interface SessionValidation {
   defects: SessionDefect[];
 }
 
-const STATUSES = new Set(["active", "completed", "failed", "cancelled"]);
-const KINDS = new Set(["arena", "agent", "builder"]);
-const ENTRY_KINDS = new Set(["lifecycle", "verdict", "note"]);
+// Membership mirrors the contract vocabularies by construction (single list in
+// contracts), so a new status/kind is picked up here without an edit.
+const STATUSES = new Set<string>(SESSION_STATUSES);
+const KINDS = new Set<string>(SESSION_KINDS);
+const ENTRY_KINDS = new Set<string>(SESSION_ENTRY_KINDS);
 
 /** Validates a v2-shaped document, collecting every defect. */
 export function validateSessionDocument(document: unknown): SessionValidation {
