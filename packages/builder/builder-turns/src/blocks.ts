@@ -79,13 +79,14 @@ const DESCRIPTIONS: Record<string, string> = {
   history_full: "Append full past tool args and results",
 };
 
-function describe(value: string): string {
+/** Looks up the per-option English copy from the DESCRIPTIONS table (empty when unmapped). */
+function optionDescription(value: string): string {
   return DESCRIPTIONS[value] ?? "";
 }
 
 /** Derives labeled options from a contracts enum's values (labels localize in the UI). */
 function fromEnum(schema: { options: readonly string[] }): CapabilityOptionSpec[] {
-  return schema.options.map((value) => ({ value, label: value, description: describe(value) }));
+  return schema.options.map((value) => ({ value, label: value, description: optionDescription(value) }));
 }
 
 /** Capability block slots, derived from the single-source option lists the Arena uses. */
@@ -134,7 +135,7 @@ export const CAPABILITY_GROUPS: ReadonlyArray<{
     options: HistoryModeSchema.options.map((value) => ({
       value,
       label: value,
-      description: describe(`history_${value}`),
+      description: optionDescription(`history_${value}`),
     })),
   },
 ];
