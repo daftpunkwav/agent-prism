@@ -66,6 +66,13 @@ describe("loopback host guard", () => {
     expect(res.status).toBe(403);
   });
 
+  it("rejects Host headers carrying URL components (userinfo)", async () => {
+    // new URL() would absorb "attacker.example" as userinfo and resolve the
+    // hostname to the allowlisted localhost; the value is not a uri-host[:port].
+    const res = await getWithHost("/api/sessions", "attacker.example@localhost");
+    expect(res.status).toBe(403);
+  });
+
   it("does not register the guard on a non-loopback bind (deliberate exposure)", async () => {
     const app = testApp({ backendHost: "0.0.0.0" });
     const res = await app.request("/api/sessions", { headers: { host: "evil.example.com" } });

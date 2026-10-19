@@ -177,14 +177,20 @@ function loopbackHostGuard(allowedOrigins: string[]): MiddlewareHandler {
     const raw = c.req.header("host");
     if (raw === undefined || raw === "") return next();
     // Parse through URL so a bracketed IPv6 or a port suffix normalize to the
-    // bare hostname the allowlist check expects; a malformed Host is rejected.
-    let hostname = "";
+    // bare hostname the allowlist check expects. The value must be nothing but
+    // `uri-host[:port]`: URL components that a Host header cannot carry
+    // (userinfo, a path) would otherwise be absorbed by the parse —
+    // `attacker.example@localhost` would resolve to the allowlisted hostname.
+    let parsed: URL;
     try {
-      hostname = new URL(`http://${raw}`).hostname;
+      parsed = new URL(`http://${raw}`);
     } catch {
       return c.json({ detail: "Forbidden: host header is not allowed" }, 403);
     }
-    if (allowedHosts.has(hostname.toLowerCase())) return next();
+    if (parsed.username !== "" || parsed.password !== "" || parsed.pathname !== "/") {
+      return c.json({ detail: "Forbidden: host header is not allowed" }, 403);
+    }
+    if (allowedHosts.has(parsed.hostname.toLowerCase())) return next();
     return c.json({ detail: "Forbidden: host header is not allowed" }, 403);
   };
 }
