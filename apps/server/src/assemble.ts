@@ -277,7 +277,12 @@ export async function assemble(): Promise<RuntimeComponents> {
     endpointUpdateToEntity,
     parseConfig: (raw, ids) => parseProviderConfig(raw, envSeed, ids),
     testConnection: (provider, target) =>
-      testProviderConnection({ provider, catalog: endpointCatalog, idGenerator }, target),
+      testProviderConnection(
+        // Same operator knobs as every other model boundary: the probe must not
+        // hang on the raw factory defaults when the endpoint is black-holed.
+        { provider, catalog: endpointCatalog, idGenerator, ...llmCallOptions() },
+        target,
+      ),
   };
 
   // Judge-model resilience policy (composition root owns the tuning): the model
