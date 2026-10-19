@@ -55,6 +55,14 @@ export class FrameDecoder {
       // Tolerate CRLF writers and blank keep-alive lines: neither is a message.
       const line = this.buffer.slice(0, lineEnd).replace(/\r$/, "");
       this.buffer = this.buffer.slice(lineEnd + 1);
+      // Ceiling check before emitting: a complete frame whose terminating
+      // newline arrived in this chunk would otherwise slip past the post-loop
+      // check below and be accepted however large it is.
+      if (line.length > MAX_FRAME_BUFFER_CHARS) {
+        this.overflow = true;
+        this.buffer = "";
+        return out;
+      }
       if (line.trim() === "") continue;
       out.push(line);
     }

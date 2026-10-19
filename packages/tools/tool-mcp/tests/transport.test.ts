@@ -3,7 +3,7 @@
  * @description Locks MCP stdio framing against a real child process (not the in-memory duplex).
  */
 import { describe, expect, it } from "vitest";
-import { NodeMcpTransport } from "../src/transport.js";
+import { FrameDecoder, NodeMcpTransport } from "../src/transport.js";
 
 /**
  * Child server speaking the MCP stdio framing: one JSON object per line in and out.
@@ -78,5 +78,15 @@ describe("NodeMcpTransport", { retry: 1 }, () => {
     // (signal) or right after it drained (code 1 on the truncated write), and
     // both mean the same thing — the peer did not survive the frame guard.
     expect(exit.code !== 0 || exit.signal !== null).toBe(true);
+  });
+
+  it("rejects a single complete frame that crosses the ceiling (newline in the same chunk)", () => {
+    // The terminating newline rides the same chunk as the oversized body: the
+    // post-loop buffer check never sees it, so the pre-emission check must latch.
+    const decoder = new FrameDecoder();
+    const oversized = `${"z".repeat(17 * 1024 * 1024)}\n{"jsonrpc":"2.0"}`;
+    const messages = decoder.push(oversized);
+    expect(messages).toEqual([]);
+    expect(decoder.overflowed).toBe(true);
   });
 });
