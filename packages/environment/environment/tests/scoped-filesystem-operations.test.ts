@@ -55,7 +55,7 @@ describe("ScopedFileSystem edit and delete", () => {
       fs.writeFile("script.sh", "total=100\n");
       // String.replace would expand $& (the match), $` (the prefix), $' (the
       // suffix), and $$ in the replacement; an edit must write user text as-is.
-      const replacement = "cost: $$ & $& end `$` '${}'";
+      const replacement = "cost: $$ & $& end `$` mid $' end";
       fs.editFile("script.sh", "100", replacement);
       expect(fs.readFile("script.sh")).toBe(`total=${replacement}\n`);
     } finally {
