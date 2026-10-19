@@ -436,6 +436,21 @@ describe("spawnPersistentShell off Windows", () => {
     expect(child.signals).toEqual([]);
   });
 
+  it("marks the shell dead when the spawn fails asynchronously (missing bash ENOENT)", () => {
+    // A missing binary does not throw at spawn time: node reports ENOENT through
+    // the child's error event, so the handle must converge to dead (the
+    // bash_session send path re-checks alive() and reports "no live shell"
+    // instead of writing into a shell that never existed).
+    const shell = spawnPersistentShell({ cwd: "/work" });
+    expect(shell.alive()).toBe(true);
+    child.emit("error", new Error("spawn bash ENOENT"));
+    expect(shell.alive()).toBe(false);
+    expect(() => shell.write("echo hi\n")).toThrow(/persistent shell is closed/);
+    // Killing an already-dead shell must not signal a child that never started.
+    shell.kill();
+    expect(child.signals).toEqual([]);
+  });
+
   it("reports a failed shell write and a failed start", () => {
     const shell = spawnPersistentShell({ cwd: "/work" });
     child.stdin.write.mockImplementation(() => {
