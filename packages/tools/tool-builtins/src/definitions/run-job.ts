@@ -58,7 +58,10 @@ interface JobRecord {
 /** Oversized poll deltas spill to workspace files instead of vanishing. */
 const SPILL_THRESHOLD_CHARS = 32 * 1024;
 const MAX_SPILL_BYTES = 256 * 1024;
-const MAX_SPILL_FILES = 20;
+// Retention for job *.log spills only, independent of the result-spill-*.txt
+// retention in spill.ts (the two rotation policies never evict each other's
+// files; keeping separate constants preserves that boundary).
+const MAX_JOB_SPILL_FILES = 20;
 
 /** Process-scoped registry namespaced by workspace root (see file header for lifetime limits). */
 interface JobScope {
@@ -159,7 +162,7 @@ function renderPoll(
         .listFiles(SPILL_DIR, { recursive: false })
         .filter((entry) => entry.endsWith(".log"))
         .sort();
-      for (const extra of spilled.slice(0, Math.max(0, spilled.length - MAX_SPILL_FILES))) {
+      for (const extra of spilled.slice(0, Math.max(0, spilled.length - MAX_JOB_SPILL_FILES))) {
         try {
           fs.deleteFile(extra);
         } catch {
