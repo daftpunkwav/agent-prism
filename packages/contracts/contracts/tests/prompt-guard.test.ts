@@ -67,9 +67,9 @@ describe("sanitizeForJson", () => {
     expect(sanitizeForJson("  hello  ")).toBe("hello");
   });
 
-  it("strips a dangling fence line when the closing fence never arrives", () => {
-    // Truncated model output: no complete fence body exists, so the fallback
-    // drops the lone fence line instead of leaving it in the JSON candidate.
-    expect(sanitizeForJson('{"a": 1}\n```')).toBe('{"a": 1}');
+  it("strips a dangling fence line from an incomplete JSON candidate", () => {
+    // No complete object candidate exists, so extraction returns null and the
+    // fence-line fallback runs; the incomplete candidate must survive verbatim.
+    expect(sanitizeForJson('{"a": 1\n```')).toBe('{"a": 1');
   });
 });
