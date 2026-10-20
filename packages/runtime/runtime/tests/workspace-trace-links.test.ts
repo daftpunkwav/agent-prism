@@ -100,6 +100,27 @@ describe("WorkspaceRegistry.traceDirsForWorkspace", { retry: 1 }, () => {
     writeFileSync(join(runsRoot, "stray.txt"), "", "utf-8");
     expect(registry.traceDirsForWorkspace("ws-a")).toEqual([]);
   });
+
+  it("refreshes a cached empty scan when a follow-up run associates the workspace", () => {
+    const { registry, runsRoot } = makeRegistry();
+    expect(registry.traceDirsForWorkspace("ws-a")).toEqual([]);
+    // The logs page polls while columns start; a run associating mid-poll must
+    // be visible on the next scan, never pinned to the cached empty result.
+    mkdirSync(join(runsRoot, "run-2", "_traces"), { recursive: true });
+    registry.associateTrace("run-2", "ws-a");
+    expect(registry.traceDirsForWorkspace("ws-a")).toEqual([join(runsRoot, "run-2", "_traces")]);
+  });
+
+  it("refreshes a cached scan when the workspace copy appears and when it is removed", () => {
+    const { registry, runsRoot } = makeRegistry();
+    expect(registry.traceDirsForWorkspace("ws-a")).toEqual([]);
+    registry.create("ws-a", "run-1");
+    mkdirSync(join(runsRoot, "run-1", "_traces"), { recursive: true });
+    expect(registry.traceDirsForWorkspace("ws-a")).toEqual([join(runsRoot, "run-1", "_traces")]);
+    // No marker was associated, so removing the copy drops the run from the scan.
+    registry.remove("ws-a");
+    expect(registry.traceDirsForWorkspace("ws-a")).toEqual([]);
+  });
 });
 
 describe("WorkspaceRegistry.associateTrace", { retry: 1 }, () => {

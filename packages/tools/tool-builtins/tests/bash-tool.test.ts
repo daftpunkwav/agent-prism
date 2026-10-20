@@ -52,6 +52,37 @@ describe("bashTool", { retry: 1 }, () => {
     }
   });
 
+  it("frames a non-zero exit as model output, not a tool error", async () => {
+    const ws = tempWorkspace();
+    try {
+      // A failing command is a valid observation for the model: the tool stays
+      // ok:true and prefixes the combined output with the real exit code.
+      const command = process.platform === "win32" ? "Write-Output gone; exit 3" : "sh -c 'echo gone; exit 3'";
+      const out = await bashTool.execute(ws, { command });
+      expect(out.ok).toBe(true);
+      expect(out.result.startsWith("[exit 3]")).toBe(true);
+      expect(out.result).toContain("gone");
+    } finally {
+      ws.cleanup();
+    }
+  }, 60_000);
+
+  it("rejects with AbortError when the signal fires mid-run", async () => {
+    const ws = tempWorkspace();
+    try {
+      const controller = new AbortController();
+      const command = process.platform === "win32" ? "Start-Sleep -Seconds 30" : "sleep 30";
+      const pending = bashTool.execute(ws, { command }, controller.signal);
+      // Abort while the child still runs: the run converges as AbortError
+      // (the registry rethrows it to the driver), not as a tool-error result.
+      setTimeout(() => controller.abort(), 300);
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    } finally {
+      // The abort-killed child holds the workspace cwd until the OS releases it.
+      ws.cleanup(10_000);
+    }
+  }, 60_000);
+
   it("propagates an already-aborted signal as AbortError", async () => {
     const ws = tempWorkspace();
     try {

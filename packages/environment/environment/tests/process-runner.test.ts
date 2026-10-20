@@ -168,6 +168,16 @@ describe("splitShellCommand", { retry: 1 }, () => {
   it("keeps quote characters on non-posix (windows) tokenization", () => {
     expect(splitShellCommand(`echo "a b"`, false)).toEqual(["echo", `"a b"`]);
   });
+
+  it("keeps backslashes literal inside posix single quotes", () => {
+    // Real shells never process backslash escapes inside single quotes: a
+    // pattern like 'a\\b' must reach argv with both backslashes intact
+    // (collapsing them silently changes grep/sed patterns).
+    expect(splitShellCommand(`echo 'a\\\\b'`, true)).toEqual(["echo", "a\\\\b"]);
+    expect(splitShellCommand(`echo 'C:\\path'`, true)).toEqual(["echo", "C:\\path"]);
+    // Double quotes still collapse the two escapes.
+    expect(splitShellCommand(`echo "a\\\\b"`, true)).toEqual(["echo", "a\\b"]);
+  });
 });
 
 describe("spawnBackground", { retry: 1 }, () => {

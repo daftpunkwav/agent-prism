@@ -18,7 +18,7 @@ import { Hono } from "hono";
 import type { Context, MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import type { Clock, McpServerConfigView } from "@agentprism/contracts";
-import { sanitizeErrorMessage } from "@agentprism/contracts";
+import { isLoopbackHost, sanitizeErrorMessage } from "@agentprism/contracts";
 import { buildCorsOriginList, type RuntimeKnobFieldMeta, type RuntimeKnobs, type Settings } from "@agentprism/config";
 import { AppError, type ArenaLogsService, type ArenaService, type MatrixService, type ProviderService, type ProjectStore, type SessionService, type ThreadService, type WorkspaceFileService } from "@agentprism/application";
 import { BuilderError, type BuilderService } from "@agentprism/builder-service";
@@ -150,6 +150,58 @@ function apiTokenMiddleware(token: string): MiddlewareHandler {
 }
 
 /**
+ * DNS-rebinding guard for the loopback-default deployment. The cross-site guard
+ * above covers state-changing methods (their foreign Origin header is visible),
+ * but plain reads stay open — and a page that rebinds its own hostname to the
+ * loopback address becomes same-origin with this listener and could read
+ * sessions, workspace files, and provider config. Browsers always send Host, so
+ * while the server binds a loopback address, a non-allowlisted Host is the
+ * rebinding signature and is rejected. Requests without a Host header pass
+ * (HTTP/1.0-style and in-process test clients; a rebinding attack needs a
+ * browser, which always sends Host). The allowlist shares the CORS single
+ * source: an operator-declared frontend origin stays reachable through it, the
+ * same CORS_ORIGINS remedy as every other browser-facing guard. A non-loopback
+ * bind means the operator deliberately exposed named hosts, and the token gate
+ * then applies anyway, so the guard is not registered there.
+ */
+function loopbackHostGuard(allowedOrigins: string[]): MiddlewareHandler {
+  const allowedHosts = new Set<string>(["localhost", "127.0.0.1", "::1", "[::1]"]);
+  for (const origin of allowedOrigins) {
+    try {
+      allowedHosts.add(new URL(origin).hostname.toLowerCase());
+    } catch {
+      // A malformed allowlist entry is loadSettings' contract, not a Host value.
+    }
+  }
+  return async (c, next) => {
+    const raw = c.req.header("host");
+    if (raw === undefined || raw === "") return next();
+    // URL delimiters are not part of a uri-host[:port] authority; URL parsing
+    // would silently absorb them (a trailing /?x lands in the pathname) and a
+    // delimiter in Host can change the URL the server constructs downstream.
+    if (/[/?#]/.test(raw)) {
+      return c.json({ detail: "Forbidden: host header is not allowed" }, 403);
+    }
+    // Parse through URL so a bracketed IPv6 or a port suffix normalize to the
+    // bare hostname the allowlist check expects. The value must be nothing but
+    // `uri-host[:port]`: URL components that a Host header cannot carry
+    // (userinfo, a path) would otherwise be absorbed by the parse —
+    // `attacker.example@localhost` would resolve to the allowlisted hostname.
+    let parsed: URL;
+    try {
+      parsed = new URL(`http://${raw}`);
+    } catch {
+      return c.json({ detail: "Forbidden: host header is not allowed" }, 403);
+    }
+    if (parsed.username !== "" || parsed.password !== "" || parsed.pathname !== "/") {
+      return c.json({ detail: "Forbidden: host header is not allowed" }, 403);
+    }
+    if (allowedHosts.has(parsed.hostname.toLowerCase())) return next();
+    return c.json({ detail: "Forbidden: host header is not allowed" }, 403);
+  };
+}
+
+/**
  * Builds the HTTP shell: protocol parsing, middleware, health checks, error
  * mapping, and event serialization only. Domain routes are mounted by the caller
  * (see route-* leaves); this file does not listen on ports, create drivers, or
@@ -158,6 +210,11 @@ function apiTokenMiddleware(token: string): MiddlewareHandler {
 export function createHttpApplication(deps: HttpApplicationDeps): HttpApp {
   const { settings } = deps;
   const app = new Hono<{ Variables: { appSettings: Settings } }>();
+
+  // DNS rebinding read guard: only meaningful on a loopback bind (see above).
+  if (isLoopbackHost(settings.backendHost)) {
+    app.use("*", loopbackHostGuard(buildCorsOriginList(settings.corsOrigins, settings.frontendPort)));
+  }
 
   // CORS: allowlist + credentials
   app.use(

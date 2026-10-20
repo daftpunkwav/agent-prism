@@ -6,6 +6,8 @@
  * - Lock the mutation semantics both backends promise to keep identical
  *   (caps, sanitization, stale-active migration, newest-first ordering —
  *   see the JsonlSessionStore header)
+ * - Provide in-memory JsonFile/AppendFile doubles so the parity suite pays no
+ *   disk cost: durability mechanics keep their dedicated real-file tests
  *
  * The single-doc and JSONL backends are a deliberate dual implementation that
  * differs only in durability mechanics. That "mirror exactly" invariant was
@@ -17,6 +19,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { AppendFile, JsonFile } from "@agentprism/persistence";
 import type { SessionStore } from "@agentprism/contracts";
 import { SessionNotFoundError, SessionValidationError } from "@agentprism/contracts";
 import {
@@ -25,6 +28,40 @@ import {
   MAX_SESSION_TITLE_CHARS,
   MAX_SUMMARY_CHARS,
 } from "@agentprism/session";
+
+/**
+ * In-memory JsonFile double over the same JSON round-trip the real file does:
+ * write serializes and read re-parses, so a payload that only survives because
+ * it was never serialized fails here exactly as it would on disk.
+ */
+export class MemoryJsonFile implements JsonFile {
+  private payload: unknown = null;
+
+  read<T>(): T | null {
+    return this.payload === null ? null : (JSON.parse(JSON.stringify(this.payload)) as T);
+  }
+
+  async write(payload: unknown): Promise<void> {
+    this.payload = JSON.parse(JSON.stringify(payload));
+  }
+}
+
+/** In-memory AppendFile double: line list with the same append/read/rewrite contract. */
+export class MemoryAppendFile implements AppendFile {
+  private lines: string[] = [];
+
+  async append(newLines: string[]): Promise<void> {
+    this.lines.push(...newLines);
+  }
+
+  async readLines(): Promise<string[]> {
+    return [...this.lines];
+  }
+
+  async rewrite(lines: string[]): Promise<void> {
+    this.lines = [...lines];
+  }
+}
 
 /** One backend under test: fresh instances over the SAME backing files. */
 export interface SessionStoreBackend {

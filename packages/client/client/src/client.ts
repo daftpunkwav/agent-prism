@@ -216,6 +216,8 @@ export interface MatrixStreamItem {
   score?: string;
   error?: string;
   report?: unknown;
+  /** In-stream failure channel: the route reuses the systemErrorEvent shape on this stream. */
+  message?: string;
 }
 
 /** Named options for streamMatrixRun (avoids a long positional parameter list). */

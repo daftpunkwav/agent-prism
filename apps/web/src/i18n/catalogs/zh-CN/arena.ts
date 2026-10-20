@@ -386,6 +386,7 @@ export const arena = {
   },
   stream: {
     runError: "运行错误",
+    matrixRunError: "矩阵运行失败",
     disconnected: "连接在所有列结束前中断，请重新发起提问",
   },
   ws: {

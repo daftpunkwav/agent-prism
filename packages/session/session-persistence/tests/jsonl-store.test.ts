@@ -11,7 +11,7 @@ import { AtomicJsonFile } from "@agentprism/persistence";
 import { RandomIdGenerator, SystemClock } from "@agentprism/runtime";
 import { InMemoryBlobStore } from "@agentprism/session";
 import { JsonlSessionStore } from "../src/jsonl-session-store.js";
-import { runSessionStoreParityTests } from "./session-store-parity.harness.js";
+import { MemoryAppendFile, MemoryJsonFile, runSessionStoreParityTests } from "./session-store-parity.harness.js";
 
 function backend() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-jsonl-"));
@@ -30,23 +30,30 @@ function backend() {
 
 // Mutation semantics mirror FileSessionStore exactly (see the class header);
 // the shared suite is that mirror's guard, next to the doc backend's copy.
+// Log and snapshot are the in-memory doubles: the parity suite locks
+// semantics, and real-disk append+checkpoint under full-suite load pushed the
+// cap cases toward the 30s budget. Replay, checkpoints, and crash posture keep
+// their dedicated real-file tests below and in jsonl-store-guards.
 runSessionStoreParityTests("JsonlSessionStore", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-parity-"));
   // One blob sidecar shared across reopens: the sidecar is durable in
-  // production, so spilled entries must survive an instance swap.
+  // production, so spilled entries must survive an instance swap. The log and
+  // snapshot are shared the same way — each open() re-loads the same backing
+  // files, which is the reopen behavior under test.
   const blobs = new InMemoryBlobStore();
+  const log = new MemoryAppendFile();
+  const snapshot = new MemoryJsonFile();
   let seq = 0;
   let now = 1_700_000_000_000;
   return {
     open: () =>
       new JsonlSessionStore({
-        log: new NodeAppendFile(path.join(dir, "sessions.jsonl")),
-        snapshot: new AtomicJsonFile(path.join(dir, "snapshot.json")),
+        log,
+        snapshot,
         idGenerator: { next: () => `parity-${++seq}` },
         clock: { now: () => (now += 1) },
         blobs,
       }),
-    dispose: () => fs.rmSync(dir, { recursive: true, force: true }),
+    dispose: () => {},
   };
 });
 

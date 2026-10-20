@@ -48,6 +48,21 @@ describe("ScopedFileSystem edit and delete", () => {
     }
   });
 
+  it("lands dollar sequences in new_text verbatim", () => {
+    const root = makeRoot();
+    try {
+      const fs = new ScopedFileSystem(root);
+      fs.writeFile("script.sh", "total=100\n");
+      // String.replace would expand $& (the match), $` (the prefix), $' (the
+      // suffix), and $$ in the replacement; an edit must write user text as-is.
+      const replacement = "cost: $$ & $& end `$` mid $' end";
+      fs.editFile("script.sh", "100", replacement);
+      expect(fs.readFile("script.sh")).toBe(`total=${replacement}\n`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("rejects an edit of a file that does not exist", () => {
     const root = makeRoot();
     try {

@@ -77,7 +77,15 @@ function describeProbeError(error: unknown, secrets: Array<string | undefined>):
  * id only → stored endpoint; endpoints only → the first one; otherwise legacy flat construction.
  */
 export async function testProviderConnection(
-  deps: { provider: ProviderConfig; catalog?: EndpointCatalog; idGenerator: IdGenerator },
+  deps: {
+    provider: ProviderConfig;
+    catalog?: EndpointCatalog;
+    idGenerator: IdGenerator;
+    /** Probe per-attempt timeout; defaults to LLM_TIMEOUT_MS. The host injects the operator knobs. */
+    timeoutMs?: number;
+    /** Probe SDK retry count; defaults to LLM_MAX_RETRIES. */
+    maxRetries?: number;
+  },
   target: ConnectionTestTarget | null,
 ): Promise<ConnectionTestResult> {
   const { provider, catalog } = deps;
@@ -120,6 +128,11 @@ export async function testProviderConnection(
     const model = createChatModel({
       provider,
       catalog,
+      // Operator-tuned timeout/retries: without this a black-holed endpoint pins
+      // the probe HTTP request for the raw factory defaults (minutes per attempt
+      // chain) even when the operator has tuned the knobs down.
+      ...(deps.timeoutMs !== undefined ? { timeoutMs: deps.timeoutMs } : {}),
+      ...(deps.maxRetries !== undefined ? { maxRetries: deps.maxRetries } : {}),
       overrides: {
         endpointId: undefined,
         apiKey: endpoint.api_key,

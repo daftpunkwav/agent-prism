@@ -44,17 +44,24 @@ interface JobRecord {
   id: string;
   command: string;
   job: BackgroundJob;
-  /** Output chars already reported: polls return the delta, not the whole log. */
+  /**
+   * Absolute output offset already reported: polls return the delta, not the
+   * whole log. job.outputStart() rebases it onto the current buffer, whose head
+   * the cap may have trimmed.
+   */
   sent: number;
   killed: boolean;
-  /** Output chars already persisted to spill files (monotone; bounds disk writes). */
+  /** Absolute output offset already persisted to spill files (monotone; bounds disk writes). */
   spilled: number;
 }
 
 /** Oversized poll deltas spill to workspace files instead of vanishing. */
 const SPILL_THRESHOLD_CHARS = 32 * 1024;
 const MAX_SPILL_BYTES = 256 * 1024;
-const MAX_SPILL_FILES = 20;
+// Retention for job *.log spills only, independent of the result-spill-*.txt
+// retention in spill.ts (the two rotation policies never evict each other's
+// files; keeping separate constants preserves that boundary).
+const MAX_JOB_SPILL_FILES = 20;
 
 /** Process-scoped registry namespaced by workspace root (see file header for lifetime limits). */
 interface JobScope {
@@ -118,10 +125,18 @@ function renderPoll(
   scope: JobScope,
   fs: { writeFile(path: string, content: string): unknown; deleteFile(path: string): unknown; listFiles(dir: string, options?: { recursive?: boolean }): string[] },
 ): string {
+  // Absolute stream offset of the buffer's first char: the cap head-trims a
+  // flooded job's buffer, so the sent/spilled cursors are rebased off it.
+  const base = record.job.outputStart();
   const full = record.job.output();
-  const delta = full.slice(record.sent);
-  record.sent = full.length;
-  const head = `job ${record.id}: ${statusLine(record)}, ${full.length} chars total`;
+  // A cursor behind the buffer head means the cap already dropped output that
+  // neither this delta nor the spill file will ever show; report the gap loudly
+  // instead of letting the poll look like a clean continuation.
+  const dropped = Math.max(0, base - Math.min(record.sent, record.spilled));
+  const delta = full.slice(Math.max(0, record.sent - base));
+  record.sent = base + full.length;
+  const head = `job ${record.id}: ${statusLine(record)}, ${base + full.length} chars total`;
+  const droppedNote = dropped > 0 ? `\n(${dropped} chars of earlier output scrolled out of the buffer before this poll)` : "";
   // Sandbox setup failure: the exit-3 sentinel is mapped to a readable note
   // instead of drowning in raw output, mirroring the bash tool.
   const setupFailure = record.job.sandboxSetupFailure();
@@ -129,12 +144,12 @@ function renderPoll(
     setupFailure === null || record.job.alive()
       ? ""
       : `\n(${setupFailure}; the job never started — check sandbox_mode or the workspace root)`;
-  if (delta === "" && setupNote === "") return `${head}\n(no new output)`;
-  if (delta === "") return `${head}${setupNote}`;
+  if (delta === "" && setupNote === "" && droppedNote === "") return `${head}\n(no new output)`;
+  if (delta === "") return `${head}${droppedNote}${setupNote}`;
   // Spill trigger keys on unspilled volume, not the single delta: streamed output
   // arrives in arbitrary chunks, so per-delta thresholds would rarely fire while the
   // middle still vanishes. Spilled files stay readable/greppable mid-run.
-  const unspilled = full.slice(record.spilled);
+  const unspilled = full.slice(Math.max(0, record.spilled - base));
   let spillNote = "";
   if (unspilled.length > SPILL_THRESHOLD_CHARS) {
     // The middle would otherwise vanish: persist the full span for read/grep,
@@ -147,12 +162,12 @@ function renderPoll(
           ? `${unspilled.slice(0, MAX_SPILL_BYTES)}\n…(spill capped, ${unspilled.length} chars total)`
           : unspilled;
       fs.writeFile(file, body);
-      record.spilled = full.length;
+      record.spilled = base + full.length;
       const spilled = fs
         .listFiles(SPILL_DIR, { recursive: false })
         .filter((entry) => entry.endsWith(".log"))
         .sort();
-      for (const extra of spilled.slice(0, Math.max(0, spilled.length - MAX_SPILL_FILES))) {
+      for (const extra of spilled.slice(0, Math.max(0, spilled.length - MAX_JOB_SPILL_FILES))) {
         try {
           fs.deleteFile(extra);
         } catch {
@@ -164,7 +179,7 @@ function renderPoll(
       spillNote = `\n(spill failed: ${error instanceof Error ? error.message : String(error)})`;
     }
   }
-  return `${head}\n${truncate(delta)}${spillNote}${setupNote}`;
+  return `${head}${droppedNote}\n${truncate(delta)}${spillNote}${setupNote}`;
 }
 
 async function executeRunJob(workspace: ToolWorkspace, args: ToolArgs): Promise<ToolExecutionResult> {

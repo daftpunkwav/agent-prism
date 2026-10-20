@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { MapToolRegistry } from "@agentprism/tool-registry";
 import { McpClient, McpError, mcpContentToText } from "../src/client.js";
 import { registerRemoteMcpTools, remoteToolName } from "../src/remote-tools.js";
-import { frameMessage, FrameDecoder } from "../src/transport.js";
+import { MAX_FRAME_BUFFER_CHARS, frameMessage, FrameDecoder } from "../src/transport.js";
 import type { McpChildProcess, McpTransport } from "../src/transport.js";
 
 /** In-memory duplex: scripted replies per method, observable writes. */
@@ -358,5 +358,21 @@ describe("FrameDecoder", () => {
     expect(decoder.push(framed.slice(half))).toEqual(['{"a":1}']);
     // A CRLF writer and stray keep-alive newlines must not produce phantom bodies.
     expect(decoder.push('{"b":2}\r\n\n{"c":3}\n')).toEqual(['{"b":2}', '{"c":3}']);
+  });
+
+  it("latches overflow past the frame ceiling and stops buffering (bounded memory)", () => {
+    const decoder = new FrameDecoder();
+    expect(decoder.overflowed).toBe(false);
+    // A legitimate huge single body stays under the ceiling and deframes fine.
+    const big = "x".repeat(MAX_FRAME_BUFFER_CHARS - 1);
+    expect(decoder.push(`${big}\n`)).toEqual([big]);
+    expect(decoder.overflowed).toBe(false);
+
+    // One unframed flood past the ceiling latches overflow: accumulation stops
+    // (the decoder never grows past roughly the ceiling) and later chunks no-op.
+    expect(decoder.push("y".repeat(MAX_FRAME_BUFFER_CHARS + 1))).toEqual([]);
+    expect(decoder.overflowed).toBe(true);
+    expect(decoder.push("more\n")).toEqual([]);
+    expect(decoder.overflowed).toBe(true);
   });
 });

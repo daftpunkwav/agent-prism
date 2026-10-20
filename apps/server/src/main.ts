@@ -49,8 +49,11 @@ async function main(): Promise<void> {
         await stop?.();
       } finally {
         // Compact before the last flush: the log tail lands in the snapshot, so the
-        // next boot replays a bounded log.
-        await components.checkpointStores().catch(() => undefined);
+        // next boot replays a bounded log. A failed compaction is not fatal (the
+        // durable log replays on the next boot) but must not vanish silently.
+        await components.checkpointStores().catch((error: unknown) => {
+          console.warn(`[server] Shutdown checkpoint failed: ${error instanceof Error ? error.message : String(error)}`);
+        });
         await components?.flushDurableStores();
       }
     },

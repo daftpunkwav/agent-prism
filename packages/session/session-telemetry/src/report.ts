@@ -7,10 +7,10 @@
  * - Keep output short, sorted, and free of timestamps (diffable)
  */
 
-import type { SessionKind } from "@agentprism/contracts";
+import { SESSION_KINDS, type SessionKind } from "@agentprism/contracts";
 import type { SessionTelemetry } from "./counters.js";
 
-const KINDS: SessionKind[] = ["arena", "agent", "builder"];
+const KINDS: readonly SessionKind[] = SESSION_KINDS;
 
 /** Renders one telemetry snapshot as stable lines. */
 export function renderTelemetryReport(telemetry: SessionTelemetry): string {

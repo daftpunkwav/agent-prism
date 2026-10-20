@@ -37,22 +37,54 @@ export interface McpTransport {
 /** Parses newline-delimited JSON-RPC bodies out of a text chunk buffer. */
 export class FrameDecoder {
   private buffer = "";
+  /** Latched once the buffer outgrew the ceiling: the peer is not speaking MCP stdio. */
+  private overflow = false;
 
-  /** Pushes a text chunk, returning complete message bodies. */
+  /** Pushes one text chunk, returning complete message bodies. */
   push(chunk: string): string[] {
+    // A body that outgrows the ceiling without ever emitting a newline is not a
+    // JSON-RPC message: keep buffering it and memory exhaustion is only a matter
+    // of stream rate. The latch stops accumulation (the transport kills the
+    // peer, so no further input matters) and keeps this decoder allocation-bounded.
+    if (this.overflow) return [];
     this.buffer += chunk;
     const out: string[] = [];
     for (;;) {
       const lineEnd = this.buffer.indexOf("\n");
-      if (lineEnd === -1) return out;
+      if (lineEnd === -1) break;
       // Tolerate CRLF writers and blank keep-alive lines: neither is a message.
       const line = this.buffer.slice(0, lineEnd).replace(/\r$/, "");
       this.buffer = this.buffer.slice(lineEnd + 1);
+      // Ceiling check before emitting: a complete frame whose terminating
+      // newline arrived in this chunk would otherwise slip past the post-loop
+      // check below and be accepted however large it is.
+      if (line.length > MAX_FRAME_BUFFER_CHARS) {
+        this.overflow = true;
+        this.buffer = "";
+        return out;
+      }
       if (line.trim() === "") continue;
       out.push(line);
     }
+    if (this.buffer.length > MAX_FRAME_BUFFER_CHARS) {
+      this.overflow = true;
+      this.buffer = "";
+    }
+    return out;
+  }
+
+  /** True once the buffer outgrew the ceiling (sticky; the transport fails closed on it). */
+  get overflowed(): boolean {
+    return this.overflow;
   }
 }
+
+/**
+ * Frame buffer ceiling (chars). One legitimate JSON-RPC body can be large (a
+ * tools/call reply carrying a big payload), but far below this; a stream that
+ * exceeds the ceiling with no newline in flight is a broken or hostile peer.
+ */
+export const MAX_FRAME_BUFFER_CHARS = 16_000_000;
 
 /** Frames one JSON-RPC body as a newline-delimited line. */
 export function frameMessage(body: string): string {
@@ -108,10 +140,24 @@ export class NodeMcpTransport implements McpTransport {
     // could act on.
     child.stdin?.on("error", () => {});
     child.stdout?.on("error", () => {});
+    let overflowReported = false;
     child.stdout?.on("data", (chunk: Buffer) => {
       for (const message of decoder.push(textDecoder.write(chunk))) {
         queue.push(message);
         wake();
+      }
+      if (decoder.overflowed && !overflowReported) {
+        // Fail closed on a peer that never frames: left alone, its output would
+        // grow the frame buffer without bound (resource exhaustion inside one
+        // run). Killing ends the stream, so pending calls reject through the
+        // normal stream-end path and a later spawn starts clean.
+        overflowReported = true;
+        console.warn(`[mcp] server output exceeded ${MAX_FRAME_BUFFER_CHARS} chars with no message framing; killing the server process`);
+        try {
+          child.kill();
+        } catch {
+          // Already exited: the exit path reports the outcome.
+        }
       }
     });
     const finish = (): void => {

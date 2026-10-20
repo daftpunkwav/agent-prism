@@ -75,6 +75,27 @@ describe("runJobTool", { retry: 1 }, () => {
     }
   });
 
+  it("reports output the cap dropped between polls", async () => {
+    const ws = tempWorkspace();
+    try {
+      // Deterministic single-gap flood: the job delays its write so start()
+      // returns long before any output exists, and the 1.2s margin after the
+      // write begins dwarfs the pipe drain time for 1.5MB — by the first poll
+      // the whole burst has landed and the head trim has dropped its oldest
+      // span behind the zero cursor.
+      const id = await start(
+        ws,
+        `${NODE} -e "setTimeout(() => { process.stdout.write('x'.repeat(1500000)); console.log('TAIL-MARKER') }, 300)"`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const acc = await pollUntilDone(ws, id);
+      expect(acc).toContain("scrolled out of the buffer");
+      expect(acc).toContain("TAIL-MARKER");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("kills a hanging job", async () => {
     const ws = tempWorkspace();
     try {

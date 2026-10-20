@@ -387,6 +387,7 @@ export const arena = {
   },
   stream: {
     runError: "Run error",
+    matrixRunError: "Matrix run failed",
     disconnected: "Connection lost before every column finished; run the question again",
   },
   ws: {

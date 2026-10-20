@@ -13,7 +13,7 @@
  * time ranges are half-open [from, to) over createdAt/updatedAt.
  */
 
-import { SessionNotFoundError, type SessionEntry, type SessionKind, type SessionRecord, type SessionStatus, type SessionStore } from "@agentprism/contracts";
+import { SESSION_KINDS, SESSION_STATUSES, SessionNotFoundError, type SessionEntry, type SessionKind, type SessionRecord, type SessionStatus, type SessionStore } from "@agentprism/contracts";
 
 /** Sort orders for session queries. */
 export type SessionSort = "newest" | "oldest" | "title";
@@ -49,8 +49,8 @@ export interface SessionQueryPage {
 const QUERY_DEFAULT_LIMIT = 50;
 const QUERY_MAX_LIMIT = 500;
 
-const KNOWN_KINDS: readonly SessionKind[] = ["arena", "agent", "builder"];
-const KNOWN_STATUSES: readonly SessionStatus[] = ["active", "completed", "failed", "cancelled"];
+const KNOWN_KINDS: readonly SessionKind[] = SESSION_KINDS;
+const KNOWN_STATUSES: readonly SessionStatus[] = SESSION_STATUSES;
 
 function matchesText(record: SessionRecord, text: string): boolean {
   const needle = text.toLowerCase();

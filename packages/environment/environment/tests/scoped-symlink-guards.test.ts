@@ -4,7 +4,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, lstatSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, lstatSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -127,6 +127,27 @@ describe("ScopedFileSystem symlink guards", () => {
     expect(fs.writeFile("fresh/dir/x.txt", "x")).toContain("Wrote");
     rmSync(root, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
+  });
+
+  it("createFile does not clobber an entry that appears between the existence pre-check and the open (race)", () => {
+    const root = makeRoot();
+    try {
+      // Stand-in for the losing side of a create race: the pre-check answered
+      // "absent", but a concurrent writer's entry exists by open time.
+      const raced = new ScopedFileSystem(root);
+      (raced as unknown as { exists: (path: string) => boolean }).exists = (path: string) => {
+        if (path === "race.txt") {
+          writeFileSync(join(root, "race.txt"), "concurrent", "utf-8");
+        }
+        return false;
+      };
+      expect(() => raced.createFile("race.txt", "mine")).toThrow(/already exists/);
+      expect(readFileSync(join(root, "race.txt"), "utf-8")).toBe("concurrent");
+      // Non-racing creates are unaffected.
+      expect(new ScopedFileSystem(root).createFile("fresh.txt", "x")).toContain("Wrote");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("in-root read/write/edit are unaffected", () => {

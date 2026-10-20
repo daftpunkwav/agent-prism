@@ -44,7 +44,16 @@ export interface ProcessOptions {
   sandbox?: ProcessSandboxRequest;
 }
 
-/** Cumulative output cap per stream (characters) to keep huge outputs from exhausting memory. */
+/**
+ * Cumulative output cap per stream (characters) to keep huge outputs from exhausting memory.
+ * Two consumption shapes share the cap: runProcess is one-shot (its consumer reads the
+ * buffer once at settle), so it simply stops appending at the cap; the long-lived handles
+ * (persistent shell, background job) instead drop the OLDEST output so the stream keeps
+ * flowing — a frozen buffer would permanently hide every later sentinel line (bash_session
+ * sends would all burn their full timeout on an alive-but-mute shell) and every new job
+ * output (run_job polls would report "no new output" forever). Their consumers rebase
+ * buffer offsets via outputStart().
+ */
 const MAX_OUTPUT_CHARS = 1_000_000;
 
 /**
@@ -283,17 +292,21 @@ export interface PersistentShell {
   alive(): boolean;
   /** Writes raw bytes to shell stdin (the caller appends newlines/markers). */
   write(data: string): void;
-  /** Combined output so far (capped). */
+  /** Combined output so far (capped; the oldest output is dropped once the cap overflows). */
   output(): string;
+  /** Absolute stream offset of output()'s first character; grows as the cap trims the head. */
+  outputStart(): number;
   /** Closes stdin then SIGTERMs (EOF lets `exit`-less shells finish first). */
   kill(): void;
 }
 
 /**
  * Spawns `bash --noprofile --norc -s` (POSIX only): hermetic, reads commands
- * from stdin, no prompt on pipes. Throws WorkspaceError when bash is missing
- * or the spawn itself fails. Windows callers must fail closed upstream —
- * interactive PowerShell framing is a separate backend, not a flag flip.
+ * from stdin, no prompt on pipes. Throws WorkspaceError when the spawn call
+ * itself fails; a missing bash binary is reported asynchronously through the
+ * returned handle (the child's error event marks it dead), not as a throw.
+ * Windows callers must fail closed upstream — interactive PowerShell framing
+ * is a separate backend, not a flag flip.
  *
  * @param options Working directory the shell starts in.
  * @returns Live shell handle (write/output/alive/kill); caller owns framing and lifetime.
@@ -316,11 +329,22 @@ export function spawnPersistentShell(options: PersistentShellOptions): Persisten
     throw new WorkspaceError(`Error: cannot start persistent shell (${(error as Error).message})`);
   }
   let buffer = "";
+  /** Total characters dropped from the buffer's head: outputStart() = trimmed. */
+  let trimmed = 0;
   let running = true;
   let escalate: NodeJS.Timeout | null = null;
   const shellDecoder = new StreamDecoder();
   const append = (chunk: Buffer) => {
-    if (buffer.length < MAX_OUTPUT_CHARS) buffer += shellDecoder.decode(chunk);
+    // Decode every chunk even past the cap: skipping would desync a multi-byte
+    // sequence straddling the boundary for all later output.
+    buffer += shellDecoder.decode(chunk);
+    if (buffer.length > MAX_OUTPUT_CHARS) {
+      // Head-trim (see MAX_OUTPUT_CHARS): the sentinel-framed cursor consumer
+      // must keep seeing fresh output on a long-lived shell.
+      const drop = buffer.length - MAX_OUTPUT_CHARS;
+      buffer = buffer.slice(drop);
+      trimmed += drop;
+    }
   };
   child.stdout?.on("data", append);
   child.stderr?.on("data", append);
@@ -345,6 +369,7 @@ export function spawnPersistentShell(options: PersistentShellOptions): Persisten
       }
     },
     output: () => buffer,
+    outputStart: () => trimmed,
     kill: () => {
       try {
         child.stdin?.end();
@@ -390,8 +415,10 @@ export interface BackgroundJob {
   alive(): boolean;
   /** Exit code once reaped, null while running or signal-killed. */
   exitCode(): number | null;
-  /** Combined output so far (capped). */
+  /** Combined output so far (capped; the oldest output is dropped once the cap overflows). */
   output(): string;
+  /** Absolute stream offset of output()'s first character; grows as the cap trims the head. */
+  outputStart(): number;
   /** Reason when the sandbox helper failed at setup (exit 3 + authenticated sentinel); null otherwise. */
   sandboxSetupFailure(): string | null;
   /** SIGTERM now, SIGKILL escalation on the shared schedule; safe to call twice. */
@@ -431,16 +458,26 @@ export function spawnBackground(options: BackgroundJobOptions): BackgroundJob {
     throw new WorkspaceError(`Error: cannot start background job (${(error as Error).message})`);
   }
   let buffer = "";
+  /** Total characters dropped from the buffer's head: outputStart() = trimmed. */
+  let trimmed = 0;
   let code: number | null = null;
   let running = true;
   let escalate: NodeJS.Timeout | null = null;
   const jobDecoder = new StreamDecoder();
-  child.stdout?.on("data", (chunk: Buffer) => {
-    if (buffer.length < MAX_OUTPUT_CHARS) buffer += jobDecoder.decode(chunk);
-  });
-  child.stderr?.on("data", (chunk: Buffer) => {
-    if (buffer.length < MAX_OUTPUT_CHARS) buffer += jobDecoder.decode(chunk);
-  });
+  const append = (chunk: Buffer) => {
+    // Decode every chunk even past the cap (see spawnPersistentShell): skipping
+    // would desync a multi-byte sequence straddling the boundary.
+    buffer += jobDecoder.decode(chunk);
+    if (buffer.length > MAX_OUTPUT_CHARS) {
+      // Head-trim (see MAX_OUTPUT_CHARS): run_job's poll/spill cursors must keep
+      // seeing fresh output on a long-lived job.
+      const drop = buffer.length - MAX_OUTPUT_CHARS;
+      buffer = buffer.slice(drop);
+      trimmed += drop;
+    }
+  };
+  child.stdout?.on("data", append);
+  child.stderr?.on("data", append);
   child.on("error", () => {
     // Bad binary and friends: mark finished; the exit code stays null and the
     // buffered output (often empty) is whatever the OS delivered before the error.
@@ -468,6 +505,7 @@ export function spawnBackground(options: BackgroundJobOptions): BackgroundJob {
     alive: () => running && child.exitCode === null && child.signalCode === null,
     exitCode: () => code,
     output: () => buffer,
+    outputStart: () => trimmed,
     sandboxSetupFailure: () =>
       sandbox !== undefined && code === 3 && isSandboxSetupFailure(buffer, sandboxNonce)
         ? sandboxSetupFailureReason(buffer, sandboxNonce)
@@ -511,7 +549,10 @@ export function splitShellCommand(command: string, posix: boolean): string[] {
   for (let i = 0; i < command.length; i += 1) {
     const ch = command[i];
     if (quote !== null) {
-      if (posix && ch === "\\" && i + 1 < command.length && (command[i + 1] === quote || command[i + 1] === "\\")) {
+      // POSIX: backslashes are literal inside single quotes (only the closing
+      // quote ends the token); inside double quotes a backslash escapes the
+      // quote and another backslash, per shell rules.
+      if (posix && quote === '"' && ch === "\\" && i + 1 < command.length && (command[i + 1] === quote || command[i + 1] === "\\")) {
         current += command[i + 1];
         i += 1;
         continue;

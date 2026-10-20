@@ -222,4 +222,31 @@ describe("testProviderConnection endpoint selection", () => {
     expect(result.ok).toBe(true);
     expect(result.message).toContain("pong from loopback");
   });
+
+  it("applies the injected timeout to a hanging endpoint instead of the raw factory default", async () => {
+    // A server that accepts and never answers models a black-holed endpoint:
+    // the probe must fail on the operator-injected timeout, not hang out the
+    // 120s factory default (x retries) while the HTTP request stays pinned.
+    const hang = createServer(() => {});
+    await new Promise<void>((resolve) => hang.listen(0, "127.0.0.1", resolve));
+    const address = hang.address();
+    const url = `http://127.0.0.1:${typeof address === "object" && address !== null ? address.port : 0}/v1`;
+    try {
+      const target: ConnectionTestTarget = {
+        endpoints: [{ id: "", api_key: "k", base_url: url, api_format: "openai_chat" } as never],
+      };
+      const startedAt = Date.now();
+      const result = await testProviderConnection(
+        { provider: provider([]), idGenerator: ids, timeoutMs: 600, maxRetries: 0 },
+        target,
+      );
+      expect(result.ok).toBe(false);
+      // Wide ceiling for loaded machines: the injected bound is 0.6s, the raw
+      // factory default this regression locks out is 120s per attempt.
+      expect(Date.now() - startedAt).toBeLessThan(30_000);
+    } finally {
+      hang.closeAllConnections();
+      await new Promise<void>((resolve) => hang.close(() => resolve()));
+    }
+  });
 });

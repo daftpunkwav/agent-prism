@@ -32,7 +32,7 @@ Settings 在启动时经 `packages/config/config/src/settings.ts` 中的 `loadSe
 | `LLM_MODEL` | `step-3.7-flash` | 播种模型 |
 | `LLM_API_FORMAT` | `anthropic_messages` | `anthropic_messages`、`openai_chat` 或 `openai_responses` |
 | `LLM_TEMPERATURE` | `0.0` | 0 至 2 |
-| `LLM_TIMEOUT_MS` | `120000` | 每次 chat-model 调用超时，适用于列模型、judge、narrative 与 builder |
+| `LLM_TIMEOUT_MS` | `120000` | 每次 chat-model 调用超时，适用于列模型、judge、narrative、builder 与连接探针 |
 | `LLM_MAX_RETRIES` | `2`，范围 0 至 5 | chat model 的 SDK 级瞬时失败重试次数 |
 | `LLM_RETRY_DELAY_MS` | `500`，范围 0 至 10 000 | 已解析但当前无消费者：重试由 chat model 的 SDK 承担（`LLM_MAX_RETRIES`），退避由 SDK 自行管理；保留兼容 |
 

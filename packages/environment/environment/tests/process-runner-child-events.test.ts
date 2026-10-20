@@ -436,6 +436,21 @@ describe("spawnPersistentShell off Windows", () => {
     expect(child.signals).toEqual([]);
   });
 
+  it("marks the shell dead when the spawn fails asynchronously (missing bash ENOENT)", () => {
+    // A missing binary does not throw at spawn time: node reports ENOENT through
+    // the child's error event, so the handle must converge to dead (the
+    // bash_session send path re-checks alive() and reports "no live shell"
+    // instead of writing into a shell that never existed).
+    const shell = spawnPersistentShell({ cwd: "/work" });
+    expect(shell.alive()).toBe(true);
+    child.emit("error", new Error("spawn bash ENOENT"));
+    expect(shell.alive()).toBe(false);
+    expect(() => shell.write("echo hi\n")).toThrow(/persistent shell is closed/);
+    // Killing an already-dead shell must not signal a child that never started.
+    shell.kill();
+    expect(child.signals).toEqual([]);
+  });
+
   it("reports a failed shell write and a failed start", () => {
     const shell = spawnPersistentShell({ cwd: "/work" });
     child.stdin.write.mockImplementation(() => {
@@ -467,6 +482,37 @@ describe("spawnPersistentShell off Windows", () => {
     shell.kill();
     vi.advanceTimersByTime(3_000);
     expect(child.signals).toEqual([undefined, "SIGKILL"]);
+  });
+
+  it("head-trims a flooded buffer and advances outputStart (cursor consumers can rebase)", () => {
+    const shell = spawnPersistentShell({ cwd: "/work" });
+    expect(shell.outputStart()).toBe(0);
+    child.out("x".repeat(1_000_000));
+    // The overflowing chunk lands whole, then the head is trimmed back to the cap.
+    child.out("tail-marker");
+    expect(shell.output().length).toBe(1_000_000);
+    expect(shell.output().endsWith("tail-marker")).toBe(true);
+    expect(shell.outputStart()).toBe("tail-marker".length);
+    // Later output keeps landing on the trimmed buffer: the shell never goes mute.
+    child.out("newer");
+    expect(shell.output().endsWith("newer")).toBe(true);
+    expect(shell.output().length).toBe(1_000_000);
+    expect(shell.outputStart()).toBe("tail-marker".length + "newer".length);
+    shell.kill();
+  });
+});
+
+describe("long-lived handle output caps", () => {
+  it("background job: head-trims the combined buffer and advances outputStart", () => {
+    const job = spawnBackground({ argv: ["node"], cwd: "/work" });
+    expect(job.outputStart()).toBe(0);
+    child.out("x".repeat(1_000_000));
+    child.err("tail-marker");
+    expect(job.output().length).toBe(1_000_000);
+    expect(job.output().endsWith("tail-marker")).toBe(true);
+    expect(job.outputStart()).toBe("tail-marker".length);
+    child.close(0);
+    expect(job.exitCode()).toBe(0);
   });
 });
 

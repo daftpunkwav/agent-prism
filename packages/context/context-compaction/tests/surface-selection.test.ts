@@ -60,6 +60,36 @@ describe("selectSpan metering divisor", () => {
   });
 });
 
+describe("selectSpan pair safety", () => {
+  const long = "wording that comfortably exceeds the target tokens";
+
+  it("keeps a multi-call assistant's full tool-result run inside the span", () => {
+    const frames = [
+      frame({ id: "u", role: "user", text: "question" }),
+      frame({ id: "a", role: "assistant", text: long }),
+      frame({ id: "t1", role: "tool", text: long }),
+      frame({ id: "t2", role: "tool", text: long }),
+    ];
+    // Ending on t1 would orphan t2 (its requester is condensed away), so the span
+    // must extend through every tool result of the batch.
+    const span = selectSpan(frames, surfaceTokens([frames[1] as SurfaceFrame, frames[2] as SurfaceFrame]) - 1);
+    expect(span?.ids).toEqual(["a", "t1", "t2"]);
+  });
+
+  it("still ends a span that covers a complete assistant/tool pair", () => {
+    // The trailing assistant outranks the pair on weight so the pair span wins on
+    // its own merits; the assertion is that ending on t1 (next = a2, not a tool)
+    // stays legal once t1's requester is inside.
+    const frames = [
+      frame({ id: "a1", role: "assistant", text: long }),
+      frame({ id: "t1", role: "tool", text: long }),
+      frame({ id: "a2", role: "assistant", text: long, weight: 10 }),
+    ];
+    const span = selectSpan(frames, surfaceTokens([frames[0] as SurfaceFrame]) - 1);
+    expect(span?.ids).toEqual(["a1", "t1"]);
+  });
+});
+
 describe("checkpoint envelope escaping", () => {
   it("round-trips section content that looks like a section head", () => {
     const sections = {

@@ -32,7 +32,7 @@ import {
   type PipelineConfig,
   type SessionQueryPort,
 } from "@agentprism/contracts";
-import { arenaErrorEvent, completeEvent, extractAnswerFromEvents, isPipelineConfigBanner, majorityVote, type RunAttachment } from "@agentprism/contracts";
+import { arenaErrorEvent, completeEvent, createAnswerProjection, extractAnswerFromEvents, majorityVote, type RunAttachment } from "@agentprism/contracts";
 import {
   applyCustomContextTuning,
   createContextAnalytics,
@@ -624,13 +624,11 @@ export async function* runAgentExecution(
     let driverCompleted = false;
     // Ordered unique tool names observed this run (caps the episodic keyActions).
     const seenTools: string[] = [];
-    // Answer mirror for the structured finalize; maintained with the same
-    // preference rule as extractAnswerFromEvents (last thought with banner
-    // skip, falling back to the last observation) so the finalize normalizes
-    // exactly what downstream consumers would extract.
-    let structuredAnswer = "";
-    let streamingAnswer = "";
-    let structuredLastObservation = "";
+    // Answer projection for the structured finalize: the contracts single-source
+    // state machine (createAnswerProjection, the incremental form of
+    // extractAnswerFromEvents), fed incrementally so the finalize normalizes
+    // exactly what downstream consumers would extract from the same stream.
+    const answerProjection = createAnswerProjection();
     // The driver's terminal complete is held back so the structured finalize
     // below can land before it: thread persistence extracts at the complete
     // event, so the normalized answer must precede it.
@@ -667,20 +665,7 @@ export async function* runAgentExecution(
         if (heldComplete === null) heldComplete = event;
         continue;
       }
-      if (event.type === "thought") {
-        if (!isPipelineConfigBanner(event.content)) structuredAnswer = event.content ?? "";
-      } else if (event.type === "thought_delta") {
-        const chunk = event.content ?? "";
-        if (chunk !== "" && !(streamingAnswer === "" && isPipelineConfigBanner(chunk))) {
-          streamingAnswer += chunk;
-          structuredAnswer = streamingAnswer;
-        }
-      } else if (event.type === "thought_end") {
-        structuredAnswer = (event.content ?? "") !== "" ? (event.content ?? "") : streamingAnswer;
-        streamingAnswer = "";
-      } else if (event.type === "observation") {
-        structuredLastObservation = event.result ?? "";
-      }
+      answerProjection.push(event);
       yield stampEvent(event, label, spec.turn, spec.agentId, spec.runId, deps.clock.now());
     }
 
@@ -705,7 +690,7 @@ export async function* runAgentExecution(
     // complete event, so the normalized answer must precede it. Skipped for
     // failed runs — a failed complete is terminal, no further calls happen —
     // and for cancelled runs, which the checkpoint above already threw out.
-    if (structuredAnswer === "") structuredAnswer = structuredLastObservation;
+    const structuredAnswer = answerProjection.answer();
     if (
       spec.config.prompt_profile === "structured" &&
       structuredAnswer !== "" &&

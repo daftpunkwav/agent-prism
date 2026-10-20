@@ -35,6 +35,8 @@ class FakeShell implements PersistentShell {
   pid = 4242;
   running = true;
   written: string[] = [];
+  /** Absolute stream offset of buffer[0]: grows when a test trims the head. */
+  start = 0;
   private buffer = "";
   /** Appended to the output buffer whenever a command is written. */
   emit: (command: string) => string = () => "";
@@ -48,6 +50,14 @@ class FakeShell implements PersistentShell {
   }
   output(): string {
     return this.buffer;
+  }
+  outputStart(): number {
+    return this.start;
+  }
+  /** Models the real output cap's head-trim: drops the oldest output and advances outputStart. */
+  trimHead(drop: number): void {
+    this.buffer = this.buffer.slice(drop);
+    this.start += drop;
   }
   kill(): void {
     this.running = false;
@@ -152,6 +162,47 @@ describe("bash_session tool", () => {
       // The second send only sees output after the first sentinel (cursor moved).
       const second = await bashSessionTool.execute(ws, { action: "send", command: "echo two" });
       expect(second.result).toBe("second output\n[exit 3]");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
+  it("still frames the sentinel after the capped buffer trims its head (cursor rebases)", async () => {
+    const ws = tempWorkspace();
+    try {
+      const shell = new FakeShell();
+      let emitCount = 0;
+      shell.emit = (data) => {
+        emitCount += 1;
+        // The flooded send produces unframed output; later sends frame their own
+        // sentinel (record.seq counts every send, found or not).
+        if (data.includes("flood")) return "flood-out ";
+        return `hello world\n__AP_DONE_${emitCount}__:0\n`;
+      };
+      mockSpawn.mockReturnValue(shell);
+      await bashSessionTool.execute(ws, { action: "start" });
+
+      // A flooded send never sees its sentinel and burns its budget (pre-trim).
+      const flooded = await bashSessionTool.execute(ws, { action: "send", command: "yes | flood", timeout: 1 });
+      expect(flooded.result).toContain("Still running after 1s");
+      expect(shell.start).toBe(0);
+
+      // The real output cap head-trims here: the already-reported flood region
+      // leaves the buffer and outputStart jumps ahead of the record's cursor.
+      const drop = shell.output().indexOf("flood-out") + "flood-out ".length;
+      shell.trimHead(drop);
+      expect(shell.start).toBe(drop);
+
+      // The next send still frames its sentinel: a tool reading the stale
+      // buffer-local cursor would time out again on an alive-but-mute shell.
+      const found = await bashSessionTool.execute(ws, { action: "send", command: "echo hello" });
+      expect(found.ok).toBe(true);
+      expect(found.result).toBe("hello world\n[exit 0]");
+
+      // A follow-up send still reads only its own region (absolute cursor advanced).
+      shell.emit = () => "after\n__AP_DONE_3__:5\n";
+      const next = await bashSessionTool.execute(ws, { action: "send", command: "echo after" });
+      expect(next.result).toBe("after\n[exit 5]");
     } finally {
       ws.cleanup();
     }

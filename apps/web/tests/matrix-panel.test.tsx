@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { MatrixPanel } from "../src/app/arena/MatrixPanel.js";
+import { streamMatrixRun } from "@agentprism/client";
 
 vi.mock("@agentprism/client", () => ({
   fetchTemplates: vi.fn(async () => [
@@ -39,10 +40,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderPanel() {
+function renderPanel(setError: (message: string) => void = () => {}) {
   return render(
     <I18nProvider initialLocale="en">
-      <MatrixPanel setError={() => {}} />
+      <MatrixPanel setError={setError} />
     </I18nProvider>,
   );
 }
@@ -55,5 +56,15 @@ describe("matrix panel", () => {
     expect(screen.getByText("Tokens")).toBeDefined();
     expect(screen.getByText("120")).toBeDefined();
     expect(screen.getByText("native=pass")).toBeDefined();
+  });
+
+  it("surfaces an in-stream error item through setError", async () => {
+    vi.mocked(streamMatrixRun).mockImplementationOnce(async ({ onItem }) => {
+      onItem({ type: "error", message: "boom" });
+    });
+    const setError = vi.fn();
+    renderPanel(setError);
+    fireEvent.click(screen.getByText("Run full matrix"));
+    await waitFor(() => expect(setError).toHaveBeenCalledWith("boom"));
   });
 });

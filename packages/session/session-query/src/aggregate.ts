@@ -12,13 +12,20 @@
  * the host decides the loading budget.
  */
 
-import type { SessionEntry, SessionKind, SessionRecord, SessionStatus } from "@agentprism/contracts";
+import {
+  SESSION_KINDS,
+  SESSION_STATUSES,
+  type SessionEntry,
+  type SessionKind,
+  type SessionRecord,
+  type SessionStatus,
+} from "@agentprism/contracts";
 
 /** Counts grouped by kind then status. */
 export type SessionCounts = Record<SessionKind, Record<SessionStatus, number>>;
 
-const KINDS: SessionKind[] = ["arena", "agent", "builder"];
-const STATUSES: SessionStatus[] = ["active", "completed", "failed", "cancelled"];
+const KINDS: readonly SessionKind[] = SESSION_KINDS;
+const STATUSES: readonly SessionStatus[] = SESSION_STATUSES;
 
 /** Zero-filled counts table. */
 export function emptyCounts(): SessionCounts {

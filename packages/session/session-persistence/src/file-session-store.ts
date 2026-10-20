@@ -14,6 +14,9 @@
 
 import { z } from "zod";
 import {
+  SESSION_ENTRY_KINDS,
+  SESSION_KINDS,
+  SESSION_STATUSES,
   SessionNotFoundError,
   SessionValidationError,
   type Clock,
@@ -38,8 +41,8 @@ import {
 } from "@agentprism/session";
 
 /** Session kind enum for persisted documents (shared with the JSONL snapshot path). */
-export const SessionKindSchema = z.enum(["arena", "agent", "builder"]);
-const SessionStatusSchema = z.enum(["active", "completed", "failed", "cancelled"]);
+export const SessionKindSchema = z.enum(SESSION_KINDS);
+const SessionStatusSchema = z.enum(SESSION_STATUSES);
 
 const SessionRecordSchema = z.object({
   id: z.string().min(1),
@@ -57,7 +60,7 @@ const SessionEntrySchema = z.object({
   sessionId: z.string().min(1),
   seq: z.number().int().min(0),
   at: z.number().int(),
-  kind: z.enum(["lifecycle", "verdict", "note"]),
+  kind: z.enum(SESSION_ENTRY_KINDS),
   content: z.string().max(MAX_ENTRY_CONTENT_CHARS),
 });
 
