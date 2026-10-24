@@ -114,6 +114,45 @@ function effectiveFlag(segment, flag) {
   return matches.length === 0 ? undefined : matches[matches.length - 1][1];
 }
 
+/**
+ * Splits a curl command at --next: each chunk holds exactly the options of
+ * one transfer, because curl resets its option set there.
+ */
+function splitTransfers(segment) {
+  const bounds = [...segment.matchAll(/(?:^|\s)--next(?=\s|$)/g)];
+  if (bounds.length === 0) return [segment];
+  const chunks = [];
+  let from = 0;
+  for (const match of bounds) {
+    chunks.push(segment.slice(from, match.index));
+    from = match.index + match[0].length;
+  }
+  chunks.push(segment.slice(from));
+  return chunks;
+}
+
+/**
+ * True when an unquoted `$` expansion appears in the arguments: its value
+ * splits into separate curl words, so a static scan cannot know which options
+ * it carries. Quoted expansions expand into a single word and stay allowed.
+ */
+function hasUnquotedExpansion(transfer) {
+  let quote = null;
+  for (let i = 0; i < transfer.length; i += 1) {
+    const ch = transfer[i];
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+    } else if (quote === '"') {
+      if (ch === "\\") i += 1;
+      else if (ch === '"') quote = null;
+    } else if (ch === "'") quote = "'";
+    else if (ch === '"') quote = '"';
+    else if (ch === "\\") i += 1;
+    else if (ch === "$") return true;
+  }
+  return false;
+}
+
 if (!existsSync(WORKFLOWS_DIR)) {
   console.error(`[check-workflow-downloads] workflows directory not found: ${WORKFLOWS_DIR}`);
   process.exit(1);
@@ -129,14 +168,24 @@ for (const entry of readdirSync(WORKFLOWS_DIR).sort()) {
     // text in a comment cannot satisfy the checks.
     const command = text.replace(/\s#.*$/, "");
     for (const segment of curlSegments(command)) {
-      invocations += 1;
-      const where = `${path.relative(REPO_ROOT, file)}:${start}`;
-      if (effectiveFlag(segment, PROTO_FLAG) !== "=https") {
-        failures.push(`${where}: curl without --proto '=https' (${segment.slice(0, 120)})`);
-      }
-      if (effectiveFlag(segment, PROTO_REDIR_FLAG) !== "=https") {
-        failures.push(`${where}: curl without --proto-redir '=https' (${segment.slice(0, 120)})`);
-      }
+      // curl resets its option set at --next: every transfer must carry the
+      // pins itself, so the segment is validated per transfer.
+      const transfers = splitTransfers(segment);
+      transfers.forEach((transfer, index) => {
+        invocations += 1;
+        const suffix = transfers.length > 1 ? ` (--next transfer ${index + 1})` : "";
+        const where = `${path.relative(REPO_ROOT, file)}:${start}`;
+        if (hasUnquotedExpansion(transfer)) {
+          failures.push(`${where}: curl with unquoted shell expansion in arguments${suffix} (${transfer.slice(0, 120)})`);
+          return;
+        }
+        if (effectiveFlag(transfer, PROTO_FLAG) !== "=https") {
+          failures.push(`${where}: curl without --proto '=https'${suffix} (${transfer.slice(0, 120)})`);
+        }
+        if (effectiveFlag(transfer, PROTO_REDIR_FLAG) !== "=https") {
+          failures.push(`${where}: curl without --proto-redir '=https'${suffix} (${transfer.slice(0, 120)})`);
+        }
+      });
     }
   }
 }

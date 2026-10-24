@@ -7,46 +7,20 @@
  *   curl.exe, command substitution, several invocations on one line) is
  *   recognized and requires --proto '=https' and --proto-redir '=https'
  * - Pin that flag-like text in comments, a bare protocol name, a protocol
- *   list, or a later broader flag cannot satisfy the checks
+ *   list, a later broader flag, or an unquoted expansion cannot satisfy the
+ *   checks, and that every --next transfer carries the pins itself
  *
  * The gate is tested as a shell black box: each case runs its CLI against a
  * fixture directory, so exit codes and per-line messages are covered end to
- * end instead of against internal helpers.
+ * end instead of against internal helpers. Spawning real node processes opts
+ * the suite into `retry: 1` (see vitest.config.ts).
  */
 
-import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { cleanupWorkspaces, runGate, runGateDir, workflow } from "./check-workflow-downloads-fixtures";
 
 const REPO_ROOT = join(import.meta.dirname, "..", "..");
-const GATE = join(REPO_ROOT, "scripts", "ci", "check_workflow_downloads.mjs");
-
-const workspaces: string[] = [];
-
-/** Runs the gate CLI against a directory without fixture files. */
-function runGateDir(dir: string): { status: number; stdout: string; stderr: string } {
-  try {
-    const stdout = execFileSync(process.execPath, [GATE, dir], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-    return { status: 0, stdout, stderr: "" };
-  } catch (error) {
-    const failure = error as { status?: number; stdout?: string; stderr?: string };
-    return { status: failure.status ?? 1, stdout: failure.stdout ?? "", stderr: failure.stderr ?? "" };
-  }
-}
-
-/** Writes fixture workflow files into a fresh temp directory and runs the gate on it. */
-function runGate(files: Record<string, string>): { status: number; stdout: string; stderr: string } {
-  const dir = mkdtempSync(join(tmpdir(), "workflow-downloads-"));
-  workspaces.push(dir);
-  for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
-  return runGateDir(dir);
-}
-
-function workflow(runBlock: string): Record<string, string> {
-  return { "demo.yml": `jobs:\n  demo:\n    steps:\n      - run: |\n${runBlock}\n` };
-}
 
 const SECURE =
   "          # --proto pins the initial request and --proto-redir pins every redirect\n" +
@@ -54,10 +28,10 @@ const SECURE =
   '            "https://example.com/z.tgz"';
 
 afterAll(() => {
-  for (const dir of workspaces) rmSync(dir, { recursive: true, force: true });
+  cleanupWorkspaces();
 });
 
-describe("check-workflow-downloads gate", () => {
+describe("check-workflow-downloads gate", { retry: 1 }, () => {
   it("accepts a fully pinned multiline download", () => {
     const result = runGate(workflow(SECURE));
     expect(result.status).toBe(0);
@@ -150,6 +124,35 @@ describe("check-workflow-downloads gate", () => {
       workflow("          curl --proto '=https' --proto-redir '=https' -o /tmp/a \"https://example.com/a\" | tar -xzf - -C /tmp"),
     );
     expect(pinnedBeforePipe.status).toBe(0);
+  });
+
+  it("rejects options smuggled through an unquoted expansion", () => {
+    const result = runGate(workflow("          curl --proto '=https' --proto-redir '=https' $OPTS -o /tmp/a \"https://example.com/a\""));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("unquoted shell expansion");
+  });
+
+  it("allows quoted expansions as single-word arguments", () => {
+    const result = runGate(workflow("          curl --proto '=https' --proto-redir '=https' -o /tmp/a \"https://example.com/${V}.tgz\""));
+    expect(result.status).toBe(0);
+  });
+
+  it("requires the pins on every transfer after --next", () => {
+    const result = runGate(
+      workflow("          curl --proto '=https' --proto-redir '=https' -o /tmp/a \"https://example.com/a\" --next -o /tmp/b \"https://example.com/b\""),
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--next transfer 2");
+  });
+
+  it("accepts transfers that each carry the pins", () => {
+    const result = runGate(
+      workflow(
+        "          curl --proto '=https' --proto-redir '=https' -o /tmp/a \"https://example.com/a\"" +
+          " --next --proto '=https' --proto-redir '=https' -o /tmp/b \"https://example.com/b\"",
+      ),
+    );
+    expect(result.status).toBe(0);
   });
 
   it("fails closed when a folded block leaves curl alone on a physical line", () => {
