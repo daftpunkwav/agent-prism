@@ -65,14 +65,43 @@ function logicalLines(text) {
 
 /**
  * Splits a logical shell line into one segment per curl invocation: a segment
- * spans from its curl token to the next one, so each segment carries exactly
- * the options of the invocation it belongs to.
+ * spans exactly the shell command its invocation belongs to, so flag-like text
+ * in a later command cannot satisfy the checks.
  */
 function curlSegments(command) {
-  const starts = [...command.matchAll(CURL_TOKEN)].map((match) => match.index + match[1].length);
-  return starts.map((start, index) =>
-    command.slice(start, index + 1 < starts.length ? starts[index + 1] : command.length),
-  );
+  return [...command.matchAll(CURL_TOKEN)].map((match) => {
+    const start = match.index + match[1].length;
+    return command.slice(start, commandEnd(command, start, match[1] === "("));
+  });
+}
+
+/**
+ * End of the shell command starting at `start`: scan with quote and
+ * command-substitution awareness and stop at the first unquoted separator
+ * (`;`, `|`, `&`) or at the closing parenthesis when the invocation sits
+ * inside one. Nested substitutions open a tracked depth, so their content and
+ * their closing parenthesis stay inside the segment.
+ */
+function commandEnd(line, start, nestedParen) {
+  let inner = 0;
+  let quote = null;
+  for (let i = start; i < line.length; i += 1) {
+    const ch = line[i];
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+    } else if (quote === '"') {
+      if (ch === "\\") i += 1;
+      else if (ch === '"') quote = null;
+    } else if (ch === "'") quote = "'";
+    else if (ch === '"') quote = '"';
+    else if (ch === "\\") i += 1;
+    else if (ch === "(") inner += 1;
+    else if (ch === ")") {
+      if (inner > 0) inner -= 1;
+      else return i;
+    } else if (inner === 0 && ";|&".includes(ch)) return i;
+  }
+  return line.length;
 }
 
 /**

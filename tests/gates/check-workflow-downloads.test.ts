@@ -126,6 +126,32 @@ describe("check-workflow-downloads gate", () => {
     expect(result.status).toBe(1);
   });
 
+  it("rejects flag-like text in a later command on the same line", () => {
+    const result = runGate(
+      workflow("          curl -sSfL -o /tmp/a \"https://example.com/a\" && echo \"--proto '=https' --proto-redir '=https'\""),
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/without --proto '=https'/);
+  });
+
+  it("ends the segment at the substitution close before a later command", () => {
+    const result = runGate(
+      workflow("          files=$(curl -sSfL \"https://example.com/list\") && echo \"--proto '=https' --proto-redir '=https'\""),
+    );
+    expect(result.status).toBe(1);
+  });
+
+  it("keeps quoted separators and pipes out of the flag scope correctly", () => {
+    const pinnedQuoted = runGate(
+      workflow("          curl --proto '=https' --proto-redir '=https' -d 'a||b;c' -o /tmp/a \"https://example.com/a\""),
+    );
+    expect(pinnedQuoted.status).toBe(0);
+    const pinnedBeforePipe = runGate(
+      workflow("          curl --proto '=https' --proto-redir '=https' -o /tmp/a \"https://example.com/a\" | tar -xzf - -C /tmp"),
+    );
+    expect(pinnedBeforePipe.status).toBe(0);
+  });
+
   it("fails closed when a folded block leaves curl alone on a physical line", () => {
     const result = runGate(workflow("          curl\n            --proto '=https' --proto-redir '=https' \"https://example.com/a\""));
     expect(result.status).toBe(1);
