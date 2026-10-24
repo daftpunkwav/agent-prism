@@ -133,6 +133,9 @@ jobs:
             case "$f" in
               # Editing the pipeline must never let the pipeline skip itself.
               .github/*) workflows=true ;;
+              # Gate scripts run inside the workflow-lint job, so changing one
+              # must re-run that job to validate the change.
+              scripts/ci/*) workflows=true ;;
             esac
           done < <(git diff --no-renames --name-only "$BASE...HEAD")
           {
