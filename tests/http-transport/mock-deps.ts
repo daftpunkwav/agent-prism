@@ -48,7 +48,9 @@ export function mockThreadService(arena: ArenaService = { run: vi.fn() } as unkn
   return new ThreadService({
     threads: new FileThreadStore({
       file: new AtomicJsonFile(filePath),
-      idGenerator: { next: () => Math.random().toString(16).slice(2, 14).padEnd(12, "0") },
+      // Same 12-char lowercase-hex shape the real store mints, from a CSPRNG
+      // instead of Math.random (S2245: Math.random is not a secure id source).
+      idGenerator: { next: () => randomUUID().replace(/-/g, "").slice(0, 12) },
       clock: { now: () => 1700000000000 },
     }),
     arena,
