@@ -4,13 +4,17 @@
  * in the GitHub workflows.
  *
  * Responsibilities:
- * - Fail when a workflow curl omits --proto '=https' (initial request) or
- *   --proto-redir '=https' (redirects): curl keeps two separate protocol
- *   policies, so only both flags rule out a plaintext downgrade
+ * - Fail when any workflow curl (bare, path-qualified, or curl.exe) runs
+ *   without --proto '=https' and --proto-redir '=https': curl keeps separate
+ *   protocol policies for the initial request and for redirects, and a bare
+ *   protocol name only adds to the default set instead of restricting it
+ * - Validate each invocation separately, so flags from one curl cannot
+ *   satisfy another one on the same logical line (command substitutions
+ *   included), and let the last occurrence of a repeated flag decide
  *
  * Constraint: dependency-free Node so the workflow-lint job can run it right
  * after checkout; the first CLI argument overrides the scanned directory
- * (used by the gate's own regression checks).
+ * (used by the committed regression tests in tests/gates/).
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -21,17 +25,20 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..");
 const WORKFLOWS_DIR = path.resolve(process.argv[2] ?? path.join(REPO_ROOT, ".github", "workflows"));
 
-const CURL = /(^|\s)curl\s/;
-// A bare `https` argument only adds https to the default all-protocols set
-// (verified against curl 8: it still downloads over http), so the `=https`
-// only-form is required on both flags.
-const HTTPS_PROTO = /(^|\s)--proto(?!-)\s+['"]?=https/;
-const HTTPS_PROTO_REDIR = /(^|\s)--proto-redir\s+['"]?=https/;
+const PROTO_FLAG = "--proto";
+const PROTO_REDIR_FLAG = "--proto-redir";
+
+// A curl invocation starts at the word curl (optionally path-qualified,
+// optionally curl.exe) after a shell boundary: line start, whitespace, or one
+// of ;&|( (command substitution and separators). `(?=\s|$)` also catches a
+// folded-YAML block that leaves curl alone at the end of a physical line, so
+// that layout fails the gate instead of escaping it.
+const CURL_TOKEN = /(^|[\s;&|(])((?:[^\s;&|(]*[\\/])?curl(?:\.exe)?)(?=\s|$)/g;
 
 /**
  * Rebuilds the shell's view of a run block: comment lines are dropped and
- * backslash continuations are joined, so a curl spread over several lines is
- * checked as one command.
+ * backslash continuations are joined, so a command spread over several
+ * physical lines is checked as one logical line.
  */
 function logicalLines(text) {
   const lines = [];
@@ -56,6 +63,28 @@ function logicalLines(text) {
   return lines;
 }
 
+/**
+ * Splits a logical shell line into one segment per curl invocation: a segment
+ * spans from its curl token to the next one, so each segment carries exactly
+ * the options of the invocation it belongs to.
+ */
+function curlSegments(command) {
+  const starts = [...command.matchAll(CURL_TOKEN)].map((match) => match.index + match[1].length);
+  return starts.map((start, index) =>
+    command.slice(start, index + 1 < starts.length ? starts[index + 1] : command.length),
+  );
+}
+
+/**
+ * The value curl will actually use for the flag: within one invocation the
+ * last occurrence wins, so an early '=https' cannot satisfy a later broader
+ * setting. Optional quotes are stripped from the value.
+ */
+function effectiveFlag(segment, flag) {
+  const matches = [...segment.matchAll(new RegExp(`(?:^|\\s)${flag}\\s+['"]?([^'"\\s]+)`, "g"))];
+  return matches.length === 0 ? undefined : matches[matches.length - 1][1];
+}
+
 if (!existsSync(WORKFLOWS_DIR)) {
   console.error(`[check-workflow-downloads] workflows directory not found: ${WORKFLOWS_DIR}`);
   process.exit(1);
@@ -67,13 +96,18 @@ for (const entry of readdirSync(WORKFLOWS_DIR).sort()) {
   if (!/\.ya?ml$/.test(entry)) continue;
   const file = path.join(WORKFLOWS_DIR, entry);
   for (const { start, text } of logicalLines(readFileSync(file, "utf8"))) {
-    if (!CURL.test(text)) continue;
-    invocations += 1;
-    if (!HTTPS_PROTO.test(text)) {
-      failures.push(`${path.relative(REPO_ROOT, file)}:${start}: curl without --proto '=https' (${text.slice(0, 120)})`);
-    }
-    if (!HTTPS_PROTO_REDIR.test(text)) {
-      failures.push(`${path.relative(REPO_ROOT, file)}:${start}: curl without --proto-redir '=https' (${text.slice(0, 120)})`);
+    // Trailing shell comments carry no commands: strip them so flag-like
+    // text in a comment cannot satisfy the checks.
+    const command = text.replace(/\s#.*$/, "");
+    for (const segment of curlSegments(command)) {
+      invocations += 1;
+      const where = `${path.relative(REPO_ROOT, file)}:${start}`;
+      if (effectiveFlag(segment, PROTO_FLAG) !== "=https") {
+        failures.push(`${where}: curl without --proto '=https' (${segment.slice(0, 120)})`);
+      }
+      if (effectiveFlag(segment, PROTO_REDIR_FLAG) !== "=https") {
+        failures.push(`${where}: curl without --proto-redir '=https' (${segment.slice(0, 120)})`);
+      }
     }
   }
 }
