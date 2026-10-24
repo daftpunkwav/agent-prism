@@ -50,9 +50,11 @@ jobs:
         run: |
           set -euo pipefail
           V=8.30.1
-          curl -sSfL --retry 3 -o /tmp/gitleaks.tgz \
+          # --proto pins the allowed protocols so a redirect cannot downgrade
+          # the release download to plain HTTP.
+          curl --proto '=https' -sSfL --retry 3 -o /tmp/gitleaks.tgz \
             "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_linux_x64.tar.gz"
-          curl -sSfL --retry 3 -o /tmp/checksums.txt \
+          curl --proto '=https' -sSfL --retry 3 -o /tmp/checksums.txt \
             "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_checksums.txt"
           grep "gitleaks_${V}_linux_x64.tar.gz" /tmp/checksums.txt \
             | sed "s|gitleaks_${V}_linux_x64.tar.gz|/tmp/gitleaks.tgz|" | sha256sum -c -

@@ -274,7 +274,9 @@ jobs:
         run: |
           set -euo pipefail
           version=1.7.12
-          curl -sSfL --retry 3 -o /tmp/actionlint.tar.gz \
+          # --proto pins the allowed protocols so a redirect cannot downgrade
+          # the release download to plain HTTP.
+          curl --proto '=https' -sSfL --retry 3 -o /tmp/actionlint.tar.gz \
             "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz"
           tar -xzf /tmp/actionlint.tar.gz -C /usr/local/bin actionlint
           actionlint -color .github/workflows/*.yml
@@ -283,7 +285,7 @@ jobs:
         run: |
           set -euo pipefail
           version=1.30.1
-          curl -sSfL --retry 3 -o /tmp/zizmor.tar.gz \
+          curl --proto '=https' -sSfL --retry 3 -o /tmp/zizmor.tar.gz \
             "https://github.com/woodruffw/zizmor/releases/download/v${version}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
           tar -xzf /tmp/zizmor.tar.gz -C /usr/local/bin
           zizmor --persona=pedantic --min-severity=medium .github/workflows/
