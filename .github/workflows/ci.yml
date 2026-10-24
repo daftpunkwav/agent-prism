@@ -255,7 +255,8 @@ jobs:
   # The pipeline audits itself: actionlint catches syntax errors, bad
   # expressions and shellcheck issues in run blocks, zizmor audits the
   # workflows for unsafe expression expansion, excessive permissions and
-  # unpinned actions. Both are pinned release binaries, so this adds no
+  # unpinned actions, and a repo gate pins every workflow curl download to
+  # https. The binaries are pinned release artifacts, so this adds no
   # third-party action to the supply chain. Runs whenever .github changed.
   workflow-lint:
     name: Workflow lint (actionlint + zizmor)
@@ -270,13 +271,24 @@ jobs:
         with:
           persist-credentials: false
 
+      # The https policy on workflow downloads is enforced by a repo gate
+      # rather than review attention: dropping --proto or --proto-redir from
+      # any workflow curl fails this job.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: https download policy
+        run: node scripts/ci/check_workflow_downloads.mjs
+
       - name: actionlint
         run: |
           set -euo pipefail
           version=1.7.12
-          # --proto pins the allowed protocols so a redirect cannot downgrade
-          # the release download to plain HTTP.
-          curl --proto '=https' -sSfL --retry 3 -o /tmp/actionlint.tar.gz \
+          # --proto pins the initial request and --proto-redir pins every
+          # redirect to https (curl keeps two separate protocol policies, so
+          # the release download cannot be downgraded to plain HTTP).
+          curl --proto '=https' --proto-redir '=https' -sSfL --retry 3 -o /tmp/actionlint.tar.gz \
             "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz"
           tar -xzf /tmp/actionlint.tar.gz -C /usr/local/bin actionlint
           actionlint -color .github/workflows/*.yml
@@ -285,7 +297,7 @@ jobs:
         run: |
           set -euo pipefail
           version=1.30.1
-          curl --proto '=https' -sSfL --retry 3 -o /tmp/zizmor.tar.gz \
+          curl --proto '=https' --proto-redir '=https' -sSfL --retry 3 -o /tmp/zizmor.tar.gz \
             "https://github.com/woodruffw/zizmor/releases/download/v${version}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
           tar -xzf /tmp/zizmor.tar.gz -C /usr/local/bin
           zizmor --persona=pedantic --min-severity=medium .github/workflows/
