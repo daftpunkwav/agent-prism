@@ -71,35 +71,57 @@ function logicalLines(text) {
 function curlSegments(command) {
   return [...command.matchAll(CURL_TOKEN)].map((match) => {
     const start = match.index + match[1].length;
-    return command.slice(start, commandEnd(command, start, match[1] === "("));
+    return command.slice(start, commandEnd(command, start));
   });
 }
 
 /**
- * End of the shell command starting at `start`: scan with quote and
- * command-substitution awareness and stop at the first unquoted separator
- * (`;`, `|`, `&`) or at the closing parenthesis when the invocation sits
- * inside one. Nested substitutions open a tracked depth, so their content and
- * their closing parenthesis stay inside the segment.
+ * Iterates the characters a shell treats as syntax candidates: quoted spans
+ * are consumed as literal text (only a double-quoted backslash escapes the
+ * next character) and a backslash outside quotes hides the character that
+ * follows it. Each step yields the character's index in the scanned text and
+ * the character itself, so segment checks never branch on quoting state.
  */
-function commandEnd(line, start, nestedParen) {
-  let inner = 0;
+function* shellSyntaxChars(text, from = 0) {
   let quote = null;
-  for (let i = start; i < line.length; i += 1) {
-    const ch = line[i];
-    if (quote === "'") {
-      if (ch === "'") quote = null;
-    } else if (quote === '"') {
-      if (ch === "\\") i += 1;
-      else if (ch === '"') quote = null;
-    } else if (ch === "'") quote = "'";
-    else if (ch === '"') quote = '"';
-    else if (ch === "\\") i += 1;
-    else if (ch === "(") inner += 1;
-    else if (ch === ")") {
-      if (inner > 0) inner -= 1;
-      else return i;
-    } else if (inner === 0 && ";|&".includes(ch)) return i;
+  for (let i = from; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quote !== null && ch === quote) {
+      quote = null;
+      continue;
+    }
+    if (quote === '"' && ch === "\\") {
+      i += 1;
+      continue;
+    }
+    if (quote !== null) continue;
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      continue;
+    }
+    if (ch === "\\") {
+      i += 1;
+      continue;
+    }
+    yield { index: i, ch };
+  }
+}
+
+/**
+ * End of the shell command starting at `start`: scan with quote and
+ * command-substitution awareness (quoting is delegated to shellSyntaxChars)
+ * and stop at the first unquoted separator (`;`, `|`, `&`) or at the closing
+ * parenthesis when the invocation sits inside one. Nested substitutions open
+ * a tracked depth, so their content and their closing parenthesis stay
+ * inside the segment.
+ */
+function commandEnd(line, start) {
+  let depth = 0;
+  for (const { index, ch } of shellSyntaxChars(line, start)) {
+    if (ch === "(") depth += 1;
+    else if (ch === ")" && depth === 0) return index;
+    else if (ch === ")") depth -= 1;
+    else if (depth === 0 && ";|&".includes(ch)) return index;
   }
   return line.length;
 }
@@ -137,18 +159,8 @@ function splitTransfers(segment) {
  * it carries. Quoted expansions expand into a single word and stay allowed.
  */
 function hasUnquotedExpansion(transfer) {
-  let quote = null;
-  for (let i = 0; i < transfer.length; i += 1) {
-    const ch = transfer[i];
-    if (quote === "'") {
-      if (ch === "'") quote = null;
-    } else if (quote === '"') {
-      if (ch === "\\") i += 1;
-      else if (ch === '"') quote = null;
-    } else if (ch === "'") quote = "'";
-    else if (ch === '"') quote = '"';
-    else if (ch === "\\") i += 1;
-    else if (ch === "$") return true;
+  for (const { ch } of shellSyntaxChars(transfer)) {
+    if (ch === "$") return true;
   }
   return false;
 }
