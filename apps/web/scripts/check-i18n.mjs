@@ -69,12 +69,13 @@ function scanCjk() {
 // duplicated `pnpm test` (and inherited its load-sensitive flakiness) for a gate whose
 // contract is exactly one file's assertions.
 const CATALOG_CONTRACT = "apps/web/tests/catalog-parity.test.ts";
+// Launch the workspace-local vitest entry directly: no PATH lookup for a
+// launcher binary (S4036) and no shell fallback needed to resolve pnpm.cmd.
+const VITEST_ENTRY = path.join(REPO_ROOT, "node_modules", "vitest", "vitest.mjs");
 try {
-  execFileSync("pnpm", ["vitest", "run", CATALOG_CONTRACT], {
+  execFileSync(process.execPath, [VITEST_ENTRY, "run", CATALOG_CONTRACT], {
     cwd: REPO_ROOT,
     stdio: "inherit",
-    // Windows resolves pnpm via the shell (pnpm.cmd); POSIX shells are unaffected.
-    shell: true,
   });
 } catch {
   fail(`catalog contract suite failed (${CATALOG_CONTRACT}; see vitest output above)`);
