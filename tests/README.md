@@ -12,6 +12,8 @@
   - `tests/http-transport/`: HTTP transport contracts, covering routes and error mapping.
   - `tests/drivers/`: cross-backend driver consistency, covering the banner map and
     reasoning support.
+  - `tests/gates/`: repo-gate contracts, locking the root gate scripts and the
+    coverage config against their known bypasses.
 - `apps/<app>/tests/`: app-level tests, next to `src/`:
   - `apps/web/tests/`: frontend app tests for the i18n contracts.
   - `apps/server/tests/`: testable runtime units such as port probing.
