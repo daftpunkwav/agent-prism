@@ -130,6 +130,138 @@ function loadLayout(): BuilderLayout {
 }
 
 /** Builder workspace root: sessions, composition, chat turns, and trace panels. */
+/** One row in the session list: the switch affordance, the inline rename
+ * editor, and the run/delete controls. Extracted from BuilderClient so the
+ * rename branches stay out of that hotspot's complexity.
+ *
+ * The renaming row renders as a non-interactive div (not a button): HTML
+ * forbids <input>/<button> inside <button>, and the nested editor there
+ * broke hydration. */
+function SessionRow({
+  session,
+  active,
+  chatBusy,
+  renaming,
+  renameDraft,
+  onSwitch,
+  onAbort,
+  onDelete,
+  onRename,
+  onDraftChange,
+  onStartRename,
+  onFinishRename,
+}: {
+  session: BuilderSessionView;
+  active: boolean;
+  chatBusy: boolean;
+  renaming: boolean;
+  renameDraft: string;
+  onSwitch: (id: string) => void;
+  onAbort: (id: string) => void;
+  onDelete: (id: string) => void;
+  onRename: (id: string, name: string) => void;
+  onDraftChange: (value: string) => void;
+  onStartRename: () => void;
+  onFinishRename: () => void;
+}) {
+  const t = useT();
+  const sessionMeta = (
+    <span className="builder-session-meta">
+      {session.running ? t("builder.running") : t("builder.idle")} · {session.turn_count}
+    </span>
+  );
+  return (
+    <div className="builder-session" data-active={active} data-running={session.running}>
+      {renaming ? (
+        <div className="builder-session-main builder-session-renaming">
+          <Bot size={13} />
+          <span className="builder-session-rename">
+            {/* Inline rename must take focus on mount: the user just clicked rename. */}
+            {/* biome-ignore lint/a11y/noAutofocus: focus-on-mount is the rename affordance */}
+            <input
+              autoFocus
+              className="builder-rename-input"
+              value={renameDraft}
+              maxLength={60}
+              aria-label={t("builder.renameAria")}
+              onChange={(e) => { onDraftChange(e.target.value); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onRename(session.id, renameDraft);
+                if (e.key === "Escape") onFinishRename();
+              }}
+            />
+            <button
+              type="button"
+              className="builder-session-delete"
+              aria-label={t("builder.renameConfirm")}
+              onClick={() => onRename(session.id, renameDraft)}
+            >
+              <Check size={12} />
+            </button>
+            <button
+              type="button"
+              className="builder-session-delete"
+              aria-label={t("builder.renameCancel")}
+              onClick={() => { onFinishRename(); }}
+            >
+              <X size={12} />
+            </button>
+          </span>
+          {sessionMeta}
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="builder-session-main"
+          disabled={chatBusy}
+          title={chatBusy ? t("builder.swapBlocked") : undefined}
+          onClick={() => {
+            // Switching mid-turn would splice one session's stream into another view.
+            if (chatBusy) return;
+            onSwitch(session.id);
+          }}
+        >
+          <Bot size={13} />
+          <span className="builder-session-name">{session.name}</span>
+          {sessionMeta}
+        </button>
+      )}
+      {session.running ? (
+        <button
+          type="button"
+          className="builder-session-delete"
+          aria-label={t("builder.stop")}
+          title={t("builder.stop")}
+          onClick={() => onAbort(session.id)}
+        >
+          <Square size={12} />
+        </button>
+      ) : (
+        <>
+        {!renaming && (
+        <button
+          type="button"
+          className="builder-session-delete"
+          aria-label={t("builder.renameAria")}
+          onClick={onStartRename}
+        >
+          <Pencil size={12} />
+        </button>
+        )}
+        <button
+          type="button"
+          className="builder-session-delete"
+          aria-label={t("builder.delete")}
+          onClick={() => onDelete(session.id)}
+        >
+          <Trash2 size={12} />
+        </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function BuilderClient() {
   const t = useT();
   const locale = useLocale();
@@ -663,115 +795,26 @@ export function BuilderClient() {
         </header>
         <div className="builder-sessions">
           {error !== null ? <div className="builder-session-error">{error}</div> : null}
-          {sessions.map((session) => {
-            const renaming = renamingId === session.id;
-            const sessionMeta = (
-              <span className="builder-session-meta">
-                {session.running ? t("builder.running") : t("builder.idle")} · {session.turn_count}
-              </span>
-            );
-            /* The rename editor hosts <input>/<button>, which HTML forbids
-              inside <button> (hydration error), so the renaming row renders
-              as a non-interactive div wearing the same layout class. */
-            return (
-              <div
-                key={session.id}
-                className="builder-session"
-                data-active={session.id === activeId}
-                data-running={session.running}
-              >
-                {renaming ? (
-                  <div className="builder-session-main builder-session-renaming">
-                    <Bot size={13} />
-                    <span className="builder-session-rename">
-                      {/* Inline rename must take focus on mount: the user just clicked rename. */}
-                      {/* biome-ignore lint/a11y/noAutofocus: focus-on-mount is the rename affordance */}
-                      <input
-                        autoFocus
-                        className="builder-rename-input"
-                        value={renameDraft}
-                        maxLength={60}
-                        aria-label={t("builder.renameAria")}
-                        onChange={(e) => { setRenameDraft(e.target.value); }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") void handleRename(session.id, renameDraft);
-                          if (e.key === "Escape") setRenamingId(null);
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="builder-session-delete"
-                        aria-label={t("builder.renameConfirm")}
-                        onClick={() => void handleRename(session.id, renameDraft)}
-                      >
-                        <Check size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        className="builder-session-delete"
-                        aria-label={t("builder.renameCancel")}
-                        onClick={() => { setRenamingId(null); }}
-                      >
-                        <X size={12} />
-                      </button>
-                    </span>
-                    {sessionMeta}
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="builder-session-main"
-                    disabled={chatBusy}
-                    title={chatBusy ? t("builder.swapBlocked") : undefined}
-                    onClick={() => {
-                      // Switching mid-turn would splice one session's stream into another view.
-                      if (chatBusy) return;
-                      switchSession(session.id);
-                    }}
-                  >
-                    <Bot size={13} />
-                    <span className="builder-session-name">{session.name}</span>
-                    {sessionMeta}
-                  </button>
-                )}
-                {session.running ? (
-                  <button
-                    type="button"
-                    className="builder-session-delete"
-                    aria-label={t("builder.stop")}
-                    title={t("builder.stop")}
-                    onClick={() => handleAbortSession(session.id)}
-                  >
-                    <Square size={12} />
-                  </button>
-                ) : (
-                  <>
-                  {!renaming && (
-                  <button
-                    type="button"
-                    className="builder-session-delete"
-                    aria-label={t("builder.renameAria")}
-                    onClick={() => {
-                      setRenameDraft(session.name);
-                      setRenamingId(session.id);
-                    }}
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  )}
-                  <button
-                    type="button"
-                    className="builder-session-delete"
-                    aria-label={t("builder.delete")}
-                    onClick={() => void handleDeleteSession(session.id)}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                  </>
-                )}
-              </div>
-            );
-          })}
+          {sessions.map((session) => (
+            <SessionRow
+              key={session.id}
+              session={session}
+              active={session.id === activeId}
+              chatBusy={chatBusy}
+              renaming={renamingId === session.id}
+              renameDraft={renameDraft}
+              onSwitch={switchSession}
+              onAbort={handleAbortSession}
+              onDelete={handleDeleteSession}
+              onRename={(id, name) => void handleRename(id, name)}
+              onDraftChange={setRenameDraft}
+              onStartRename={() => {
+                setRenameDraft(session.name);
+                setRenamingId(session.id);
+              }}
+              onFinishRename={() => { setRenamingId(null); }}
+            />
+          ))}
         </div>
         {catalog !== null && composition !== null ? (
           <div className="builder-board-wrap">
