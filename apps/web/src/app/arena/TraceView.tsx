@@ -228,10 +228,7 @@ const TraceStep = memo(function TraceStep({
             {t("arena.trace.thinkingShort")}
           </span>
           {live ? (
-            <span className="ml-1.5 font-normal opacity-80">
-              {t("arena.trace.thinkingStreaming")}
-              <span className="trace-cursor" />
-            </span>
+            <span className="ml-1.5 font-normal opacity-80">{t("arena.trace.thinkingStreaming")}</span>
           ) : (
             <span className="ml-1.5 font-normal text-muted-foreground font-mono">
               {t("arena.trace.thinkingChars", { count: seg.text.length })}
@@ -297,14 +294,11 @@ const TraceStep = memo(function TraceStep({
             {roleLabel}
           </span>
           <span className="font-mono text-muted-foreground">{t("arena.trace.stepAnswer", { step: seg.step })}</span>
-          {streaming && <span className="ml-1 text-muted-foreground">{t("arena.trace.thinkingStreaming")}<span className="trace-cursor" /></span>}
+          {streaming && <span className="ml-1 text-muted-foreground">{t("arena.trace.thinkingStreaming")}</span>}
         </span>
         <div className={`text-sm leading-relaxed ${interim ? "text-muted-foreground" : ""}`}>
           {streaming ? (
-            <span className="whitespace-pre-wrap break-words">
-              {seg.text}
-              <span className="trace-cursor" />
-            </span>
+            <span className="whitespace-pre-wrap break-words">{seg.text}</span>
           ) : (
             <MarkdownBlock text={seg.text} />
           )}
