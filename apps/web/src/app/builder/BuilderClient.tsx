@@ -670,19 +670,12 @@ export function BuilderClient() {
               data-active={session.id === activeId}
               data-running={session.running}
             >
-              <button
-                type="button"
-                className="builder-session-main"
-                disabled={chatBusy}
-                title={chatBusy ? t("builder.swapBlocked") : undefined}
-                onClick={() => {
-                  // Switching mid-turn would splice one session's stream into another view.
-                  if (chatBusy) return;
-                  switchSession(session.id);
-                }}
-              >
-                <Bot size={13} />
-                {renamingId === session.id ? (
+              {/* The rename editor hosts <input>/<button>, which HTML forbids
+                  inside <button> (hydration error), so the renaming row renders
+                  as a non-interactive div wearing the same layout class. */}
+              {renamingId === session.id ? (
+                <div className="builder-session-main builder-session-renaming">
+                  <Bot size={13} />
                   <span className="builder-session-rename">
                     {/* Inline rename must take focus on mount: the user just clicked rename. */}
                     {/* biome-ignore lint/a11y/noAutofocus: focus-on-mount is the rename affordance */}
@@ -715,13 +708,29 @@ export function BuilderClient() {
                       <X size={12} />
                     </button>
                   </span>
-                ) : (
-                <span className="builder-session-name">{session.name}</span>
-                )}
-                <span className="builder-session-meta">
-                  {session.running ? t("builder.running") : t("builder.idle")} · {session.turn_count}
-                </span>
-              </button>
+                  <span className="builder-session-meta">
+                    {session.running ? t("builder.running") : t("builder.idle")} · {session.turn_count}
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="builder-session-main"
+                  disabled={chatBusy}
+                  title={chatBusy ? t("builder.swapBlocked") : undefined}
+                  onClick={() => {
+                    // Switching mid-turn would splice one session's stream into another view.
+                    if (chatBusy) return;
+                    switchSession(session.id);
+                  }}
+                >
+                  <Bot size={13} />
+                  <span className="builder-session-name">{session.name}</span>
+                  <span className="builder-session-meta">
+                    {session.running ? t("builder.running") : t("builder.idle")} · {session.turn_count}
+                  </span>
+                </button>
+              )}
               {session.running ? (
                 <button
                   type="button"

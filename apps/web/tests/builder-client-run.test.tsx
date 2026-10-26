@@ -133,6 +133,10 @@ describe("BuilderClient orchestration", () => {
     fireEvent.click(await screen.findByText(en().newAgent));
     fireEvent.click(await screen.findByRole("button", { name: en().renameAria }));
     const input = await screen.findByLabelText(en().renameAria);
+    // Regression: the editor once rendered <input>/<button> inside the row's
+    // own <button>, which is illegal HTML and broke hydration.
+    expect(input.closest("button")).toBeNull();
+    expect(document.querySelector("button button")).toBeNull();
     fireEvent.change(input, { target: { value: "Renamed agent" } });
     fireEvent.click(screen.getByRole("button", { name: en().renameConfirm }));
     await waitFor(() => expect(patchBuilderComposition).toHaveBeenCalledWith("s1", { name: "Renamed agent" }));
