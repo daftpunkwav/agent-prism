@@ -107,6 +107,14 @@ export function UiSelect({ value, onChange, options, disabled = false, ariaLabel
     };
     const onScroll = (event: Event) => {
       if (event.target instanceof Node && popRef.current?.contains(event.target)) return;
+      // A streaming run fires programmatic scrolls in unrelated containers
+      // (trace auto-follow, grid reflow). Dismiss only when the anchor itself
+      // moved — the fixed popup stays valid as long as the trigger holds still,
+      // and closing on every background scroll made the popup flicker shut
+      // before any option could be picked mid-run.
+      const rect = triggerRef.current?.getBoundingClientRect();
+      const anchor = anchorRef.current;
+      if (rect && anchor && Math.abs(rect.left - anchor.left) < 1 && Math.abs(rect.top - anchor.top) < 1) return;
       setOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);

@@ -7,6 +7,8 @@
  * - Pin trigger label, option selection, and popup dismissal
  * - Pin disabled options never firing onChange
  * - Pin grouped entries rendering a non-selectable caption
+ * - Pin scroll dismissal: background scrolls keep the popup open, an anchor
+ *   move closes it
  */
 
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -118,5 +120,41 @@ describe("UiSelect", () => {
     fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("a background scroll that leaves the trigger in place keeps the popup open", () => {
+    render(<UiSelect value="a" onChange={() => {}} options={OPTIONS} ariaLabel="Pick" />);
+    fireEvent.click(screen.getByRole("button", { name: "Pick" }));
+    expect(screen.getByRole("listbox")).toBeDefined();
+    // Streaming runs auto-scroll unrelated containers (trace auto-follow,
+    // grid reflow); those scrolls must not dismiss a popup whose anchor held
+    // still, or the popup flickers shut before any option can be picked.
+    const scroller = document.createElement("div");
+    document.body.appendChild(scroller);
+    try {
+      fireEvent.scroll(scroller);
+      fireEvent.scroll(window);
+      expect(screen.getByRole("listbox")).toBeDefined();
+    } finally {
+      scroller.remove();
+    }
+  });
+
+  it("a scroll that moves the trigger dismisses the popup", () => {
+    render(<UiSelect value="a" onChange={() => {}} options={OPTIONS} ariaLabel="Pick" />);
+    const trigger = screen.getByRole("button", { name: "Pick" });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("listbox")).toBeDefined();
+    // jsdom has no layout engine: move the anchor by stubbing its rect, the
+    // way a real page scroll relocates the trigger.
+    trigger.getBoundingClientRect = () => ({ left: 0, top: 220, width: 120, height: 32 }) as DOMRect;
+    const scroller = document.createElement("div");
+    document.body.appendChild(scroller);
+    try {
+      fireEvent.scroll(scroller);
+      expect(screen.queryByRole("listbox")).toBeNull();
+    } finally {
+      scroller.remove();
+    }
   });
 });
