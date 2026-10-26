@@ -178,6 +178,11 @@
   cursor: pointer;
 }
 
+/* Non-interactive renaming row (shares .builder-session-main for layout). */
+.builder-session-renaming {
+  cursor: default;
+}
+
 .builder-session-name {
   overflow: hidden;
   text-overflow: ellipsis;
