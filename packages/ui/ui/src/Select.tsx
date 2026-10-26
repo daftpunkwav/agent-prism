@@ -117,13 +117,17 @@ export function UiSelect({ value, onChange, options, disabled = false, ariaLabel
       if (rect && anchor && Math.abs(rect.left - anchor.left) < 1 && Math.abs(rect.top - anchor.top) < 1) return;
       setOpen(false);
     };
+    // Resize can shrink the viewport without moving the trigger, which would
+    // strand the fixed popup off-screen; a resize never originates from a
+    // streaming run, so it always dismisses.
+    const onResize = () => setOpen(false);
     document.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }, [open]);
 

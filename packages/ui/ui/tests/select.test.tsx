@@ -8,7 +8,7 @@
  * - Pin disabled options never firing onChange
  * - Pin grouped entries rendering a non-selectable caption
  * - Pin scroll dismissal: background scrolls keep the popup open, an anchor
- *   move closes it
+ *   move closes it, and a window resize always closes it
  */
 
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -156,5 +156,15 @@ describe("UiSelect", () => {
     } finally {
       scroller.remove();
     }
+  });
+
+  it("a window resize dismisses the popup even with the trigger stationary", () => {
+    render(<UiSelect value="a" onChange={() => {}} options={OPTIONS} ariaLabel="Pick" />);
+    fireEvent.click(screen.getByRole("button", { name: "Pick" }));
+    expect(screen.getByRole("listbox")).toBeDefined();
+    // A shrunken viewport can strand the fixed popup off-screen without
+    // moving the trigger, so resize always dismisses.
+    fireEvent.resize(window);
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
 });
