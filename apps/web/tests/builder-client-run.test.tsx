@@ -137,6 +137,8 @@ describe("BuilderClient orchestration", () => {
     // own <button>, which is illegal HTML and broke hydration.
     expect(input.closest("button")).toBeNull();
     expect(document.querySelector("button button")).toBeNull();
+    // The rename field takes focus on mount: the user just clicked rename.
+    expect(document.activeElement).toBe(input);
     fireEvent.change(input, { target: { value: "Renamed agent" } });
     fireEvent.click(screen.getByRole("button", { name: en().renameConfirm }));
     await waitFor(() => expect(patchBuilderComposition).toHaveBeenCalledWith("s1", { name: "Renamed agent" }));

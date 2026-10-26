@@ -13,6 +13,7 @@
 
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Bot, Check, Pencil, Square, Trash2, X } from "lucide-react";
 import type { BuilderSessionView } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
@@ -59,14 +60,18 @@ function SessionRenameEditor({
   onFinishRename: () => void;
 }) {
   const t = useT();
+  const inputRef = useRef<HTMLInputElement>(null);
+  // The rename field takes focus on mount: the user just clicked rename, so the
+  // next keystroke belongs in the draft.
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
   return (
     <div className="builder-session-main builder-session-renaming">
       <Bot size={13} />
       <span className="builder-session-rename">
-        {/* Inline rename must take focus on mount: the user just clicked rename. */}
-        {/* biome-ignore lint/a11y/noAutofocus: focus-on-mount is the rename affordance */}
         <input
-          autoFocus
+          ref={inputRef}
           className="builder-rename-input"
           value={renameDraft}
           maxLength={60}
