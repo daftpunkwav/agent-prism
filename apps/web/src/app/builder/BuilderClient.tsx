@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Bot, Check, Pencil, Plus, Square, Trash2, X } from "lucide-react";
 import {
   abortBuilderTurn,
@@ -130,13 +130,118 @@ function loadLayout(): BuilderLayout {
 }
 
 /** Builder workspace root: sessions, composition, chat turns, and trace panels. */
+/** The inline rename editor. Rendered as a non-interactive div (not a
+ * button): HTML forbids <input>/<button> inside <button>, and nesting the
+ * editor inside the row's own button broke hydration. */
+function SessionRenameEditor({
+  sessionId,
+  renameDraft,
+  onRename,
+  onDraftChange,
+  onFinishRename,
+  children,
+}: {
+  sessionId: string;
+  renameDraft: string;
+  onRename: (id: string, name: string) => void;
+  onDraftChange: (value: string) => void;
+  onFinishRename: () => void;
+  children: ReactNode;
+}) {
+  const t = useT();
+  return (
+    <div className="builder-session-main builder-session-renaming">
+      <Bot size={13} />
+      <span className="builder-session-rename">
+        {/* Inline rename must take focus on mount: the user just clicked rename. */}
+        {/* biome-ignore lint/a11y/noAutofocus: focus-on-mount is the rename affordance */}
+        <input
+          autoFocus
+          className="builder-rename-input"
+          value={renameDraft}
+          maxLength={60}
+          aria-label={t("builder.renameAria")}
+          onChange={(e) => { onDraftChange(e.target.value); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onRename(sessionId, renameDraft);
+            if (e.key === "Escape") onFinishRename();
+          }}
+        />
+        <button
+          type="button"
+          className="builder-session-delete"
+          aria-label={t("builder.renameConfirm")}
+          onClick={() => onRename(sessionId, renameDraft)}
+        >
+          <Check size={12} />
+        </button>
+        <button
+          type="button"
+          className="builder-session-delete"
+          aria-label={t("builder.renameCancel")}
+          onClick={() => { onFinishRename(); }}
+        >
+          <X size={12} />
+        </button>
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/** Run-state controls at the end of a session row: stop while running,
+ * rename + delete otherwise. */
+function SessionRowControls({
+  session,
+  renaming,
+  onAbort,
+  onDelete,
+  onStartRename,
+}: {
+  session: BuilderSessionView;
+  renaming: boolean;
+  onAbort: (id: string) => void;
+  onDelete: (id: string) => void;
+  onStartRename: () => void;
+}) {
+  const t = useT();
+  return session.running ? (
+    <button
+      type="button"
+      className="builder-session-delete"
+      aria-label={t("builder.stop")}
+      title={t("builder.stop")}
+      onClick={() => onAbort(session.id)}
+    >
+      <Square size={12} />
+    </button>
+  ) : (
+    <>
+    {!renaming && (
+    <button
+      type="button"
+      className="builder-session-delete"
+      aria-label={t("builder.renameAria")}
+      onClick={onStartRename}
+    >
+      <Pencil size={12} />
+    </button>
+    )}
+    <button
+      type="button"
+      className="builder-session-delete"
+      aria-label={t("builder.delete")}
+      onClick={() => onDelete(session.id)}
+    >
+      <Trash2 size={12} />
+    </button>
+    </>
+  );
+}
+
 /** One row in the session list: the switch affordance, the inline rename
  * editor, and the run/delete controls. Extracted from BuilderClient so the
- * rename branches stay out of that hotspot's complexity.
- *
- * The renaming row renders as a non-interactive div (not a button): HTML
- * forbids <input>/<button> inside <button>, and the nested editor there
- * broke hydration. */
+ * rename branches stay out of that hotspot's complexity. */
 function SessionRow({
   session,
   active,
@@ -173,42 +278,15 @@ function SessionRow({
   return (
     <div className="builder-session" data-active={active} data-running={session.running}>
       {renaming ? (
-        <div className="builder-session-main builder-session-renaming">
-          <Bot size={13} />
-          <span className="builder-session-rename">
-            {/* Inline rename must take focus on mount: the user just clicked rename. */}
-            {/* biome-ignore lint/a11y/noAutofocus: focus-on-mount is the rename affordance */}
-            <input
-              autoFocus
-              className="builder-rename-input"
-              value={renameDraft}
-              maxLength={60}
-              aria-label={t("builder.renameAria")}
-              onChange={(e) => { onDraftChange(e.target.value); }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onRename(session.id, renameDraft);
-                if (e.key === "Escape") onFinishRename();
-              }}
-            />
-            <button
-              type="button"
-              className="builder-session-delete"
-              aria-label={t("builder.renameConfirm")}
-              onClick={() => onRename(session.id, renameDraft)}
-            >
-              <Check size={12} />
-            </button>
-            <button
-              type="button"
-              className="builder-session-delete"
-              aria-label={t("builder.renameCancel")}
-              onClick={() => { onFinishRename(); }}
-            >
-              <X size={12} />
-            </button>
-          </span>
+        <SessionRenameEditor
+          sessionId={session.id}
+          renameDraft={renameDraft}
+          onRename={onRename}
+          onDraftChange={onDraftChange}
+          onFinishRename={onFinishRename}
+        >
           {sessionMeta}
-        </div>
+        </SessionRenameEditor>
       ) : (
         <button
           type="button"
@@ -226,38 +304,13 @@ function SessionRow({
           {sessionMeta}
         </button>
       )}
-      {session.running ? (
-        <button
-          type="button"
-          className="builder-session-delete"
-          aria-label={t("builder.stop")}
-          title={t("builder.stop")}
-          onClick={() => onAbort(session.id)}
-        >
-          <Square size={12} />
-        </button>
-      ) : (
-        <>
-        {!renaming && (
-        <button
-          type="button"
-          className="builder-session-delete"
-          aria-label={t("builder.renameAria")}
-          onClick={onStartRename}
-        >
-          <Pencil size={12} />
-        </button>
-        )}
-        <button
-          type="button"
-          className="builder-session-delete"
-          aria-label={t("builder.delete")}
-          onClick={() => onDelete(session.id)}
-        >
-          <Trash2 size={12} />
-        </button>
-        </>
-      )}
+      <SessionRowControls
+        session={session}
+        renaming={renaming}
+        onAbort={onAbort}
+        onDelete={onDelete}
+        onStartRename={onStartRename}
+      />
     </div>
   );
 }
