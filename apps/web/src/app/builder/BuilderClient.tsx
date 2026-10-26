@@ -12,8 +12,8 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Bot, Check, Pencil, Plus, Square, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Plus } from "lucide-react";
 import {
   abortBuilderTurn,
   answerBuilderQuestion,
@@ -36,21 +36,22 @@ import {
 import { useLocale, useT } from "@/i18n/useT";
 import { AskUserModal, askQuestionsOfArgs, type PendingAskBatch } from "@/components/AskUserModal";
 import { attachTurnSegments, mergedTraceEntries, segmentsOf, settledTurns } from "./builderTrace";
+import {
+  clampLayout,
+  clampSideW,
+  DEFAULT_LAYOUT,
+  LAYOUT_KEY,
+  loadLayout,
+  shellColumnWidth,
+  type BuilderLayout,
+} from "./builderLayout";
 import { BlockBoard } from "./BlockBoard";
 import { ChatPanel, type ChatEntry } from "./ChatPanel";
+import { SessionRow } from "./SessionRow";
 import { TracePanel, type TraceTab } from "./TracePanel";
 
-/** Persisted three-column layout: side widths plus left/right collapse. */
-interface BuilderLayout {
-  leftW: number;
-  rightW: number;
-  leftOpen: boolean;
-  rightOpen: boolean;
-}
-
-const LAYOUT_KEY = "agentprism.builder.layout";
+/** localStorage key of the remembered composition. */
 const COMPOSITION_KEY = "agentprism.builder.composition";
-const DEFAULT_LAYOUT: BuilderLayout = { leftW: 320, rightW: 420, leftOpen: true, rightOpen: true };
 
 /** Reads the remembered last-used composition; null when absent or corrupted. */
 function loadStoredComposition(): Partial<BuilderComposition> | null {
@@ -65,256 +66,10 @@ function loadStoredComposition(): Partial<BuilderComposition> | null {
   }
 }
 
-/** Side-width bounds as fractions of the shell's column area: two visible
- * columns allow [1/3, 2/3] per side, three visible columns [1/4, 1/2]. */
-const TWO_COL_BOUNDS = { minFrac: 1 / 3, maxFrac: 2 / 3 };
-const THREE_COL_BOUNDS = { minFrac: 0.25, maxFrac: 0.5 };
-
 /** Pointer travel (px) past which a press becomes a drag instead of a click. */
 const DRAG_THRESHOLD_PX = 4;
 
-/** Live width of the area the three columns share (shell content minus the
- * two grid gaps); 0 when unavailable (SSR prerender, unmounted mid-gesture). */
-function shellColumnWidth(): number {
-  if (typeof document === "undefined") return 0;
-  const shell = document.querySelector(".builder-shell");
-  if (!(shell instanceof HTMLElement)) return 0;
-  const style = getComputedStyle(shell);
-  const gap = Number.parseFloat(style.columnGap);
-  const width =
-    shell.clientWidth -
-    Number.parseFloat(style.paddingLeft) -
-    Number.parseFloat(style.paddingRight) -
-    (Number.isFinite(gap) ? gap * 2 : 0);
-  return Number.isFinite(width) && width > 0 ? width : 0;
-}
-
-/**
- * Clamp one side column to the active bounds. With three columns the chat
- * column also keeps its minimum share, so this side is additionally capped by
- * the other side's width; the cap never drops below the minimum.
- */
-function clampSideW(width: number, otherW: number, threeCols: boolean, total: number): number {
-  if (!Number.isFinite(width) || total <= 0) return width;
-  const { minFrac, maxFrac } = threeCols ? THREE_COL_BOUNDS : TWO_COL_BOUNDS;
-  let hi = maxFrac * total;
-  if (threeCols) hi = Math.max(minFrac * total, Math.min(hi, (1 - minFrac) * total - otherW));
-  return Math.round(Math.min(hi, Math.max(minFrac * total, width)));
-}
-
-/** Clamp open side widths to the bounds of the given visibility; idempotent. */
-function clampLayout(prev: BuilderLayout): BuilderLayout {
-  const total = shellColumnWidth();
-  if (total <= 0) return prev;
-  const threeCols = prev.leftOpen && prev.rightOpen;
-  const leftW = prev.leftOpen ? clampSideW(prev.leftW, prev.rightW, threeCols, total) : prev.leftW;
-  const rightW = prev.rightOpen ? clampSideW(prev.rightW, leftW, threeCols, total) : prev.rightW;
-  if (leftW === prev.leftW && rightW === prev.rightW) return prev;
-  return { ...prev, leftW, rightW };
-}
-
-function loadLayout(): BuilderLayout {
-  try {
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem(LAYOUT_KEY) : null;
-    if (!raw) return clampLayout(DEFAULT_LAYOUT);
-    const parsed = JSON.parse(raw) as Partial<BuilderLayout>;
-    return clampLayout({
-      leftW: typeof parsed.leftW === "number" && Number.isFinite(parsed.leftW) ? parsed.leftW : DEFAULT_LAYOUT.leftW,
-      rightW: typeof parsed.rightW === "number" && Number.isFinite(parsed.rightW) ? parsed.rightW : DEFAULT_LAYOUT.rightW,
-      leftOpen: parsed.leftOpen ?? true,
-      rightOpen: parsed.rightOpen ?? true,
-    });
-  } catch {
-    return DEFAULT_LAYOUT;
-  }
-}
-
 /** Builder workspace root: sessions, composition, chat turns, and trace panels. */
-/** The inline rename editor. Rendered as a non-interactive div (not a
- * button): HTML forbids <input>/<button> inside <button>, and nesting the
- * editor inside the row's own button broke hydration. */
-function SessionRenameEditor({
-  sessionId,
-  renameDraft,
-  onRename,
-  onDraftChange,
-  onFinishRename,
-  children,
-}: {
-  sessionId: string;
-  renameDraft: string;
-  onRename: (id: string, name: string) => void;
-  onDraftChange: (value: string) => void;
-  onFinishRename: () => void;
-  children: ReactNode;
-}) {
-  const t = useT();
-  return (
-    <div className="builder-session-main builder-session-renaming">
-      <Bot size={13} />
-      <span className="builder-session-rename">
-        {/* Inline rename must take focus on mount: the user just clicked rename. */}
-        {/* biome-ignore lint/a11y/noAutofocus: focus-on-mount is the rename affordance */}
-        <input
-          autoFocus
-          className="builder-rename-input"
-          value={renameDraft}
-          maxLength={60}
-          aria-label={t("builder.renameAria")}
-          onChange={(e) => { onDraftChange(e.target.value); }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onRename(sessionId, renameDraft);
-            if (e.key === "Escape") onFinishRename();
-          }}
-        />
-        <button
-          type="button"
-          className="builder-session-delete"
-          aria-label={t("builder.renameConfirm")}
-          onClick={() => onRename(sessionId, renameDraft)}
-        >
-          <Check size={12} />
-        </button>
-        <button
-          type="button"
-          className="builder-session-delete"
-          aria-label={t("builder.renameCancel")}
-          onClick={() => { onFinishRename(); }}
-        >
-          <X size={12} />
-        </button>
-      </span>
-      {children}
-    </div>
-  );
-}
-
-/** Run-state controls at the end of a session row: stop while running,
- * rename + delete otherwise. */
-function SessionRowControls({
-  session,
-  renaming,
-  onAbort,
-  onDelete,
-  onStartRename,
-}: {
-  session: BuilderSessionView;
-  renaming: boolean;
-  onAbort: (id: string) => void;
-  onDelete: (id: string) => void;
-  onStartRename: () => void;
-}) {
-  const t = useT();
-  return session.running ? (
-    <button
-      type="button"
-      className="builder-session-delete"
-      aria-label={t("builder.stop")}
-      title={t("builder.stop")}
-      onClick={() => onAbort(session.id)}
-    >
-      <Square size={12} />
-    </button>
-  ) : (
-    <>
-    {!renaming && (
-    <button
-      type="button"
-      className="builder-session-delete"
-      aria-label={t("builder.renameAria")}
-      onClick={onStartRename}
-    >
-      <Pencil size={12} />
-    </button>
-    )}
-    <button
-      type="button"
-      className="builder-session-delete"
-      aria-label={t("builder.delete")}
-      onClick={() => onDelete(session.id)}
-    >
-      <Trash2 size={12} />
-    </button>
-    </>
-  );
-}
-
-/** One row in the session list: the switch affordance, the inline rename
- * editor, and the run/delete controls. Extracted from BuilderClient so the
- * rename branches stay out of that hotspot's complexity. */
-function SessionRow({
-  session,
-  active,
-  chatBusy,
-  renaming,
-  renameDraft,
-  onSwitch,
-  onAbort,
-  onDelete,
-  onRename,
-  onDraftChange,
-  onStartRename,
-  onFinishRename,
-}: {
-  session: BuilderSessionView;
-  active: boolean;
-  chatBusy: boolean;
-  renaming: boolean;
-  renameDraft: string;
-  onSwitch: (id: string) => void;
-  onAbort: (id: string) => void;
-  onDelete: (id: string) => void;
-  onRename: (id: string, name: string) => void;
-  onDraftChange: (value: string) => void;
-  onStartRename: () => void;
-  onFinishRename: () => void;
-}) {
-  const t = useT();
-  const sessionMeta = (
-    <span className="builder-session-meta">
-      {session.running ? t("builder.running") : t("builder.idle")} · {session.turn_count}
-    </span>
-  );
-  return (
-    <div className="builder-session" data-active={active} data-running={session.running}>
-      {renaming ? (
-        <SessionRenameEditor
-          sessionId={session.id}
-          renameDraft={renameDraft}
-          onRename={onRename}
-          onDraftChange={onDraftChange}
-          onFinishRename={onFinishRename}
-        >
-          {sessionMeta}
-        </SessionRenameEditor>
-      ) : (
-        <button
-          type="button"
-          className="builder-session-main"
-          disabled={chatBusy}
-          title={chatBusy ? t("builder.swapBlocked") : undefined}
-          onClick={() => {
-            // Switching mid-turn would splice one session's stream into another view.
-            if (chatBusy) return;
-            onSwitch(session.id);
-          }}
-        >
-          <Bot size={13} />
-          <span className="builder-session-name">{session.name}</span>
-          {sessionMeta}
-        </button>
-      )}
-      <SessionRowControls
-        session={session}
-        renaming={renaming}
-        onAbort={onAbort}
-        onDelete={onDelete}
-        onStartRename={onStartRename}
-      />
-    </div>
-  );
-}
-
 export function BuilderClient() {
   const t = useT();
   const locale = useLocale();
