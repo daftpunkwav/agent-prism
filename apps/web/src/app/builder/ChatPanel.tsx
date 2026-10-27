@@ -30,6 +30,7 @@ import type { RunAttachment } from "@agentprism/client";
 import { useFollowScroll } from "@/hooks/useFollowScroll";
 import type { DisplaySegment } from "@agentprism/arena-view";
 import { MarkdownBlock } from "@/components/MarkdownBlock";
+import { actionDetail } from "@/components/actionDetail";
 import { useT } from "@/i18n/useT";
 import type { ChatEntry } from "./chatEntry";
 
@@ -54,22 +55,6 @@ const MAX_ATTACHMENT_BYTES = 64 * 1024;
 const MAX_ATTACHMENT_CHARS = 64 * 1024;
 const ACCEPTED_EXTENSIONS =
   ".txt,.md,.markdown,.json,.csv,.log,.py,.js,.ts,.tsx,.jsx,.html,.css,.yaml,.yml,.toml,.ini,.xml,.sql,.sh,.ps1,.java,.c,.cpp,.h,.go,.rs,.rb,.php";
-
-/** One-line detail for a tool call: target path or first command line. */
-function actionDetail(seg: DisplaySegment): string {
-  const args = seg.args ?? {};
-  if (typeof args.path === "string" && args.path !== "") return args.path;
-  if (typeof args.command === "string" && args.command !== "") {
-    const line = args.command.split("\n")[0] ?? args.command;
-    return line.length > 64 ? line.slice(0, 64) + "…" : line;
-  }
-  const first = Object.values(args).find((value) => typeof value === "string" && value !== "");
-  if (typeof first === "string") {
-    const line = first.split("\n")[0] ?? first;
-    return line.length > 64 ? line.slice(0, 64) + "…" : line;
-  }
-  return "";
-}
 
 /** Steps that render as work rows: drops config banners and settled step ticks. */
 function flatSteps(segments: DisplaySegment[]): DisplaySegment[] {

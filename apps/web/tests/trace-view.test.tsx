@@ -60,6 +60,39 @@ describe("TraceView", () => {
     expect(container.textContent).toContain("file body");
   });
 
+  it("keeps command content out of the collapsed tool row", () => {
+    const command = "Get-ChildItem -Force -Path . | Select-Object Name, Length; Write-Output done";
+    renderTrace({
+      events: [
+        { type: "action", tool: "bash", args: { command }, turn: 1, step: 1 },
+        { type: "observation", tool: "bash", result: "ok", turn: 1, step: 1 },
+      ] as unknown as ArenaEvent[],
+    });
+    const details = document.querySelector('details[data-kind="tool"]') as HTMLDetailsElement | null;
+    const summary = details?.querySelector("summary");
+    expect(details).not.toBeNull();
+    // The row must still be collapsed: an open-by-default details element would
+    // put the command on screen without any expansion.
+    expect(details?.open).toBe(false);
+    // Exact match: any leaked slice of the command (prefix, suffix, truncated)
+    // changes the text and fails, while the expected labels stay exactly these
+    // ("Code exec" category badge + tool name + "done" chip, whitespace-stripped).
+    expect(summary?.textContent?.replace(/\s+/g, "")).toBe("Codeexecbashdone");
+    // The command stays reachable through the expandable args body.
+    expect(details?.querySelector("pre")?.textContent).toContain(command);
+  });
+
+  it("keeps short non-command argument details on the collapsed tool row", () => {
+    renderTrace({
+      events: [
+        { type: "action", tool: "glob", args: { pattern: "**/*" }, turn: 1, step: 1 },
+        { type: "observation", tool: "glob", result: "a.ts", turn: 1, step: 1 },
+      ] as unknown as ArenaEvent[],
+    });
+    const summary = document.querySelector('details[data-kind="tool"] summary');
+    expect(summary?.textContent).toContain("**/*");
+  });
+
   it("renders file diffs and errors distinctly", () => {
     const { container } = renderTrace({
       events: [
