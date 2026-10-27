@@ -19,14 +19,14 @@ const DETAIL_MAX_CHARS = 64;
 
 /**
  * Argument keys that carry a short locating hint, in priority order. Target
- * hints (pattern, query, URL, name, directory) come before the bare action
- * verb: a symbols call with both `action: "search"` and `query: "parser"`
- * should show the target, not the verb. The list is a whitelist on purpose:
- * shell tools store their line under various keys (command, cmd, run-job's
- * command, custom MCP spellings), so an unknown key must never reach the
- * collapsed row.
+ * hints (pattern, query, URL, name, directory, job id) come before the bare
+ * action verb: a symbols call with both `action: "search"` and `query:
+ * "parser"` should show the target, not the verb. The list is a whitelist on
+ * purpose: shell tools store their line under various keys (command, cmd,
+ * run-job's command, custom MCP spellings), so an unknown key must never reach
+ * the collapsed row.
  */
-const DETAIL_KEYS = ["pattern", "query", "url", "name", "dir", "action"] as const;
+const DETAIL_KEYS = ["pattern", "query", "url", "name", "dir", "job_id", "action"] as const;
 
 /**
  * Collapsed-row detail for a tool call: target path, else the first whitelisted

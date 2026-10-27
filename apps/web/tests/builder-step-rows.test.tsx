@@ -83,6 +83,12 @@ describe("builder step rows", () => {
     expect(summary?.textContent).not.toContain("search");
   });
 
+  it("shows the job id on a polled job row", () => {
+    renderSteps([actionSegment({ id: "a8", tool: "run_job", args: { action: "poll", job_id: "j-7" } })]);
+    const summary = screen.getByText("run_job").closest("summary");
+    expect(summary?.textContent).toContain("j-7");
+  });
+
   it("still shows short path details on the summary row", () => {
     renderSteps([actionSegment({ id: "a2", tool: "read", args: { path: "README.md" } })]);
     const summary = screen.getByText("read").closest("summary");
