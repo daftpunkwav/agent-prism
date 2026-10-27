@@ -37,14 +37,24 @@ function renderSteps(segments: DisplaySegment[]) {
 }
 
 describe("builder step rows", () => {
+  const COMMAND = "Get-ChildItem -Force -Path . | Select-Object Name, Length; Write-Output done";
+
   it("keeps command content out of the collapsed summary row", () => {
     renderSteps([actionSegment({})]);
     const summary = screen.getByText("bash").closest("summary");
     expect(summary).not.toBeNull();
-    expect(summary?.textContent).not.toContain("Get-ChildItem");
+    // The whole command line must be absent: a prefix-only assertion would let
+    // a suffix leak slip through.
+    expect(summary?.textContent).not.toContain(COMMAND);
     // The command stays reachable through the expandable args body.
     const body = summary?.parentElement?.querySelector("pre");
-    expect(body?.textContent).toContain("Get-ChildItem");
+    expect(body?.textContent).toContain(COMMAND);
+  });
+
+  it("keeps legacy cmd-key commands out of the collapsed summary row", () => {
+    renderSteps([actionSegment({ id: "a4", args: { cmd: COMMAND } })]);
+    const summary = screen.getByText("bash").closest("summary");
+    expect(summary?.textContent).not.toContain(COMMAND);
   });
 
   it("still shows short path details on the summary row", () => {

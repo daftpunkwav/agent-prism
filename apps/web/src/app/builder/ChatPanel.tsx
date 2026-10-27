@@ -59,12 +59,14 @@ const ACCEPTED_EXTENSIONS =
  * One-line detail for a tool call: target path or a short non-command argument.
  * Command content never surfaces here: a shell line wraps the collapsed row and
  * reads as noise until the step is opened — it stays in the expandable args body.
+ * Third-party MCP shells may carry the line under the legacy `cmd` key, so both
+ * spellings are excluded from the fallback pick.
  */
 function actionDetail(seg: DisplaySegment): string {
   const args = seg.args ?? {};
   if (typeof args.path === "string" && args.path !== "") return args.path;
   const first = Object.entries(args)
-    .filter(([key]) => key !== "command")
+    .filter(([key]) => key !== "command" && key !== "cmd")
     .map(([, value]) => value)
     .find((value) => typeof value === "string" && value !== "");
   if (typeof first === "string") {
