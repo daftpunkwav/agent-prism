@@ -38,14 +38,20 @@ function renderSteps(segments: DisplaySegment[]) {
 
 describe("builder step rows", () => {
   const COMMAND = "Get-ChildItem -Force -Path . | Select-Object Name, Length; Write-Output done";
+  // The one-line budget the detail picker used to truncate to: a summary showing
+  // this prefix (with or without an ellipsis) is still a leak.
+  const COMMAND_PREFIX = COMMAND.slice(0, 64);
+
+  function assertSummaryHides(summary: Element | null): void {
+    expect(summary).not.toBeNull();
+    expect(summary?.textContent).not.toContain(COMMAND);
+    expect(summary?.textContent).not.toContain(COMMAND_PREFIX);
+  }
 
   it("keeps command content out of the collapsed summary row", () => {
     renderSteps([actionSegment({})]);
     const summary = screen.getByText("bash").closest("summary");
-    expect(summary).not.toBeNull();
-    // The whole command line must be absent: a prefix-only assertion would let
-    // a suffix leak slip through.
-    expect(summary?.textContent).not.toContain(COMMAND);
+    assertSummaryHides(summary);
     // The command stays reachable through the expandable args body.
     const body = summary?.parentElement?.querySelector("pre");
     expect(body?.textContent).toContain(COMMAND);
@@ -53,8 +59,12 @@ describe("builder step rows", () => {
 
   it("keeps legacy cmd-key commands out of the collapsed summary row", () => {
     renderSteps([actionSegment({ id: "a4", args: { cmd: COMMAND } })]);
-    const summary = screen.getByText("bash").closest("summary");
-    expect(summary?.textContent).not.toContain(COMMAND);
+    assertSummaryHides(screen.getByText("bash").closest("summary"));
+  });
+
+  it("drops unknown-key command content longer than the one-line budget", () => {
+    renderSteps([actionSegment({ id: "a5", args: { script: COMMAND } })]);
+    assertSummaryHides(screen.getByText("bash").closest("summary"));
   });
 
   it("still shows short path details on the summary row", () => {

@@ -31,6 +31,7 @@ import {
 import type { ArenaEvent } from "@agentprism/client";
 import { mergeEvents, parsePipelineBanner, type DisplaySegment } from "@agentprism/arena-view";
 import { MarkdownBlock } from "@/components/MarkdownBlock";
+import { actionDetail } from "@/components/actionDetail";
 import { PipelineConfigBadges } from "./PipelineConfigView";
 import { toolCategory, type ToolCategory } from "./toolTaxonomy";
 import { useT } from "@/i18n/useT";
@@ -411,22 +412,6 @@ const TraceStep = memo(function TraceStep({
   return null;
 });
 
-/** One-line detail of a tool call: target path or first command line. */
-function actionDetail(seg: DisplaySegment): string {
-  const args = seg.args ?? {};
-  if (typeof args.path === "string" && args.path !== "") return args.path;
-  if (typeof args.command === "string" && args.command !== "") {
-    const line = args.command.split("\n")[0] ?? args.command;
-    return line.length > 64 ? line.slice(0, 64) + "…" : line;
-  }
-  const first = Object.values(args).find((value) => typeof value === "string" && value !== "");
-  if (typeof first === "string") {
-    const line = first.split("\n")[0] ?? first;
-    return line.length > 64 ? line.slice(0, 64) + "…" : line;
-  }
-  return "";
-}
-
 /** Pretty-printed call arguments, truncated to keep the DOM bounded. */
 function argsPreview(args: Record<string, unknown>, t: Translate): string {
   const json = JSON.stringify(args, null, 2);
@@ -500,7 +485,11 @@ function renderAction(seg: DisplaySegment, accentColor: string, live: boolean, t
           {kindLabel}
         </span>
         <span className="font-mono text-foreground">{toolName}</span>
-        {detail !== "" && <span className="font-mono text-muted-foreground">{detail}</span>}
+        {detail !== "" && (
+          <span className="font-mono text-muted-foreground min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            {detail}
+          </span>
+        )}
         {executing ? (
           <span className="inline-flex items-center gap-1 text-muted-foreground">
             <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden />

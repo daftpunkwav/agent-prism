@@ -30,6 +30,7 @@ import type { RunAttachment } from "@agentprism/client";
 import { useFollowScroll } from "@/hooks/useFollowScroll";
 import type { DisplaySegment } from "@agentprism/arena-view";
 import { MarkdownBlock } from "@/components/MarkdownBlock";
+import { actionDetail } from "@/components/actionDetail";
 import { useT } from "@/i18n/useT";
 import type { ChatEntry } from "./chatEntry";
 
@@ -54,27 +55,6 @@ const MAX_ATTACHMENT_BYTES = 64 * 1024;
 const MAX_ATTACHMENT_CHARS = 64 * 1024;
 const ACCEPTED_EXTENSIONS =
   ".txt,.md,.markdown,.json,.csv,.log,.py,.js,.ts,.tsx,.jsx,.html,.css,.yaml,.yml,.toml,.ini,.xml,.sql,.sh,.ps1,.java,.c,.cpp,.h,.go,.rs,.rb,.php";
-
-/**
- * One-line detail for a tool call: target path or a short non-command argument.
- * Command content never surfaces here: a shell line wraps the collapsed row and
- * reads as noise until the step is opened — it stays in the expandable args body.
- * Third-party MCP shells may carry the line under the legacy `cmd` key, so both
- * spellings are excluded from the fallback pick.
- */
-function actionDetail(seg: DisplaySegment): string {
-  const args = seg.args ?? {};
-  if (typeof args.path === "string" && args.path !== "") return args.path;
-  const first = Object.entries(args)
-    .filter(([key]) => key !== "command" && key !== "cmd")
-    .map(([, value]) => value)
-    .find((value) => typeof value === "string" && value !== "");
-  if (typeof first === "string") {
-    const line = first.split("\n")[0] ?? first;
-    return line.length > 64 ? line.slice(0, 64) + "…" : line;
-  }
-  return "";
-}
 
 /** Steps that render as work rows: drops config banners and settled step ticks. */
 function flatSteps(segments: DisplaySegment[]): DisplaySegment[] {

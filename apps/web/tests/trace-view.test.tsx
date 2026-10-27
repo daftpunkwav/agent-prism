@@ -60,6 +60,32 @@ describe("TraceView", () => {
     expect(container.textContent).toContain("file body");
   });
 
+  it("keeps command content out of the collapsed tool row", () => {
+    const command = "Get-ChildItem -Force -Path . | Select-Object Name, Length; Write-Output done";
+    renderTrace({
+      events: [
+        { type: "action", tool: "bash", args: { command }, turn: 1, step: 1 },
+        { type: "observation", tool: "bash", result: "ok", turn: 1, step: 1 },
+      ] as unknown as ArenaEvent[],
+    });
+    const summary = document.querySelector('details[data-kind="tool"] summary');
+    expect(summary).not.toBeNull();
+    expect(summary?.textContent).not.toContain(command);
+    // The command stays reachable through the expandable args body.
+    expect(summary?.parentElement?.querySelector("pre")?.textContent).toContain(command);
+  });
+
+  it("keeps short non-command argument details on the collapsed tool row", () => {
+    renderTrace({
+      events: [
+        { type: "action", tool: "glob", args: { pattern: "**/*" }, turn: 1, step: 1 },
+        { type: "observation", tool: "glob", result: "a.ts", turn: 1, step: 1 },
+      ] as unknown as ArenaEvent[],
+    });
+    const summary = document.querySelector('details[data-kind="tool"] summary');
+    expect(summary?.textContent).toContain("**/*");
+  });
+
   it("renders file diffs and errors distinctly", () => {
     const { container } = renderTrace({
       events: [
