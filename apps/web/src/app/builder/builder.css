@@ -602,6 +602,11 @@ details[open] > .builder-seg-summary > svg:first-child {
 .builder-seg-detail {
   color: var(--muted-foreground);
   font-weight: 400;
+  /* One clipped line: a wrapping detail makes the collapsed rows uneven in height. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .builder-seg-live-hint {

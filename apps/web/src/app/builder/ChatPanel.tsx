@@ -55,15 +55,18 @@ const MAX_ATTACHMENT_CHARS = 64 * 1024;
 const ACCEPTED_EXTENSIONS =
   ".txt,.md,.markdown,.json,.csv,.log,.py,.js,.ts,.tsx,.jsx,.html,.css,.yaml,.yml,.toml,.ini,.xml,.sql,.sh,.ps1,.java,.c,.cpp,.h,.go,.rs,.rb,.php";
 
-/** One-line detail for a tool call: target path or first command line. */
+/**
+ * One-line detail for a tool call: target path or a short non-command argument.
+ * Command content never surfaces here: a shell line wraps the collapsed row and
+ * reads as noise until the step is opened — it stays in the expandable args body.
+ */
 function actionDetail(seg: DisplaySegment): string {
   const args = seg.args ?? {};
   if (typeof args.path === "string" && args.path !== "") return args.path;
-  if (typeof args.command === "string" && args.command !== "") {
-    const line = args.command.split("\n")[0] ?? args.command;
-    return line.length > 64 ? line.slice(0, 64) + "…" : line;
-  }
-  const first = Object.values(args).find((value) => typeof value === "string" && value !== "");
+  const first = Object.entries(args)
+    .filter(([key]) => key !== "command")
+    .map(([, value]) => value)
+    .find((value) => typeof value === "string" && value !== "");
   if (typeof first === "string") {
     const line = first.split("\n")[0] ?? first;
     return line.length > 64 ? line.slice(0, 64) + "…" : line;
