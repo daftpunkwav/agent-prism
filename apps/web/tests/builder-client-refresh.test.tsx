@@ -71,6 +71,10 @@ describe("detached session-list refreshes", () => {
     fireEvent.change(composer, { target: { value: "hi there" } });
     fireEvent.click(screen.getByRole("button", { name: en().send }));
     await waitFor(() => expect(streamBuilderChat).toHaveBeenCalledOnce());
+    // Three detached refreshes ran exactly once each: mount, turn start, and
+    // the settle resync (the stream mock resolves immediately, so the settle
+    // resync can land before the send is even observed).
+    await waitFor(() => expect(fetchBuilderSessions).toHaveBeenCalledTimes(3));
     await settle();
     expect(unhandled).toEqual([]);
   });
@@ -87,6 +91,8 @@ describe("detached session-list refreshes", () => {
     expect(rowStop).toBeDefined();
     fireEvent.click(rowStop as HTMLElement);
     await waitFor(() => expect(abortBuilderTurn).toHaveBeenCalledWith("s1"));
+    // Mount refresh plus the post-abort resync.
+    await waitFor(() => expect(fetchBuilderSessions).toHaveBeenCalledTimes(2));
     await settle();
     expect(unhandled).toEqual([]);
   });
