@@ -68,14 +68,18 @@ describe("TraceView", () => {
         { type: "observation", tool: "bash", result: "ok", turn: 1, step: 1 },
       ] as unknown as ArenaEvent[],
     });
-    const summary = document.querySelector('details[data-kind="tool"] summary');
-    expect(summary).not.toBeNull();
-    // The whole line and its displayed prefix must both be absent: a summary
-    // showing only a truncated slice is still a leak.
-    expect(summary?.textContent).not.toContain(command);
-    expect(summary?.textContent).not.toContain(command.slice(0, 64));
+    const details = document.querySelector('details[data-kind="tool"]') as HTMLDetailsElement | null;
+    const summary = details?.querySelector("summary");
+    expect(details).not.toBeNull();
+    // The row must still be collapsed: an open-by-default details element would
+    // put the command on screen without any expansion.
+    expect(details?.open).toBe(false);
+    // Exact match: any leaked slice of the command (prefix, suffix, truncated)
+    // changes the text and fails, while the expected labels stay exactly these
+    // ("Code exec" category badge + tool name + "done" chip, whitespace-stripped).
+    expect(summary?.textContent?.replace(/\s+/g, "")).toBe("Codeexecbashdone");
     // The command stays reachable through the expandable args body.
-    expect(summary?.parentElement?.querySelector("pre")?.textContent).toContain(command);
+    expect(details?.querySelector("pre")?.textContent).toContain(command);
   });
 
   it("keeps short non-command argument details on the collapsed tool row", () => {
