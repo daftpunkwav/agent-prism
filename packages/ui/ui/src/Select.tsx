@@ -68,7 +68,7 @@ function nextSelectableIndex(options: UiSelectOption[], from: number, step: 1 | 
   return from;
 }
 
-/** Themed dropdown select with a portal popup: click-outside, scroll/resize dismiss, full arrow-key navigation. */
+/** Themed dropdown select with a portal popup: click-outside dismisses, scroll dismisses only when it moves the trigger, resize always dismisses; full arrow-key navigation. */
 export function UiSelect({ value, onChange, options, disabled = false, ariaLabel, className, icon, triggerLabel }: UiSelectProps) {
   const flat = flattenEntries(options);
   const listboxId = useId();
@@ -94,10 +94,11 @@ export function UiSelect({ value, onChange, options, disabled = false, ariaLabel
     if (refocus) triggerRef.current?.focus();
   }, []);
 
-  // Dismiss on outside press, or on scrolls originating outside the popup: the popup is
-  // fixed-positioned, so a scrolled anchor would leave it stranded. Scrolls inside the
-  // popup itself (its own overflow) must not dismiss it, or long lists can never scroll.
-  // Resize has no Node target (window) and always dismisses.
+  // Dismiss on outside press, and on scrolls that move the trigger: the popup is
+  // fixed-positioned, so a moved anchor would leave it stranded. Background scrolls
+  // that leave the trigger in place (streaming auto-follow) keep the popup open, and
+  // scrolls inside the popup itself (its own overflow) must never dismiss it, or long
+  // lists can never scroll. Resize has no Node target (window) and always dismisses.
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
