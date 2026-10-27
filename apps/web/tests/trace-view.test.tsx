@@ -70,7 +70,10 @@ describe("TraceView", () => {
     });
     const summary = document.querySelector('details[data-kind="tool"] summary');
     expect(summary).not.toBeNull();
+    // The whole line and its displayed prefix must both be absent: a summary
+    // showing only a truncated slice is still a leak.
     expect(summary?.textContent).not.toContain(command);
+    expect(summary?.textContent).not.toContain(command.slice(0, 64));
     // The command stays reachable through the expandable args body.
     expect(summary?.parentElement?.querySelector("pre")?.textContent).toContain(command);
   });

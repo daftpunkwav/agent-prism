@@ -62,9 +62,16 @@ describe("builder step rows", () => {
     assertSummaryHides(screen.getByText("bash").closest("summary"));
   });
 
-  it("drops unknown-key command content longer than the one-line budget", () => {
+  it("drops command content stored under an unknown key entirely", () => {
     renderSteps([actionSegment({ id: "a5", args: { script: COMMAND } })]);
     assertSummaryHides(screen.getByText("bash").closest("summary"));
+  });
+
+  it("drops unknown-key arguments even when they are short", () => {
+    renderSteps([actionSegment({ id: "a6", args: { task: "git status" } })]);
+    const summary = screen.getByText("bash").closest("summary");
+    expect(summary).not.toBeNull();
+    expect(summary?.textContent).not.toContain("git status");
   });
 
   it("still shows short path details on the summary row", () => {

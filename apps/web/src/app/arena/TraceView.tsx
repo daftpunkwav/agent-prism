@@ -486,7 +486,7 @@ function renderAction(seg: DisplaySegment, accentColor: string, live: boolean, t
         </span>
         <span className="font-mono text-foreground">{toolName}</span>
         {detail !== "" && (
-          <span className="font-mono text-muted-foreground min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+          <span className="font-mono text-muted-foreground flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
             {detail}
           </span>
         )}
