@@ -142,10 +142,7 @@ function ThoughtRow({
       </summary>
       <div className="builder-seg-body builder-seg-prose">
         {live ? (
-          <span className="whitespace-pre-wrap break-words">
-            {segment.text}
-            <span className="builder-seg-cursor" />
-          </span>
+          <span className="whitespace-pre-wrap break-words">{segment.text}</span>
         ) : (
           <MarkdownBlock text={segment.text} />
         )}
@@ -254,7 +251,7 @@ function SegmentRow({
           {live ? (
             <span className="builder-seg-live-hint">{t("builder.thinkingStreaming")}</span>
           ) : (
-            <span className="builder-seg-meta">{t("builder.thinkingChars", { count: segment.text.length })}</span>
+            <span className="builder-seg-meta-text">{t("builder.thinkingChars", { count: segment.text.length })}</span>
           )}
           {duration !== null && <span className="builder-seg-duration">{duration}</span>}
         </summary>
@@ -286,10 +283,7 @@ function SegmentRow({
         </div>
         <div className="builder-seg-prose">
           {streaming ? (
-            <span className="whitespace-pre-wrap break-words">
-              {segment.text}
-              <span className="builder-seg-cursor" />
-            </span>
+            <span className="whitespace-pre-wrap break-words">{segment.text}</span>
           ) : (
             <MarkdownBlock text={segment.text} />
           )}

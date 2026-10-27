@@ -66,16 +66,6 @@
   background: color-mix(in srgb, var(--destructive) 8%, transparent);
 }
 
-.trace-cursor {
-  display: inline-block;
-  width: 0.45em;
-  height: 1em;
-  margin-left: 1px;
-  vertical-align: text-bottom;
-  background: var(--accent);
-  animation: trace-blink 1s steps(2, start) infinite;
-}
-
 /* Timeline layout: one vertical rail, rows hang off it */
 .trace-timeline {
   display: flex;
@@ -399,12 +389,6 @@ details[open] > summary .trace-chevron {
 }
 .trace-seg[data-kind="error"] {
   background: color-mix(in srgb, var(--destructive) 8%, transparent);
-}
-
-@keyframes trace-blink {
-  to {
-    visibility: hidden;
-  }
 }
 
 .token-bar {

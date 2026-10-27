@@ -612,19 +612,22 @@ details[open] > .builder-seg-summary > svg:first-child {
 
 .builder-seg-done {
   margin-left: auto;
+  flex-shrink: 0;
   color: var(--success);
   font-weight: 400;
+}
+
+/* The duration rides flush after the status chip / running hint: two auto
+   margins split the free space and left the chip drifting mid-row instead of
+   pinned to the right edge. */
+.builder-seg-done + .builder-seg-duration,
+.builder-seg-live-hint + .builder-seg-duration {
+  margin-left: 0;
 }
 
 .builder-seg-meta-text {
   color: var(--muted-foreground);
   font-weight: 400;
-}
-
-.builder-seg-cursor::after {
-  content: "▋";
-  animation: builder-cursor-blink 1s step-end infinite;
-  color: var(--muted-foreground);
 }
 
 /* Settled bubble trail: collapsed by default, compact one-line step rows. */
@@ -679,12 +682,6 @@ details[open] > .builder-turn-trace-summary > svg:first-child {
   line-height: 1.6;
   min-width: 0;
   overflow-wrap: break-word;
-}
-
-@keyframes builder-cursor-blink {
-  50% {
-    opacity: 0;
-  }
 }
 
 .builder-seg-prose {

@@ -68,7 +68,7 @@ function nextSelectableIndex(options: UiSelectOption[], from: number, step: 1 | 
   return from;
 }
 
-/** Themed dropdown select with a portal popup: click-outside, scroll/resize dismiss, full arrow-key navigation. */
+/** Themed dropdown select with a portal popup: click-outside dismisses, scroll dismisses only when it moves the trigger, resize always dismisses; full arrow-key navigation. */
 export function UiSelect({ value, onChange, options, disabled = false, ariaLabel, className, icon, triggerLabel }: UiSelectProps) {
   const flat = flattenEntries(options);
   const listboxId = useId();
@@ -94,10 +94,11 @@ export function UiSelect({ value, onChange, options, disabled = false, ariaLabel
     if (refocus) triggerRef.current?.focus();
   }, []);
 
-  // Dismiss on outside press, or on scrolls originating outside the popup: the popup is
-  // fixed-positioned, so a scrolled anchor would leave it stranded. Scrolls inside the
-  // popup itself (its own overflow) must not dismiss it, or long lists can never scroll.
-  // Resize has no Node target (window) and always dismisses.
+  // Dismiss on outside press, and on scrolls that move the trigger: the popup is
+  // fixed-positioned, so a moved anchor would leave it stranded. Background scrolls
+  // that leave the trigger in place (streaming auto-follow) keep the popup open, and
+  // scrolls inside the popup itself (its own overflow) must never dismiss it, or long
+  // lists can never scroll. Resize has no Node target (window) and always dismisses.
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -107,15 +108,27 @@ export function UiSelect({ value, onChange, options, disabled = false, ariaLabel
     };
     const onScroll = (event: Event) => {
       if (event.target instanceof Node && popRef.current?.contains(event.target)) return;
+      // A streaming run fires programmatic scrolls in unrelated containers
+      // (trace auto-follow, grid reflow). Dismiss only when the anchor itself
+      // moved — the fixed popup stays valid as long as the trigger holds still,
+      // and closing on every background scroll made the popup flicker shut
+      // before any option could be picked mid-run.
+      const rect = triggerRef.current?.getBoundingClientRect();
+      const anchor = anchorRef.current;
+      if (rect && anchor && Math.abs(rect.left - anchor.left) < 1 && Math.abs(rect.top - anchor.top) < 1) return;
       setOpen(false);
     };
+    // Resize can shrink the viewport without moving the trigger, which would
+    // strand the fixed popup off-screen; a resize never originates from a
+    // streaming run, so it always dismisses.
+    const onResize = () => setOpen(false);
     document.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }, [open]);
 
