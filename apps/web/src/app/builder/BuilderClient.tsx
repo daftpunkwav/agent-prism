@@ -291,7 +291,7 @@ export function BuilderClient() {
       setHistory((prev) => [...prev, { role: "user", content: message }]);
       // Mark the session running in the registry immediately, so the session list's
       // guards (switch/delete) reflect the turn while it streams.
-      void refreshSessions();
+      void refreshSessions().catch(() => undefined);
 
       void streamBuilderChat({
         language: locale,
@@ -377,7 +377,7 @@ export function BuilderClient() {
             abortRef.current = null;
             setPendingAsk(null);
           }
-          void refreshSessions();
+          void refreshSessions().catch(() => undefined);
           // The settled turn is in the journal now: pull it so the timeline keeps
           // the whole trail, then drop the live tail (it would duplicate the block).
           try {
@@ -416,7 +416,7 @@ export function BuilderClient() {
       if (activeIdRef.current === id) abortRef.current?.abort();
       void abortBuilderTurn(id)
         .catch(() => undefined)
-        .finally(() => void refreshSessions());
+        .finally(() => { void refreshSessions().catch(() => undefined); });
     },
     [refreshSessions],
   );

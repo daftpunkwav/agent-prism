@@ -5,70 +5,37 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { BuilderCatalog, BuilderComposition } from "@agentprism/client";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import type { BuilderComposition } from "@agentprism/client";
 import {
   createBuilderSession,
   fetchBuilderSessionDetail,
   patchBuilderComposition,
   streamBuilderChat,
 } from "@agentprism/client";
-import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
-import { BuilderClient } from "../src/app/builder/BuilderClient.js";
+import {
+  BUILDER_CATALOG,
+  BUILDER_COMPOSITION,
+  BUILDER_DETAIL,
+  renderBuilderClient,
+} from "./builder-client-fixtures.js";
 
 vi.mock("@agentprism/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@agentprism/client")>()),
-  fetchBuilderCatalog: vi.fn(async () => CATALOG),
+  fetchBuilderCatalog: vi.fn(async () => BUILDER_CATALOG),
   fetchBuilderSessions: vi.fn(async () => SESSIONS),
   createBuilderSession: vi.fn(async () => ({ id: "s1" })),
-  fetchBuilderSessionDetail: vi.fn(async () => DETAIL),
+  fetchBuilderSessionDetail: vi.fn(async () => BUILDER_DETAIL),
   patchBuilderComposition: vi.fn(async (_id: string, patch: { composition?: BuilderComposition }) => ({
-    composition: patch.composition ?? COMPOSITION,
+    composition: patch.composition ?? BUILDER_COMPOSITION,
   })),
   streamBuilderChat: vi.fn(),
 }));
 
 const streamMock = vi.mocked(streamBuilderChat);
 
-const CATALOG = {
-  capabilities: [
-    { block: "reasoning", options: [{ value: "react", label: "react", description: "ReAct" }] },
-  ],
-  endpoints: [],
-  frameworks: [{ id: "native", name: "Native", status: "available", reason: "" }],
-  tools: [{ name: "read", description: "read", mutates_workspace: false }],
-} as unknown as BuilderCatalog;
-
-const COMPOSITION = {
-  framework: "native",
-  endpoint_id: "",
-  tools: [],
-  model_id: "",
-  thinking_level: "off",
-  context: "full",
-  prompt_profile: "zero_shot",
-  reasoning: "react",
-  harness: "std",
-  memory: "off",
-  mcp_policy: "off",
-  skill_policy: "off",
-  orchestration: "single",
-  system_prompt: "",
-  temperature: 0.7,
-  top_p: 1,
-  max_output_tokens: 8192,
-  max_steps: 24,
-  frequency_penalty: 0,
-  presence_penalty: 0,
-} as unknown as BuilderComposition;
-
 const SESSIONS = [{ id: "s1", name: "My agent", running: false, turn_count: 0, workspace: "" }] as never[];
-
-const DETAIL = {
-  session: { id: "s1", name: "My agent", composition: COMPOSITION, history: [], workspace: "" },
-  records: [],
-};
 
 const en = () => getCatalog("en").builder;
 
@@ -77,13 +44,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderBuilder() {
-  return render(
-    <I18nProvider initialLocale="en">
-      <BuilderClient />
-    </I18nProvider>,
-  );
-}
+const renderBuilder = renderBuilderClient;
 
 describe("BuilderClient orchestration", () => {
   it("creates a session and loads its composition into the board", async () => {
