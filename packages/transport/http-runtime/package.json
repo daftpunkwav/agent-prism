@@ -22,7 +22,7 @@
     "@agentprism/builder-service": "workspace:*",
     "@agentprism/config": "workspace:*",
     "@agentprism/contracts": "workspace:*",
-    "hono": "^4.13.13"
+    "hono": "^4.13.14"
   },
   "devDependencies": {
     "@types/node": "^24"
