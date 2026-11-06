@@ -22,9 +22,9 @@
     "@agentprism/driver-langchain": "workspace:*",
     "@agentprism/driver-run-support": "workspace:*",
     "@agentprism/harness": "workspace:*",
-    "@langchain/core": "^1.3.0",
-    "@langchain/langgraph": "^1.5.3",
-    "deepagents": "^1.16.0"
+    "@langchain/core": "^1.3.3",
+    "@langchain/langgraph": "^1.6.0",
+    "deepagents": "^1.16.2"
   },
   "devDependencies": {
     "@agentprism/runtime": "workspace:*",
