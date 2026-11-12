@@ -37,7 +37,10 @@ the runner Clock, and an optional `agentId`.
   `max_input_tokens`, `max_output_tokens`, `context_usage_pct`, and `input_usage_pct`.
   `TokenStats` itself carries no defaults; the tracker falls back to a context window of
   128 000, max input of 120 000, and max output of 96 000.
-- `PipelineMetrics` adds `success`, `duration_ms`, `tool_calls`, and `steps`.
+- `PipelineMetrics` adds `success`, `duration_ms`, `tool_calls`, `steps`, and the token
+  block (`input_tokens`, `output_tokens`, `total_tokens`, `context_window`,
+  `max_input_tokens`, `max_output_tokens`, `context_usage_pct`, `input_usage_pct`); the
+  counters default to 0 and the window/cap fields default to 128 000 / 120 000 / 96 000.
 - Nested subagent and ralph_loop events are consumed internally and never replayed
   upward. Their tokens fold into the parent through `complete`-event metrics.
 - Answer extraction for judging reads the last `thought`, or else the last `observation`,

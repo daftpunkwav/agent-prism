@@ -71,6 +71,20 @@ describe("parseShellCommand substitutions", { retry: 1 }, () => {
     expect(parseShellCommand("echo $(cat $(ls -la))", "linux")).toHaveLength(3);
   });
 
+  it("reviews substitutions inside double quotes as their own segments", () => {
+    // A double quote suppresses word splitting, not command substitution.
+    expect(texts('echo "$(cat f)"')).toEqual([["cat", "f"], ["echo", ""]]);
+    expect(texts('echo "`cat f`"')).toEqual([["cat", "f"], ["echo", ""]]);
+    // The substitution text does not join the word; the inner segments carry the review.
+    expect(texts('echo "a$(cat f)b"')).toEqual([["cat", "f"], ["echo", "ab"]]);
+  });
+
+  it("keeps escaped and single-quoted substitutions literal", () => {
+    expect(texts('echo "\\$(cat f)"')).toEqual([["echo", "$(cat f)"]]);
+    expect(texts("echo '$(cat f)'")).toEqual([["echo", "$(cat f)"]]);
+    expect(texts('echo "\\`cat f\\`"')).toEqual([["echo", "`cat f`"]]);
+  });
+
   it("consumes an unterminated backtick substitution to the end", () => {
     // The inner text is reviewed first (it is parsed in place), the missing
     // closing backtick only ends the scan.

@@ -114,6 +114,13 @@ export class MatrixService {
     )) {
       events.push(event);
     }
+    // Cancellation is never a scored cell: a partial stream from an aborted run
+    // must not be judged into a completed cell (the caller stops the matrix).
+    if (signal?.aborted) {
+      const aborted = new Error("Aborted");
+      aborted.name = "AbortError";
+      throw aborted;
+    }
     const byLabel = new Map<string, ArenaEvent[]>();
     for (const event of events) {
       if (event.pipeline === "") continue;

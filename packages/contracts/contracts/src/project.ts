@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { CUSTOM_DIMENSION_ID_MAX } from "./custom-dimension.js";
 
 /** Summary of a single column run result within a project. */
 export const PipelineRunResultSchema = z.object({
@@ -23,7 +24,10 @@ export const ProjectSchema = z.object({
   id: z.string().min(1).max(100),
   name: z.string().min(1).max(200),
   question: z.string().max(8000),
-  dimension: z.string().max(50),
+  // Builtin dimension id or a registered custom dimension id: the same bound the
+  // run request accepts, so every pinnable axis can be archived (a narrower cap
+  // silently rejected custom ids longer than it while the run itself accepted them).
+  dimension: z.string().max(CUSTOM_DIMENSION_ID_MAX),
   created_at: z.string().max(64),
   results: z.array(PipelineRunResultSchema).default([]),
   workspace_files: z.record(z.string(), z.record(z.string(), z.string())).default({}),
@@ -35,7 +39,8 @@ export type Project = z.infer<typeof ProjectSchema>;
 export const ProjectCreateSchema = z.object({
   name: z.string().min(1).max(200),
   question: z.string().max(8000),
-  dimension: z.string().max(50),
+  /** Comparison axis the run used: builtin id or registered custom dimension id. */
+  dimension: z.string().max(CUSTOM_DIMENSION_ID_MAX),
   pipeline_labels: z.array(z.string()).min(1).max(16),
   workspace_names: z.array(z.string()).max(16).default([]),
 });

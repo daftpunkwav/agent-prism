@@ -210,7 +210,7 @@ builder palette，也不参与 `/api/arena/meta` 的按端点 thinking 轴投影
 `provider-catalog/src/endpoints.ts` 中的 `resolveCredentialReference` 在构造模型的
 唯一消费点解析它。查找与 `loadSettings` 使用同一次合并：根 `.env` 计入，进程环境变量
 优先。存储值保持为引用，已解析的密钥绝不写回，缺失变量解析为 `""`，随后在模型构造时
-失败关闭。不做部分插值。
+失败关闭。不做部分插值。连接测试的失败详情会同时打码存储的引用与其解析值，因为 SDK 错误可能回显已解析的密钥。
 
 ## 持久化布局
 
@@ -221,7 +221,7 @@ builder palette，也不参与 `/api/arena/meta` 的按端点 thinking 轴投影
 | `data/provider_config.json` 与 `.bak` | provider endpoints 与 settings | 缺失则应用 `LLM_*` env 播种；主文件损坏则从 `.bak` 恢复；一次有界重试后仍抛错的读取以告警回退到播种（`provider-store.ts` 的 `load`） |
 | `data/sessions.json` 与 `.bak` | session 账本快照 `{version:1, sessions:[…]}`，由 op 日志压缩而来 | 主文件损坏则从 `.bak` 恢复；陈旧的 `active` 行在加载时翻转为 `failed` |
 | `data/sessions.jsonl` | 追加式 session op 日志，启动时重放（损坏行跳过并计数） | 由 `checkpoint()` 压缩进快照：每 30 分钟的宿主节奏、关机时，以及日志超过 32 MB 大小预算时 |
-| `data/sessions.json.blobs/` | 超大账本条目文本，命名为 `<sessionId>.<seq>.blob.txt`，每个至多 128 K 字符 | 删除时按 session 清除 |
+| `data/sessions.json.blobs/` | 超大账本条目文本，命名为 `<sanitized-session-id>.<id-hash>.<seq>.blob.txt`（hash 使规范化后相同的 id 彼此区分），每个至多 128 K 字符 | 删除时按 session 清除 |
 | `data/builder_sessions.json` 与 `.bak` | builder session store | 原子写 `.bak` 恢复 |
 | `data/threads.json` 与 `.bak` | 持久 agent threads `{version:1, threads:[…]}`，含 transcript、pinned config、workspace 链接 | 原子写 `.bak` 恢复，逐项损坏遏制，陈旧的 `running` 在加载时重置为 idle |
 | `data/projects.json` | 归档的 projects | 原子写 `.bak` 恢复 |
@@ -232,12 +232,12 @@ builder palette，也不参与 `/api/arena/meta` 的按端点 thinking 轴投影
 | `data/skill_settings.json` | 停用技能名单（settings API） | 读取失败降级为“全部技能启用” |
 | `data/skills/<name>/SKILL.md` | 运维创建的自定义技能 | 删除技能时同时清理目录；损坏文件在发现时跳过 |
 | `data/runs/<runId>/<workspace>/` | 每列临时 workspace | 重启后重水化，上限 `MAX_WORKSPACES`，TTL 为 `WORKSPACE_TTL_SECONDS`，带 run 中保护的 LRU 淘汰 |
-| `data/runs/<runId>/_traces/` | 每 run 可观测日志，每列一对 JSONL：`<label>.events.jsonl`（原始 run 事件）与 `<label>.wire.jsonl`（捕获的 LLM wire 记录），另含 `<workspace>.ws` workspace-run 标记 | 仅追加且 fail-open：首次追加失败告警一次，run 继续；由 column-logs 端点读回 |
+| `data/runs/<runId>/_traces/` | 每 run 可观测日志，每列一对 JSONL：`<sanitized-label>.events.jsonl`（原始 run 事件）与 `<sanitized-label>.wire.jsonl`（捕获的 LLM wire 记录），另含 `<workspace>.ws` workspace-run 标记 | 仅追加且 fail-open：首次追加失败告警一次，run 继续；由 column-logs 端点读回 |
 | `data/runs/…/.spills/` | tool 结果与 job 输出 dump，命名为 `spill-*.txt` 与 `NNNNNN-<jobId>.log` | 20 文件轮转 |
 
 写入统一经 `@agentprism/persistence`。文档型 store 原子写：`.tmp` 文件、rename、
 per-path 写队列与 `.bak` 副本。行式文件（session op 日志）经 per-path 队列追加，
-加载时跳过并计数截断或损坏的行，而非丢失整个 store。
+加载时跳过并计数截断或损坏的行，而非丢失整个 store。在支持 POSIX mode 的平台上，新文件以 owner-only（`0o600`）创建、新父目录以 owner-only（`0o700`）创建；原子替换会把 tmp 文件的 mode 带到目标上，因此早先 world-readable 的文件会被替换为私有文件，且每次写入都会把 `.bak` 副本重新设为 `0o600`。Windows 忽略这些 mode，由其 ACL 控制访问。
 
 ## 前端配置
 

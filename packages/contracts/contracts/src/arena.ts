@@ -58,11 +58,20 @@ export const PipelineConfigSchema = z.object({
   prompt_profile: PromptProfileSchema.default("zero_shot"),
   endpoint_id: z.string().default(""),
   model_id: z.string().default(DEFAULT_MODEL_ID),
-  temperature: z.number().default(0.0),
-  top_p: z.number().default(1.0),
-  frequency_penalty: z.number().default(0.0),
-  presence_penalty: z.number().default(0.0),
-  max_output_tokens: z.number().int().min(64).max(128_000).default(96000),
+  // Decode ranges come from the shared DECODE_FIELD_RANGES table (single source):
+  // any value the arena baseline panel can pin must also be pinnable as a whole
+  // config (threads, matrix cells); the old hardcoded bounds disagreed with the
+  // table (max_output_tokens stopped at 128k while the panel offers 384k).
+  temperature: z.number().min(DECODE_FIELD_RANGES.temperature.min).max(DECODE_FIELD_RANGES.temperature.max).default(0.0),
+  top_p: z.number().min(DECODE_FIELD_RANGES.top_p.min).max(DECODE_FIELD_RANGES.top_p.max).default(1.0),
+  frequency_penalty: z.number().min(DECODE_FIELD_RANGES.frequency_penalty.min).max(DECODE_FIELD_RANGES.frequency_penalty.max).default(0.0),
+  presence_penalty: z.number().min(DECODE_FIELD_RANGES.presence_penalty.min).max(DECODE_FIELD_RANGES.presence_penalty.max).default(0.0),
+  max_output_tokens: z
+    .number()
+    .int()
+    .min(DECODE_FIELD_RANGES.max_output_tokens.min)
+    .max(DECODE_FIELD_RANGES.max_output_tokens.max)
+    .default(96000),
   // Plain string, not the four-level enum: level mode carries vendor-defined
   // level names from the endpoint config, budget mode pins "off" (the budget
   // pair rides the two numeric fields below). Legality is enforced at pipeline

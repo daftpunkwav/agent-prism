@@ -32,6 +32,20 @@ describe("renderInstructions", () => {
     expect(renderInstructions([]).text).toBe("");
   });
 
+  it("renders higher-precedence workspace files after lower ones", () => {
+    // The loader hands workspace files low-to-high (AGENTS.md, AGENTS.local.md);
+    // the renderer must keep that order so the local override lands last.
+    const out = renderInstructions(
+      [
+        { name: "agents-md", description: "d", body: "project rules", source: "workspace" },
+        { name: "agents-local-md", description: "d", body: "local rules", source: "workspace" },
+      ],
+      100000,
+    );
+    expect(out.layers).toEqual(["agents-md", "agents-local-md"]);
+    expect(out.text.indexOf("project rules")).toBeLessThan(out.text.indexOf("local rules"));
+  });
+
   it("caps the whole block within budget", () => {
     const out = renderInstructions(BUNDLED_INSTRUCTION_LAYERS, 100);
     expect(out.text.length).toBeLessThanOrEqual(200);

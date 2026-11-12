@@ -174,6 +174,27 @@ describe("runProcess kill escalation", () => {
     await expect(pending).resolves.toMatchObject({ kind: "timeout", exitCode: null });
   });
 
+  it("keeps the timeout outcome when the killed child traps the signal and exits zero", async () => {
+    vi.useFakeTimers();
+    const pending = runProcess({ argv: ["node"], cwd: "/work", timeoutSeconds: 2 });
+    vi.advanceTimersByTime(2_000);
+    expect(child.signals).toEqual([undefined]);
+    // A SIGTERM handler that exits cleanly must not turn our kill into a success.
+    child.close(0);
+    await expect(pending).resolves.toMatchObject({ kind: "timeout", exitCode: null });
+  });
+
+  it("does not report a timeout for a child that exited inside the budget", async () => {
+    vi.useFakeTimers();
+    const pending = runProcess({ argv: ["node"], cwd: "/work", timeoutSeconds: 2 });
+    // The direct child finished in time; only a grandchild still holds the stdio pipes.
+    child.exit(0);
+    vi.advanceTimersByTime(2_000);
+    expect(child.signals).toEqual([]);
+    child.close(0);
+    await expect(pending).resolves.toMatchObject({ kind: "ok", exitCode: 0 });
+  });
+
   it("reports an externally signalled child as an error, never as a timeout", async () => {
     const pending = runProcess({ argv: ["node"], cwd: "/work", timeoutSeconds: 30 });
     child.close(null, "SIGKILL");

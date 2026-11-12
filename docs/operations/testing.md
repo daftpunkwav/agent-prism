@@ -16,7 +16,7 @@ operational map: runners, resolution mechanics, and what runs where.
    - `tests/drivers/`: driver banner consistency, reasoning-support declarations, and
      backend registration across the driver family.
    - `tests/http-transport/`: the request contract, covering routes, auth, error
-     mapping, limits, settings, and SSE streams, with 13 test files and a shared
+     mapping, limits, settings, and SSE streams, with 15 test files and a shared
      `mock-deps.ts`.
 3. App tests: `apps/web/tests/` for i18n catalog parity, locale resolution, and component
    tests, and `apps/server/tests/` for `assemble`, `load-drivers`, `mount-routes`,
@@ -30,7 +30,7 @@ pnpm test:coverage         # same run, writing coverage reports to cov-report/
 pnpm smoke                 # probe a running server over HTTP (see Smoke)
 pnpm typecheck             # packages (build first) + apps + tests
 pnpm typecheck:tests       # tsc -p tsconfig.tests.json --noEmit
-pnpm verify                # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
+pnpm verify                # build + typecheck (packages, apps, tests) + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 ```
 
 There are no per-package test scripts. The root `vitest.config.ts` include patterns pick
@@ -51,7 +51,7 @@ its share of tests. Reports land in `cov-report/` as text plus a JSON summary.
 
 Coverage thresholds fail the run when any metric falls under its floor: statements
 89, branches 78, functions 90, and lines 91 (about one and a half points under the
-90.59/80.13/91.91/92.69 baseline). CI runs on the Windows reference platform, so the
+90.35/79.73/91.69/92.44 baseline). CI runs on the Windows reference platform, so the
 numbers come from the same run that gates the merge, and the margin absorbs
 run-to-run noise and spawn jitter while turning a broad regression red instead of
 letting coverage slide. Raise the bar as coverage improves; a red gate means
@@ -67,27 +67,44 @@ no behavior of their own. A callable forwarded from another workspace package co
 covered where it is declared — the same binding, tested once. An export whose
 declaration cannot be resolved is reported rather than assumed to be data.
 `scripts/check-export-tests.mjs` holds a `PENDING` list of callable exports that still
-lack a test. The list is a worklist and may only shrink.
+lack a test. The list is a worklist and must only shrink: a pending symbol that gains a
+test, and a pending line that no longer matches any export (renamed or removed), both
+fail the gate so the exemption list cannot rot. On the real workspace root, a `PENDING`
+package that has left the workspace counts as the same inert exemption and fails too; a
+fixture repository that holds a subset of the workspace only judges the packages it
+contains.
 
 ## Smoke
 
 `scripts/smoke.mjs` probes an already-running server over HTTP. It waits for the process
-to answer, then checks `/health`, `/api/sessions`, and `/api/arena/meta`. It reads only,
-starts no run, and exits non-zero with a per-check summary.
+to answer, then checks `/health`, `/api/sessions`, and `/api/arena/meta`. The meta check
+is the only guard against a builtin backend silently dropping out of the built
+composition: when `DRIVERS` is unset or blank it requires every builtin framework id to be
+registered, and an operator-narrowed allowlist skips that assertion. It reads only,
+starts no run, and exits non-zero with a per-check summary. Invalid
+`SMOKE_TIMEOUT_MS`/`SMOKE_REQUEST_TIMEOUT_MS` values fail fast instead of flowing into the
+deadline math: the whole value must be a bare positive integer, so `1e5` or `30000ms` is
+rejected rather than prefix-parsed into a wrong deadline.
 
 ```bash
 pnpm smoke                                      # http://127.0.0.1:8281
 SMOKE_BASE_URL=https://host.example pnpm smoke  # any deployed environment
 SMOKE_PORT=8291 SMOKE_TIMEOUT_MS=60000 pnpm smoke
+SMOKE_REQUEST_TIMEOUT_MS=10000 pnpm smoke       # per-probe request deadline
 SMOKE_API_TOKEN=secret pnpm smoke               # when API_TOKEN is set
 ```
 
+`SMOKE_HOST`/`SMOKE_PORT` build the target when `SMOKE_BASE_URL` is absent, and
+`SMOKE_REQUEST_TIMEOUT_MS` bounds each probe request (default 5 seconds; the readiness
+window defaults to 30 seconds).
+
 ## CI
 
-`.github/workflows/ci.yml` runs on `windows-latest`. The `verify` job covers typecheck,
-web lint, the i18n gate, coverage, import boundaries, dependency hygiene, and
-export-test coverage. The `smoke` job builds the host, starts
-`apps/server/dist/main.js`, and runs the smoke probe against it.
+`.github/workflows/ci.yml` runs on `windows-latest`. The `verify` job builds the
+packages, then typechecks packages, apps, and tests, and covers web lint, the i18n gate,
+coverage, import boundaries, dependency hygiene, and export-test coverage. The `smoke`
+job needs `verify`, builds the host, starts `apps/server/dist/main.js`, and runs the
+smoke probe against it; a docs-only pull request skips both jobs.
 
 Windows is the reference platform: the restricted-token sandbox and the process-runner
 suites are Win32-only, so another runner would skip the security-relevant cases.
@@ -129,5 +146,5 @@ suites are Win32-only, so another runner would skip the security-relevant cases.
   opt-in for Windows file-lock jitter.
 - Behavioral deltas are pinned explicitly. The compaction strategies have unit tests that
   pin the delta against `sliding`.
-- The full gate set is `pnpm verify`: build, typecheck, coverage, web lint, i18n catalogs, import boundaries,
+- The full gate set is `pnpm verify`: build, typecheck (packages, apps, tests), coverage, web lint, i18n catalogs, import boundaries,
   dependency hygiene, and export-test coverage.

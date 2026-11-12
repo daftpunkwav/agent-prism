@@ -76,6 +76,23 @@ describe("applyTokenBudget", () => {
     ];
     expect(applyTokenBudget(messages)).toEqual(messages);
   });
+
+  it("treats keepTurns=0 as 'pin nothing' instead of pinning everything", () => {
+    // The settings knob allows 0 ("budget keeps newest turns"). `slice(-0)` is
+    // `slice(0)`, so the naive split pinned the whole transcript and the strategy
+    // silently stopped dropping anything while reporting "no safe drop found".
+    const messages: LlmMessage[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "u".repeat(2000) },
+      { role: "assistant", content: "a".repeat(2000) },
+      { role: "user", content: "latest" },
+    ];
+    const out = applyTokenBudget(messages, { budget: 100, keepTurns: 0 });
+    expect(out[0]).toEqual({ role: "system", content: "sys" }); // required system text survives
+    expect(out.some((m) => m.role === "system" && m.content.includes("dropped 2 older message(s)"))).toBe(true);
+    expect(JSON.stringify(out)).not.toContain("a".repeat(100));
+    expect(JSON.stringify(out)).toContain("latest");
+  });
 });
 
 describe("pipeline routing", () => {

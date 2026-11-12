@@ -8,8 +8,8 @@ single-source document; when prose and code disagree, the code and
 
 ## Environment
 
-- Node.js >= 20.9 (`engines` in the root `package.json`) and pnpm 11 (the
-  `packageManager` field pins the exact version).
+- Node.js `>= 24.21.0 < 25` (the `engines` range in the root `package.json`) and pnpm 12
+  (the `packageManager` field pins the exact version).
 - **Windows is the reference platform.** CI runs on `windows-latest` because the
   restricted-token sandbox and the process-runner suites are Win32-only; on another
   OS those security-relevant cases skip. Development on other platforms works for
@@ -32,7 +32,7 @@ single-source document; when prose and code disagree, the code and
 ## Before you push: quality gates
 
 ```bash
-pnpm verify                                # build + typecheck + coverage + boundaries + check:deps + check:exports
+pnpm verify                                # build + typecheck (packages, apps, tests) + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 pnpm --filter @agentprism/web lint         # web ESLint, after UI code changes
 pnpm --filter @agentprism/web check:i18n   # web i18n gate, after frontend copy changes
 ```

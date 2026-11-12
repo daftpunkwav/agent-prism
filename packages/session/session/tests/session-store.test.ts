@@ -69,6 +69,21 @@ describe("SessionStore lifecycle", () => {
     expect((await store.get(created.id))?.entryCount).toBe(2);
   });
 
+  it("serializes concurrent appends so each entry claims its own seq", async () => {
+    const store = testStore();
+    const created = await store.create({ kind: "agent", title: "race" });
+    // Both calls read list.length before either pushes: the spill await always
+    // yields, so without the per-session queue both would claim seq 0.
+    const [first, second] = await Promise.all([
+      store.appendEntry(created.id, { kind: "note", content: "a" }),
+      store.appendEntry(created.id, { kind: "note", content: "b" }),
+    ]);
+    expect([first.seq, second.seq].sort((left, right) => left - right)).toEqual([0, 1]);
+    const entries = await store.listEntries(created.id);
+    expect(entries.map((entry) => entry.seq).sort((left, right) => left - right)).toEqual([0, 1]);
+    expect((await store.get(created.id))?.entryCount).toBe(2);
+  });
+
   it("lists newest-first with kind/status/limit filters", async () => {
     const store = testStore();
     await store.create({ kind: "arena", title: "a1" });

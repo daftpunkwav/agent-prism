@@ -14,8 +14,8 @@
 
 `"name": "@agentprism/<leaf>"`、`"private": true`、`"type": "module"`、`exports` 指向
 `./dist/index.js`、`files: ["dist"]`、`build` 与 `typecheck` 脚本，以及只与实际
-import 相符的依赖。`pnpm check:deps` 会因过期、缺失或仅测试用的运行时声明而失败，
-并建议把仅测试依赖降级为 `devDependencies`。
+import 相符的依赖。`pnpm check:deps` 会因过期或缺失的声明与 value-edge 环而失败，
+并在已声明的运行时依赖仅被测试使用时告警，建议降级为 `devDependencies`。
 
 ## tsconfig.json
 

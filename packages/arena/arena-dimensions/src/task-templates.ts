@@ -110,9 +110,12 @@ export const TEMPLATES: TaskTemplate[] = [
     suggested_dimension: "context",
     suggested_selections: ["sliding", "vector"],
     // Chinese unit "minutes" kept via Unicode escape alongside English forms.
+    // Written as an unquantified alternation because the judge's ReDoS pre-filter
+    // rejects a quantified group whose content carries a quantifier — the natural
+    // `\d{1,4}(\.\d+)?` form would reject the template's own pattern.
     judge: judge({
       type: "regex",
-      pattern: "\\d{1,4}(\\.\\d+)?\\s*(\u5206\u949f|min|minutes?)",
+      pattern: "(?:\\d{1,4}\\.\\d+|\\d{1,4})\\s*(?:\\u5206\\u949f|min|minutes?)",
     }),
     category: "scored",
   },

@@ -174,6 +174,56 @@ describe("ArenaService.run cancellation", () => {
   });
 });
 
+describe("ArenaService.run early consumer stop", () => {
+  function serviceWith(stream: AsyncIterable<unknown>) {
+    const runner = mockRunner();
+    const release = vi.fn();
+    runner.acquireSlot = vi.fn().mockResolvedValue(release);
+    runner.streamParallel = vi.fn().mockReturnValue(stream);
+    const store = mockSessions();
+    const service = new ArenaService({
+      router: mockRouter() as any,
+      runnerFactory: async () => runner as any,
+      answerJudge: mockAnswerJudge(),
+      sessions: new SessionService({ store }),
+    });
+    return { service, store, release };
+  }
+
+  it("settles the ledger as cancelled when the consumer stops before the stream ends", async () => {
+    async function* openStream() {
+      yield { type: "start", pipeline: "p", turn: 0, agentId: "a", runId: "r", timestamp: 1 };
+      yield { type: "thought", pipeline: "p", turn: 0, agentId: "a", runId: "r", timestamp: 2 };
+    }
+    const { service, store, release } = serviceWith(openStream());
+    // A client disconnect closes the SSE loop: the route breaks out of the
+    // generator, so the run never produces its own terminal.
+    for await (const _event of service.run({} as any)) break;
+
+    expect(release).toHaveBeenCalledOnce();
+    const records = await store.list();
+    expect(records).toHaveLength(1);
+    expect(records[0]?.status).toBe("cancelled");
+  });
+
+  it("books an abort-drained stream as cancelled, never completed", async () => {
+    const controller = new AbortController();
+    async function* abortDrainingStream() {
+      yield { type: "start", pipeline: "p", turn: 0, agentId: "a", runId: "r", timestamp: 1 };
+      controller.abort();
+      yield { type: "complete", pipeline: "p", turn: 0, agentId: "a", runId: "r", timestamp: 2, metrics: { success: true } };
+    }
+    const { service, store } = serviceWith(abortDrainingStream());
+    const events: unknown[] = [];
+    for await (const event of service.run({} as any, { signal: controller.signal })) events.push(event);
+    expect(events).toHaveLength(2);
+
+    const records = await store.list();
+    expect(records).toHaveLength(1);
+    expect(records[0]?.status).toBe("cancelled");
+  });
+});
+
 describe("ArenaService.assertKnownDimension contract", () => {
   it("accepts a registered custom axis and rejects an unknown one as 422", () => {
     const router = mockRouter({

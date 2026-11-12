@@ -4,7 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmStreamPart, ToolDefinition } from "@agentprism/contracts";
-import { extractAnswerFromEvents, PipelineConfigSchema } from "@agentprism/contracts";
+import { ConfigurationError, extractAnswerFromEvents, PipelineConfigSchema, sanitizeErrorMessage } from "@agentprism/contracts";
 import { RagStoreCache } from "@agentprism/harness";
 import type { AgentExecutionContext } from "@agentprism/harness";
 import { MapToolRegistry } from "@agentprism/tool-registry";
@@ -264,9 +264,13 @@ describe("CrewAIDriver runtime picker", () => {
     // A nonexistent interpreter makes the probe fail deterministically on any
     // machine, installed framework or not.
     vi.stubEnv("ARENA_PYTHON", "definitely-not-a-real-interpreter-xyz");
-    await expect(collect(new CrewAIDriver(), contextWith(stubLlm([], [])))).rejects.toThrow(
-      /ARENA_CREWAI_RUNTIME=python requires a Python interpreter with the crewai package/,
+    const failure = await collect(new CrewAIDriver(), contextWith(stubLlm([], []))).catch(
+      (error: unknown) => error,
     );
+    expect(failure).toBeInstanceOf(ConfigurationError);
+    // The install hint is authored for the operator: the shared sanitizer must
+    // keep it in the client-facing error event instead of collapsing to "Error".
+    expect(sanitizeErrorMessage(failure)).toContain("ARENA_CREWAI_RUNTIME=python requires a Python interpreter");
   });
 
   it("runs the pattern fallback without probing under ARENA_CREWAI_RUNTIME=ts", async () => {

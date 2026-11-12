@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { OBSERVATION_MAX_CHARS } from "@agentprism/contracts";
 import type { TokenTracker } from "@agentprism/telemetry";
 import {
   canonicalToolName,
@@ -53,6 +54,23 @@ describe("emitToolOutcomeEvents", () => {
     expect(joined.startsWith("y".repeat(32_000))).toBe(true);
     const marker = events[events.length - 1];
     expect(marker?.content).toContain("truncated at 32000 of 60000");
+    // The marker must not promise output the observation cannot carry: the
+    // observation is capped at OBSERVATION_MAX_CHARS, far below the hard cap.
+    expect(marker?.content).not.toContain("full output in the observation");
+  });
+
+  it("keeps the >32k progress prefix containing the observation so consumers dedupe it", () => {
+    const result = "z".repeat(60_000);
+    const events = emitToolOutcomeEvents("col", "ws", 1, "bash", { result, fileDiff: null });
+    const streamed = events.map((event) => event.content).join("");
+    // The trace fold appends a column observation only when the streamed
+    // tool_progress prefix does not already contain it; a marker appended after
+    // the 32 000-char prefix must not break that containment.
+    const observation = result.slice(0, OBSERVATION_MAX_CHARS);
+    expect(streamed.startsWith(observation)).toBe(true);
+    expect(streamed.includes(observation)).toBe(true);
+    // And the observation itself never carries the marker text.
+    expect(observation).not.toContain("truncated at");
   });
 
   it("emits no progress events for empty bash output", () => {

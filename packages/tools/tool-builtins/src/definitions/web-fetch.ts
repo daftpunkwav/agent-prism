@@ -200,7 +200,12 @@ async function executeWebFetch(
         code: "workspace_error",
       };
     }
-    if ((error as Error)?.name === "AbortError") {
+    // AbortSignal.timeout aborts with a DOMException named "TimeoutError" (a caller
+    // cancellation carries "AbortError"), so checking only AbortError reported a real
+    // timeout through the generic transport branch ("fetch failed: ...") instead of
+    // the timeout outcome the model retries differently.
+    const errorName = (error as Error)?.name;
+    if (errorName === "AbortError" || errorName === "TimeoutError" || timeoutSignal.aborted) {
       const aborted = signal?.aborted === true;
       return {
         result: aborted ? "Error: aborted" : `Error: fetch timed out (${timeoutMs}ms)`,

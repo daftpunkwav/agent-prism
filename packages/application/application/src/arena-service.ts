@@ -187,7 +187,8 @@ export class ArenaService {
   /**
    * Parallel run event stream (holds the global concurrency gate; queued runs can
    * be aborted on client disconnect). Every run opens an execution session first
-   * and closes it when the stream settles, so runs stay queryable after disconnect.
+   * and settles it as completed, failed or cancelled before the stream ends — also
+   * when the consumer stops reading early — so runs stay queryable after disconnect.
    *
    * @param request Validated run request (malformed shapes fall back, never throw here).
    * @param options AbortSignal for client disconnect (aborted runs land cancelled).
@@ -210,6 +211,11 @@ export class ArenaService {
     );
     let eventsYielded = 0;
     let outlineDropped = 0;
+    // Tracks whether the ledger row reached a terminal. A consumer that stops
+    // early (client disconnect closes the SSE loop) ends the generator by return,
+    // which skips both the success and the catch path: the finally below settles
+    // that row instead of leaving it active forever.
+    let settled = false;
     const collected: ArenaEvent[] = [];
     try {
       const runner = await this.ensureRunner();
@@ -239,20 +245,27 @@ export class ArenaService {
         release();
       }
       if (session !== null) {
-        // Per-turn outline folded server-side: the ledger keeps a compact
-        // turn map without persisting the full event stream.
-        const digest = outlineDigest(outlineTurns(collected));
-        if (digest.length > 0) {
-          // The ledger note is the only trace of the outline, so it must admit when
-          // the tail retention dropped earlier events (their turns fold as "open").
-          if (outlineDropped > 0) digest.push(`(${outlineDropped} earlier event(s) omitted)`);
-          await this.safeSession("outline", () =>
-            this.deps.sessions.appendEntry(session.id, "note", digest.join("\n")),
+        if (options.signal?.aborted === true) {
+          // Abort wins over success: a stream that finished draining after the
+          // client cancelled is a cancelled run, never a completed one.
+          await this.safeSession("cancel", () => this.deps.sessions.cancelSession(session.id));
+        } else {
+          // Per-turn outline folded server-side: the ledger keeps a compact
+          // turn map without persisting the full event stream.
+          const digest = outlineDigest(outlineTurns(collected));
+          if (digest.length > 0) {
+            // The ledger note is the only trace of the outline, so it must admit when
+            // the tail retention dropped earlier events (their turns fold as "open").
+            if (outlineDropped > 0) digest.push(`(${outlineDropped} earlier event(s) omitted)`);
+            await this.safeSession("outline", () =>
+              this.deps.sessions.appendEntry(session.id, "note", digest.join("\n")),
+            );
+          }
+          await this.safeSession("complete", () =>
+            this.deps.sessions.completeSession(session.id, undefined, { eventsYielded }),
           );
         }
-        await this.safeSession("complete", () =>
-          this.deps.sessions.completeSession(session.id, undefined, { eventsYielded }),
-        );
+        settled = true;
       }
     } catch (error) {
       if (session !== null) {
@@ -262,8 +275,15 @@ export class ArenaService {
         } else {
           await this.safeSession("fail", () => this.deps.sessions.failSession(session.id, sanitizeErrorMessage(error)));
         }
+        settled = true;
       }
       throw error;
+    } finally {
+      if (session !== null && !settled) {
+        // The stream never produced a terminal (consumer stopped reading): the
+        // consumer-owned cancel is the honest status, matching the abort path.
+        await this.safeSession("cancel", () => this.deps.sessions.cancelSession(session.id));
+      }
     }
   }
 

@@ -37,6 +37,49 @@ describe("indexFile", () => {
     expect(indexFile("a.png", TS)).toEqual([]);
     expect(indexFiles([{ path: "b.ts", text: TS }, { path: "a.ts", text: TS }])[0]!.file).toBe("a.ts");
   });
+
+  it("labels interfaces, enums, structs, and traits by their own kind", () => {
+    // Regression: a shared alternative pattern recorded every construct as "class".
+    const ts = [
+      "export interface Shape {",
+      "  area(): number;",
+      "}",
+      "export enum Color { Red }",
+      "declare class Legacy {}",
+    ].join("\n");
+    const tsDefs = indexFile("a.ts", ts);
+    expect(tsDefs.find((d) => d.name === "Shape")?.kind).toBe("interface");
+    expect(tsDefs.find((d) => d.name === "Color")?.kind).toBe("enum");
+    expect(tsDefs.find((d) => d.name === "Legacy")?.kind).toBe("class");
+
+    const rust = [
+      "pub struct Config {",
+      "  value: u32,",
+      "}",
+      "",
+      "pub fn load() -> Config {",
+      "}",
+      "",
+      "trait Loader {",
+      "  fn load_it();",
+      "}",
+    ].join("\n");
+    const rustDefs = indexFile("lib.rs", rust);
+    expect(rustDefs.find((d) => d.name === "Config")?.kind).toBe("struct");
+    expect(rustDefs.find((d) => d.name === "load")?.kind).toBe("function");
+    expect(rustDefs.find((d) => d.name === "Loader")?.kind).toBe("trait");
+    // Indented trait methods are definitions scoped under the trait.
+    const loadIt = rustDefs.find((d) => d.name === "load_it");
+    expect(loadIt?.kind).toBe("function");
+    expect(loadIt?.scope).toBe("Loader");
+  });
+
+  it("indexes indented methods and Go receiver declarations", () => {
+    const py = indexFile("worker.py", "class Worker:\n    def run(self):\n        pass\n");
+    expect(py.find((d) => d.name === "run")?.scope).toBe("Worker");
+    const go = indexFile("server.go", "func (s *Server) Serve() {\n}\n");
+    expect(go.find((d) => d.name === "Serve")?.kind).toBe("function");
+  });
 });
 
 describe("searchSymbols", () => {

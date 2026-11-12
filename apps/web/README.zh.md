@@ -56,6 +56,7 @@ import `@agentprism/contracts`。
 
 ## 测试
 
-`tests/` 存放 58 个 jsdom + testing-library 套件，覆盖页面、分区组件与 hooks。
+`tests/` 存放 76 个套件：jsdom + testing-library 的页面、分区组件、hook 与组件测试，
+外加 catalog 对等、locale 解析与存储、CSP、narrative 渲染等纯单元测试。
 套件随根 `pnpm test` 运行（根 vitest 配置的 include 覆盖 `apps/*/tests`，并把
 `@/` 别名映射到 `src/`）。

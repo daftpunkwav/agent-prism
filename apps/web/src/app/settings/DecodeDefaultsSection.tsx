@@ -12,6 +12,7 @@ import { DECODE_FIELD_RANGES } from "@agentprism/client";
 import { NumberInput } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
 import type { SettingsForm } from "./settingsConnectionModel";
+import { CONNECTION_FIELD_LIMITS } from "./settingsConnectionModel";
 import { Field } from "./Field";
 
 interface DecodeDefaultsSectionProps {
@@ -77,6 +78,7 @@ export function DecodeDefaultsSection({ form, onChange }: DecodeDefaultsSectionP
             className="form-input"
             placeholder={t("settings.decode.notesPlaceholder")}
             value={form.notes}
+            maxLength={CONNECTION_FIELD_LIMITS.notes}
             onChange={(e) => { onChange({ notes: e.target.value }); }}
           />
         </div>

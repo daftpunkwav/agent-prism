@@ -212,6 +212,27 @@ describe("testProviderConnection endpoint selection", () => {
     expect(result.message).not.toContain(key);
   });
 
+  it("redacts a resolved ${env:NAME} credential echoed by the vendor", async () => {
+    // The stored key is a reference; model construction resolves it, and the SDK
+    // error can echo the resolved secret (auth header) instead of the reference.
+    const url = `${await loopbackUrl()}/echo-auth`;
+    const resolvedKey = "sk-resolved-env-secret";
+    process.env.AGENTPRISM_PROBE_ENV_KEY = resolvedKey;
+    try {
+      const target: ConnectionTestTarget = {
+        endpoints: [
+          { id: "", api_key: "${env:AGENTPRISM_PROBE_ENV_KEY}", base_url: url, api_format: "openai_chat" } as never,
+        ],
+      };
+      const result = await testProviderConnection({ provider: provider([]), idGenerator: ids }, target);
+      expect(result.ok).toBe(false);
+      expect(result.message).toContain("Connection failed:");
+      expect(result.message).not.toContain(resolvedKey);
+    } finally {
+      delete process.env.AGENTPRISM_PROBE_ENV_KEY;
+    }
+  });
+
   it("selects a stored endpoint by id when the target pins testEndpointId", async () => {
     const url = await loopbackUrl();
     const stored = provider([

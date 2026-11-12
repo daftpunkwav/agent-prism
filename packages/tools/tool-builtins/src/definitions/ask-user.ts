@@ -243,21 +243,32 @@ export function liveAskUserTool(respond: AskUserRespond): ToolDefinition {
           code: "workspace_error",
         };
       }
-      recordBatch(workspace, parsed.questions, reply);
-      if (!reply.answered) {
-        return { result: boundText(workspace, "ask_user", deferText(parsed.questions)), fileDiff: null, ok: true };
+      if (reply.answered) {
+        // The human's answer is already in hand. An audit-log write failure must
+        // degrade to a note instead of rejecting the call: a thrown tool error would
+        // discard real answers and read to the model as "the question failed".
+        let auditFailure = "";
+        try {
+          recordBatch(workspace, parsed.questions, reply);
+        } catch (error) {
+          auditFailure = `\n(audit log write failed: ${error instanceof Error ? error.message : String(error)})`;
+        }
+        const byId = new Map(reply.answers.map((entry) => [entry.id, entry.answer]));
+        const lines = parsed.questions.map((item) => {
+          const answer = byId.get(item.id) ?? "";
+          const suffix = answer.trim() === "" ? "(skipped: proceed on the safest assumption)" : answer;
+          return `- [${item.id}] ${suffix}`;
+        });
+        return {
+          result: boundText(workspace, "ask_user", `The human answered inline:\n${lines.join("\n")}${auditFailure}`),
+          fileDiff: null,
+          ok: true,
+        };
       }
-      const byId = new Map(reply.answers.map((entry) => [entry.id, entry.answer]));
-      const lines = parsed.questions.map((item) => {
-        const answer = byId.get(item.id) ?? "";
-        const suffix = answer.trim() === "" ? "(skipped: proceed on the safest assumption)" : answer;
-        return `- [${item.id}] ${suffix}`;
-      });
-      return {
-        result: boundText(workspace, "ask_user", `The human answered inline:\n${lines.join("\n")}`),
-        fileDiff: null,
-        ok: true,
-      };
+      // Unanswered batches keep surfacing a log failure: the defer text claims the
+      // batch was recorded for operator review, and a silent loss would make that false.
+      recordBatch(workspace, parsed.questions, reply);
+      return { result: boundText(workspace, "ask_user", deferText(parsed.questions)), fileDiff: null, ok: true };
     },
   };
 }

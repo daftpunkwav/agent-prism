@@ -5,7 +5,8 @@
 `packages/` 下的一切都按 `<family>/<leaf>/` 两级组织。family 目录聚合相关 leaf，并
 携带一张角色表 `README.md`；每个 leaf 都是真实的 workspace package，命名为
 `@agentprism/<leaf>`，在 `pnpm-workspace.yaml` 中 glob 为 `packages/*/*`，提供
-`src/ tests/ README.md package.json tsconfig.json`。
+`src/ README.md package.json tsconfig.json`；除三个由根 `tests/http-transport/` 覆盖
+其行为的 route leaf 外，每个 leaf 还带一个共置的 `tests/` 目录。
 
 各 family 之间的依赖方向由 `pnpm boundaries` 与 `pnpm check:deps` 固定；family 角色、
 seam 面与铁律的完整映射见 [docs/architecture.zh.md](../docs/architecture.zh.md)。
@@ -28,6 +29,7 @@ seam 面与铁律的完整映射见 [docs/architecture.zh.md](../docs/architectu
 | [`agent/`](agent/README.md) | agent | 单列执行生命周期 |
 | [`drivers/`](drivers/README.md) | driver-run-support, driver-native, driver-langchain, driver-langgraph, driver-deepagents, driver-openai-agents, driver-claude-agent-sdk, driver-plan-execute, driver-self-critique, driver-autogen, driver-crewai | Driver 共享运行支持（run-support）与十个 loop-architecture backend |
 | [`dimensions/`](dimensions/README.md) | dimensions | 实验 dimension catalog 与选项 |
+| [`custom/`](custom/README.md) | summary-budget, memory-top-n, tool-replay | 每个 leaf 一个自定义对比维度；每个只允许依赖 contracts |
 | [`evaluation/`](evaluation/README.md) | evaluation | 评判、对比报告、ablation 行、matrix 聚合 |
 | [`providers/`](providers/README.md) | provider-catalog, provider-langchain | Provider seam，含 catalog、config、lookup；以及 LangChain SDK 模型构造 |
 | [`arena/`](arena/README.md) | arena-dimensions, arena-runner | Dimension 路由与 baselines、并行多列 runner |

@@ -152,6 +152,20 @@ export class BuilderService {
     }
   }
 
+  /**
+   * Settles one ledger row under the best-effort rule above. The id is captured
+   * before the async call so the closure never re-reads a mutable field.
+   */
+  private async settleLedger(
+    ledger: SessionRecord | null,
+    action: "cancel" | "fail" | "complete",
+    settle: (ledgerId: string) => Promise<SessionRecord>,
+  ): Promise<void> {
+    if (ledger === null) return;
+    const ledgerId = ledger.id;
+    await this.safeLedger(action, () => settle(ledgerId));
+  }
+
   constructor(deps: BuilderServiceDeps) {
     this.deps = deps;
     this.askChannel = new AskUserChannel({ waitMs: deps.askUserWaitMs });
@@ -202,16 +216,23 @@ export class BuilderService {
    */
   patchComposition(id: string, request: BuilderPatchRequest): BuilderSwapResult {
     const record = this.deps.store.get(id);
-    if (typeof request.name === "string") {
-      this.deps.store.rename(id, request.name);
-    }
     if (request.composition === undefined) {
+      // A name-only patch is legal mid-turn (pure metadata) and mutates nothing else.
+      if (typeof request.name === "string") {
+        this.deps.store.rename(id, request.name);
+      }
       return { changed_fields: [], tools_added: [], tools_removed: [], composition: record.composition };
     }
+    // Validate the whole patch before mutating: a rejected composition half must not
+    // leave the rename applied (the client gets one status code, so it must see no
+    // change at all).
     this.assertIdle(record);
     const before = record.composition;
     const after = normalizeComposition({ ...before, ...request.composition });
     this.assertCompositionAvailable(after);
+    if (typeof request.name === "string") {
+      this.deps.store.rename(id, request.name);
+    }
 
     const diff = diffComposition(before, after);
     this.deps.store.updateComposition(id, after);
@@ -241,8 +262,10 @@ export class BuilderService {
     this.deps.store.delete(id);
     this.traces.delete(id);
     void this.deps.traceStore.delete(id);
-    // The store only schedules a debounced flush: force it so a crash in the next 300ms
-    // cannot resurrect a session the user just deleted.
+    // The store only schedules a debounced flush: kick it immediately so the delete
+    // reaches disk as early as possible. The write is still async, so the response can
+    // return first and a process crash inside that window can resurrect the session;
+    // closing it fully needs an awaited (async) delete signature in the transport.
     void this.deps.store.flushNow();
   }
 
@@ -294,21 +317,26 @@ export class BuilderService {
     this.runs.set(id, { controller });
     this.deps.store.markRunning(id, true);
 
-    const before = record.history.reduce((sum, message) => sum + message.content.length, 0);
-    const ledger = await this.safeLedger("create", () =>
-      this.deps.sessions.startSession("builder", "/compact", {
-        builderSession: id,
-        turn: record.turnCount,
-        maintenance: "compact",
-      }),
-    );
-    const trace = this.traceLogFor(id);
-    const startEntry = trace.append("session", `Compact started · ${record.history.length} messages, ${before} chars`, {
-      turn: record.turnCount,
-    });
-    yield { stream: "trace", entry: startEntry };
-
+    // One try covers the whole body, including the first chunk: a consumer that
+    // stops iterating right after it (SSE client gone) must still release the run
+    // slot, or the session stays "running" for the process lifetime.
+    let ledger: SessionRecord | null = null;
+    let ledgerSettled = false;
     try {
+      const before = record.history.reduce((sum, message) => sum + message.content.length, 0);
+      ledger = await this.safeLedger("create", () =>
+        this.deps.sessions.startSession("builder", "/compact", {
+          builderSession: id,
+          turn: record.turnCount,
+          maintenance: "compact",
+        }),
+      );
+      const trace = this.traceLogFor(id);
+      const startEntry = trace.append("session", `Compact started · ${record.history.length} messages, ${before} chars`, {
+        turn: record.turnCount,
+      });
+      yield { stream: "trace", entry: startEntry };
+
       // Extractive pre-trim: the summarizer reads at most this much; older turns
       // beyond the window are dropped the same way trimToCaps would drop them.
       const transcript = record.history
@@ -333,9 +361,8 @@ export class BuilderService {
       const summary = invoked.text.trim();
       if (summary === "") {
         trace.append("session", "Compact failed: empty summary from model", { turn: record.turnCount });
-        if (ledger !== null) {
-          await this.safeLedger("fail", () => this.deps.sessions.failSession(ledger.id, "compact failed"));
-        }
+        ledgerSettled = true;
+        await this.settleLedger(ledger, "fail", (ledgerId) => this.deps.sessions.failSession(ledgerId, "compact failed"));
         yield {
           stream: "turn",
           turn: {
@@ -355,12 +382,11 @@ export class BuilderService {
         before,
         after,
       });
-      if (ledger !== null) {
-        // No token metadata: invoke() usage is untrusted-shape; a zero here would lie.
-        await this.safeLedger("complete", () =>
-          this.deps.sessions.completeSession(ledger.id, `compacted ${before}→${after} chars`),
-        );
-      }
+      ledgerSettled = true;
+      // No token metadata: invoke() usage is untrusted-shape; a zero here would lie.
+      await this.settleLedger(ledger, "complete", (ledgerId) =>
+        this.deps.sessions.completeSession(ledgerId, `compacted ${before}→${after} chars`),
+      );
       yield {
         stream: "turn",
         turn: {
@@ -372,17 +398,23 @@ export class BuilderService {
         },
       };
     } catch (error) {
-      if (ledger !== null) {
-        if (controller.signal.aborted) {
-          await this.safeLedger("cancel", () => this.deps.sessions.cancelSession(ledger.id));
-        } else {
-          await this.safeLedger("fail", () => this.deps.sessions.failSession(ledger.id, sanitizeErrorMessage(error)));
-        }
+      if (controller.signal.aborted) {
+        await this.settleLedger(ledger, "cancel", (ledgerId) => this.deps.sessions.cancelSession(ledgerId));
+      } else {
+        await this.settleLedger(ledger, "fail", (ledgerId) =>
+          this.deps.sessions.failSession(ledgerId, sanitizeErrorMessage(error)),
+        );
       }
+      ledgerSettled = true;
       throw error;
     } finally {
       this.runs.delete(id);
       this.deps.store.markRunning(id, false);
+      // A consumer that detached before the turn settled leaves an active ledger
+      // row behind; close it as cancelled so the ledger mirrors the session.
+      if (!ledgerSettled) {
+        await this.settleLedger(ledger, "cancel", (ledgerId) => this.deps.sessions.cancelSession(ledgerId));
+      }
       void this.deps.store.flushNow();
       void this.deps.traceStore.flush(id);
     }
@@ -423,35 +455,12 @@ export class BuilderService {
     this.runs.set(id, { controller });
     this.deps.store.markRunning(id, true);
 
-    // Every settled turn lands in the execution ledger (arena parity): the builder
-    // kind exists in the ledger vocabulary but had no writer until now.
-    const question = message.replace(/\s+/g, " ").trim();
-    const ledger = await this.safeLedger("create", () =>
-      this.deps.sessions.startSession("builder", question === "" ? "builder turn" : question.slice(0, 80), {
-        builderSession: id,
-        turn: record.turnCount + 1,
-      }),
-    );
-
-    const trace = this.traceLogFor(id);
-    const turn = record.turnCount + 1;
-    const composition = record.composition;
-    // Turn boundary marker: the journal's spine for replaying the whole trail.
-    this.deps.traceStore.append(id, { kind: "turn", turn, ts: this.deps.clock.now(), user: message });
-
-    // Notices are consumed exactly once; a tool-free composition always reminds the model.
-    const notices = this.deps.store.takeNotices(id);
-    if (composition.tools.length === 0) {
-      notices.unshift(buildNoToolsNotice());
-    }
-
-    const startEntry = trace.append(
-      "session",
-      `Turn ${turn} started · framework=${composition.framework} · tools=${describeTools(composition)}`,
-      { turn, message_chars: message.length, notices: [...notices], composition },
-    );
-    yield { stream: "trace", entry: startEntry };
-
+    // One try covers the whole body, including the first chunk: a consumer that
+    // stops iterating right after it (SSE client gone) must still release the run
+    // slot, or the session stays "running" for the process lifetime (409 on every
+    // later turn/patch/delete).
+    let ledger: SessionRecord | null = null;
+    let ledgerSettled = false;
     let output: BuilderTurnOutput | null = null;
     // Only pairing-relevant events are retained, the same rule the thread turn path
     // applies: extractToolRounds reads actions and observations only, so holding the
@@ -459,6 +468,35 @@ export class BuilderService {
     // 20 k deltas ≈ 8 MB) in a list nothing ever reads.
     const toolEvents: ArenaEvent[] = [];
     try {
+      // Every settled turn lands in the execution ledger (arena parity): the builder
+      // kind exists in the ledger vocabulary but had no writer until now.
+      const question = message.replace(/\s+/g, " ").trim();
+      ledger = await this.safeLedger("create", () =>
+        this.deps.sessions.startSession("builder", question === "" ? "builder turn" : question.slice(0, 80), {
+          builderSession: id,
+          turn: record.turnCount + 1,
+        }),
+      );
+
+      const trace = this.traceLogFor(id);
+      const turn = record.turnCount + 1;
+      const composition = record.composition;
+      // Turn boundary marker: the journal's spine for replaying the whole trail.
+      this.deps.traceStore.append(id, { kind: "turn", turn, ts: this.deps.clock.now(), user: message });
+
+      // Notices are consumed exactly once; a tool-free composition always reminds the model.
+      const notices = this.deps.store.takeNotices(id);
+      if (composition.tools.length === 0) {
+        notices.unshift(buildNoToolsNotice());
+      }
+
+      const startEntry = trace.append(
+        "session",
+        `Turn ${turn} started · framework=${composition.framework} · tools=${describeTools(composition)}`,
+        { turn, message_chars: message.length, notices: [...notices], composition },
+      );
+      yield { stream: "trace", entry: startEntry };
+
       const iterator = runBuilderTurn(
         {
           driverLookup: this.deps.driverLookup,
@@ -518,16 +556,13 @@ export class BuilderService {
       }
 
       const result = output as BuilderTurnOutput;
+      ledgerSettled = true;
       if (result.aborted) {
         trace.append("session", `Turn ${turn} aborted`, { turn });
-        if (ledger !== null) {
-          await this.safeLedger("cancel", () => this.deps.sessions.cancelSession(ledger.id));
-        }
+        await this.settleLedger(ledger, "cancel", (ledgerId) => this.deps.sessions.cancelSession(ledgerId));
       } else if (result.errorSeen) {
         trace.append("session", `Turn ${turn} failed`, { turn, runId: result.runId });
-        if (ledger !== null) {
-          await this.safeLedger("fail", () => this.deps.sessions.failSession(ledger.id, "builder turn failed"));
-        }
+        await this.settleLedger(ledger, "fail", (ledgerId) => this.deps.sessions.failSession(ledgerId, "builder turn failed"));
       } else {
         // Whitespace-only answers are truthy: trim before the emptiness check so
         // a blank reply lands as the placeholder, never as stored whitespace.
@@ -542,13 +577,11 @@ export class BuilderService {
           workspace: result.workspaceName,
           metrics: result.metrics,
         });
-        if (ledger !== null) {
-          await this.safeLedger("complete", () =>
-            this.deps.sessions.completeSession(ledger.id, answer.slice(0, 200), {
-              total_tokens: result.metrics?.total_tokens ?? 0,
-            }),
-          );
-        }
+        await this.settleLedger(ledger, "complete", (ledgerId) =>
+          this.deps.sessions.completeSession(ledgerId, answer.slice(0, 200), {
+            total_tokens: result.metrics?.total_tokens ?? 0,
+          }),
+        );
       }
       yield {
         stream: "turn",
@@ -563,18 +596,24 @@ export class BuilderService {
     } catch (error) {
       // Escaping throws are rare (turn failures surface as errorSeen above):
       // still close the ledger, then let the failure propagate unchanged.
-      if (ledger !== null) {
-        if (controller.signal.aborted) {
-          await this.safeLedger("cancel", () => this.deps.sessions.cancelSession(ledger.id));
-        } else {
-          await this.safeLedger("fail", () => this.deps.sessions.failSession(ledger.id, sanitizeErrorMessage(error)));
-        }
+      if (controller.signal.aborted) {
+        await this.settleLedger(ledger, "cancel", (ledgerId) => this.deps.sessions.cancelSession(ledgerId));
+      } else {
+        await this.settleLedger(ledger, "fail", (ledgerId) =>
+          this.deps.sessions.failSession(ledgerId, sanitizeErrorMessage(error)),
+        );
       }
+      ledgerSettled = true;
       throw error;
     } finally {
       options.signal?.removeEventListener("abort", forwardAbort);
       this.runs.delete(id);
       this.deps.store.markRunning(id, false);
+      // A consumer that detached before the turn settled leaves an active ledger
+      // row behind; close it as cancelled so the ledger mirrors the session.
+      if (!ledgerSettled) {
+        await this.settleLedger(ledger, "cancel", (ledgerId) => this.deps.sessions.cancelSession(ledgerId));
+      }
       void this.deps.store.flushNow();
       // Turn-end durability for the journal (also awaited implicitly by detail reads).
       void this.deps.traceStore.flush(id);

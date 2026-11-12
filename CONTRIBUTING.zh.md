@@ -7,7 +7,7 @@
 
 ## 环境
 
-- Node.js >= 20.9（根 `package.json` 的 `engines`），pnpm 11（`packageManager`
+- Node.js `>= 24.21.0 < 25`（根 `package.json` 的 `engines` 范围），pnpm 12（`packageManager`
   字段钉住精确版本）。
 - **Windows 是参考平台。** CI 运行在 `windows-latest`，因为受限令牌沙箱与
   process-runner 套件仅适用于 Win32；在其他 OS 上这些与安全相关的用例会被跳过。
@@ -29,7 +29,7 @@
 ## 推送前：质量门禁
 
 ```bash
-pnpm verify                                # 构建 + typecheck + coverage + boundaries + check:deps + check:exports
+pnpm verify                                # 构建 + typecheck（packages、apps、tests）+ coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 pnpm --filter @agentprism/web lint         # web ESLint，改动 UI 代码后运行
 pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文案后运行
 ```

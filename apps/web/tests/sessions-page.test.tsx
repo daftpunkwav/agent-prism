@@ -80,6 +80,37 @@ describe("sessions page", () => {
     await waitFor(() => expect(exportSession).toHaveBeenCalledWith("s1"));
   });
 
+  it("keeps a later expansion when an earlier detail fetch fails", async () => {
+    const { listSessions, getSessionDetail } = await import("@agentprism/client");
+    // Two records; the first detail fetch fails late (after the user already
+    // expanded the second row).
+    vi.mocked(listSessions).mockResolvedValueOnce([
+      { id: "s1", kind: "arena", title: "first run", status: "completed", createdAt: 1700000000000, updatedAt: 1700000001000, summary: "done", metadata: {}, entryCount: 1 },
+      { id: "s2", kind: "arena", title: "second run", status: "completed", createdAt: 1700000002000, updatedAt: 1700000003000, summary: "done", metadata: {}, entryCount: 1 },
+    ] as never);
+    let rejectFirst: ((error: Error) => void) | undefined;
+    vi.mocked(getSessionDetail)
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          }) as never,
+      )
+      .mockResolvedValueOnce({
+        record: { id: "s2", kind: "arena", title: "second run", status: "completed" },
+        entries: [{ sessionId: "s2", seq: 0, at: 1700000002000, kind: "note", content: "milestone two" }],
+      } as never);
+    renderPage();
+    expect(await screen.findByText("second run")).toBeDefined();
+    fireEvent.click(screen.getAllByText(/1 milestones/)[0] as Element);
+    fireEvent.click(screen.getAllByText(/1 milestones/)[1] as Element);
+    expect(await screen.findByText("milestone two")).toBeDefined();
+    // The first request's late failure must not collapse the second row.
+    rejectFirst?.(new Error("detail unavailable"));
+    await waitFor(() => expect(screen.getByText("detail unavailable")).toBeDefined());
+    expect(screen.getByText("milestone two")).toBeDefined();
+  });
+
   it("deletes a record after confirm", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPage();

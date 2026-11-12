@@ -19,6 +19,7 @@
 
 import type { AgentDriver, ArenaEvent, LlmAssistantMessage, LlmMessage, ToolDefinition } from "@agentprism/contracts";
 import {
+  ConfigurationError,
   PIPELINE_BANNER_PREFIX,
   arenaErrorEvent,
   completeEvent,
@@ -114,7 +115,7 @@ async function* streamWorkerTurn(
   const prepared = applyContextPipeline(
     [...messages, { role: "user", content: instruction }],
     config.context,
-    { retrieveSnippets, ...context.contextTuning },
+    { retrieveSnippets, analytics: context.contextAnalytics, ...context.contextTuning },
   );
   const definitions = toolDefinitions.length > 0 ? toolDefinitions : undefined;
   stats.step += 1;
@@ -218,7 +219,7 @@ async function* runManagerCall(
     const prepared = applyContextPipeline(
       [...messages, { role: "user", content: MANAGER_INSTRUCTION }],
       config.context,
-      { retrieveSnippets, ...context.contextTuning },
+      { retrieveSnippets, analytics: context.contextAnalytics, ...context.contextTuning },
     );
     const result = await context.llm.invoke(prepared, { signal: context.signal });
     text = result.text;
@@ -264,7 +265,10 @@ export class CrewAIDriver implements AgentDriver {
       return;
     }
     if (runtime === "python") {
-      throw new Error(
+      // ConfigurationError, not a plain Error: the message is authored for the
+      // operator (install hint + README) and the sanitizer passes it through to
+      // the client, whereas a plain Error would surface as "Error".
+      throw new ConfigurationError(
         "ARENA_CREWAI_RUNTIME=python requires a Python interpreter with the crewai package " +
           "(pip install -r packages/drivers/driver-crewai/python/requirements.txt); " +
           "see packages/drivers/driver-crewai/README.md",

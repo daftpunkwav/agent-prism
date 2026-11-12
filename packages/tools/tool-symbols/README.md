@@ -2,8 +2,8 @@
 
 Regex-based code symbol index: definitions, references, and dependents.
 
-- `index`: per-file definition extraction (function/class/interface/struct/enum
-  plus arrow-const) with line numbers, no parsers, degrades gracefully.
+- `index`: per-file definition extraction (function/class/interface/struct/enum/
+  trait plus arrow-const) with line numbers, no parsers, degrades gracefully.
 - `query`: exact/prefix/substring symbol search, reference search with
   word boundaries, and reverse-dependency (importer) lookup.
 - `tool`: read-only `symbols` builtin (defs/refs/search/dependents), all toolsets.

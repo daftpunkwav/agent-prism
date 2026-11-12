@@ -154,6 +154,25 @@ describe("settings routes", () => {
     expect(detail.detail).toContain("command");
   });
 
+  it("answers 400, never a 500, for a JSON null settings body", async () => {
+    // A JSON `null` is a valid body: a null property read used to escape the
+    // hand-validation as a TypeError and surface as a 500.
+    const app = buildTestApp();
+    const cases = [
+      { path: "/api/settings/skills", method: "POST" },
+      { path: "/api/settings/skills/user-a/enabled", method: "PUT" },
+      { path: "/api/settings/mcp", method: "PUT" },
+    ] as const;
+    for (const { path, method } of cases) {
+      const res = await app.request(path, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: "null",
+      });
+      expect(res.status, `${method} ${path}`).toBe(400);
+    }
+  });
+
   it("leaves the routes unregistered when the controllers are absent", async () => {
     const app = buildTestApp({
       runtimeKnobs: undefined,

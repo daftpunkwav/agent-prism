@@ -21,7 +21,13 @@ import { Plus, Trash2, X } from "lucide-react";
 import { NumberInput, UiSelect } from "@agentprism/ui";
 import { useT } from "@/i18n/useT";
 import type { ModelSlot } from "./settingsConnectionModel";
-import { appliedThinkingMode, editorThinkingLevels, legalThinkingLevel } from "./settingsConnectionModel";
+import {
+  appliedThinkingMode,
+  CONNECTION_FIELD_LIMITS,
+  editorThinkingLevels,
+  ENDPOINT_TOKEN_LIMITS,
+  legalThinkingLevel,
+} from "./settingsConnectionModel";
 import { Field } from "./Field";
 
 export interface ModelModalProps {
@@ -193,6 +199,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
               <input
                 className="form-input text-sm"
                 value={draft.label}
+                maxLength={CONNECTION_FIELD_LIMITS.label}
                 placeholder={t("settings.model.labelPlaceholder")}
                 aria-label={t("settings.model.labelAria", { index: 1 })}
                 onChange={(e) => { patch({ label: e.target.value }); }}
@@ -203,6 +210,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 className="form-input font-mono text-sm"
                 value={draft.model}
                 required
+                maxLength={CONNECTION_FIELD_LIMITS.model}
                 placeholder="model id"
                 aria-label={t("settings.model.modelIdAria", { index: 1 })}
                 onChange={(e) => { patch({ model: e.target.value }); }}
@@ -216,6 +224,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 className="form-input font-mono text-sm"
                 integer
                 min={1024}
+                max={ENDPOINT_TOKEN_LIMITS.context_window}
                 value={draft.context_window}
                 invalidMessage={t("settings.model.invalidNumber")}
                 onChange={(context_window) => { patch({ context_window }); }}
@@ -226,6 +235,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 className="form-input font-mono text-sm"
                 integer
                 min={256}
+                max={ENDPOINT_TOKEN_LIMITS.max_input_tokens}
                 value={draft.max_input_tokens}
                 invalidMessage={t("settings.model.invalidNumber")}
                 onChange={(max_input_tokens) => { patch({ max_input_tokens }); }}
@@ -236,6 +246,7 @@ export function ModelModal({ initial, isNew, apiFormat, defaultEndpointId, onSet
                 className="form-input font-mono text-sm"
                 integer
                 min={64}
+                max={ENDPOINT_TOKEN_LIMITS.max_output_tokens}
                 value={draft.max_output_tokens}
                 invalidMessage={t("settings.model.invalidNumber")}
                 onChange={(max_output_tokens) => { patch({ max_output_tokens }); }}

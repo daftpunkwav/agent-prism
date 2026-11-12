@@ -210,6 +210,7 @@ export class LangGraphDriver implements AgentDriver {
         lcTools,
         retrieveSnippets: createColumnSnippetRetriever(context.rag, context.workspace),
         contextTuning: context.contextTuning,
+        contextAnalytics: context.contextAnalytics,
         harness: config.harness,
         signal: context.signal,
         onToolExecuted: recordTool,

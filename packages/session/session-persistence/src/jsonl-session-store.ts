@@ -36,7 +36,7 @@ import {
   MAX_SUMMARY_CHARS,
   spillOversizedEntry,
 } from "@agentprism/session";
-import { PersistedFileSchema, type PersistedSessionItem } from "./file-session-store.js";
+import { persistedSessions, type PersistedSessionItem } from "./file-session-store.js";
 
 /** Op-log line variants (discriminated by `op`). */
 type SessionOp =
@@ -76,6 +76,30 @@ const STORE_MUTATION_KEY = "store";
 /** Identity for a seq-less replay match. Content is included so two notes at one timestamp stay distinct. */
 function entryIdentity(sessionId: string, at: number, kind: string, content: string): string {
   return `${sessionId}\0${at}\0${kind}\0${content}`;
+}
+
+/** Finite epoch-ms field: a non-number would poison createdAt/updatedAt ordering and views. */
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/** Plain (non-array) object guard for replayed metadata payloads. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Metadata containment for replayed lines: null/undefined mean "none", a
+ * non-object payload is corruption (the caller rejects the op), and only the
+ * scalar values the record type allows survive the merge.
+ */
+function replayMetadata(value: unknown): SessionRecord["metadata"] {
+  const out: SessionRecord["metadata"] = {};
+  if (!isPlainObject(value)) return out;
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "string" || typeof entry === "number" || typeof entry === "boolean") out[key] = entry;
+  }
+  return out;
 }
 
 /**
@@ -377,11 +401,21 @@ export class JsonlSessionStore implements SessionStore {
       console.warn(`[jsonl-session-store] snapshot unreadable, replaying log only: ${error instanceof Error ? error.message : String(error)}`);
     }
     if (raw !== null) {
-      const parsed = PersistedFileSchema.safeParse(raw);
-      if (parsed.success) {
-        this.loadItems(parsed.data.sessions);
-      } else {
+      // The container version gates forward compatibility: an unknown version is a
+      // newer writer's snapshot, so replaying the old-format log is safer than
+      // partially interpreting it. Within the expected version, corrupt items are
+      // contained per item — the same rule as the single-doc backend, otherwise one
+      // bad record would wipe every session the (now truncated) log also lost.
+      const persisted = (raw as { version?: unknown }).version === 1 ? persistedSessions(raw) : null;
+      if (persisted === null) {
         console.warn("[jsonl-session-store] snapshot schema mismatch, replaying log only");
+      } else {
+        if (persisted.dropped > 0) {
+          console.warn(
+            `[jsonl-session-store] snapshot partially corrupt: kept ${persisted.items.length}, dropped ${persisted.dropped}`,
+          );
+        }
+        this.loadItems(persisted.items);
       }
     }
     let lines: string[] = [];
@@ -413,6 +447,10 @@ export class JsonlSessionStore implements SessionStore {
     if (op === null || typeof op !== "object" || typeof op.op !== "string") return false;
     if (op.op === "create") {
       if (typeof op.id !== "string" || op.id === "") return false;
+      // Field types are part of the op contract: a JSON-valid but type-corrupt line
+      // is rejected like any other corrupt line instead of poisoning record state.
+      if (!isFiniteNumber(op.at)) return false;
+      if (op.metadata !== undefined && op.metadata !== null && !isPlainObject(op.metadata)) return false;
       // The snapshot already holds this session. Applying create again would mark
       // it failed and drop entries the checkpoint had already saved.
       if (this.records.has(op.id)) return true;
@@ -427,13 +465,16 @@ export class JsonlSessionStore implements SessionStore {
         createdAt: op.at,
         updatedAt: op.at,
         summary: null,
-        metadata: { ...(op.metadata ?? {}) },
+        metadata: replayMetadata(op.metadata),
         entryCount: 0,
       });
       this.entries.set(op.id, []);
       return true;
     }
     if (op.op === "entry") {
+      if (typeof op.sessionId !== "string" || op.sessionId === "") return false;
+      if (!isFiniteNumber(op.at)) return false;
+      if (op.seq !== undefined && (!Number.isSafeInteger(op.seq) || op.seq < 0)) return false;
       const record = this.records.get(op.sessionId);
       const list = this.entries.get(op.sessionId) ?? [];
       if (record === undefined || list.length >= MAX_ENTRIES_PER_SESSION) return false;
@@ -458,19 +499,25 @@ export class JsonlSessionStore implements SessionStore {
       return true;
     }
     if (op.op === "complete" || op.op === "fail" || op.op === "cancel") {
+      if (typeof op.id !== "string" || op.id === "") return false;
+      if (!isFiniteNumber(op.at)) return false;
+      if (op.op === "complete" && op.metadata !== undefined && op.metadata !== null && !isPlainObject(op.metadata)) {
+        return false;
+      }
       const record = this.records.get(op.id);
       if (record === undefined) return false;
       record.status = op.op === "complete" ? "completed" : op.op === "fail" ? "failed" : "cancelled";
       record.updatedAt = op.at;
       if (op.op === "complete") {
         if (typeof op.summary === "string" && op.summary !== "") record.summary = op.summary;
-        Object.assign(record.metadata, op.metadata ?? {});
+        Object.assign(record.metadata, replayMetadata(op.metadata));
       } else {
         record.summary = typeof op.reason === "string" ? op.reason : "";
       }
       return true;
     }
     if (op.op === "delete") {
+      if (typeof op.id !== "string" || op.id === "") return false;
       this.records.delete(op.id);
       this.entries.delete(op.id);
       return true;

@@ -12,7 +12,7 @@
  * files (exactly the files agents most often need to navigate).
  */
 
-export type SymbolKind = "function" | "class" | "interface" | "struct" | "enum" | "const";
+export type SymbolKind = "function" | "class" | "interface" | "struct" | "enum" | "trait" | "const";
 
 /** One indexed definition. */
 export interface SymbolDef {
@@ -35,11 +35,21 @@ export const SYMBOL_EXTENSIONS = new Set([
 ]);
 
 const PATTERNS: Array<{ kind: SymbolKind; pattern: RegExp }> = [
-  { kind: "class", pattern: /^(?:export\s+|abstract\s+)*(?:class|interface|struct|enum|trait)\s+([A-Za-z_$][\w$]*)/ },
-  { kind: "function", pattern: /^(?:export\s+|async\s+|public\s+|private\s+|protected\s+|static\s+|def\s+|function\s+|fn\s+|func\s+)*\b(?:def|function|fn|func)\s+([A-Za-z_$][\w$]*)/ },
-  { kind: "function", pattern: /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(/ },
-  { kind: "function", pattern: /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/ },
-  { kind: "const", pattern: /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*[:=]/ },
+  // One pattern per construct: a shared alternative list reported every interface,
+  // struct, enum, and trait as a "class", which mislabels the navigation output.
+  // Leading whitespace is allowed so indented methods (Python class methods,
+  // Rust trait methods) are indexed too, scoped by the indentation stack.
+  { kind: "class", pattern: /^\s*(?:export\s+|abstract\s+|declare\s+)*class\s+([A-Za-z_$][\w$]*)/ },
+  { kind: "interface", pattern: /^\s*(?:export\s+|declare\s+)*interface\s+([A-Za-z_$][\w$]*)/ },
+  { kind: "struct", pattern: /^\s*(?:export\s+|pub\s+|declare\s+)*struct\s+([A-Za-z_$][\w$]*)/ },
+  { kind: "enum", pattern: /^\s*(?:export\s+|pub\s+|declare\s+)*enum\s+([A-Za-z_$][\w$]*)/ },
+  { kind: "trait", pattern: /^\s*(?:export\s+|pub\s+)*trait\s+([A-Za-z_$][\w$]*)/ },
+  { kind: "function", pattern: /^\s*(?:export\s+|async\s+|public\s+|private\s+|protected\s+|static\s+|def\s+|function\s+|fn\s+|func\s+|pub\s+)*\b(?:def|function|fn|func)\s+([A-Za-z_$][\w$]*)/ },
+  // Go method declarations carry a receiver between `func` and the name.
+  { kind: "function", pattern: /^\s*func\s+\([^)]*\)\s*([A-Za-z_$][\w$]*)/ },
+  { kind: "function", pattern: /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(/ },
+  { kind: "function", pattern: /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/ },
+  { kind: "const", pattern: /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*[:=]/ },
   { kind: "function", pattern: /^\s*([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*(?::\s*[^{};]+)?\{?\s*$/ },
 ];
 
@@ -67,7 +77,7 @@ export function isIndexable(path: string): boolean {
 
 /**
  * Extracts definitions from one file's text (never throws on broken input).
- * Scope tracks indentation-nested class/function containers.
+ * Scope tracks indentation-nested container definitions.
  */
 export function indexFile(path: string, text: string): SymbolDef[] {
   if (!isIndexable(path)) return [];
@@ -87,7 +97,9 @@ export function indexFile(path: string, text: string): SymbolDef[] {
       if (name === undefined || NON_DEFINITIONS.has(name)) continue;
       const column = (match.index ?? 0) + match[0].indexOf(name) + 1;
       out.push({ name, kind, file: path, line: i + 1, column, scope: stack.map((entry) => entry.name).join(" > ") });
-      if (kind === "class" || kind === "function") stack.push({ name, indent });
+      // Every construct except a plain value declaration can enclose indented
+      // definitions (class/interface/trait methods, nested types).
+      if (kind !== "const") stack.push({ name, indent });
       break;
     }
   }

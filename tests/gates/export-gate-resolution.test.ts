@@ -157,4 +157,33 @@ describe("check-export-tests resolution", () => {
     expect(stderr).toContain("could not be resolved");
     expect(stderr).toContain("tool-v: ns");
   });
+
+  it("reports a PENDING entry whose symbol no longer exists", () => {
+    // PENDING lists `@agentprism/runtime: Workspace`. A tree that keeps the package but
+    // drops the export must fail: an inert exemption would otherwise sit in the list
+    // and shelter a future export that reuses the name.
+    const root = fixture({
+      "packages/runtime/runtime/package.json": pkgJson("@agentprism/runtime"),
+      "packages/runtime/runtime/src/index.ts": "export const notWorkspace = 1;\n",
+    });
+    const { status, stderr } = runGate(root);
+    expect(status).toBe(1);
+    expect(stderr).toContain("no longer resolve to an export");
+    expect(stderr).toContain("@agentprism/runtime: Workspace");
+  });
+
+  it("reports a PENDING package that left the workspace on a workspace root", () => {
+    // The workspace marker tells the gate it is judging the real tree rather than a
+    // fixture subset, so a PENDING package that is gone is an inert exemption too.
+    // (One package keeps the scan's `packages/` root present.)
+    const root = fixture({
+      "pnpm-workspace.yaml": 'packages:\n  - "packages/*/*"\n',
+      "packages/tools/tool-none/package.json": pkgJson("@agentprism/tool-none"),
+      "packages/tools/tool-none/src/index.ts": "export const none = 1;\n",
+    });
+    const { status, stderr } = runGate(root);
+    expect(status).toBe(1);
+    expect(stderr).toContain("no longer resolve to an export");
+    expect(stderr).toContain("@agentprism/runtime: Workspace");
+  });
 });

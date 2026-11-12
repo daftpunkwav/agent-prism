@@ -43,4 +43,14 @@ describe("isResolvableMentionPath", () => {
     expect(isResolvableMentionPath("a\\b")).toBe(false);
     expect(isResolvableMentionPath("")).toBe(false);
   });
+
+  it("accepts the trailing-slash directory form", () => {
+    // `@src/` is how a directory is normally mentioned; the separator carries no
+    // segment, so it must not read as an empty segment (unresolvable).
+    expect(isResolvableMentionPath("src/")).toBe(true);
+    expect(isResolvableMentionPath("src/nested/")).toBe(true);
+    expect(isResolvableMentionPath("/etc/")).toBe(false);
+    expect(isResolvableMentionPath("../")).toBe(false);
+    expect(isResolvableMentionPath("src//")).toBe(true); // trailing run normalizes to "src"
+  });
 });

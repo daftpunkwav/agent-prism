@@ -29,13 +29,24 @@ export function GuideSection() {
   const t = useT();
   const [skin, setSkin] = useState(DEFAULT_SKIN);
   useEffect(() => {
-    setSkin(normalizeSkin(localStorage.getItem(SKIN_STORAGE_KEY)));
+    // Storage access can throw (privacy mode, disabled storage): the guide tab must
+    // still render, showing the default skin instead of crashing the page.
+    try {
+      setSkin(normalizeSkin(localStorage.getItem(SKIN_STORAGE_KEY)));
+    } catch {
+      // Unavailable storage: keep the default skin.
+    }
   }, []);
   const skinOptions = SKINS.map((name) => ({ value: name, label: t(`settings.skin.${name}` as never) }));
   const onSkin = (value: string) => {
-    localStorage.setItem(SKIN_STORAGE_KEY, value);
     applySkin(value);
     setSkin(value);
+    // Persistence is best-effort; the applied skin must survive a storage failure.
+    try {
+      localStorage.setItem(SKIN_STORAGE_KEY, value);
+    } catch {
+      // Unavailable storage: the skin applies for this view only.
+    }
   };
   return (
     <section aria-label={t("settings.section.guide")} className="space-y-4">

@@ -3,8 +3,8 @@
  * @description Locks atomic persistence, concurrent safety, and search recall.
  */
 
-import { describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MemoryStore, tokenizeText } from "../src/store.js";
@@ -106,6 +106,23 @@ describe("MemoryStore", () => {
       expect(store.size).toBe(10);
       const reloaded = new MemoryStore<Note>(extract, { filePath });
       expect(reloaded.size).toBe(10);
+    } finally {
+      rmSync(join(filePath, ".."), { recursive: true, force: true });
+    }
+  });
+
+  it("starts empty instead of crashing when the persisted shape is not an array", () => {
+    const filePath = tempFile();
+    try {
+      // Valid JSON, wrong top-level shape: construction must not throw (a boot-time
+      // crash on a hand-edited/foreign file takes the whole host down).
+      writeFileSync(filePath, JSON.stringify({ items: [] }), "utf-8");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const store = new MemoryStore<Note>(extract, { filePath });
+      expect(store.size).toBe(0);
+      expect(store.search("anything")).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("not an array"));
+      warn.mockRestore();
     } finally {
       rmSync(join(filePath, ".."), { recursive: true, force: true });
     }

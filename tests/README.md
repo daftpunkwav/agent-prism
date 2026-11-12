@@ -15,7 +15,8 @@
   - `tests/gates/`: repo-gate contracts, locking the root gate scripts and the
     coverage config against their known bypasses.
 - `apps/<app>/tests/`: app-level tests, next to `src/`:
-  - `apps/web/tests/`: frontend app tests for the i18n contracts.
+  - `apps/web/tests/`: frontend app tests — jsdom + testing-library suites for pages,
+    sections, and hooks, plus the i18n and locale contracts.
   - `apps/server/tests/`: testable runtime units such as port probing.
 
 Put a new test in the directory it belongs to. Single-package tests go in the package's
@@ -26,11 +27,12 @@ directories.
 
 `apps/server/tests/` covers the host as far as reading allows: the boot smoke
 (`assemble.test.ts`: health, sessions, meta, builder endpoints, arena logs), the entry
-sequencing (`main.test.ts`: assemble → startServer → signal handlers, plus the shutdown
-order), signal-driven graceful shutdown (`lifecycle.test.ts`), and the port preflight.
-`apps/web/tests/` holds the jsdom + testing-library suites for pages, sections, and hooks.
-Neither layer starts a real browser, and no test drives the UI end to end; the CI `smoke`
-job boots the built host over HTTP for that. Business logic still belongs to journey tests.
+sequencing (`main.test.ts`: assemble → startServer → crash handlers → signal handlers,
+plus the shutdown order), signal-driven graceful shutdown (`lifecycle.test.ts`), and the
+port preflight. `apps/web/tests/` holds the jsdom + testing-library suites for pages,
+sections, and hooks. Neither layer starts a real browser, and no test drives the UI end
+to end; the CI `smoke` job boots the built host over HTTP for that. Business logic still
+belongs to journey tests.
 
 ## Single responsibility
 

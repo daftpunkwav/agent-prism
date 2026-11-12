@@ -11,7 +11,7 @@ import { AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 import { applyContextPipeline } from "@agentprism/harness";
-import type { ContextPipelineOptions, ToolAccess } from "@agentprism/harness";
+import type { ContextAnalytics, ContextPipelineOptions, ToolAccess } from "@agentprism/harness";
 import type { ToolExecutionResult } from "@agentprism/contracts";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -48,6 +48,8 @@ export interface ReasoningGraphDeps {
   retrieveSnippets?: (query: string) => string;
   /** Operator-tuned context strategy budgets (absent fields keep built-in defaults). */
   contextTuning?: ContextPipelineOptions;
+  /** Per-run context analytics seam forwarded from the execution context (usage + effectiveness rows). */
+  contextAnalytics?: ContextAnalytics;
   /** Harness level for the tool drift guard ("bare" disables the guard). */
   harness?: string;
   signal?: AbortSignal;
@@ -77,6 +79,7 @@ export function llmMessages(state: AgentStateType, deps: ReasoningGraphDeps, ext
   const grounded = toLcMessages(
     applyContextPipeline(fromLcMessages(state.messages ?? []), strategy, {
       retrieveSnippets: deps.retrieveSnippets,
+      analytics: deps.contextAnalytics,
       ...deps.contextTuning,
     }),
   );

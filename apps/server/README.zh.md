@@ -34,17 +34,18 @@
 
 | 文件 | 职责 |
 |---|---|
-| `src/main.ts` | 启动顺序：`assemble()` → `startServer()` → `installSignalHandlers()` |
+| `src/main.ts` | 启动：`assemble()` → `startServer()` → 周期性 session checkpoint + 崩溃处理器 → signal handlers |
 | `src/assemble.ts` | 唯一的组合根：构造 driver 注册表、执行 `registerDriversBestEffort`、挂载路由叶包 |
 | `src/load-drivers.ts` | `builtinDriverLoaders`，各 driver 后端的动态导入 |
 | `src/mount-routes.ts` | 按顺序挂载路由叶包；`GET /api/sessions/stats` 必须先于 `GET /api/sessions/:sessionId` 注册 |
 | `src/server.ts` | Hono 应用监听服务 |
 | `src/portcheck.ts` | 端口可用性校验 |
-| `src/lifecycle.ts` | 信号处理与优雅停机 |
+| `src/lifecycle.ts` | 信号处理、优雅停机与有界崩溃 flush |
 
 ## 测试
 
 `tests/` 存放宿主级套件：真实 `assemble()` 组装并在真实端口上探测
-（`assemble.test.ts`），以及路由挂载、driver 加载、信号生命周期、启动失败路径。
+（`assemble.test.ts`），以及 settings 写入装配、judge-async 回退、builder trace-id 守卫、
+column callbacks、路由挂载、driver 加载、信号生命周期、端口校验与启动失败路径。
 归属规则见 [tests/README.md](../../tests/README.md)；套件随根 `pnpm test`
 运行（根 vitest 配置的 include 覆盖 `apps/*/tests`）。

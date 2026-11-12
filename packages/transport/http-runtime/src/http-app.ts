@@ -216,13 +216,15 @@ export function createHttpApplication(deps: HttpApplicationDeps): HttpApp {
     app.use("*", loopbackHostGuard(buildCorsOriginList(settings.corsOrigins, settings.frontendPort)));
   }
 
-  // CORS: allowlist + credentials
+  // CORS: allowlist + credentials. PATCH is a real route method (builder
+  // composition hot-swap); leaving it out of the preflight response makes a
+  // cross-origin frontend unable to send the request at all.
   app.use(
     "*",
     cors({
       origin: buildCorsOriginList(settings.corsOrigins, settings.frontendPort),
       credentials: true,
-      allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowHeaders: ["Content-Type", "Authorization", "X-API-Token"],
     }),
   );

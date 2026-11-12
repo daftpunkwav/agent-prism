@@ -45,8 +45,8 @@ Notes:
   Arena dimension options — so they are neither selectable in the Arena lane picker nor
   legal baseline values.
 - Baseline-only decode fields `top_p`, `frequency_penalty`, `presence_penalty`, and
-  `max_output_tokens`, along with the safety control fields `approval_mode` and
-  `sandbox_mode`, live in `BASELINE_ONLY_OPTIONS`.
+  `max_output_tokens`, along with the control fields `thinking_mode`, `approval_mode`,
+  and `sandbox_mode`, live in `BASELINE_ONLY_OPTIONS`.
 - Numeric fields are free numeric inputs in both the baseline panel and the
   comparison-dimension lane picker. Decode parameters accept their `DECODE_FIELD_RANGES`
   span. `max_steps` accepts 1 to 100 000 plus the `unlimited` token, which is the

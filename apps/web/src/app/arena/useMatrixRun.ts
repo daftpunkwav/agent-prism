@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchTemplates,
   isAbortError,
@@ -41,6 +41,17 @@ export function useMatrixRun(setError: (message: string) => void) {
   const [cells, setCells] = useState<MatrixCellResultView[]>([]);
   const [elapsedSecs, setElapsedSecs] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Switching main tabs unmounts the matrix panel: without this the stream keeps
+  // running (the backend executes every scored template) with nobody reading its
+  // events. Abort on unmount so the server-side work converges with the view.
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    },
+    [],
+  );
 
   const stop = useCallback(() => {
     abortRef.current?.abort();

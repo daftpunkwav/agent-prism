@@ -24,7 +24,13 @@ Sequencing rules pinned in code:
 
 - `stream.onAbort` on the route aborts an `AbortController` whose signal reaches the
   runner. A client abort books the session as `cancelled`, and abort wins over failure.
-  See `packages/transport/route-arena/src/arena.ts` and contracts `SessionStatus`.
+  `runAgentExecution` re-checks the signal before its terminal events (after the awaited
+  finalize and settlement work), so a cancelled run can never report a successful
+  terminal. A consumer that stops reading before a terminal settles the opened ledger row
+  as `cancelled` in the service's `finally`, matching the abort path instead of leaving it
+  `active`. See `packages/transport/route-arena/src/arena.ts`,
+  `packages/agent/agent/src/agent-execution.ts`, `ArenaService.run`, and contracts
+  `SessionStatus`.
 - In-stream exceptions are emitted as an `error` event with `pipeline: "system"` on the
   same SSE channel, so the stream never dies silently.
 - Session booking goes through the `SessionService` use-case layer wrapped in
@@ -62,7 +68,10 @@ sequenceDiagram
   metrics, one LLM narrative call, and optional ablation rows.
 - `POST /api/arena/matrix` on SSE channel `"matrix"` executes 1 to 32 template cells
   sequentially through `ArenaService` and emits `matrix_progress` and a final
-  `matrix_report`. Per-cell failures stay isolated.
+  `matrix_report`. Per-cell failures stay isolated, and an aborted matrix run never
+  scores a partial cell: the abort propagates as `AbortError` before judging.
+- The `JudgeSpec` types are `keyword`, `json`, `code`, `numeric`, `exclude`, `regex`,
+  `none`, and `llm` (the last runs only through the async judge port).
 - `scripts/run-matrix.mjs` reads `GET /api/arena/templates` for scored templates and
   drives that endpoint from the CLI.
 
@@ -108,7 +117,7 @@ completes.
 |---|---|---|
 | `data/sessions.json` and `.bak` | session snapshot document `{version:1, sessions:[…]}` (compacted from the log) | `JsonlSessionStore` |
 | `data/sessions.jsonl` | append-only mutation log replayed on boot | `JsonlSessionStore` |
-| `data/sessions.json.blobs/` | oversized ledger entry texts named `<sessionId>.<seq>.blob.txt` | `FileBlobStore` |
+| `data/sessions.json.blobs/` | oversized ledger entry texts named `<sanitized-session-id>.<id-hash>.<seq>.blob.txt` (the hash keeps sanitized ids apart) | `FileBlobStore` |
 | `data/provider_config.json` and `.bak` | provider endpoints; keys may be `${env:NAME}` references | `ProviderConfigStore` |
 | `data/builder_sessions.json` and `.bak` | builder session store | `BuilderSessionStore` |
 | `data/builder_traces/<sessionId>.jsonl` | per-session observability journal with trace entries, arena events, and turn markers | `SessionTraceStore` |
@@ -116,7 +125,7 @@ completes.
 | `data/memory_episodic.json` and `data/memory_semantic.json` | cross-session memory stores | `EpisodicMemory`, `SemanticMemory` |
 | `data/runtime_knobs.json` | file-backed runtime knob overrides | `RuntimeKnobsStore` |
 | `data/runs/<runId>/<workspace>/` | per-column scratch workspaces, rehydrated after restart | `WorkspaceRegistry` |
-| `data/runs/<runId>/_traces/` | per-run observability logs, one JSONL pair per column (`<label>.events.jsonl`, `<label>.wire.jsonl`) plus `<workspace>.ws` markers; append-only and fail-open | `RunTraceLogs` (arena-runner), read back by `ArenaLogsService` |
+| `data/runs/<runId>/_traces/` | per-run observability logs, one JSONL pair per column (`<sanitized-label>.events.jsonl`, `<sanitized-label>.wire.jsonl`) plus `<workspace>.ws` markers; append-only and fail-open | `RunTraceLogs` (arena-runner), read back by `ArenaLogsService` |
 | `…/.spills/` | oversized tool-result and job output dumps | `tool-builtins` spill helper |
 
 Document stores write atomically through `@agentprism/persistence`: a `.tmp` file, a

@@ -162,6 +162,18 @@ describe("webFetchTool fetch outcomes", () => {
     expect(outcome.result).toContain("fetch timed out (1234ms)");
   });
 
+  it("maps the real AbortSignal.timeout rejection (TimeoutError) to the tuned timeout message", async () => {
+    // Node aborts an AbortSignal.timeout with a DOMException named "TimeoutError", not
+    // "AbortError": without that branch a real timeout surfaced as "fetch failed: ...".
+    setToolTuning({ webFetchTimeoutMs: 4321 });
+    vi.mocked(globalThis.fetch).mockRejectedValue(
+      new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+    );
+    const outcome = await webFetchTool.execute(EMPTY_WS, { url: "https://93.184.216.34/" });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.result).toContain("fetch timed out (4321ms)");
+  });
+
   it("reports an aborted outcome when the caller signal already fired", async () => {
     const controller = new AbortController();
     controller.abort();

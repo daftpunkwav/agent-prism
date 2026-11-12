@@ -64,6 +64,7 @@ not import `@agentprism/contracts` directly.
 
 ## Tests
 
-`tests/` holds 58 jsdom + testing-library suites covering pages, sections, and
-hooks. They run under the root `pnpm test` (the root vitest config globs
+`tests/` holds 76 suites: jsdom + testing-library page, section, hook, and component
+tests, plus pure unit tests for catalog parity, locale resolution and storage, CSP, and
+narrative rendering. They run under the root `pnpm test` (the root vitest config globs
 `apps/*/tests` and maps the `@/` alias to `src/`).

@@ -15,7 +15,9 @@
 | 默认启用 sandbox deny-list | agent 链中阻断不可逆文件系统命令；这是护栏，不是安全边界 | `@agentprism/sandbox` `DenyListSandboxPolicy`，经 `beforeExecute` 接入 |
 | Session 写入由 service 拥有 | 只有 `SessionService` 用例层写存储；run 绝不直接触碰 | `ArenaService.run`、`safeSession` |
 | 账本隔离 | 账本病态只告警，绝不打断被观察的 run | application 中的 `safeSession` 包裹 |
-| 客户端 abort 记为 `cancelled` | Cancel 语义与 failure 不同 | contracts `SessionStatus`、route abort 装配 |
+| 客户端 abort 记为 `cancelled` | Cancel 语义与 failure 不同；在最后一个 await 步骤之后落地的 abort 仍记为 `cancelled`，消费者停止读取时会把已打开的账本行结算为 cancelled 而不是留在 `active` | contracts `SessionStatus`、route abort 装配、`agent/agent-execution` 中的 abort checkpoint、`ArenaService.run` 与 `ThreadService` 的 settle-on-return |
+| 在支持 mode 的平台上持久化仅 owner 可读写 | 持久化文档含 provider 密钥与会话文本；POSIX 上 store 以 `0o600` 创建文件、以 `0o700` 创建新父目录，原子 rename 会把早先 world-readable 的文件替换为私有文件，且 `.bak` 副本会被重新设为 `0o600`。Windows 忽略 mode，由其 ACL 控制访问 | `persistence/src/json-store.ts`、`persistence/src/append-file.ts` |
+| 导出测试门禁自检其工作清单 | 已获得测试的 `PENDING` 条目，以及已不再对应任何导出的 `PENDING` 条目，都会让门禁失败：豁免清单必须双向收缩，否则会腐烂成静默的全面豁免 | `scripts/check-export-tests.mjs` |
 | 超大产物先持久化再修剪 | 超预算产物完整 dump 到磁盘并带 locator 与预览，而非静默丢失 | `tool-builtins/definitions/spill.ts`、`session/blob-store.ts` |
 | `ask_user` 有界等待人工，超时降级 defer | interactive 运行把问题批次交给共享 `AskUserChannel`（默认等待 5 分钟）；超时、abort 或人工跳过后按未回答结算，落入与 headless 模式相同的 defer 文本，因此列永远不会无限阻塞，也绝不伪造答案 | `tool-builtins/definitions/ask-user.ts`、`runtime/src/ask-user-channel.ts` |
 | `subagent` 深度上限 1，toolset 继承减去自身 | 防止无界递归与权限升级 | `agent/agent-execution` 实体 body |

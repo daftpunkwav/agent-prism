@@ -27,7 +27,7 @@ import { estimateMessageTokens, messageText } from "./message-text.js";
 /** Overflow target that triggers compaction (estimated tokens to condense). */
 export const CHECKPOINT_COMPACT_TARGET_TOKENS = 2_000;
 
-/** Converts one message to a frame (user turns and the final exchange stay pinned). */
+/** Converts one message to a frame (only the live user ask at the tail stays pinned). */
 function toFrame(message: LlmMessage, index: number, total: number): SurfaceFrame {
   const role = message.role === "tool" || message.role === "assistant" || message.role === "user" || message.role === "system"
     ? message.role

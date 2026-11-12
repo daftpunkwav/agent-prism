@@ -140,6 +140,17 @@ describe("ConnectionsSection", () => {
     expect(props.onUpdateConn).toHaveBeenCalledWith("a", { use_full_url: false });
   });
 
+  it("caps editable fields at the provider schema lengths", () => {
+    // Regression: over-long values used to submit fine and fail the whole save with a 422.
+    const props = makeProps();
+    renderSection(props);
+    const en = getCatalog("en").settings.connection;
+    expect((screen.getByDisplayValue("Alpha") as HTMLInputElement).maxLength).toBe(100);
+    expect((screen.getByDisplayValue("https://api.example.com/v1") as HTMLInputElement).maxLength).toBe(500);
+    expect((screen.getByPlaceholderText(en.optional) as HTMLInputElement).maxLength).toBe(500);
+    expect((screen.getByPlaceholderText(en.keyPlaceholder) as HTMLInputElement).maxLength).toBe(4096);
+  });
+
   it("reveals the stored API key only through the visibility toggle", () => {
     const props = makeProps();
     // A stored key is reported by the mask flag, not by shipping the value to the UI.

@@ -13,8 +13,9 @@ family `README.md` role table. Single-leaf families mirror the name, as in `foo/
 
 `"name": "@agentprism/<leaf>"`, `"private": true`, `"type": "module"`, `exports` to
 `./dist/index.js`, `files: ["dist"]`, `build` and `typecheck` scripts, and dependencies
-that match actual imports only. `pnpm check:deps` fails on stale, missing, or test-only
-runtime declarations and suggests demoting test-only dependencies to `devDependencies`.
+that match actual imports only. `pnpm check:deps` fails on stale or missing declarations
+and value-edge cycles, and warns when a declared runtime dependency is used only in
+tests, suggesting a demotion to `devDependencies`.
 
 ## tsconfig.json
 

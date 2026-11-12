@@ -79,9 +79,14 @@ export function normalizeRuntimeKnobs(raw: unknown, base: RuntimeKnobs): Runtime
       : {};
     return clampField(meta, retries[key], base.harnessRetries[key]) as number;
   };
-  const crewaiProcess = typeof source.crewaiProcess === "string" && source.crewaiProcess === "hierarchical"
-    ? "hierarchical"
-    : base.crewaiProcess;
+  // Select fields resolve through the shared field metadata so a legal option the
+  // base does not already hold stays selectable: hardcoding one option made the
+  // switch one-way (hierarchical -> sequential was silently ignored).
+  const crewaiProcess = clampField(
+    RUNTIME_KNOB_FIELDS.find((field) => field.key === "crewaiProcess"),
+    source.crewaiProcess,
+    base.crewaiProcess,
+  ) as RuntimeKnobs["crewaiProcess"];
   return {
     contextWindowMessages: numeric("contextWindowMessages", base.contextWindowMessages),
     contextCharsPerToken: numeric("contextCharsPerToken", base.contextCharsPerToken),

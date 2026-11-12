@@ -42,6 +42,30 @@ describe("globTool", () => {
     }
   });
 
+  it("matches a pattern written relative to the searched subdirectory", async () => {
+    const ws = tempWorkspace();
+    try {
+      ws.fs.writeFile("src/a.ts", "1");
+      ws.fs.writeFile("src/nested/b.ts", "2");
+      ws.fs.writeFile("docs/c.ts", "3");
+      // listFiles returns root-relative paths; the base must be stripped before the
+      // base-relative match or "*.ts" under path "src" would never match (regression:
+      // the filter prefixed the base a second time).
+      const outcome = await globTool.execute(ws, { pattern: "*.ts", path: "src" });
+      expect(outcome.ok).toBe(true);
+      expect(outcome.result.split("\n").sort()).toEqual(["src/a.ts"]);
+      // Root-relative patterns keep working with a base directory too.
+      const rooted = await globTool.execute(ws, { pattern: "src/**/*.ts", path: "src" });
+      expect(rooted.result.split("\n").sort()).toEqual(["src/a.ts", "src/nested/b.ts"]);
+      // "." is the conventional spelling of the workspace root; the scoped filesystem
+      // canonicalizes it to null, so it must be normalized before the walk.
+      const dot = await globTool.execute(ws, { pattern: "**/*.ts", path: "." });
+      expect(dot.result.split("\n").sort()).toEqual(["docs/c.ts", "src/a.ts", "src/nested/b.ts"]);
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("supports brace alternation", () => {
     const regex = globToRegExp("*.{ts,tsx}");
     expect(regex.test("a.ts")).toBe(true);

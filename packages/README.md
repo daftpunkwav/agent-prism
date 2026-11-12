@@ -3,7 +3,9 @@
 Everything under `packages/` is organized two levels deep: `<family>/<leaf>/`. A family
 directory groups related leaves and carries a role-table `README.md`; every leaf is an
 actual workspace package (`@agentprism/<leaf>`, glob `packages/*/*` in
-`pnpm-workspace.yaml`) shipping `src/ tests/ README.md package.json tsconfig.json`.
+`pnpm-workspace.yaml`) shipping `src/ README.md package.json tsconfig.json`, plus a
+co-located `tests/` directory in every leaf except the three route leaves whose behavior
+is covered from the root `tests/http-transport/` suite.
 
 Dependency directions between families are fixed by `pnpm boundaries` and
 `pnpm check:deps`; the full map (family roles, seam surfaces, iron rules) lives in

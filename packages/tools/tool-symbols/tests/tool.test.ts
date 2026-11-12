@@ -3,7 +3,7 @@
  * @description Locks the read-only symbols tool over a stub workspace.
  */
 import { describe, expect, it } from "vitest";
-import { symbolsTool } from "../src/tool.js";
+import { SYMBOLS_MAX_FILES, SYMBOLS_MAX_OUTPUT_CHARS, symbolsTool } from "../src/tool.js";
 
 function workspace(files: Record<string, string>) {
   return {
@@ -43,5 +43,27 @@ describe("symbolsTool", () => {
     expect((await symbolsTool.execute(ws, { action: "defs", path: "gone.ts" })).ok).toBe(false);
     expect((await symbolsTool.execute(ws, { action: "search" })).ok).toBe(false);
     expect((await symbolsTool.execute({ ...ws, fs: null }, { action: "search", path: "x" })).ok).toBe(false);
+  });
+
+  it("reports a capped symbol index instead of reading as a whole-workspace verdict", async () => {
+    const files: Record<string, string> = {};
+    for (let i = 0; i <= SYMBOLS_MAX_FILES; i += 1) {
+      files[`src/f${String(i).padStart(3, "0")}.ts`] = `export function fn${i}(): void {}\n`;
+    }
+    const ws = workspace(files);
+    // The index stops at SYMBOLS_MAX_FILES; the result must disclose that partial
+    // coverage instead of reading as a verdict on the whole workspace.
+    const out = await symbolsTool.execute(ws, { action: "search", path: "zzz_no_such_symbol" });
+    expect(out.ok).toBe(true);
+    expect(out.result).toContain("(no symbols matching");
+    expect(out.result).toContain(`of ${SYMBOLS_MAX_FILES + 1} indexable workspace files`);
+  });
+
+  it("caps a huge defs listing loudly", async () => {
+    const ws = workspace({ "big.js": Array.from({ length: 5000 }, (_v, i) => `f${i}()`).join("\n") });
+    const out = await symbolsTool.execute(ws, { action: "defs", path: "big.js" });
+    expect(out.ok).toBe(true);
+    expect(out.result.length).toBeLessThanOrEqual(SYMBOLS_MAX_OUTPUT_CHARS);
+    expect(out.result).toContain("output capped");
   });
 });

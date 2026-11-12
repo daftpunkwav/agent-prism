@@ -50,7 +50,19 @@ function expandNumericIpv4(hostname: string): string | null {
   return null;
 }
 
-function parseHost(hostname: string): { kind: "name" | "ipv4" | "ipv6"; value: string } {
+/**
+ * Strips the DNS absolute-form trailing dot ("localhost." → "localhost").
+ * The WHATWG parser normalizes a numeric host's trailing dot away, but keeps it
+ * on a name host; every denylist/loopback/range check therefore has to compare
+ * the dotless spelling or "metadata.google.internal." resolves exactly like the
+ * denylisted name and passes as an ordinary name host.
+ */
+function normalizeHostname(hostname: string): string {
+  return hostname.endsWith(".") ? hostname.slice(0, -1) : hostname;
+}
+
+function parseHost(rawHostname: string): { kind: "name" | "ipv4" | "ipv6"; value: string } {
+  const hostname = normalizeHostname(rawHostname);
   if (hostname.startsWith("[") && hostname.endsWith("]")) {
     return { kind: "ipv6", value: hostname.slice(1, -1) };
   }
@@ -126,15 +138,16 @@ function parseHttpUrl(rawUrl: string, field: string): URL {
 }
 
 function assertHostAllowed(parsed: URL, field: string): void {
-  if (isAmbiguousIpv4Literal(parsed.hostname)) {
+  const hostname = normalizeHostname(parsed.hostname);
+  if (isAmbiguousIpv4Literal(hostname)) {
     throw new UrlValidationError(`${field} IP literal has an ambiguous (octal/hex) form`);
   }
-  const host = parseHost(parsed.hostname);
+  const host = parseHost(hostname);
   const normalized = host.value.toLowerCase();
-  if (DENYLIST_HOSTS.has(normalized) || DENYLIST_HOSTS.has(parsed.hostname.toLowerCase())) {
+  if (DENYLIST_HOSTS.has(normalized) || DENYLIST_HOSTS.has(hostname.toLowerCase())) {
     throw new UrlValidationError(`${field} hostname is not allowed`);
   }
-  const isLoopback = isLoopbackHost(parsed.hostname) || isLoopbackHost(normalized);
+  const isLoopback = isLoopbackHost(hostname) || isLoopbackHost(normalized);
   if (host.kind === "name") {
     if (isLoopback) return;
     // Name hosts are allowed (DNS resolution is not validated here)

@@ -12,7 +12,7 @@ import path from "node:path";
 import { AtomicJsonFile } from "@agentprism/persistence";
 import { RandomIdGenerator, SystemClock } from "@agentprism/runtime";
 import { MAX_ENTRIES_PER_SESSION, MAX_SESSIONS_PER_STORE, MAX_SUMMARY_CHARS } from "@agentprism/session";
-import { FileSessionStore } from "../src/file-session-store.js";
+import { FileSessionStore, persistedSessions } from "../src/file-session-store.js";
 
 function tempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "agentprism-ledger-recovery-"));
@@ -42,28 +42,28 @@ function record(id: string, overrides: Record<string, unknown> = {}) {
 }
 
 describe("FileSessionStore load tolerance", () => {
-  it("starts empty when the file is unreadable and warns", () => {
+  it("starts empty when the file is unreadable and warns", async () => {
     const dir = tempDir();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       fs.mkdirSync(path.join(dir, "sessions.json"), { recursive: true });
       const store = storeOver(dir);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("session file unreadable"));
-      expect(store.list({})).resolves.toEqual([]);
+      await expect(store.list({})).resolves.toEqual([]);
     } finally {
       warn.mockRestore();
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("starts empty when the sessions field is not an array", () => {
+  it("starts empty when the sessions field is not an array", async () => {
     const dir = tempDir();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       fs.writeFileSync(path.join(dir, "sessions.json"), JSON.stringify({ version: 1, sessions: "nope" }), "utf-8");
       const store = storeOver(dir);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("schema mismatch"));
-      expect(store.list({})).resolves.toEqual([]);
+      await expect(store.list({})).resolves.toEqual([]);
     } finally {
       warn.mockRestore();
       fs.rmSync(dir, { recursive: true, force: true });
@@ -160,6 +160,30 @@ describe("FileSessionStore load tolerance", () => {
       warn.mockRestore();
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("persistedSessions containment", () => {
+  it("returns every item when the document validates and reports what it dropped", () => {
+    const document = {
+      version: 1,
+      sessions: [{ record: record("s-a"), entries: [{ sessionId: "s-a", seq: 0, at: 1, kind: "note", content: "kept" }] }],
+    };
+    expect(persistedSessions(document)).toMatchObject({ dropped: 0 });
+    expect(persistedSessions(document)?.items[0]?.record.id).toBe("s-a");
+
+    // One corrupt sibling is dropped alone; the valid one survives.
+    const partial = persistedSessions({
+      version: 2,
+      sessions: [{ record: record("s-good"), entries: [] }, { record: { id: "s-bad" }, entries: [] }, "junk"],
+    });
+    expect(partial?.items.map((item) => item.record.id)).toEqual(["s-good"]);
+    expect(partial?.dropped).toBe(2);
+
+    // A document without a sessions array is unreadable as a whole-state file.
+    expect(persistedSessions({ version: 1, sessions: "nope" })).toBeNull();
+    expect(persistedSessions(null)).toBeNull();
+    expect(persistedSessions("junk")).toBeNull();
   });
 });
 

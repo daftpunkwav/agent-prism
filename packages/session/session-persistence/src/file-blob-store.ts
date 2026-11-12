@@ -46,9 +46,21 @@ export class FileBlobStore implements SessionBlobStore {
     this.dir = dir;
   }
 
+  /**
+   * Rejects a sequence number that is not a non-negative safe integer. The value
+   * becomes a filename segment, so an unchecked value could carry path separators
+   * out of the blob directory; the read path turns the refusal into a miss.
+   */
+  static assertSeq(seq: number): number {
+    if (!Number.isSafeInteger(seq) || seq < 0) {
+      throw new Error(`Invalid blob sequence: ${String(seq)}`);
+    }
+    return seq;
+  }
+
   /** Blob filename infix for one key (operator-safe, bounded, sequence-scoped). */
   static fileName(sessionId: string, seq: number): string {
-    return `${safeInfix(sessionId)}.${seq}${BLOB_FILE_SUFFIX}`;
+    return `${safeInfix(sessionId)}.${FileBlobStore.assertSeq(seq)}${BLOB_FILE_SUFFIX}`;
   }
 
   async saveBlob(sessionId: string, seq: number, text: string): Promise<void> {

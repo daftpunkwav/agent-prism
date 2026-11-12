@@ -13,19 +13,23 @@
     交互与 metrics 透传。
   - `tests/http-transport/`：HTTP transport 契约，覆盖 routes 与 error mapping。
   - `tests/drivers/`：跨 backend driver 一致性，覆盖 banner map 与 reasoning 支持。
+  - `tests/gates/`：仓库门禁契约，锁定根门禁脚本与覆盖率配置，防止其已知绕过路径。
 - `apps/<app>/tests/`：app 级测试，紧邻 `src/`：
-  - `apps/web/tests/`：前端 app 测试，针对 i18n 契约。
+  - `apps/web/tests/`：前端 app 测试——jsdom + testing-library 的页面、分区组件与
+    hook 套件，外加 i18n 与 locale 契约。
   - `apps/server/tests/`：可测试的 runtime 单元，如端口探测。
 
 新测试放入其所属目录。单 package 测试放入该 package 自己的 `tests/`；只有真正跨
 多 package 的流程才放入根 `tests/` 的 journey 目录。
 
-## app 层不测什么
+## app 层测什么
 
-listener 与 serve，即 `main` 与 `server`；信号处理；以及需要浏览器运行时的 Next.js
-页面与组件。assembly root 只允许一个只读的启动冒烟测试
-`apps/server/tests/assemble.test.ts`，它覆盖 health、sessions 与 meta，不启动任何
-run，也不写入。业务逻辑属于 journey 测试。
+`apps/server/tests/` 在可读范围内覆盖宿主：启动冒烟（`assemble.test.ts`：health、
+sessions、meta、builder 端点、arena 日志）、入口时序（`main.test.ts`：assemble →
+startServer → 崩溃处理器 → signal handlers，外加停机顺序）、信号驱动的优雅停机
+（`lifecycle.test.ts`）与端口预检。`apps/web/tests/` 存放页面、分区组件与 hook 的
+jsdom + testing-library 套件。两层都不启动真实浏览器，也没有测试端到端驱动 UI；CI 的
+`smoke` job 会启动构建后的宿主并做 HTTP 探测。业务逻辑仍属于 journey 测试。
 
 ## 单一职责
 

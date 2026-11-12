@@ -28,7 +28,7 @@ import { UiSelect } from "@agentprism/ui";
 import { DEFAULT_PROVIDER_NAME, safeHttpUrl, testProvider } from "@agentprism/client";
 import { useT } from "@/i18n/useT";
 import type { ConnectionGroup, ModelSlot } from "./settingsConnectionModel";
-import { API_KEY_SENTINEL, appliedThinkingMode, blankModel, isLocalModelId, legalThinkingLevel, newLocalId } from "./settingsConnectionModel";
+import { API_KEY_SENTINEL, appliedThinkingMode, blankModel, CONNECTION_FIELD_LIMITS, isLocalModelId, legalThinkingLevel, newLocalId } from "./settingsConnectionModel";
 import { ModelModal } from "./ModelModal";
 import { Field } from "./Field";
 
@@ -379,6 +379,7 @@ export function ConnectionsSection({
                       <input
                         className="form-input"
                         value={c.provider_name}
+                        maxLength={CONNECTION_FIELD_LIMITS.provider_name}
                         placeholder={`${DEFAULT_PROVIDER_NAME} / MiniMax / DeepSeek…`}
                         onChange={(e) => onUpdateConn(c.key, { provider_name: e.target.value })}
                       />
@@ -406,6 +407,7 @@ export function ConnectionsSection({
                     <input
                       className="form-input font-mono text-sm"
                       value={c.base_url}
+                      maxLength={CONNECTION_FIELD_LIMITS.base_url}
                       onChange={(e) => { onUpdateConn(c.key, { base_url: e.target.value }); }}
                     />
                     <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -432,6 +434,7 @@ export function ConnectionsSection({
                             : t("settings.connection.keyPlaceholder")
                         }
                         value={c.api_key !== "" || keyEdited[c.key] ? c.api_key : c.api_key_set ? API_KEY_SENTINEL : ""}
+                        maxLength={CONNECTION_FIELD_LIMITS.api_key}
                         onFocus={() => {
                           // The sentinel is display-only: focus clears it so typing starts fresh,
                           // and form state stays "" (meaning "keep the stored key").
@@ -460,6 +463,7 @@ export function ConnectionsSection({
                       <input
                         className="form-input"
                         value={c.website_url}
+                        maxLength={CONNECTION_FIELD_LIMITS.website_url}
                         placeholder={t("settings.connection.optional")}
                         onChange={(e) => { onUpdateConn(c.key, { website_url: e.target.value }); }}
                       />

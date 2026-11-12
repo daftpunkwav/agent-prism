@@ -1,6 +1,6 @@
 # `@agentprism/application`
 
-Use-case services: the four arena / provider / workspace / projects services plus domain errors.
+Use-case services: arena runs and judging, matrix runs, the run-log read side, the execution-session ledger service, agent threads (store + resume/fork service), provider settings, workspace files, project archives, and the shared domain errors.
 
 ## Dependencies
 

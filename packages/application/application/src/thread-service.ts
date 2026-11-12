@@ -176,10 +176,21 @@ export class ThreadService {
       : await this.safeLedger("create", () =>
         sessions.startSession("agent", `thread ${id} turn`, { threadId: id }),
       );
+    // Tracks whether the ledger row reached a terminal: a consumer that stops
+    // reading early ends the generator by return, and the finally below settles
+    // that row instead of leaving it active forever.
+    let settled = false;
     try {
       yield* this.streamTurn(thread, request, options);
       if (sessions !== undefined && ledger !== null) {
-        await this.safeLedger("complete", () => sessions.completeSession(ledger.id));
+        if (options.signal?.aborted === true) {
+          // Abort wins over success: a turn whose stream drained after the caller
+          // cancelled is a cancelled turn, never a completed one.
+          await this.safeLedger("cancel", () => sessions.cancelSession(ledger.id));
+        } else {
+          await this.safeLedger("complete", () => sessions.completeSession(ledger.id));
+        }
+        settled = true;
       }
     } catch (error) {
       if (sessions !== undefined && ledger !== null) {
@@ -188,9 +199,15 @@ export class ThreadService {
         } else {
           await this.safeLedger("fail", () => sessions.failSession(ledger.id, sanitizeErrorMessage(error)));
         }
+        settled = true;
       }
       throw error;
     } finally {
+      if (sessions !== undefined && ledger !== null && !settled) {
+        // The turn never produced a terminal (consumer stopped reading): the
+        // consumer-owned cancel is the honest status, matching the abort path.
+        await this.safeLedger("cancel", () => sessions.cancelSession(ledger.id));
+      }
       this.deps.threads.markRunning(id, false);
     }
   }
@@ -216,7 +233,9 @@ export class ThreadService {
       }
       if (event.type === "complete" && event.pipeline === label) {
         const success = event.metrics?.success === true;
-        if (success) {
+        // A cancelled turn never commits, even when a success terminal was already
+        // in flight: the transcript is the resume anchor and must match the ledger.
+        if (success && options.signal?.aborted !== true) {
           const answer = extractAnswerFromEvents(collected);
           if (answer.trim() === "") {
             // The store commits a placeholder; make the degenerate extraction observable.

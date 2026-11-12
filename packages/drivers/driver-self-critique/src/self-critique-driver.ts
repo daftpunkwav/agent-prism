@@ -106,7 +106,7 @@ async function criticPass(
       },
     ],
     context.config.context,
-    { retrieveSnippets, ...context.contextTuning },
+    { retrieveSnippets, analytics: context.contextAnalytics, ...context.contextTuning },
   );
   try {
     const result = await context.llm.invoke(prepared, { signal: context.signal });
@@ -205,7 +205,11 @@ export class SelfCritiqueDriver implements AgentDriver {
     let redirects = 0;
 
     while (stats.turns < maxSteps) {
-      const prepared = applyContextPipeline(messages, config.context, { retrieveSnippets, ...context.contextTuning });
+      const prepared = applyContextPipeline(messages, config.context, {
+        retrieveSnippets,
+        analytics: context.contextAnalytics,
+        ...context.contextTuning,
+      });
       stats.step += 1;
       stats.turns += 1;
       const streamStep = stats.step;

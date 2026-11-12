@@ -109,6 +109,81 @@ describe("redirect rules", { retry: 1 }, () => {
   });
 });
 
+describe("heads with write or exec arguments", { retry: 1 }, () => {
+  it("accepts the forms that only read", () => {
+    for (const command of [
+      "env",
+      "env FOO=1",
+      "env -0",
+      "sort in.txt",
+      "sort -n in.txt",
+      "uniq in.txt",
+      "uniq -c in.txt",
+      "diff a b",
+      "diff -u a b",
+      "tree .",
+      "file README.md",
+      "gcc --version",
+      "gcc -v",
+      "date +%s",
+      "date -u",
+      "date -R",
+      "date +%Y-%m-%d",
+      "hostname",
+      "hostname -f",
+      "hostname -i",
+      "git reflog",
+      "git reflog show HEAD@{1}",
+    ]) {
+      safe(command);
+    }
+  });
+
+  it("rejects the forms that write files or run programs", () => {
+    for (const command of [
+      // `env rm ...` runs rm; -S takes a command string, attached or not.
+      "env rm -rf /",
+      "env FOO=1 rm -rf /",
+      "env -S'echo hi'",
+      "env --split-string=echo",
+      // --pre runs a program per file; --compress-program runs a compression program.
+      "rg --pre rm pattern .",
+      "sort --compress-program=rm in.txt",
+      // Output-file and temp-directory arguments write, including attached (`-oX`) forms.
+      "sort -o out.txt in.txt",
+      "sort -oout.txt in.txt",
+      "sort --output=out.txt in.txt",
+      "sort -T /tmp in.txt",
+      "uniq in.txt out.txt",
+      "diff -o patch.diff a b",
+      "diff -opatch.diff a b",
+      "diff --output=patch.diff a b",
+      "tree -o tree.txt",
+      "tree -otree.txt",
+      "tree --output=tree.txt",
+      "file -C -m magic",
+      "file -Cm magic",
+      "file --compile -m magic",
+      // System state and hostname setters, including attached option values.
+      "date -s 2020-01-01",
+      "date -s20200101",
+      "date -us 20200101",
+      "date --set=2020-01-01",
+      "hostname evil",
+      "hostname -F names.txt",
+      "hostname -F/tmp/names",
+      "hostname --file=/tmp/names",
+      // `git reflog` mutating subactions rewrite the reflog.
+      "git reflog expire --expire=now --all",
+      "git reflog delete HEAD@{1}",
+      // `gcc -v` alone prints version info; with an input it compiles.
+      "gcc -v main.c",
+    ]) {
+      unsafe(command);
+    }
+  });
+});
+
 describe("shellCommandFromArgs", { retry: 1 }, () => {
   it("reads the command string and treats anything else as empty", () => {
     expect(shellCommandFromArgs({ command: "ls -la" })).toBe("ls -la");

@@ -43,9 +43,12 @@ export function renderInstructions(
   layers: readonly InstructionLayer[],
   budget: number = INSTRUCTIONS_MAX_CHARS,
 ): RenderedInstructions {
-  const ordered = [...layers].sort(
-    (a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source] || (a.name < b.name ? -1 : 1),
-  );
+  // Stable sort by source only: within one source the caller's order is the
+  // precedence order (repoFiles / workspaceFiles arrive low-to-high), so the
+  // highest-precedence file (workspace AGENTS.local.md) renders last where
+  // instruction-following models weight it most. Sorting by name as well would
+  // put agents-local-md before agents-md and silently reverse that precedence.
+  const ordered = [...layers].sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source]);
   const sections: string[] = [];
   const included: string[] = [];
   const truncated: RenderedInstructions["truncated"] = [];

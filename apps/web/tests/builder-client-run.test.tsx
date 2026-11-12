@@ -80,6 +80,25 @@ describe("BuilderClient orchestration", () => {
     expect(screen.getByText("All done")).toBeDefined();
   });
 
+  it("aborts the in-flight turn stream when the shell unmounts", async () => {
+    // Regression: navigating away left the SSE read running against a dead shell.
+    let captured: AbortSignal | undefined;
+    streamMock.mockImplementationOnce(
+      (params: { signal?: AbortSignal }) =>
+        new Promise<void>(() => {
+          captured = params.signal;
+        }),
+    );
+    const view = renderBuilder();
+    fireEvent.click(await screen.findByText(en().newAgent));
+    const composer = await screen.findByPlaceholderText(en().chatPlaceholder);
+    fireEvent.change(composer, { target: { value: "hi there" } });
+    fireEvent.click(screen.getByRole("button", { name: en().send }));
+    await waitFor(() => expect(captured).toBeDefined());
+    view.unmount();
+    await waitFor(() => expect(captured?.aborted).toBe(true));
+  });
+
   it("patches the composition through the hot-swap after an edit marks it dirty", async () => {
     renderBuilder();
     fireEvent.click(await screen.findByText(en().newAgent));

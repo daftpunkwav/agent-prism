@@ -8,6 +8,7 @@
  */
 
 import {
+  chmodSync,
   copyFileSync,
   mkdirSync,
   readdirSync,
@@ -16,7 +17,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { copyFile, mkdir, rename, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /**
@@ -100,17 +101,48 @@ function backupHealthySync(filePath: string): boolean {
 }
 
 /**
+ * Best-effort owner-only mode for a file created by `copyFile`, which takes no
+ * mode argument: libuv creates the destination with the process umask, so a
+ * `.bak` of the provider config could otherwise stay world-readable next to its
+ * `0o600` main file. Windows has no mode bits of its own; a failed chmod must
+ * never fail the atomic write (the backup is a safety net, not the authority).
+ */
+function hardenBackupMode(backupPath: string): void {
+  try {
+    chmodSync(backupPath, 0o600);
+  } catch {
+    // Best-effort hardening only.
+  }
+}
+
+/** Async form of {@link hardenBackupMode}. */
+async function hardenBackupModeAsync(backupPath: string): Promise<void> {
+  try {
+    await chmod(backupPath, 0o600);
+  } catch {
+    // Best-effort hardening only.
+  }
+}
+
+/**
  * Atomic JSON write: tmp file + .bak backup + rename replace.
  * A failed backup does not block the main flow; a failed write propagates so the caller decides on rollback.
+ *
+ * The tmp file is created owner-only (`0o600`) and new parent directories owner-only
+ * (`0o700`) where the platform honors modes: persisted documents include provider
+ * config with plaintext API keys, and the data directory may sit on a shared POSIX
+ * host. The rename carries the tmp file's mode onto the target, so an earlier
+ * world-readable file is replaced by a private one. Windows ignores both modes.
  */
 export function atomicWriteJson(filePath: string, payload: unknown, options: { backup?: boolean } = {}): void {
   const backup = options.backup ?? true;
-  mkdirSync(path.dirname(filePath), { recursive: true });
+  mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
   const tmpPath = `${filePath}.tmp`;
-  writeFileSync(tmpPath, JSON.stringify(payload, null, 2) + "\n", "utf-8");
+  writeFileSync(tmpPath, JSON.stringify(payload, null, 2) + "\n", { encoding: "utf-8", mode: 0o600 });
   if (backup && backupHealthySync(filePath)) {
     try {
       copyFileSync(filePath, `${filePath}.bak`);
+      hardenBackupMode(`${filePath}.bak`);
     } catch (error) {
       console.warn(`[persistence] Backup failed ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -146,12 +178,13 @@ export async function atomicWriteJsonAsync(filePath: string, payload: unknown, o
 
 async function doAtomicWriteJsonAsync(filePath: string, payload: unknown, options: { backup?: boolean }): Promise<void> {
   const backup = options.backup ?? true;
-  await mkdir(path.dirname(filePath), { recursive: true });
+  await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
   const tmpPath = `${filePath}.tmp`;
-  await writeFile(tmpPath, JSON.stringify(payload, null, 2) + "\n", "utf-8");
+  await writeFile(tmpPath, JSON.stringify(payload, null, 2) + "\n", { encoding: "utf-8", mode: 0o600 });
   if (backup && backupHealthySync(filePath)) {
     try {
       await copyFile(filePath, `${filePath}.bak`);
+      await hardenBackupModeAsync(`${filePath}.bak`);
     } catch (error) {
       console.warn(`[persistence] Backup failed ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
