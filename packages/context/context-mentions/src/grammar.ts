@@ -85,7 +85,10 @@ export function isResolvableMentionPath(path: string): boolean {
   // A trailing slash is the natural directory notation for mentions (`@src/`); it
   // carries no path segment, so it is normalized away before validation. Leaving it
   // in made every `@dir/` mention "unresolvable" and its listing branch unreachable.
-  const clean = path.trim().replace(/\/+$/, "");
+  // Trimmed with endsWith rather than a regex: an unanchored `\/+$` is quadratic on
+  // adversarial input, and this function receives user-authored mention text.
+  let clean = path.trim();
+  while (clean.endsWith("/")) clean = clean.slice(0, -1);
   if (clean === "" || clean.startsWith("/") || hasIllegalPathChars(clean)) return false;
   if (clean.includes("\\")) return false;
   return clean.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
