@@ -7,7 +7,10 @@ registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf �
 
 ## 入口链与进程行为
 
-- `src/main.ts`：`assemble()`，然后 `startServer()`，然后 `installSignalHandlers()`。
+- `src/main.ts`：`assemble()`，然后 `startServer()`，然后一个 30 分钟、unref 的
+  `checkpointStores()` 定时器、`installCrashHandlers()`，最后 `installSignalHandlers()`。
+  signal 路径先 flush 持久 store、停止 server，再压缩 session 日志并在 `finally` 中
+  再次 flush，因此连接排空期间提交的 turn 也不会丢失。
 - `src/server.ts`：在 `@hono/node-server` 的 `serve(...)` 之前调用
   `ensurePortAvailable(settings.backendHost, settings.backendPort)`，并注册一个
   `EADDRINUSE` 错误监听器覆盖探测到绑定的竞态。stop 先关闭空闲连接，再关闭
@@ -15,8 +18,10 @@ registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf �
 - `src/portcheck.ts`：当端口超出 1 至 65535 或已被占用时抛出 `InvalidPortError`
   或 `PortInUseError`。它绝不调用 `process.exit`，由宿主入口记录日志并退出。
   没有自动回退端口。
-- `src/lifecycle.ts`：SIGINT、SIGTERM、SIGBREAK 有 5 秒优雅关闭超时，随后强制
-  `exit(1)`。`disposeSignalHandlers()` 为测试与嵌入宿主解绑监听器。
+- `src/lifecycle.ts`：SIGINT、SIGTERM、SIGBREAK 有 `SERVER_SHUTDOWN_GRACE_MS`
+  优雅关闭超时（默认 5 秒），随后强制 `exit(1)`。`disposeSignalHandlers()` 为测试与
+  嵌入宿主解绑监听器；`installCrashHandlers()` 在未捕获异常或 unhandled rejection
+  时执行一次有界持久 store flush，然后以非零码退出。
 - dev 脚本先运行 `predev` 的 `tsc`，再运行 `node --watch dist/main.js`。它监视的是
   编译产物。见 [../operations/runbook.zh.md](../operations/runbook.zh.md)。
 
@@ -64,7 +69,7 @@ registry、调用 `registerDriversBestEffort`、挂载 `register*Routes` leaf �
 `data/memory_episodic.json` 的 `EpisodicMemory` 与基于 `data/memory_semantic.json`
 的 `SemanticMemory`，桥接进一个 `MemoryServiceAdapter`。
 
-返回 `{ settings, app, flushDurableStores }`，类型为 `RuntimeComponents`。
+返回 `{ settings, app, flushDurableStores, checkpointStores }`，类型为 `RuntimeComponents`。
 
 ## Driver 注册
 

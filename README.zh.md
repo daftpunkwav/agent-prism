@@ -94,8 +94,11 @@ pnpm -r build      # build every package, including Next.js
 pnpm build         # build all packages
 pnpm typecheck     # package typecheck and test typecheck
 pnpm test          # Vitest suite
+pnpm verify        # full gate sweep: build、typecheck、coverage、web lint、i18n、boundaries、deps、exports
 pnpm boundaries    # scripts/check-boundaries.mjs: dependency direction rules
 pnpm check:deps    # scripts/check-package-deps.mjs: declared vs imported deps and value-edge cycles
+pnpm check:exports # scripts/check-export-tests.mjs: 可调用公共导出必须被测试引用
+pnpm smoke         # 对已运行服务做 HTTP 探测
 pnpm dev:server    # Hono HTTP backend on 8281
 pnpm dev:web       # Next.js frontend on 8280
 pnpm start:server  # run the built backend
@@ -109,10 +112,10 @@ catalog key 对等，并对 `src/app` 与 `src/components` 做 CJK 扫描，确�
 
 ```
 apps/<app>/                composition root (server) and frontend (web); see apps/README.md
-packages/<family>/<leaf>/  two-level capability families; every leaf ships src/, tests/,
-                           README.md, package.json, and tsconfig.json
+packages/<family>/<leaf>/  two-level capability families; every leaf ships src/, README.md,
+                           package.json, and tsconfig.json (most also ship tests/)
 tests/<journey>/           cross-domain journey tests through @agentprism/* public exports only
-scripts/                   gates (boundaries, deps) and the evaluation matrix runner
+scripts/                   gates (boundaries, deps, export tests, smoke) and the evaluation matrix runner
 docs/                      documentation tree; see docs/README.md for the map
 ```
 

@@ -7,7 +7,7 @@
 [CI 合并门禁](#ci-合并门禁)。标准的全量扫描为：
 
 ```bash
-pnpm verify    # 构建 + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
+pnpm verify    # 构建 + typecheck（packages、apps、tests）+ coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 pnpm --filter @agentprism/web lint         # web ESLint，改动 UI 代码后运行
 pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文案后运行
 ```
@@ -21,7 +21,7 @@ pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文�
 | 测试 | `pnpm test`，根 vitest | 行为 | 任何套件失败 |
 | 类型 | `pnpm typecheck` | 全仓库类型安全 | 类型错误；先构建 package，使跨 package 解析保持新鲜 |
 | Lint | `pnpm --filter @agentprism/web lint`，ESLint 9 flat config 位于 `apps/web/eslint.config.mjs` | web app 的 lint 纪律（Next.js core-web-vitals 与 typescript 规则） | 一个 ESLint error；warning 仅为提示，任何规则豁免都在配置内注明原因 |
-| 导出测试覆盖 | `pnpm check:exports`，来自 `scripts/check-export-tests.mjs` | 每个可调用的公共导出都被测试 harness 文件引用 | 存在无测试引用的可调用公共导出——删除它或为它补测试 |
+| 导出测试覆盖 | `pnpm check:exports`，来自 `scripts/check-export-tests.mjs` | 每个可调用的公共导出都被测试 harness 文件引用，且 `PENDING` 工作清单双向保持真实 | 存在无测试引用的可调用公共导出（删除它或为它补测试）；`PENDING` 条目已获得测试；`PENDING` 条目已不再对应任何导出；或（在真实 workspace 根上）`PENDING` package 已离开 workspace——过期行必须删除 |
 | i18n | `pnpm --filter @agentprism/web check:i18n`，来自 `apps/web/scripts/check-i18n.mjs` | UI 文案纪律 | en 与 zh-CN catalog key 对等失败，或在 `src/app`、`src/components` 中发现内联 CJK；注释与 `console.*` 被剥离，标有 `i18n-exempt` 的行被跳过 |
 
 方向规则列于 `scripts/check-boundaries.mjs` 的 `RULES` 数组，它是唯一事实来源。要点
@@ -45,10 +45,11 @@ pnpm --filter @agentprism/web check:i18n   # web i18n 门禁，改动前端文�
 
 两个 review bot（CodeRabbit 与 Sourcery）会在 PR 上评论。两者都不报告必需检查。
 `ci.yml` 的 diff 分类器把所有 `*.md` 路径连同 `.gitignore`、`.gitattributes`、
-`LICENSE` 都视为 docs-only，对这些改动跳过构建、测试与 smoke；workflow-lint
-同样跳过，除非 `.github/` 下有改动——在那里改一个 Markdown 文件也足以触发它。
+`LICENSE` 都视为 docs-only，对这些改动跳过 `verify` 与 `smoke`；workflow-lint
+同样跳过，除非 `.github/` 下有改动，或改动了 `scripts/ci/` 下的门禁脚本（workflow-lint
+自身会运行它们）——在 `.github/` 下改一个 Markdown 文件也足以触发它。
 `gate` 仍会运行，只有仍在运行的检查全部通过才会通过：PR 标题约定、路径分类
-本身，以及触及 `.github/` 时的 workflow-lint。安全工作流则完全没有路径过滤：
+本身，以及触及 `.github/` 或 `scripts/ci/` 时的 workflow-lint。安全工作流则完全没有路径过滤：
 `security-gate` 在每个 PR 上都运行，依赖审计或 secret 扫描失败对 docs-only
 改动的阻断与代码改动完全相同。
 

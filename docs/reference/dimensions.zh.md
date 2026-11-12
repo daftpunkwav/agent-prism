@@ -45,8 +45,8 @@
   它们；但它们不是 Arena 的 dimension 选项，因此在 Arena lane 选择器中不可选，也不是合法
   baseline 值。
 - 仅 baseline 的 decode 字段 `top_p`、`frequency_penalty`、`presence_penalty`、
-  `max_output_tokens`，以及安全控制字段 `approval_mode` 与 `sandbox_mode`，位于
-  `BASELINE_ONLY_OPTIONS`。
+  `max_output_tokens`，以及控制字段 `thinking_mode`、`approval_mode` 与
+  `sandbox_mode`，位于 `BASELINE_ONLY_OPTIONS`。
 - 数值字段在 baseline 面板与对比 dimension lane 选择器中都是自由数值输入。decode
   参数接受其 `DECODE_FIELD_RANGES` 范围。`max_steps` 接受 1 至 100 000，以及
   `unlimited` token，后者是哨兵 `-1`，表示无 step 预算；LangChain 与 LangGraph 把图

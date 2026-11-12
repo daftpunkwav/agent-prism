@@ -13,7 +13,7 @@
 | Frontend dev | `http://localhost:8280` | `apps/web/scripts/dev.mjs` 以 bind 与 connect 双重探测端口，接受 `-p` 或 `--port`。 |
 | Frontend start | `next start -p 8280` | 生产模式 |
 | 健康 | `GET /api/health` 与 `GET /health` | 始终免鉴权 |
-| 关闭 | SIGINT 或 SIGTERM，优雅关闭 5 秒超时，随后强制 `exit(1)` | 先关闭空闲连接 |
+| 关闭 | SIGINT、SIGTERM 或 SIGBREAK，按 `SERVER_SHUTDOWN_GRACE_MS` 优雅关闭（默认 5 秒），随后强制 `exit(1)` | 先关闭空闲连接 |
 
 ## 运行模式
 
@@ -50,6 +50,10 @@ tools 与每列 verdict。cell 会消耗真实模型调用。
   per-path 队列、`.bak` 恢复），session op 日志 `data/sessions.jsonl` 以追加写入，
   重放时遏制损坏行。损坏的 provider 文件回退到 `.env` 播种。损坏的 session
   记录被遏制，而非致命。
+- 在支持 POSIX mode 的平台上，持久文件以 owner-only（`0o600`）创建、新数据目录以
+  owner-only（`0o700`）创建；原子 rename 把该 mode 带到目标上，因此早先 world-readable
+  的文件会被替换为私有文件，且每次写入都会把 `.bak` 副本重新设为 `0o600`。Windows
+  忽略这些 mode，由其 ACL 控制访问。
 - 被杀死进程遗留为 `active` 的 session 在下次加载时翻转为 `failed`。
 - 超大账本条目位于 `data/sessions.json.blobs/`。删除一个 session 会清除其 blob。
 - `data/runs/<runId>/<workspace>/` 下的 workspace 在重启后重水化，以 `MAX_WORKSPACES`
@@ -76,7 +80,7 @@ tools 与每列 verdict。cell 会消耗真实模型调用。
 ## 调试辅助
 
 - LLM wire trace：builder turn 记录 `llm_request`、`llm_response`、`llm_error` trace
-  条目，在 builder trace 面板可见（arena 列写入 `<traceDir>/<label>.wire.jsonl`）。
+  条目，在 builder trace 面板可见（arena 列写入 `<traceDir>/<sanitized-label>.wire.jsonl`）。
 - wire 抓包要求调用经该列配置的模型发出：除 `claude_agent_sdk` 外各 backend 都满足，
   该框架由 CLI 子进程直连端点，故该列按设计没有 `.wire.jsonl`。
 - Session 取证：`GET /api/sessions/:id/export` 下载完整记录与条目信封。

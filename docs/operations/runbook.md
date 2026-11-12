@@ -12,7 +12,7 @@ Day-to-day operation of the local stack, grounded in the startup and shutdown co
 | Frontend dev | `http://localhost:8280` | `apps/web/scripts/dev.mjs` probes the port with a bind and connect double probe and accepts `-p` or `--port`. |
 | Frontend start | `next start -p 8280` | production mode |
 | Health | `GET /api/health` and `GET /health` | always unauthenticated |
-| Shutdown | SIGINT or SIGTERM, graceful with a 5-second timeout, then forced `exit(1)` | closes idle connections first |
+| Shutdown | SIGINT, SIGTERM, or SIGBREAK, graceful with a `SERVER_SHUTDOWN_GRACE_MS` timeout (default 5 seconds), then forced `exit(1)` | closes idle connections first |
 
 ## Run modes
 
@@ -49,6 +49,11 @@ Operational notes:
   rename, per-path queue, `.bak` recovery), and the session op log `data/sessions.jsonl`
   appends with corrupt-line containment on replay. A corrupt provider file falls back to
   the `.env` seed. A corrupt session record is contained rather than fatal.
+- On hosts that honor POSIX modes, persisted files are created owner-only (`0o600`) and
+  new data directories owner-only (`0o700`); the atomic rename carries that mode onto the
+  target, so an earlier world-readable file is replaced private, and the `.bak` copy is
+  re-asserted to `0o600` on every write. Windows ignores the modes, and its ACLs govern
+  access instead.
 - Sessions left `active` by a killed process flip to `failed` on the next load.
 - Oversized ledger entries live in `data/sessions.json.blobs/`. Deleting a session purges
   its blobs.
@@ -77,7 +82,7 @@ Operational notes:
 
 - LLM wire traces: builder turns record `llm_request`, `llm_response`, and `llm_error`
   trace entries, visible in the builder trace panel (arena columns write
-them to `<traceDir>/<label>.wire.jsonl`).
+them to `<traceDir>/<sanitized-label>.wire.jsonl`).
 - Wire capture needs the call to leave through the column's configured model: every
   backend does except `claude_agent_sdk`, whose CLI subprocess talks to the endpoint
   itself — that column has no `.wire.jsonl` by design.

@@ -10,17 +10,24 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
 
 - CORS。allowlist 由 `http://localhost:<FRONTEND_PORT>`、
   `http://127.0.0.1:<FRONTEND_PORT>` 与 `CORS_ORIGINS` 条目构建。`*` 在 settings
-  加载时被拒绝。方法为 `GET`、`POST`、`PUT`、`DELETE`、`OPTIONS`。头为
+  加载时被拒绝。方法为 `GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`OPTIONS`。头为
   `Content-Type`、`Authorization`、`X-API-Token`。
-- Auth。若 `API_TOKEN` 为空，所有请求通过鉴权；请求仍可能被其他守卫拒绝（loopback
-  绑定下，非白名单的 `Host` 头返回 `403`）。`/api/health` 与 `/health` 豁免。凭证为
+- 守卫。若 `API_TOKEN` 为空，所有请求通过鉴权；请求仍可能被其他守卫拒绝。loopback
+  绑定下，非白名单的 `Host` 头返回 `403`（DNS rebinding 守卫）。带 `Origin` 头的
+  状态变更请求（`POST`、`PUT`、`PATCH`、`DELETE`）若 Origin 不在 CORS allowlist 中
+  返回 `403`（跨站守卫）；无 `Origin` 的请求（curl、服务间调用）通过。
+- Auth。`/api/health` 与 `/health` 豁免。凭证为
   `Authorization: Bearer <token>`，scheme 大小写不敏感；或 `X-API-Token: <token>`。
   失败返回 `401 {"detail": …}`。
 - Body 上限。`MAX_REQUEST_SIZE` 默认 10 MiB，在 `Content-Length` 上强制，并在流式
-  传输时再次强制，因此分块 body 无法绕过。超限返回 `413`。非 JSON body 返回 `400`，
-  schema 违规返回 `422` 并附首个 zod issue 消息。
+  传输时再次强制，因此分块 body 无法绕过。超限返回 `413`。非法 JSON 一律返回 `400`。
 - 错误形态。`AppError` 与 `BuilderError` 返回 `{"detail"}` 并带各自 status。其他
-  一切返回 `500` 并附经净化的消息。
+  一切返回 `500` 并附经净化的消息。经 zod 校验的路由族（arena、builder、threads、
+  workspace upsert、session export）在 schema 不匹配时返回 `422` 并附首个 zod issue
+  消息。provider 保存与其连通性测试用同一 zod schema 解析请求 body，因此形态错误在
+  任何语义检查之前返回 `422`；`saveProvider` 随后对语义非法的配置返回 `400`。
+  `/api/settings/*` 手写校验，坏输入返回 `400`，skill 名称与 bundled 或既有 skill
+  冲突返回 `409`，持久 store 写入失败映射为 `5xx`。
 - 健康。`GET /api/health` 与 `GET /health` 返回
   `{"status":"ok","service":"arena"}`。
 
@@ -29,17 +36,27 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
 | 方法 | 路径 | 用途 | 备注 |
 |---|---|---|---|
 | GET | `/api/settings/provider` | 公开的 provider config 视图 | key 被打码，绝不返回原始值 |
-| PUT | `/api/settings/provider` | 保存 provider config | zod 校验，否则 422；接受遗留扁平协议；空 key 按 endpoint id 或 fingerprint 继承已存储 key |
+| PUT | `/api/settings/provider` | 保存 provider config | zod 校验，否则 422；语义配置校验失败返回 400；接受遗留扁平协议；空 key 按 endpoint id 或 fingerprint 继承已存储 key；真实 key 绝不返回 |
 | POST | `/api/settings/provider/test` | 连通性测试，不保存 | 空 body 测试已存储的配置 |
 
-## `route-settings/src/settings.ts` 中的 Settings knobs 与 memory
+## `route-settings/src/settings.ts` 中的 Settings knobs、memory、skills 与 MCP
+
+每个路由族仅在宿主注入对应 controller 时注册；没有该 seam 的宿主仍可启动。settings
+路由为手写校验，坏输入返回 `400`（见横切行为）。
 
 | 方法 | 路径 | 用途 | 备注 |
 |---|---|---|---|
-| GET | `/api/settings/knobs` | 读取当前 runtime knobs | 返回 `{knobs, fields}`；宿主未注入 knob store 时跳过注册 |
-| PUT | `/api/settings/knobs` | 热应用 knob 更新 | 返回 `{knobs, fields}` |
+| GET | `/api/settings/knobs` | 读取当前 runtime knobs | 返回 `{knobs, fields}` |
+| PUT | `/api/settings/knobs` | 热应用 knob 更新 | 始终 `200`：越界或非法字段被 clamp 或回退到当前值，响应中的 `knobs` 为生效值 |
 | GET | `/api/settings/memory` | 跨 session 记忆状态 | episodic 与 semantic 的计数与文件路径 |
-| POST | `/api/settings/memory/clear` | 清空两个记忆 store | 返回状态 |
+| POST | `/api/settings/memory/clear` | 清空两个记忆 store | 先持久化再响应，写入失败映射为 `5xx` |
+| GET | `/api/settings/skills` | 列出生效的 skill 目录 | `{skills}`，含 name、description、source 与 enabled |
+| POST | `/api/settings/skills` | 创建用户 skill | body `name`、`description`、`body`；`201`；bundled 或重名返回 `409` |
+| PUT | `/api/settings/skills/:name` | 更新用户 skill | body `description` 和/或 `body`；未知名字 `400`，bundled `409` |
+| DELETE | `/api/settings/skills/:name` | 删除用户 skill | `{ok:true}`；同样区分 `400`/`409` |
+| PUT | `/api/settings/skills/:name/enabled` | 启用或停用 skill | body `enabled` 为 boolean，否则 `400` |
+| GET | `/api/settings/mcp` | 读取受管 MCP server 列表 | `{servers}` |
+| PUT | `/api/settings/mcp` | 整体替换受管 MCP server 列表 | body `servers` 数组；非数组 `400`，server 配置非法 `400` 并附解析器消息 |
 
 ## `route-sessions/src/sessions.ts` 中的 Sessions
 
@@ -47,8 +64,8 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
 |---|---|---|---|
 | GET | `/api/sessions/stats` | 按 kind 与 status 计数 | 刻意注册在 `/:sessionId` 之前 |
 | GET | `/api/sessions/telemetry` | 纯文本 telemetry 报告 | 确定性渲染的报告行，为空的 kind 省略；与 stats 同理注册在 `/:sessionId` 之前 |
-| GET | `/api/sessions` | 过滤列表 | `kind` 为 `arena`、`agent`、`builder`；`status` 为 `active`、`completed`、`failed`、`cancelled`；`limit` 至少 0，上限 200；违规返回 400 |
-| GET | `/api/sessions/:sessionId` | 记录与条目 | 缺失时 404 |
+| GET | `/api/sessions` | 过滤列表或高级查询页 | `kind` 为 `arena`、`agent`、`builder`；`status` 为 `active`、`completed`、`failed`、`cancelled`；`limit` 为至少 1 的整数，上限 200；违规返回 400。任一 `q`、`sort`（`newest`、`oldest`、`title`）、`offset`、`kinds`、`statuses`（逗号分隔，各至多 10 个 token）、`createdFrom`、`createdTo`、`updatedTo`（epoch ms）、`entryText`（至多 500 字符）会把响应切换为 `{sessions, total, limit, offset}` |
+| GET | `/api/sessions/:sessionId` | 记录与条目 | 缺失时 404；`limit`（默认 50，上限 500）与 `offset` 对条目开窗 |
 | GET | `/api/sessions/:sessionId/export` | JSON 下载 | `Content-Disposition: attachment`；`exportedAt` 来自注入的 clock |
 | POST | `/api/sessions/export` | 按 ids 批量导出 | body `ids`；返回 `{documents}`；即使是无 `Content-Length` 的分块请求，body 大小上限依然生效 |
 | DELETE | `/api/sessions/:sessionId` | 运维删除 | `{deleted: <id>}`；blob sidecar 被清除 |
@@ -58,11 +75,11 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
 | 方法 | 路径 | 用途 | 备注 |
 |---|---|---|---|
 | GET | `/api/arena/meta` | dimension 与 baseline 元数据 | 维度卡片及其选项、frameworks、`baseline_defaults`、`baseline_fields`、`model_compare_ready`。UI 可以停在零选择并禁用 run |
-| POST | `/api/arena/run` | 启动一次对比 run | SSE，事件名 `"arena"`。Body：`question` 为 1 至 4000 字符，`dimension` 默认 `framework` 且接受任意已注册的自定义维度 id（未知对比轴在开流前以 422 拒绝），`selections` 为 1 至 16 个维度取值（空数组或省略会以流内 `error` event 失败），可选 `column_sessions`，`attachments` 至多 5 个、每个 64 KiB 文本。`onAbort` 取消该 run，abort 记为 `cancelled`。流内失败作为 `error` event 发出，绝不静默关闭 |
+| POST | `/api/arena/run` | 启动一次对比 run | SSE，事件名 `"arena"`。Body：`question` 为 1 至 4000 字符，`dimension` 默认 `framework` 且接受任意已注册的自定义维度 id（未知对比轴在开流前以 422 拒绝），`selections` 至多 16 个维度取值（空数组或省略会以流内 `error` event 失败），可选 `baseline` 覆盖与 `temperature`、回退 `messages` transcript（至多 24 条）、`column_sessions`、`attachments` 至多 5 个且每个 64 KiB 文本、默认 false 的 `interactive`（启用实时 `ask_user`）与 `language`（至多 16 字符）。`onAbort` 取消该 run，abort 记为 `cancelled`。流内失败作为 `error` event 发出，绝不静默关闭 |
 | POST | `/api/arena/answer` | 回答一个待处理的 ask_user 问题 | body 为 `agent_id`、`question_id`、`answer`；无活跃列等待时 404 |
 | GET | `/api/arena/pending-asks` | 等待人工回答的列 | 返回 `{pending}`，每个活跃列为一个 `{agentId, questions}` 条目，含完整待答 ask_user 问题 |
 | POST | `/api/arena/stop-column` | 仅停止一个活跃列 | body `agent_id` 来自列 event；其他列继续运行；被停止的列以 `Column stopped by user` 错误与 failed complete 结算；已结算时 404 |
-| GET | `/api/arena/column-logs` | 每列 run 日志，含原始 event 与捕获的 LLM wire | 需要 `?workspace=` 与 `?label=`，否则 400。返回 `{workspace, label, events, wire, truncated}`，尾部截断。在 run 流式期间轮询安全。未知 workspace 或 label 返回空结果，而非 404 |
+| GET | `/api/arena/column-logs` | 每列 run 日志，含原始 event 与捕获的 LLM wire | 需要 `?workspace=` 与 `?label=`，否则 400。合并该 workspace 承载过的每个 run（含后续 turn），按时间排序并截断尾部。返回 `{workspace, label, events, wire, truncated}`。在 run 流式期间轮询安全。未知 workspace 或 label 返回空结果，而非 404 |
 | GET | `/api/arena/templates` | 任务模板 | `{templates: […]}`，含 15 个 scored 与 11 个 quick |
 | POST | `/api/arena/judge` | 评判答案 | `template_id` 与至多 16 条的 `answers` 记录 |
 | POST | `/api/arena/judge-async` | 经异步端口评判答案 | body 与 `/api/arena/judge` 相同；`llm` 模板在异步 judge 已接线时走异步路径，否则回退同步 fail-closed 判定并在结果中说明缺接线 |
@@ -96,6 +113,8 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
 | PATCH | `/api/builder/sessions/:id` | 在 turn 之间热替换 composition | 与创建时同一套配置期校验（未知或停用端点、`claude_agent_sdk` 端点格式、非法 custom 值）；被拒绝的 swap 返回 422，已存 composition 保持不变 |
 | DELETE | `/api/builder/sessions/:id` | 删除 session | |
 | POST | `/api/builder/sessions/:id/abort` | 中止进行中的 turn | `{ok, aborted}` |
+| GET | `/api/builder/sessions/:id/pending-ask` | 等待人工回答的问题 | 该 session 当前 turn 的 `{questions}` |
+| POST | `/api/builder/sessions/:id/answer` | 交付一个人工回答 | body `question_id` 与可选的 `answer`（空串表示跳过）；没有匹配的待答问题时 404 |
 | POST | `/api/builder/sessions/:id/chat` | 一次 chat turn | SSE，事件名 `"builder"`；`message` 至多 12 000 字符；`attachments` 至多 5；除非客户端断开，否则以 `[DONE]` 终止 |
 
 ## `route-threads/src/threads.ts` 中的 Threads

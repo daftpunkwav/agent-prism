@@ -6,16 +6,22 @@ mount the `register*Routes` leaves.
 
 ## Entry chain and process behavior
 
-- `src/main.ts`: `assemble()`, then `startServer()`, then `installSignalHandlers()`.
+- `src/main.ts`: `assemble()`, then `startServer()`, then a 30-minute unref'd
+  `checkpointStores()` timer, `installCrashHandlers()`, and finally
+  `installSignalHandlers()`. The signal path flushes durable stores, stops the server,
+  compacts the session log, and flushes again in a `finally`, so a turn committed while
+  connections drain still survives.
 - `src/server.ts`: `ensurePortAvailable(settings.backendHost, settings.backendPort)`
   before `serve(...)` from `@hono/node-server`, plus an `EADDRINUSE` error listener that
   covers the probe-to-bind race. Stop closes idle connections, then the server.
 - `src/portcheck.ts`: throws `InvalidPortError` or `PortInUseError` when the port is out
   of 1 to 65535 or already in use. It never calls `process.exit`; the host entry logs and
   exits. There is no automatic fallback port.
-- `src/lifecycle.ts`: SIGINT, SIGTERM, and SIGBREAK get a 5-second graceful-shutdown
-  timeout before a forced `exit(1)`. `disposeSignalHandlers()` detaches listeners for
-  tests and embedding hosts.
+- `src/lifecycle.ts`: SIGINT, SIGTERM, and SIGBREAK get a `SERVER_SHUTDOWN_GRACE_MS`
+  graceful-shutdown timeout (default 5 seconds) before a forced `exit(1)`.
+  `disposeSignalHandlers()` detaches listeners for tests and embedding hosts, and
+  `installCrashHandlers()` runs one bounded durable-store flush on an uncaught exception
+  or unhandled rejection before exiting non-zero.
 - The dev script runs `predev` with `tsc`, then `node --watch dist/main.js`. It watches
   compiled output. See [../operations/runbook.md](../operations/runbook.md).
 
@@ -65,7 +71,8 @@ budgets, and driver knobs. The cross-session memory stores `EpisodicMemory` over
 `data/memory_episodic.json` and `SemanticMemory` over `data/memory_semantic.json` are
 bridged into one `MemoryServiceAdapter`.
 
-It returns `{ settings, app, flushDurableStores }`, typed as `RuntimeComponents`.
+It returns `{ settings, app, flushDurableStores, checkpointStores }`, typed as
+`RuntimeComponents`.
 
 ## Driver registration
 

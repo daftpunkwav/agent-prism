@@ -225,7 +225,8 @@ resolves it at the single consumption point where models are constructed. Lookup
 the same merge as `loadSettings`: a root `.env` value counts, and a process env value
 wins. The stored value stays a reference, resolved secrets are never written back, and
 a missing variable resolves to `""`, which then fails closed at model construction.
-There is no partial interpolation.
+There is no partial interpolation. Connection-test failure details redact both the stored
+reference and the value it resolves to, because an SDK error can echo the resolved secret.
 
 ## Persistence layout
 
@@ -236,7 +237,7 @@ Paths are defined in `config/src/paths.ts`.
 | `data/provider_config.json` and `.bak` | provider endpoints and settings | a missing file falls to the `LLM_*` env seed; a corrupt main file recovers from `.bak`; a read that still throws after one bounded retry falls back to the seed with a warning (`provider-store.ts` `load`) |
 | `data/sessions.json` and `.bak` | session ledger snapshot `{version:1, sessions:[…]}`, compacted from the op log | a corrupt main file recovers from `.bak`; stale `active` rows flip to `failed` on load |
 | `data/sessions.jsonl` | append-only session op log replayed on boot (corrupt lines are skipped and counted) | compacted into the snapshot by `checkpoint()`: on the 30-minute host cadence, on shutdown, and once the log passes its 32 MB size budget |
-| `data/sessions.json.blobs/` | oversized ledger entry texts named `<sessionId>.<seq>.blob.txt`, each at most 128 K characters | per-session purge on delete |
+| `data/sessions.json.blobs/` | oversized ledger entry texts named `<sanitized-session-id>.<id-hash>.<seq>.blob.txt` (the hash keeps sanitized ids apart), each at most 128 K characters | per-session purge on delete |
 | `data/builder_sessions.json` and `.bak` | builder session store | atomic-write `.bak` recovery |
 | `data/threads.json` and `.bak` | durable agent threads `{version:1, threads:[…]}` with transcript, pinned config, and workspace link | atomic-write `.bak` recovery, per-item corruption containment, and stale `running` reset to idle on load |
 | `data/projects.json` | archived projects | atomic-write `.bak` recovery |
@@ -247,13 +248,17 @@ Paths are defined in `config/src/paths.ts`.
 | `data/skill_settings.json` | disabled skill names (settings API) | read failure degrades to "all skills enabled" |
 | `data/skills/<name>/SKILL.md` | operator-created user skills | deleted skills drop their folder; malformed files are skipped during discovery |
 | `data/runs/<runId>/<workspace>/` | per-column scratch workspaces | rehydrated after restart with `MAX_WORKSPACES` as the cap, `WORKSPACE_TTL_SECONDS` as the TTL, and LRU eviction with in-run protection |
-| `data/runs/<runId>/_traces/` | per-run observability logs, one JSONL pair per column: `<label>.events.jsonl` (raw run events) and `<label>.wire.jsonl` (captured LLM wire records), plus `<workspace>.ws` workspace-run markers | append-only and fail-open: the first append failure warns once and the run continues; read back by the column-logs endpoint |
+| `data/runs/<runId>/_traces/` | per-run observability logs, one JSONL pair per column: `<sanitized-label>.events.jsonl` (raw run events) and `<sanitized-label>.wire.jsonl` (captured LLM wire records), plus `<workspace>.ws` workspace-run markers | append-only and fail-open: the first append failure warns once and the run continues; read back by the column-logs endpoint |
 | `data/runs/…/.spills/` | tool-result and job output dumps named `spill-*.txt` and `NNNNNN-<jobId>.log` | 20-file rotation |
 
 Writes go through `@agentprism/persistence`. Document stores write atomically: a `.tmp`
 file, a rename, a per-path write queue, and a `.bak` copy. Line-oriented files (the
 session op log) append through a per-path queue instead, and a torn or corrupt line is
-skipped and counted on load rather than losing the store.
+skipped and counted on load rather than losing the store. Where the platform honors POSIX
+modes, new files are created owner-only (`0o600`) and new parent directories owner-only
+(`0o700`); the atomic replace carries the tmp file's mode onto the target, so an earlier
+world-readable file is replaced by a private one, and the `.bak` copy is re-asserted to
+`0o600` on each write. Windows ignores the modes and its ACLs govern access.
 
 ## Frontend configuration
 

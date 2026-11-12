@@ -8,11 +8,12 @@ They are applications rather than capability leaves, so the leaf README contract
 | App | Package | Role | Entry |
 |---|---|---|---|
 | [`server/`](server/) | `@agentprism/server` | Composition root and HTTP host: settings, driver registration, route mounting, service assembly, and port listening | `src/main.ts` |
-| [`web/`](web/) | `@agentprism/web` | Next.js frontend with the arena, builder, sessions, threads, and settings pages | `src/app` |
+| [`web/`](web/) | `@agentprism/web` | Next.js frontend with the arena, builder, sessions, projects, guide, learn, and settings pages | `src/app` |
 
 ## server/
 
-- `src/main.ts` runs `assemble()`, then `startServer()`, then `installSignalHandlers()`.
+- `src/main.ts` runs `assemble()`, then `startServer()`, starts the periodic session
+  checkpoint and the crash handlers, then installs the signal handlers.
 - `src/assemble.ts` is the only composition root. It is the only place allowed to
   construct the driver registry, call `registerDriversBestEffort`, and mount the
   `register*Routes` leaves.

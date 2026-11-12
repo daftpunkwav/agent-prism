@@ -20,8 +20,10 @@ id 加入 `DimensionIdSchema`，并在
 label，参照 `mcp.ts`、`skill.ts` 或 `orchestration.ts`。默认值单独登记在
 `dimension-catalog.ts` 的 `STATIC_DEFAULT_BASE` 中。存在两种形态：
 
-- static 选项直接列在 catalog 中并原样供给 /meta：temperature、thinking、
-  thinking_budget、max_steps、mcp、skill、orchestration、memory、history_mode。
+- static 选项直接列在 catalog 中并原样供给 /meta：temperature、max_steps、mcp、
+  skill、orchestration、memory、history_mode。`thinking` 与 `thinking_budget` 也带
+  static 种子行，但 provider sync 会按 endpoint 覆盖它们（没有 pinned endpoint 支持该
+  轴时为空）。
 - 受注册表门控的选项在 `STATIC_DIMENSION_OPTIONS` 中起始为空，由启动期能力同步填充：
   `buildCapabilityOptionProjection` 把 static 表过滤到实时注册表，router 的
   `syncCapabilityOptions` 应用结果——即 prompt、reasoning、context、harness、toolset。

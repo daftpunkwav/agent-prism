@@ -36,18 +36,19 @@ Environment keys are read by `@agentprism/config` from the repo-root `.env`
 
 | File | Role |
 |---|---|
-| `src/main.ts` | Boot order: `assemble()` → `startServer()` → `installSignalHandlers()` |
+| `src/main.ts` | Boot: `assemble()` → `startServer()` → periodic session checkpoint + crash handlers → signal handlers |
 | `src/assemble.ts` | The only composition root: constructs the driver registry, applies `registerDriversBestEffort`, and mounts the route leaves |
 | `src/load-drivers.ts` | `builtinDriverLoaders`, the dynamic imports of the driver backends |
 | `src/mount-routes.ts` | Mounts route leaves in order; `GET /api/sessions/stats` registers before `GET /api/sessions/:sessionId` |
 | `src/server.ts` | Hono app serving |
 | `src/portcheck.ts` | Port availability validation |
-| `src/lifecycle.ts` | Signal handling and graceful shutdown |
+| `src/lifecycle.ts` | Signal handling, graceful shutdown, and the bounded crash flush |
 
 ## Tests
 
 `tests/` holds the host-level suite: a real `assemble()` boot probed over a real
-port (`assemble.test.ts`), route mounting, driver loading, signal lifecycle, and
-the boot-failure path. Placement rules follow
+port (`assemble.test.ts`), settings-write wiring, judge-async fallback, the builder
+trace-id guard, column callbacks, route mounting, driver loading, signal lifecycle, port
+validation, and the boot-failure path. Placement rules follow
 [tests/README.md](../../tests/README.md); the suite runs under the root
 `pnpm test` (the root vitest config globs `apps/*/tests`).

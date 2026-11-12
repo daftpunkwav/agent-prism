@@ -26,7 +26,12 @@ Web (apps/web) ──► Next rewrite /api/* → 127.0.0.1:8281 (apps/web/next.c
 
 - 路由上的 `stream.onAbort` 中止一个 `AbortController`，其 signal 抵达 runner。
   客户端 abort 把 session 记为 `cancelled`，且 abort 优先于 failure。
-  见 `packages/transport/route-arena/src/arena.ts` 与 contracts `SessionStatus`。
+  `runAgentExecution` 在其终止事件前（在 await 的 finalize 与结算工作之后）重新检查
+  signal，因此被取消的 run 绝不报告成功终止。消费者在终止前停止读取时，service 的
+  `finally` 会把已打开的账本行结算为 `cancelled`，与 abort 路径一致，而不是留在
+  `active`。见 `packages/transport/route-arena/src/arena.ts`、
+  `packages/agent/agent/src/agent-execution.ts`、`ArenaService.run` 与 contracts
+  `SessionStatus`。
 - 流内异常作为 `error` event 发出，`pipeline: "system"`，在同一 SSE 通道上，
   因此流绝不静默死亡。
 - Session 记账经 `SessionService` 用例层，并包在 `safeSession` 中。
@@ -64,7 +69,10 @@ sequenceDiagram
   一次 LLM 叙述调用、可选 ablation 行。
 - `POST /api/arena/matrix` 在 SSE 通道 `"matrix"` 上经 `ArenaService` 顺序执行
   1 至 32 个 template cell，发出 `matrix_progress` 与最终 `matrix_report`。
-  每 cell 失败相互隔离。
+  每 cell 失败相互隔离，且被 abort 的 matrix run 绝不会把不完整的 cell 判分：
+  abort 在判分前以 `AbortError` 传播。
+- `JudgeSpec` 类型为 `keyword`、`json`、`code`、`numeric`、`exclude`、`regex`、
+  `none` 与 `llm`（最后一种只经异步 judge 端口运行）。
 - `scripts/run-matrix.mjs` 读取 `GET /api/arena/templates` 的 scored 模板，
   并从 CLI 驱动该 endpoint。
 
@@ -109,7 +117,7 @@ extraction 读取最后一条 thought，否则最后一条 observation。`apps/w
 |---|---|---|
 | `data/sessions.json` 与 `.bak` | session 快照文档 `{version:1, sessions:[…]}`（由日志压缩而来） | `JsonlSessionStore` |
 | `data/sessions.jsonl` | 启动时重放的追加式变更日志 | `JsonlSessionStore` |
-| `data/sessions.json.blobs/` | 超大账本条目文本，命名为 `<sessionId>.<seq>.blob.txt` | `FileBlobStore` |
+| `data/sessions.json.blobs/` | 超大账本条目文本，命名为 `<sanitized-session-id>.<id-hash>.<seq>.blob.txt`（hash 使规范化后相同的 id 彼此区分） | `FileBlobStore` |
 | `data/provider_config.json` 与 `.bak` | provider endpoints；key 可为 `${env:NAME}` 引用 | `ProviderConfigStore` |
 | `data/builder_sessions.json` 与 `.bak` | builder session store | `BuilderSessionStore` |
 | `data/builder_traces/<sessionId>.jsonl` | 每 session 可观测日志，含 trace 条目、arena event、turn 标记 | `SessionTraceStore` |
@@ -117,7 +125,7 @@ extraction 读取最后一条 thought，否则最后一条 observation。`apps/w
 | `data/memory_episodic.json` 与 `data/memory_semantic.json` | 跨 session 记忆 store | `EpisodicMemory`、`SemanticMemory` |
 | `data/runtime_knobs.json` | 文件级 runtime knob 覆盖 | `RuntimeKnobsStore` |
 | `data/runs/<runId>/<workspace>/` | 每列临时 workspace，重启后重水化 | `WorkspaceRegistry` |
-| `data/runs/<runId>/_traces/` | 每 run 可观测日志，每列一对 JSONL（`<label>.events.jsonl`、`<label>.wire.jsonl`）及 `<workspace>.ws` 标记；仅追加且 fail-open | `RunTraceLogs`（arena-runner），由 `ArenaLogsService` 读回 |
+| `data/runs/<runId>/_traces/` | 每 run 可观测日志，每列一对 JSONL（`<sanitized-label>.events.jsonl`、`<sanitized-label>.wire.jsonl`）及 `<workspace>.ws` 标记；仅追加且 fail-open | `RunTraceLogs`（arena-runner），由 `ArenaLogsService` 读回 |
 | `…/.spills/` | 超大 tool 结果与 job 输出 dump | `tool-builtins` spill helper |
 
 文档型 store 经 `@agentprism/persistence` 原子写：`.tmp` 文件、rename、`.bak` 恢复。

@@ -16,7 +16,7 @@
    - `tests/drivers/`：driver banner 一致性、reasoning-support 声明，以及跨 driver
      家族的后端注册。
    - `tests/http-transport/`：请求契约，覆盖 routes、auth、error mapping、limits、
-     settings 与 SSE 流，含 13 个测试文件与共享 `mock-deps.ts`。
+     settings 与 SSE 流，含 15 个测试文件与共享 `mock-deps.ts`。
 3. app 测试：`apps/web/tests/` 覆盖 i18n catalog 对等、locale 解析与组件测试；
    `apps/server/tests/` 覆盖 `assemble`、`load-drivers`、`mount-routes` 与
    `portcheck`。
@@ -29,7 +29,7 @@ pnpm test:coverage         # 同一次运行，覆盖率报告写入 cov-report/
 pnpm smoke                 # 对运行中的服务做 HTTP 探测（见冒烟测试）
 pnpm typecheck             # packages (build first) + apps + tests
 pnpm typecheck:tests       # tsc -p tsconfig.tests.json --noEmit
-pnpm verify                # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
+pnpm verify                # build + typecheck（packages、apps、tests）+ coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 ```
 
 没有 per-package 测试脚本。根 `vitest.config.ts` 的 include 模式覆盖每个 leaf：
@@ -48,7 +48,7 @@ testing-library 与所配置的环境。
 报告写入 `cov-report/`，包含文本表与 JSON 摘要。
 
 覆盖率阈值在任何指标跌破各自下限时使运行失败：statements 89、branches 78、
-functions 90、lines 91（约低于 90.59/80.13/91.91/92.69 的实测基线一个半点）。
+functions 90、lines 91（约低于 90.35/79.73/91.69/92.44 的实测基线一个半点）。
 CI 在 Windows 参考平台上运行，这些数字与门禁合并的同一次运行同源；该余量
 吸收运行间噪声与进程启动抖动，同时让大范围回归变红，而不是任由覆盖率无声下滑。
 覆盖率提升后应上调阈值；门禁变红的正确响应是补回测试，而非调低数字。
@@ -61,26 +61,32 @@ CI 在 Windows 参考平台上运行，这些数字与门禁合并的同一次�
 自身不携带行为。从其它 workspace package 转发来的可调用导出按"声明处已覆盖"计算——同一
 绑定只需测一次。无法解析到声明的导出会被报告，而不是当作数据放行。
 `scripts/check-export-tests.mjs` 里有一个 `PENDING` 列表，记录仍缺测试的可调用导出。
-该列表是待办清单，只允许缩短。
+该列表是待办清单，必须双向保持真实：已获得测试的 pending 符号，以及已不再匹配任何导出的 pending 行（被重命名或移除），都会让门禁失败，因此豁免清单无法腐烂。在真实 workspace 根上，已离开 workspace 的 `PENDING` package 视为同一种失效豁免并同样失败；只持有 workspace 子集的 fixture 仓库只评判其实际包含的 package。
 
 ## 冒烟测试
 
 `scripts/smoke.mjs` 对已在运行的服务做 HTTP 探测：先等待进程响应，再检查
-`/health`、`/api/sessions` 与 `/api/arena/meta`。它只读，不启动任何 run，失败时以
-非零退出并打印逐项结果。
+`/health`、`/api/sessions` 与 `/api/arena/meta`。meta 检查是防止 builtin backend 从
+构建产物中无声掉队的唯一守卫：`DRIVERS` 未设置或为空时要求全部 builtin
+framework id 已注册；运维收窄 allowlist 时跳过该断言。它只读，不启动任何 run，
+失败时以非零退出并打印逐项结果。非法的 `SMOKE_TIMEOUT_MS`/`SMOKE_REQUEST_TIMEOUT_MS`
+会立即失败，而不是流入 deadline 计算：整个值必须是裸正整数，因此 `1e5` 或 `30000ms`
+会被拒绝，而不是被前缀解析成错误的 deadline。
 
 ```bash
 pnpm smoke                                      # http://127.0.0.1:8281
 SMOKE_BASE_URL=https://host.example pnpm smoke  # 任意已部署环境
 SMOKE_PORT=8291 SMOKE_TIMEOUT_MS=60000 pnpm smoke
+SMOKE_REQUEST_TIMEOUT_MS=10000 pnpm smoke       # 每个探测请求的 deadline
 SMOKE_API_TOKEN=secret pnpm smoke               # 设置了 API_TOKEN 时
 ```
 
 ## CI
 
-`.github/workflows/ci.yml` 运行在 `windows-latest`。`verify` job 覆盖 typecheck、
-web lint、i18n 门禁、覆盖率、import 边界、依赖卫生与导出测试覆盖；`smoke` job 构建
-宿主、启动 `apps/server/dist/main.js`，并对它运行冒烟探测。
+`.github/workflows/ci.yml` 运行在 `windows-latest`。`verify` job 先构建 package，再对
+packages、apps 与 tests 做 typecheck，并覆盖 web lint、i18n 门禁、覆盖率、import
+边界、依赖卫生与导出测试覆盖；`smoke` job 依赖 `verify`，构建宿主、启动
+`apps/server/dist/main.js`，并对它运行冒烟探测；docs-only PR 会同时跳过这两个 job。
 
 Windows 是参考平台：受限令牌沙箱与 process-runner 套件仅适用于 Win32，换用其他
 runner 会跳过与安全相关的用例。
@@ -117,5 +123,5 @@ runner 会跳过与安全相关的用例。
   定时器上（waitForCondition 轮询与通道 receive 超时），而真正 spawn 子进程的套件按
   suite opt-in `{ retry: 1 }` 吸收 Windows 文件锁抖动。
 - 行为增量被显式固定。compaction 策略有单元测试固定相对 `sliding` 的增量。
-- 完整门禁集为 `pnpm verify`：build、typecheck、覆盖率、web lint、i18n catalog、import 边界、依赖卫生与对外
-  导出的测试覆盖。
+- 完整门禁集为 `pnpm verify`：build、typecheck（packages、apps、tests）、覆盖率、web lint、i18n catalog、
+  import 边界、依赖卫生与对外导出的测试覆盖。

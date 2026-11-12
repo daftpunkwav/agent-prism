@@ -11,6 +11,16 @@ OS level rather than by inspecting the command text.
 | 2. Approval gate | `packages/sandbox`, `approval.ts` | `approval_mode: unless_trusted` restricts shell tools to known-safe read-only commands | `config.approval_mode`, a baseline field |
 | 3. OS write sandbox | `packages/environment`, `sandbox-launcher.ts` and `win-sandbox-helper.ts` | Windows restricted-token spawn, so child processes may write only inside the workspace root | `config.sandbox_mode: os`, a baseline field |
 
+Layer 1 mechanics: the program name is matched as the bare program, so a path-qualified
+or `.exe`/`.com`-suffixed name (`/bin/rm`, `C:\Windows\System32\format.com`, `cmd.exe`)
+cannot dodge a deny rule. Command substitutions are reviewed inside double quotes as well
+as unquoted (`"$(rm -rf /)"` still runs), POSIX shell wrapper flags are matched as
+clusters (`bash -lc '…'`), and bare `sudo` plus leading `NAME=value` assignments are
+transparent to the destructive-shape review. The read-only allowlist is deliberately
+stricter: those prefixes disqualify a command (`PATH=… ls` is not known-safe), and heads
+that can write or execute through an argument carry guards (`find -exec`, `rg --pre`,
+`sort -o`, `git reflog expire`, and similar).
+
 Review order on the `beforeExecute` chain in `agent/src/tool-access.ts`
 `buildToolAccess` is: caller hook, then approval gate, then static analysis. The OS layer
 is not a review step. It wraps the actual spawn of whatever passed review in

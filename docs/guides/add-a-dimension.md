@@ -20,8 +20,9 @@ value is registered separately in `STATIC_DEFAULT_BASE` in `dimension-catalog.ts
 Two flavors exist:
 
 - Static options are listed directly in the catalog and serve /meta as-is: temperature,
-  thinking, thinking_budget, max_steps, mcp, skill, orchestration, memory, and
-  history_mode.
+  max_steps, mcp, skill, orchestration, memory, and history_mode. `thinking` and
+  `thinking_budget` also seed static rows, but provider sync overwrites them per endpoint
+  (empty when no pinned endpoint serves the axis).
 - Registry-gated options start empty in `STATIC_DIMENSION_OPTIONS` and are filled at
   startup by the capability sync: `buildCapabilityOptionProjection` filters the static
   tables down to the live registry, and the router's `syncCapabilityOptions` applies the

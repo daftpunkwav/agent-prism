@@ -39,7 +39,10 @@ Clock；以及可选 `agentId`。
   `max_input_tokens`、`max_output_tokens`、`context_usage_pct`、`input_usage_pct`。
   `TokenStats` 本身没有默认值；tracker 的回退为 context window 128 000、max input 120 000、
   max output 96 000。
-- `PipelineMetrics` 额外含 `success`、`duration_ms`、`tool_calls`、`steps`。
+- `PipelineMetrics` 额外含 `success`、`duration_ms`、`tool_calls`、`steps`，以及 token
+  块（`input_tokens`、`output_tokens`、`total_tokens`、`context_window`、
+  `max_input_tokens`、`max_output_tokens`、`context_usage_pct`、`input_usage_pct`）；
+  计数默认 0，window/cap 字段默认 128 000 / 120 000 / 96 000。
 - 嵌套的 subagent 与 ralph_loop event 在内部消费，绝不上传重放。其 token 经
   `complete` event metrics 折叠进父级。
 - 用于 judging 的答案提取读取最后一条 `thought`，否则最后一条 `observation`，

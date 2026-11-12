@@ -6,7 +6,7 @@ the branch ruleset's required checks and review requirements, documented in
 [CI merge gates](#ci-merge-gates) below. The standard full sweep is:
 
 ```bash
-pnpm verify    # build + typecheck + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
+pnpm verify    # build + typecheck (packages, apps, tests) + coverage + web lint + check:i18n + boundaries + check:deps + check:exports
 pnpm --filter @agentprism/web lint         # web ESLint, after UI code changes
 pnpm --filter @agentprism/web check:i18n   # web i18n gate, after frontend copy changes
 ```
@@ -20,7 +20,7 @@ pnpm --filter @agentprism/web check:i18n   # web i18n gate, after frontend copy 
 | Tests | `pnpm test`, root vitest | behavior | any suite failure |
 | Types | `pnpm typecheck` | whole-repo type safety | a type error; build packages first so cross-package resolution is fresh |
 | Lint | `pnpm --filter @agentprism/web lint`, ESLint 9 flat config in `apps/web/eslint.config.mjs` | web app lint discipline (Next.js core-web-vitals and typescript rules) | an ESLint error; warnings are advisory, and any rule carve-out carries its reason inline |
-| Export-test coverage | `pnpm check:exports`, from `scripts/check-export-tests.mjs` | every callable public export is referenced by a test harness file | a callable public export with no referencing test — delete it or test it |
+| Export-test coverage | `pnpm check:exports`, from `scripts/check-export-tests.mjs` | every callable public export is referenced by a test harness file, and the `PENDING` worklist stays honest in both directions | a callable public export with no referencing test (delete it or test it), a `PENDING` entry that now has a test, a `PENDING` entry that no longer resolves to an export, or (on the real workspace root) a `PENDING` package that has left the workspace — the stale line must be deleted |
 | i18n | `pnpm --filter @agentprism/web check:i18n` from `apps/web/scripts/check-i18n.mjs` | UI copy discipline | en and zh-CN catalog key parity fails, or inline CJK is found in `src/app` or `src/components`; comments and `console.*` are stripped, and lines marked `i18n-exempt` are skipped |
 
 The direction rules are listed in the `RULES` array in `scripts/check-boundaries.mjs`,
@@ -47,11 +47,13 @@ threads, and a branch that is up to date with `main`. Merging is squash-only.
 Two review bots comment on pull requests (CodeRabbit and Sourcery). Neither
 reports a required check. The docs-only path of the `ci.yml` diff classifier
 treats every `*.md` path, plus `.gitignore`, `.gitattributes`, and `LICENSE`,
-as docs-only and skips the build, test, and smoke jobs for those changes;
-workflow-lint is skipped too unless something under `.github/` changed — a
-Markdown edit there still triggers it. The `gate` job still runs — it passes
+as docs-only and skips the `verify` and `smoke` jobs for those changes;
+workflow-lint is skipped too unless something under `.github/` changed, or a
+gate script under `scripts/ci/` (which workflow-lint itself runs) — a Markdown
+edit under `.github/` still triggers it. The `gate` job still runs — it passes
 only when the checks that still run pass: the PR title convention, the path
-classification itself, and workflow-lint when the change touches `.github/`.
+classification itself, and workflow-lint when the change touches `.github/` or
+`scripts/ci/`.
 The security workflow has no path filtering at all: `security-gate` runs on
 every pull request, so a dependency-audit or secret-scan failure blocks a
 docs-only change exactly as it would a code change.

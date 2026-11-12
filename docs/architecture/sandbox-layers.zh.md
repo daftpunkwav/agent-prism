@@ -12,6 +12,14 @@
 | 2. 审批闸门 | `packages/sandbox`，`approval.ts` | `approval_mode: unless_trusted` 把 shell 工具限制为已知安全的只读命令 | `config.approval_mode`，baseline 字段 |
 | 3. OS 写沙箱 | `packages/environment`，`sandbox-launcher.ts` 与 `win-sandbox-helper.ts` | Windows restricted-token spawn，子进程只能在 workspace 根内写入 | `config.sandbox_mode: os`，baseline 字段 |
 
+第 1 层机制：程序名按裸程序匹配，因此带路径或 `.exe`/`.com` 后缀的名字
+（`/bin/rm`、`C:\Windows\System32\format.com`、`cmd.exe`）无法绕开 deny 规则。命令
+替换在双引号内也会被审查（`"$(rm -rf /)"` 仍会执行），POSIX shell 的 wrapper flag
+按簇匹配（`bash -lc '…'`），裸 `sudo` 与前导的 `NAME=value` 赋值对灾难性形态审查是
+透明的。只读 allowlist 刻意更严格：这些前缀会使命令失去已知安全资格
+（`PATH=… ls` 不算安全），而能通过参数写入或执行的 head 另带守卫（`find -exec`、
+`rg --pre`、`sort -o`、`git reflog expire` 等）。
+
 `beforeExecute` 链上的审查顺序见 `agent/src/tool-access.ts` 的
 `buildToolAccess`：调用方 hook，然后审批闸门，然后静态分析。OS 层不是审查步骤。
 它包裹 `process-runner.ts` 中通过审查者的实际 spawn，因此静态分析无法判断的命令，
