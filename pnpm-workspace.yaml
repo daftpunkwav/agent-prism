@@ -59,19 +59,30 @@ auditConfig:
   ignoreGhsas:
     - GHSA-vfj7-8cjw-p6xm
 
-# Security floors over transitive pins (pnpm overrides). The floors lift two
-# high advisories that the declaring packages' ranges do not reach on their own:
+# Security floors over transitive pins (pnpm overrides). The floors lift
+# advisories that the declaring packages' ranges do not reach on their own:
 # - sharp >=0.35.5 (GHSA-wq5f-xc86-pv6w, high): vulnerability in a librsvg
 #   dependency of the prebuilt binaries; arrives through next's optional
 #   dependency in apps/web (image optimization is the only consumer).
 # - @modelcontextprotocol/client >=2.2.0 (GHSA-6qxp-vccf-f47h, high): OAuth
 #   client could send credentials to an authorization server chosen by the
 #   MCP server; arrives via @openai/agents-core in the openai-agents driver.
+# - @typescript-eslint/typescript-estree>minimatch >=11.0.1 (GHSA-g3hv-75wg-m249,
+#   medium, CVE-2026-118764): attacker-controlled pattern amplification in
+#   firstPhasePreProcess() when optimizationLevel >= 2 (quadratic globParts
+#   growth in the second preprocessing phase). typescript-estree pins ^10.2.2,
+#   which caret semantics can never resolve into the patched 11.x line, so the
+#   override is scoped to that one consumer: a name-wide floor would also drag
+#   the six unrelated minimatch@3.1.5 consumers from 3.x to 11.x. The only
+#   minimatch@10 path in the tree is eslint tooling in apps/web (lint-time
+#   tsconfig glob matching), so the exposure is dev-tooling only.
 # Upper bounds keep a later lockfile re-resolution inside the consumers'
-# declared ranges (next pins ^0.35.4, @openai/agents-core a 2.x client), not
-# merely below a breaking major. Re-check both floors on any next or
-# @openai/agents bump, and drop them once the declaring packages reach the
+# declared ranges' breaking-major boundary (next pins ^0.35.4, @openai/
+# agents-core a 2.x client, minimatch below its next major), not merely below
+# a breaking major. Re-check the floors on any next, @openai/agents, or
+# @typescript-eslint bump, and drop them once the declaring packages reach the
 # patched ranges on their own.
 overrides:
   sharp: ">=0.35.5 <0.36"
   '@modelcontextprotocol/client': ">=2.2.0 <3"
+  '@typescript-eslint/typescript-estree>minimatch': ">=11.0.1 <12"
