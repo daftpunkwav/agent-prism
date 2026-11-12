@@ -11,7 +11,7 @@ import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } fro
 import { WorkspaceError } from "@agentprism/environment";
 
 import { boundText } from "./spill.js";
-import { asWorkspaceView } from "./workspace-view.js";
+import { asWorkspaceView, normalizeBasePath } from "./workspace-view.js";
 
 export const GLOB_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -145,7 +145,7 @@ async function executeGlob(workspace: ToolWorkspace, args: ToolArgs): Promise<To
     if (pattern === "") {
       return { result: "Error: pattern must not be empty", fileDiff: null, ok: false, code: "workspace_error" };
     }
-    const basePath = String(args.path ?? "");
+    const basePath = normalizeBasePath(args.path);
     // A malformed character class (e.g. [z-a]) makes new RegExp throw SyntaxError,
     // and a wildcard run above GLOB_MAX_UNBOUNDED_GROUPS throws RangeError; report
     // both as tool errors like grep does for invalid regexes instead of escaping
@@ -162,7 +162,15 @@ async function executeGlob(workspace: ToolWorkspace, args: ToolArgs): Promise<To
     let base = basePath;
     while (base.endsWith("/")) base = base.slice(0, -1);
     const basePrefix = base === "" ? "" : `${base}/`;
-    const files = view.fs.listFiles(basePath, { recursive: true }).filter((file) => matcher.test(file) || matcher.test(`${basePrefix}${file}`));
+    // listFiles reports paths relative to the WORKSPACE ROOT even when a base
+    // directory is searched, so a pattern written relative to that base
+    // ("*.ts" under path "src") must be tested against the path with the base
+    // prefix stripped — prepending it again ("src/" + "src/a.ts") never matched.
+    const files = view.fs.listFiles(basePath, { recursive: true }).filter((file) => {
+      if (matcher.test(file)) return true;
+      if (basePrefix === "" || !file.startsWith(basePrefix)) return false;
+      return matcher.test(file.slice(basePrefix.length));
+    });
     if (files.length === 0) {
       return { result: `No files match ${pattern}`, fileDiff: null, ok: true };
     }

@@ -11,9 +11,10 @@
  * Scope stays "irreversible destruction": known-safe is a read-only allowlist
  * consumed by approval flows, not a general safety oracle. Unclassifiable
  * commands fail open (they run), matching the documented safety-net stance.
- * PowerShell commands are parsed with POSIX quote rules; a PowerShell backtick
- * escape may therefore be treated as a command substitution and reviewed
- * recursively — fail-closed, never fail-open.
+ * Command substitutions are reviewed wherever a shell runs them, including
+ * inside double quotes. PowerShell commands are parsed with POSIX quote rules; a
+ * PowerShell backtick escape may therefore be treated as a command substitution
+ * and reviewed recursively — fail-closed, never fail-open.
  */
 
 import type { ToolArgs } from "@agentprism/contracts";
@@ -58,12 +59,46 @@ function matchParen(text: string, openIndex: number): number {
 }
 
 /**
+ * Consumes one `$(...)` or backtick substitution starting at `index`, pushing the
+ * inner command's segments for review, and returns the index just past it.
+ * Undefined when the character starts no substitution or the recursion cap is
+ * reached (the unquoted path fails open at the same cap, deliberately).
+ *
+ * The substitution does not join the surrounding word: the shell replaces it with
+ * output static analysis cannot know, and the inner segments carry the review.
+ * This holds inside double quotes too — a shell runs `"$(rm -rf /)"`.
+ */
+function consumeSubstitution(
+  command: string,
+  index: number,
+  platform: string,
+  depth: number,
+  segments: CommandSegment[],
+): number | undefined {
+  if (depth >= MAX_RECURSION_DEPTH) return undefined;
+  if (command[index] === "$" && command[index + 1] === "(") {
+    const close = matchParen(command, index + 1);
+    const inner = close === -1 ? command.slice(index + 2) : command.slice(index + 2, close);
+    segments.push(...parseShellCommand(inner, platform, depth + 1));
+    return close === -1 ? command.length : close + 1;
+  }
+  if (command[index] === "`") {
+    const end = command.indexOf("`", index + 1);
+    const inner = end === -1 ? command.slice(index + 1) : command.slice(index + 1, end);
+    segments.push(...parseShellCommand(inner, platform, depth + 1));
+    return end === -1 ? command.length : end + 1;
+  }
+  return undefined;
+}
+
+/**
  * Splits a command into segments on unquoted operators (`&&`, `||`, `;`, `|`,
  * `&`, newline), collecting redirections separately. Quotes and backslash
  * escapes are honored (`\` is a literal path separator on win32, not an
- * escape); `$(...)` and backtick substitutions are parsed recursively so
- * their inner commands are judged too. Unterminated quotes or substitutions
- * consume to end of input (the shell would reject them anyway).
+ * escape); `$(...)` and backtick substitutions are parsed recursively so their
+ * inner commands are judged too, both unquoted and inside double quotes (a
+ * shell executes those). Unterminated quotes or substitutions consume to end of
+ * input (the shell would reject them anyway).
  */
 export function parseShellCommand(command: string, platform: string = process.platform, depth = 0): CommandSegment[] {
   const segments: CommandSegment[] = [];
@@ -112,9 +147,16 @@ export function parseShellCommand(command: string, platform: string = process.pl
         if (command[i] === "\\" && DOUBLE_QUOTE_ESCAPABLES.has(command[i + 1] ?? "")) {
           if (command[i + 1] !== "\n") current += command[i + 1];
           i += 2;
-        } else {
-          current += command[i++];
+          continue;
         }
+        // A double quote suppresses word splitting, not command substitution:
+        // `"$(rm -rf /)"` still runs the substitution, so it is reviewed here too.
+        const substitutionEnd = consumeSubstitution(command, i, platform, depth, segments);
+        if (substitutionEnd !== undefined) {
+          i = substitutionEnd;
+          continue;
+        }
+        current += command[i++];
       }
       i++;
       continue;
@@ -129,20 +171,9 @@ export function parseShellCommand(command: string, platform: string = process.pl
       }
       continue;
     }
-    if (ch === "$" && command[i + 1] === "(" && depth < MAX_RECURSION_DEPTH) {
-      const close = matchParen(command, i + 1);
-      const inner = close === -1 ? command.slice(i + 2) : command.slice(i + 2, close);
-      segments.push(...parseShellCommand(inner, platform, depth + 1));
-      if (close === -1) break;
-      i = close + 1;
-      continue;
-    }
-    if (ch === "`" && depth < MAX_RECURSION_DEPTH) {
-      const end = command.indexOf("`", i + 1);
-      const inner = end === -1 ? command.slice(i + 1) : command.slice(i + 1, end);
-      segments.push(...parseShellCommand(inner, platform, depth + 1));
-      if (end === -1) break;
-      i = end + 1;
+    const substitutionEnd = consumeSubstitution(command, i, platform, depth, segments);
+    if (substitutionEnd !== undefined) {
+      i = substitutionEnd;
       continue;
     }
     if (ch === " " || ch === "\t") {
@@ -192,6 +223,33 @@ function stripSudo(words: ShellWord[]): ShellWord[] {
   return rest;
 }
 
+/** A leading `NAME=value` word: shell syntax for the command's environment, not the command. */
+const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+/**
+ * Prefixes that do not change *which* program the segment runs, for the
+ * destruction review only: bare `sudo` and leading environment assignments
+ * (`FOO=1 rm -rf /`). Launcher commands that need their own flag parsing
+ * (`env -i`, `timeout 5`, `xargs`) stay out of static reach, like the
+ * interpreter escapes documented above.
+ *
+ * Deliberately not used by the read-only allowlist: `PATH=... ls` or
+ * `LD_PRELOAD=... ls` changes what a "safe" head executes, so an assignment
+ * must keep a command out of the known-safe set.
+ */
+function stripTransparentPrefixes(words: ShellWord[]): ShellWord[] {
+  let rest = words;
+  for (;;) {
+    const head = rest[0];
+    if (head === undefined) return rest;
+    if (head.text.toLowerCase() === "sudo" || ENV_ASSIGNMENT.test(head.text)) {
+      rest = rest.slice(1);
+      continue;
+    }
+    return rest;
+  }
+}
+
 /** Short-flag probe over lowercased words (`-R` matches "r": chmod -R, rm -R). */
 function hasShortFlag(words: ShellWord[], letter: string): boolean {
   return words.some((w) => /^-/.test(w.text) && !w.text.startsWith("--") && w.text.toLowerCase().includes(letter));
@@ -207,12 +265,26 @@ const BLOCK_DEVICE_PREFIXES = ["/dev/sd", "/dev/hd", "/dev/nvme", "/dev/mmcblk",
 /** Registry hives whose bare-root deletion destroys the whole configuration store. */
 const REGISTRY_HIVE_ROOTS = new Set(["hklm", "hkcu"]);
 
+/**
+ * The program a word invokes, lowercased: path-qualified and `.exe`/`.com`
+ * suffixed forms (`/bin/rm`, `C:\Windows\System32\format.com`, `cmd.exe`) name
+ * the same program as the bare name, so a name-matching deny rule cannot be
+ * dodged by qualifying the path.
+ */
+function programName(word: string | undefined): string {
+  const lower = (word ?? "").toLowerCase();
+  const base = lower.slice(Math.max(lower.lastIndexOf("/"), lower.lastIndexOf("\\")) + 1);
+  return base.replace(/\.(exe|com)$/, "");
+}
+
 /** Interpreter heads that take a command string through a wrapper flag. */
 const INTERPRETER_HEADS = new Set(["bash", "sh", "dash", "zsh", "ksh", "cmd", "powershell", "pwsh"]);
 
 /** Wrapper flags per interpreter family: POSIX shells take exactly one word; cmd/PowerShell join the rest. */
-const POSIX_WRAPPER_FLAGS = new Set(["-c"]);
 const WIN_COMMAND_FLAGS = new Set(["-c", "/c", "-command"]);
+// A POSIX shell accepts clustered short flags, and a cluster containing `c`
+// carries the command string (`bash -lc 'rm -rf /'`, `sh -ec ...`).
+const POSIX_WRAPPER_FLAG = /^-[a-z]*c[a-z]*$/;
 // -encodedcommand/-enc/-e carry UTF-16LE base64. The payload is decoded and judged;
 // a payload that does not decode is blocked, because the real command is invisible.
 const WIN_ENCODED_FLAGS = new Set(["-encodedcommand", "-enc", "-e"]);
@@ -229,13 +301,15 @@ const ENCODED_COMMAND_BLOCK = "Blocked by sandbox policy: undecodable PowerShell
  */
 function reviewInterpreterWrapper(segment: CommandSegment, platform: string, depth: number): SandboxVerdict {
   if (depth >= MAX_RECURSION_DEPTH) return null;
-  const stripped = stripSudo(segment.words);
+  const stripped = stripTransparentPrefixes(segment.words);
   const lowered = stripped.map((w) => w.text.toLowerCase());
-  const head = lowered[0] ?? "";
+  // `cmd.exe` / `powershell.exe` / `/bin/bash` are the same wrappers as their bare names.
+  const head = programName(lowered[0]);
   if (!INTERPRETER_HEADS.has(head)) return null;
   const posixFamily = ["bash", "sh", "dash", "zsh", "ksh"].includes(head);
-  const wrapperFlags = posixFamily ? POSIX_WRAPPER_FLAGS : WIN_WRAPPER_FLAGS;
-  const flagIndex = lowered.findIndex((w, i) => i > 0 && wrapperFlags.has(w));
+  const isWrapperFlag = (word: string): boolean =>
+    posixFamily ? POSIX_WRAPPER_FLAG.test(word) : WIN_WRAPPER_FLAGS.has(word);
+  const flagIndex = lowered.findIndex((w, i) => i > 0 && isWrapperFlag(w));
   if (flagIndex === -1) return null;
   const rest = stripped.slice(flagIndex + 1);
   const flag = lowered[flagIndex] ?? "";
@@ -288,9 +362,9 @@ function reviewEncodedPowerShell(payload: string, platform: string, depth: numbe
  * devices, whole-hive registry deletion, and Windows drive formatting.
  */
 function reviewDestructiveSegment(segment: CommandSegment, platform: string): SandboxVerdict {
-  const rawWords = stripSudo(segment.words);
+  const rawWords = stripTransparentPrefixes(segment.words);
   const words = rawWords.map((w) => w.text.toLowerCase());
-  const head = words[0] ?? "";
+  const head = programName(words[0]);
 
   for (const { op, target } of segment.redirects) {
     if (op === "<") continue;
@@ -356,13 +430,11 @@ const SAFE_SIMPLE_HEADS = new Set([
   "head",
   "tail",
   "wc",
-  "file",
   "stat",
   "du",
   "df",
   "pwd",
   "ls",
-  "tree",
   "which",
   "type",
   "whereis",
@@ -371,11 +443,7 @@ const SAFE_SIMPLE_HEADS = new Set([
   "basename",
   "dirname",
   "grep",
-  "rg",
   "where",
-  "sort",
-  "uniq",
-  "diff",
   "cmp",
   "comm",
   "cut",
@@ -392,22 +460,69 @@ const SAFE_SIMPLE_HEADS = new Set([
   "sha512sum",
   "echo",
   "printf",
-  "date",
   "id",
   "whoami",
   "uname",
-  "hostname",
-  "env",
   "printenv",
   "sleep",
 ]);
 
 /**
+ * Short options accept attached values and cluster (`-s20200101`, `-Cm`,
+ * `-ofile`), so comparing whole words misses the very flag a guard rejects at a
+ * later stage. The scan is deliberately coarse and fails closed: a letter that
+ * only appears inside another option's attached value is rejected too, which
+ * costs a read-only spelling a normal approval, never containment.
+ */
+function shortOptionLetter(word: string, letters: string): boolean {
+  if (!word.startsWith("-") || word.startsWith("--")) return false;
+  for (const ch of word.slice(1)) {
+    if (letters.includes(ch)) return true;
+  }
+  return false;
+}
+
+/**
  * Heads that are safe only under argument constraints; a guard returns true
- * when the argument words keep the command read-only.
+ * when the argument words keep the command read-only. A guard must reject every
+ * form carrying a write or exec argument: false positives (a write waved
+ * through) are the one error class this allowlist cannot afford.
  */
 const HEAD_GUARDS: Record<string, (words: string[]) => boolean> = {
   find: (words) => !words.some((w) => /^-(delete|exec|execdir|ok|okdir|fls|fprint)/.test(w)),
+  // `env CMD` runs the first non-assignment argument; only the print-only forms are read-only.
+  // -S/--split-string takes a command string, attached or not (`env -S'rm x'`).
+  env: (words) =>
+    words.slice(1).every(
+      (w) =>
+        ENV_ASSIGNMENT.test(w) ||
+        (w.startsWith("-") && !shortOptionLetter(w, "S") && !w.startsWith("--split-string")),
+    ),
+  // --pre runs a program once per file.
+  rg: (words) => !words.some((w) => w.startsWith("--pre")),
+  // -C/--compile compiles the magic database to disk (clustered as `-Cm` too).
+  file: (words) => !words.some((w) => shortOptionLetter(w, "C") || w.startsWith("--compile")),
+  // -o/--output writes the listing to a file instead of stdout.
+  tree: (words) => !words.some((w) => shortOptionLetter(w, "o") || w.startsWith("--output")),
+  // -o writes a file, -T/--temporary-directory writes temp files, --compress-program runs a program.
+  sort: (words) =>
+    !words.some(
+      (w) =>
+        shortOptionLetter(w, "oT") ||
+        w.startsWith("--output") ||
+        w.startsWith("--temporary-directory") ||
+        w.startsWith("--compress-program"),
+    ),
+  // POSIX uniq takes an optional output file: uniq [input [output]].
+  uniq: (words) => words.slice(1).filter((w) => !w.startsWith("-")).length <= 1,
+  // -o/--output writes the patch to a file (attached as `-ofile`, clustered as `-no`).
+  diff: (words) => !words.some((w) => shortOptionLetter(w, "o") || w.startsWith("--output")),
+  // -s/--set changes the system clock (attached as `-s20200101`).
+  date: (words) => !words.some((w) => shortOptionLetter(w, "s") || w.startsWith("--set")),
+  // A bare operand sets the hostname; only the query flags are read-only. -F/--file
+  // sets it from a file (attached as `-F/tmp/names` or `--file=/tmp/names`).
+  hostname: (words) =>
+    words.slice(1).every((w) => w.startsWith("-") && !shortOptionLetter(w, "F") && !w.startsWith("--file")),
   git: (words) => isSafeGitInvocation(words.slice(1)),
   npm: (words) => ["ls", "ll", "list", "outdated"].includes(words[1] ?? ""),
   pnpm: (words) => ["ls", "ll", "list", "outdated"].includes(words[1] ?? ""),
@@ -417,7 +532,8 @@ const HEAD_GUARDS: Record<string, (words: string[]) => boolean> = {
   python3: (words) => words.every((w) => ["python3", "-V", "--version"].includes(w)),
   pip: (words) => ["list", "show", "--version"].includes(words[1] ?? ""),
   pip3: (words) => ["list", "show", "--version"].includes(words[1] ?? ""),
-  gcc: (words) => words.some((w) => w === "--version" || w === "-v"),
+  // -v means verbose, not version-only: `gcc -v main.c` compiles (and writes a.out).
+  gcc: (words) => words.every((w) => w === "gcc" || w === "--version" || w === "-v"),
   rustc: (words) => words.includes("--version"),
   tsc: (words) => words.includes("--version"),
   go: (words) => words[1] === "version",
@@ -470,6 +586,9 @@ function isSafeGitInvocation(args: string[]): boolean {
       return args.length <= 1 || args.slice(1).every((w) => w === "-l" || w === "-n" || w === "--list");
     case "stash":
       return args[1] === "list";
+    case "reflog":
+      // `expire` and `delete` rewrite the reflog; only listing it is read-only.
+      return args.length === 1 || args[1] === "show";
     default:
       return true;
   }

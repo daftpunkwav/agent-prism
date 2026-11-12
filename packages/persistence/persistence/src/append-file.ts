@@ -59,8 +59,10 @@ export class NodeAppendFile implements AppendFile {
   append(lines: string[]): Promise<void> {
     const payload = lines.map((line) => `${line}\n`).join("");
     return enqueue(this.filePath, async () => {
-      await mkdir(dirname(this.filePath), { recursive: true });
-      await appendFile(this.filePath, payload, "utf-8");
+      // Owner-only creation: journals carry prompts and answers, and the data
+      // directory may sit on a shared POSIX host. On Windows the mode is ignored.
+      await mkdir(dirname(this.filePath), { recursive: true, mode: 0o700 });
+      await appendFile(this.filePath, payload, { encoding: "utf-8", mode: 0o600 });
     });
   }
 
@@ -81,9 +83,9 @@ export class NodeAppendFile implements AppendFile {
   rewrite(lines: string[]): Promise<void> {
     const payload = lines.map((line) => `${line}\n`).join("");
     return enqueue(this.filePath, async () => {
-      await mkdir(dirname(this.filePath), { recursive: true });
+      await mkdir(dirname(this.filePath), { recursive: true, mode: 0o700 });
       const tmp = `${this.filePath}.tmp`;
-      await writeFile(tmp, payload, "utf-8");
+      await writeFile(tmp, payload, { encoding: "utf-8", mode: 0o600 });
       await rename(tmp, this.filePath);
     });
   }

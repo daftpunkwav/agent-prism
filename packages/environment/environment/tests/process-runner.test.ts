@@ -4,7 +4,7 @@
  *
  * Responsibilities:
  * - Still produce output and exit when a grandchild holds the pipes
- * - Pin UTF-8-first decoding with the GBK fallback, plus abort semantics
+ * - Pin UTF-8-first decoding with the GBK fallback, plus abort/timeout semantics
  * - Lock background job lifecycle, repeatable kill, and persistent shell state
  */
 
@@ -114,6 +114,20 @@ describe("runProcess outcome kinds", { retry: 1 }, () => {
       timeoutSeconds: 1,
     });
     // The kill lands at ~1s; kind is timeout, never ok or error.
+    expect(result.kind).toBe("timeout");
+    expect(result.exitCode).toBeNull();
+  });
+});
+
+describe.skipIf(process.platform === "win32")("runProcess SIGTERM trap (POSIX)", { retry: 1 }, () => {
+  it("reports a timeout when the child traps SIGTERM and exits zero", async () => {
+    // A process that handles SIGTERM by exiting cleanly still ran past its budget:
+    // killing a run must never surface as success.
+    const result = await runProcess({
+      argv: [process.execPath, "-e", "process.on('SIGTERM', () => process.exit(0)); setTimeout(() => {}, 30000)"],
+      cwd: process.cwd(),
+      timeoutSeconds: 1,
+    });
     expect(result.kind).toBe("timeout");
     expect(result.exitCode).toBeNull();
   });

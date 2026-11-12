@@ -13,7 +13,7 @@ import { ConfigurationError } from "@agentprism/contracts";
 import { HumanMessage } from "@langchain/core/messages";
 import { createChatModel } from "./model-factory.js";
 import type { EndpointCatalog } from "@agentprism/provider-catalog";
-import { endpointUpdateToEntity } from "@agentprism/provider-catalog";
+import { endpointUpdateToEntity, resolveCredentialReference } from "@agentprism/provider-catalog";
 
 export type { ConnectionTestTarget };
 
@@ -123,6 +123,10 @@ export async function testProviderConnection(
   if (endpoint.api_key === "") {
     return { ok: false, message: "Please provide an API Key first", model: endpoint.model };
   }
+  // The failure detail is redacted against both the stored value and its resolved
+  // form: a `${env:NAME}` reference resolves inside model construction, and an SDK
+  // error can echo the resolved secret (auth header) rather than the reference.
+  const resolvedApiKey = resolveCredentialReference(endpoint.api_key);
 
   try {
     const model = createChatModel({
@@ -150,6 +154,6 @@ export async function testProviderConnection(
     const snippet = extractSnippet(response.content);
     return { ok: true, message: `Connection succeeded: ${snippet || "ok"}`, model: endpoint.model };
   } catch (error) {
-    return { ok: false, message: `Connection failed: ${describeProbeError(error, [endpoint.api_key])}`, model: endpoint.model };
+    return { ok: false, message: `Connection failed: ${describeProbeError(error, [endpoint.api_key, resolvedApiKey])}`, model: endpoint.model };
   }
 }

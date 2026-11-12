@@ -52,6 +52,16 @@ function skillErrorStatus(error: unknown): 400 | 409 {
   return message.includes("read-only") || message.includes("already exists") ? 409 : 400;
 }
 
+/**
+ * Narrows a parsed JSON body to the plain object these hand-validated endpoints
+ * read fields from. A body that is null, an array, or a scalar is a malformed
+ * payload, not a server fault: treating it as an empty object makes the
+ * per-field checks answer 400 instead of crashing a property read into a 500.
+ */
+function requestBodyObject(raw: unknown): Record<string, unknown> {
+  return raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+}
+
 /** Registers the settings knob, memory, skill, and MCP routes. */
 export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps): void {
   const { runtimeKnobs, memoryStatus, skills, mcp } = deps;
@@ -75,7 +85,7 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
   if (skills !== undefined) {
     app.get("/api/settings/skills", (c) => c.json({ skills: skills.list() }));
     app.post("/api/settings/skills", async (c) => {
-      const body = (await readJsonRaw(c)) as Record<string, unknown>;
+      const body = requestBodyObject(await readJsonRaw(c));
       const name = typeof body.name === "string" ? body.name : "";
       const description = typeof body.description === "string" ? body.description : "";
       const bodyText = typeof body.body === "string" ? body.body : "";
@@ -87,7 +97,7 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
     });
     app.put("/api/settings/skills/:name", async (c) => {
       const name = c.req.param("name");
-      const body = (await readJsonRaw(c)) as Record<string, unknown>;
+      const body = requestBodyObject(await readJsonRaw(c));
       try {
         return c.json({
           skill: skills.update(name, {
@@ -108,7 +118,7 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
       }
     });
     app.put("/api/settings/skills/:name/enabled", async (c) => {
-      const body = (await readJsonRaw(c)) as Record<string, unknown>;
+      const body = requestBodyObject(await readJsonRaw(c));
       if (typeof body.enabled !== "boolean") return c.json({ detail: "enabled must be a boolean" }, 400);
       try {
         skills.setEnabled(c.req.param("name"), body.enabled);
@@ -121,7 +131,7 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
   if (mcp !== undefined) {
     app.get("/api/settings/mcp", (c) => c.json({ servers: mcp.list() }));
     app.put("/api/settings/mcp", async (c) => {
-      const body = (await readJsonRaw(c)) as Record<string, unknown>;
+      const body = requestBodyObject(await readJsonRaw(c));
       if (!Array.isArray(body.servers)) return c.json({ detail: "servers must be an array" }, 400);
       try {
         return c.json({ servers: mcp.replace(body.servers) });

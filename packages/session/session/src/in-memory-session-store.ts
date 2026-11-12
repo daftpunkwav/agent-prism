@@ -39,11 +39,37 @@ export class InMemorySessionStore implements SessionStore {
   private readonly records = new Map<string, SessionRecord>();
   private readonly entries = new Map<string, SessionEntry[]>();
   private readonly blobs: SessionBlobStore;
+  /**
+   * Per-session serial tail for async appends. The store has no IO port, so this
+   * map is its whole synchronization surface: appending awaits the blob sidecar,
+   * and two appends interleaving that await would both read `list.length` and
+   * claim the same seq (the durable backends serialize the same way).
+   */
+  private readonly appendQueues = new Map<string, Promise<void>>();
 
   constructor(deps: SessionStoreDeps & { blobs?: SessionBlobStore }) {
     this.idGenerator = deps.idGenerator;
     this.clock = deps.clock;
     this.blobs = deps.blobs ?? new InMemoryBlobStore();
+  }
+
+  /** Queues `task` behind every append already started for one session. */
+  private enqueueAppend<T>(sessionId: string, task: () => Promise<T>): Promise<T> {
+    const tail = this.appendQueues.get(sessionId) ?? Promise.resolve();
+    // The same handler on both settle paths: a rejected predecessor must not
+    // swallow the next task (its own caller already saw the rejection).
+    const result = tail.then(task, task);
+    const settled = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.appendQueues.set(sessionId, settled);
+    // Forget the entry once nothing is queued behind it (session ids are
+    // unbounded over a process lifetime).
+    void settled.then(() => {
+      if (this.appendQueues.get(sessionId) === settled) this.appendQueues.delete(sessionId);
+    });
+    return result;
   }
 
   /** Creates an active session; rejects blank titles and a full store (contract: SessionStore). */
@@ -110,25 +136,27 @@ export class InMemorySessionStore implements SessionStore {
     sessionId: string,
     entry: { kind: SessionEntry["kind"]; content: string },
   ): Promise<SessionEntry> {
-    const record = this.require(sessionId);
-    const content = entry.content.trim();
-    if (content === "") throw new SessionValidationError("entry content must be non-empty");
-    const list = this.entries.get(sessionId) ?? [];
-    if (list.length >= MAX_ENTRIES_PER_SESSION) {
-      throw new SessionValidationError(`session holds the cap of ${MAX_ENTRIES_PER_SESSION} entries`);
-    }
-    const stored: SessionEntry = {
-      sessionId,
-      seq: list.length,
-      at: this.clock.now(),
-      kind: entry.kind,
-      content: await spillOversizedEntry(this.blobs, sessionId, list.length, content),
-    };
-    list.push(stored);
-    this.entries.set(sessionId, list);
-    record.entryCount = list.length;
-    record.updatedAt = stored.at;
-    return { ...stored };
+    return this.enqueueAppend(sessionId, async () => {
+      const record = this.require(sessionId);
+      const content = entry.content.trim();
+      if (content === "") throw new SessionValidationError("entry content must be non-empty");
+      const list = this.entries.get(sessionId) ?? [];
+      if (list.length >= MAX_ENTRIES_PER_SESSION) {
+        throw new SessionValidationError(`session holds the cap of ${MAX_ENTRIES_PER_SESSION} entries`);
+      }
+      const stored: SessionEntry = {
+        sessionId,
+        seq: list.length,
+        at: this.clock.now(),
+        kind: entry.kind,
+        content: await spillOversizedEntry(this.blobs, sessionId, list.length, content),
+      };
+      list.push(stored);
+      this.entries.set(sessionId, list);
+      record.entryCount = list.length;
+      record.updatedAt = stored.at;
+      return { ...stored };
+    });
   }
 
   /** Newest-first entries for one session (unknown sessions throw). */

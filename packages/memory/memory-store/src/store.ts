@@ -71,7 +71,13 @@ export class MemoryStore<T extends { id: string }> {
     if (!this.file) return;
     let persisted: T[];
     try {
-      persisted = this.file.read<T[]>() ?? [];
+      const raw = this.file.read<T[]>();
+      if (raw !== null && !Array.isArray(raw)) {
+        // Valid JSON of the wrong shape (hand-edited file, foreign version) must not
+        // crash construction: an unreadable store starts empty, loudly.
+        console.warn("[memory-store] persisted items are not an array; starting empty");
+      }
+      persisted = Array.isArray(raw) ? raw : [];
     } catch (error) {
       console.warn(`[memory-store] Failed to read persisted items: ${error instanceof Error ? error.message : String(error)}`);
       return;

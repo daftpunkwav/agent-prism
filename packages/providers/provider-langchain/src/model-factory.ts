@@ -158,10 +158,18 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
         // crash the SDK converter; normalize them at the transport seam.
         ...(apiFormat === "openai_responses" ? { fetch: createResponsesCompatFetch() } : {}),
       },
-      ...(overrides.topP !== undefined ? { top_p: overrides.topP } : {}),
-      ...(overrides.frequencyPenalty !== undefined ? { frequency_penalty: overrides.frequencyPenalty } : {}),
-      ...(overrides.presencePenalty !== undefined ? { presence_penalty: overrides.presencePenalty } : {}),
-      ...(thinking?.reasoningEffort !== undefined ? { reasoning_effort: thinking.reasoningEffort } : {}),
+      // LangChain's ChatOpenAI reads camelCase constructor fields; snake_case keys
+      // typecheck only because the field objects are spread, and are silently
+      // dropped at runtime (so a configured top_p/penalty never reached the wire).
+      ...(overrides.topP !== undefined ? { topP: overrides.topP } : {}),
+      ...(overrides.frequencyPenalty !== undefined ? { frequencyPenalty: overrides.frequencyPenalty } : {}),
+      ...(overrides.presencePenalty !== undefined ? { presencePenalty: overrides.presencePenalty } : {}),
+      // Thinking effort rides modelKwargs: the SDK's own `reasoning` mapping only
+      // fires for OpenAI's own model-name patterns, while this repo drives vendor
+      // endpoints that must still receive the configured level verbatim.
+      ...(thinking?.reasoningEffort !== undefined
+        ? { modelKwargs: { reasoning_effort: thinking.reasoningEffort } }
+        : {}),
     });
   }
 

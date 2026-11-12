@@ -1,6 +1,6 @@
 # `@agentprism/http-runtime`
 
-HTTP shell: `createHttpApplication(deps)` (CORS, body-size precheck, API-token auth, health checks, error mapping), the shared route pipeline (`HttpApp` type, `assertBodySize`, `readJsonRaw`/`parseJsonBody`), and the `HttpApplicationDeps` dependency port. Mounts no domain routes; the composition root does the assembly.
+HTTP shell: `createHttpApplication(deps)` (DNS-rebinding Host guard, CORS allowlist, cross-site state-change guard, streaming-enforced body-size limits, API-token auth, health checks, error mapping), the shared route pipeline (`HttpApp` type, `assertBodySize`, `readJsonRaw`/`parseJsonBody`), and the `HttpApplicationDeps` dependency port. Mounts no domain routes; the composition root does the assembly.
 
 ## Dependencies
 

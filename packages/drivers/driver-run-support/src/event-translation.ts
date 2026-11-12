@@ -162,12 +162,14 @@ export function emitToolOutcomeEvents(
     }
     if (emitted < chunkCount) {
       // Loud truncation: the dropped tail is reported, never silently swallowed.
+      // No "full output in the observation" pointer: observations are capped at
+      // OBSERVATION_MAX_CHARS (8 000), so the full text is not retrievable there.
       events.push(
         eventOf({
           type: "tool_progress",
           pipeline,
           step,
-          content: `…(stream preview truncated at ${emitted * 400} of ${result.length} chars; full output in the observation)`,
+          content: `…(stream preview truncated at ${emitted * 400} of ${result.length} chars)`,
           workspace: workspaceName,
         }),
       );

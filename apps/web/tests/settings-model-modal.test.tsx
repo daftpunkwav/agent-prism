@@ -89,6 +89,31 @@ describe("ModelModal draft handling", () => {
     expect(saveButton().disabled).toBe(true);
   });
 
+  it("rejects token budgets beyond the endpoint schema instead of submitting them", () => {
+    // Regression: the modal had only minima, so an over-ceiling value was committed and
+    // the server answered the whole save with a 422 (endpoint max: 10M context/input,
+    // 128K output).
+    const { onSave } = renderModal();
+    const initial = blankModel();
+    const context = screen.getByDisplayValue(String(initial.context_window));
+    fireEvent.change(context, { target: { value: "10000001" } });
+    fireEvent.blur(context);
+    const maxInput = screen.getByDisplayValue(String(initial.max_input_tokens));
+    fireEvent.change(maxInput, { target: { value: "10000001" } });
+    fireEvent.blur(maxInput);
+    const maxOutput = screen.getByDisplayValue(String(initial.max_output_tokens));
+    fireEvent.change(maxOutput, { target: { value: "200000" } });
+    fireEvent.blur(maxOutput);
+    // Each rejected edit flags itself in place…
+    expect(screen.getAllByRole("alert").length).toBe(3);
+    // …and never reaches the draft the modal saves.
+    fireEvent.click(saveButton());
+    const saved = onSave.mock.calls[0]?.[0] as ModelSlot;
+    expect(saved.context_window).toBe(initial.context_window);
+    expect(saved.max_input_tokens).toBe(initial.max_input_tokens);
+    expect(saved.max_output_tokens).toBe(initial.max_output_tokens);
+  });
+
   it("closes when the backdrop is clicked", () => {
     const { onClose } = renderModal();
     // The backdrop shares its aria-label with the header close button.

@@ -9,7 +9,7 @@
 
 import type { ToolArgs, ToolDefinition, ToolExecutionResult, ToolWorkspace } from "@agentprism/contracts";
 import { WorkspaceError } from "@agentprism/environment";
-import { asWorkspaceView } from "./workspace-view.js";
+import { asWorkspaceView, normalizeBasePath } from "./workspace-view.js";
 import { boundText } from "./spill.js";
 
 export const LS_JSON_SCHEMA: Record<string, unknown> = {
@@ -24,7 +24,7 @@ export const LS_JSON_SCHEMA: Record<string, unknown> = {
 async function executeLs(workspace: ToolWorkspace, args: ToolArgs): Promise<ToolExecutionResult> {
   try {
     const view = asWorkspaceView(workspace);
-    const dirPath = String(args.path ?? "");
+    const dirPath = normalizeBasePath(args.path);
     const recursive = Boolean(args.recursive);
     if (dirPath === "" && recursive) {
       return { result: boundText(workspace, "ls", view.fs.fileTree(view.name)), fileDiff: null, ok: true };

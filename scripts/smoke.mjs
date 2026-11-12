@@ -19,8 +19,29 @@ const BASE_URL = (
   process.env.SMOKE_BASE_URL ??
   `http://${process.env.SMOKE_HOST ?? "127.0.0.1"}:${process.env.SMOKE_PORT ?? "8281"}`
 ).replace(/\/+$/, "");
-const READY_TIMEOUT_MS = Number.parseInt(process.env.SMOKE_TIMEOUT_MS ?? "30000", 10);
-const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.SMOKE_REQUEST_TIMEOUT_MS ?? "5000", 10);
+
+/**
+ * Reads a positive-integer millisecond override.
+ *
+ * The whole string must be digits: `Number.parseInt` reads a leading prefix, so
+ * `1e5` would silently become 1 ms (and `30000ms` would pass as 30000), turning
+ * a typo into a confusing readiness failure. An invalid value fails fast instead
+ * of flowing into the deadline math at all.
+ */
+function positiveIntEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const text = raw.trim();
+  const value = Number(text);
+  if (!/^\d+$/.test(text) || !Number.isSafeInteger(value) || value <= 0) {
+    console.error(`[smoke] invalid ${name}=${JSON.stringify(raw)}; expected a positive integer (milliseconds)`);
+    process.exit(1);
+  }
+  return value;
+}
+
+const READY_TIMEOUT_MS = positiveIntEnv("SMOKE_TIMEOUT_MS", 30_000);
+const REQUEST_TIMEOUT_MS = positiveIntEnv("SMOKE_REQUEST_TIMEOUT_MS", 5_000);
 const READY_POLL_MS = 500;
 const API_TOKEN = process.env.SMOKE_API_TOKEN ?? "";
 

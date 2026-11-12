@@ -170,6 +170,36 @@ describe("JsonlSessionStore log replay", () => {
     }
   });
 
+  it("counts JSON-valid but type-corrupt ops instead of poisoning state", async () => {
+    const { store, cleanup } = backendWithLog([
+      createOp("s-ok"),
+      createOp("s-nullmeta"),
+      // `at` must be a finite number: a string would poison ordering/updatedAt.
+      JSON.stringify({ op: "create", id: "s-bad-at", at: "soon" }),
+      // `seq` must be a non-negative integer once present.
+      JSON.stringify({ op: "entry", sessionId: "s-ok", at: 1_100, seq: 1.5, content: "bad seq" }),
+      JSON.stringify({ op: "entry", sessionId: "s-ok", at: 1_100, seq: -1, content: "bad seq" }),
+      // `metadata` must be a plain object where the op carries it.
+      JSON.stringify({ op: "complete", id: "s-ok", at: 1_200, summary: "blocked", metadata: "oops" }),
+      // An op id that is not a string cannot address anything.
+      JSON.stringify({ op: "delete", id: 7 }),
+      JSON.stringify({ op: "entry", sessionId: "s-ok", at: 1_300, content: "good" }),
+      // A null/absent metadata payload stays tolerated (legacy writers).
+      JSON.stringify({ op: "complete", id: "s-nullmeta", at: 1_250, summary: "kept", metadata: null }),
+    ]);
+    try {
+      const target = store();
+      await target.list({});
+      expect(target.corruptLines()).toBe(5);
+      // The valid create/entry/complete lines still applied; the corrupt complete never did.
+      await expect(target.get("s-ok")).resolves.toMatchObject({ id: "s-ok", status: "failed", entryCount: 1 });
+      await expect(target.get("s-nullmeta")).resolves.toMatchObject({ status: "completed", summary: "kept" });
+      await expect(target.get("s-bad-at")).resolves.toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
   it("caps replayed sessions and entries instead of growing past the limits", async () => {
     const creates = Array.from({ length: MAX_SESSIONS_PER_STORE + 1 }, (_v, i) => createOp(`s-${i}`));
     const entries = Array.from({ length: MAX_ENTRIES_PER_SESSION + 1 }, (_v, i) => ({

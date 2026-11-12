@@ -163,6 +163,16 @@ export function BuilderClient() {
   // window listeners must go with it.
   useEffect(() => () => teardownRef.current?.(), []);
 
+  // Navigating away must not leave an in-flight turn streaming against an unmounted
+  // shell: abort the local SSE read (parity with the arena stream's unmount stop).
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    },
+    [],
+  );
+
   // Load the active session's composition, history, and persisted execution trail.
   useEffect(() => {
     if (activeId === null) {

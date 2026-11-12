@@ -540,6 +540,63 @@ describe("BuilderService.chatTurn", () => {
     harness.release();
     await collect(generator);
   });
+
+  it("releases the run slot when the consumer detaches after the first chunk", async () => {
+    // The SSE route returns the iterator as soon as the client is gone; the first
+    // chunk is yielded before the driver starts, so cleanup must cover it too.
+    const harness = makeDriverHarness(["fake"]);
+    const sessions = makeSessionLedger();
+    const service = makeService(harness, sessions);
+    const view = service.createSession(BuilderCreateRequestSchema.parse({ name: "Detach", composition: { framework: "fake" } }));
+
+    const generator = service.chatTurn(view.id, "first");
+    const first = await generator.next();
+    expect(first.done).toBe(false);
+    expect(first.value).toMatchObject({ stream: "trace" });
+    await generator.return(undefined);
+
+    // The abandoned turn must not hold the slot: the next turn runs instead of 409.
+    expect(service.abortTurn(view.id)).toBe(false);
+    const { chunks } = await collect(service.chatTurn(view.id, "second"));
+    expect(chunks.at(-1)).toMatchObject({ stream: "turn" });
+    const detail = await service.getSessionDetail(view.id);
+    expect(detail.session.running).toBe(false);
+    expect(detail.session.turn_count).toBe(1);
+    // The ledger mirrors the session: the abandoned row is closed, never left active.
+    const rows = await sessions.listSessions({ kind: "builder" });
+    expect(rows).toHaveLength(2);
+    expect(rows.filter((row) => row.status === "active")).toEqual([]);
+  });
+
+  it("releases the run slot when a /compact consumer detaches after the first chunk", async () => {
+    const harness = makeDriverHarness(["fake"]);
+    const service = makeService(harness);
+    const view = service.createSession(BuilderCreateRequestSchema.parse({ composition: { framework: "fake" } }));
+    await collect(service.chatTurn(view.id, "seed"));
+
+    const generator = service.compactTurn(view.id);
+    const first = await generator.next();
+    expect(first.value).toMatchObject({ stream: "trace" });
+    await generator.return(undefined);
+
+    const { chunks } = await collect(service.chatTurn(view.id, "after"));
+    expect(chunks.at(-1)).toMatchObject({ stream: "turn" });
+    expect((await service.getSessionDetail(view.id)).session.running).toBe(false);
+  });
+
+  it("does not apply the name half of a rejected patch", async () => {
+    const harness = makeDriverHarness(["fake"]);
+    const service = makeService(harness);
+    const view = service.createSession(BuilderCreateRequestSchema.parse({ name: "Original", composition: { framework: "fake" } }));
+    expect(() =>
+      service.patchComposition(
+        view.id,
+        BuilderPatchRequestSchema.parse({ name: "Renamed", composition: { framework: "ghost" } }),
+      ),
+    ).toThrow(BuilderError);
+    // One status code, one outcome: the rejected request changed nothing at all.
+    expect((await service.getSessionDetail(view.id)).session.name).toBe("Original");
+  });
 });
 
 describe("BuilderService execution ledger", () => {

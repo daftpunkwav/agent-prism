@@ -52,6 +52,49 @@ describe("webSearchTool", () => {
     });
   });
 
+  it("maps the real AbortSignal.timeout rejection (TimeoutError) to the timeout message", async () => {
+    // Node aborts an AbortSignal.timeout with a DOMException named "TimeoutError", not
+    // "AbortError": without that branch a real timeout surfaced as "search request failed".
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    }) as typeof fetch;
+    try {
+      await withEnv(
+        { SEARCH_PROVIDER: "exa", SEARCH_API_KEY: "k", SEARCH_API_URL: "https://search.test/api" },
+        async () => {
+          const out = await webSearchTool.execute(workspace, { query: "prism" });
+          expect(out.ok).toBe(false);
+          expect(out.result).toContain("search timed out");
+        },
+      );
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("reports caller cancellation as aborted, not as a timeout", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new DOMException("Aborted", "AbortError");
+    }) as typeof fetch;
+    try {
+      await withEnv(
+        { SEARCH_PROVIDER: "exa", SEARCH_API_KEY: "k", SEARCH_API_URL: "https://search.test/api" },
+        async () => {
+          const out = await webSearchTool.execute(workspace, { query: "prism" }, controller.signal);
+          expect(out.ok).toBe(false);
+          expect(out.code).toBe("aborted");
+          expect(out.result).toBe("Error: aborted");
+        },
+      );
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   it("round-trips an exa-shaped localhost backend", async () => {
     const server = createServer((req, res) => {
       expect(req.headers["x-api-key"]).toBe("test-key");

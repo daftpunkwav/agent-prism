@@ -19,6 +19,7 @@
 
 import type { AgentDriver, ArenaEvent, LlmAssistantMessage, LlmMessage, ToolDefinition } from "@agentprism/contracts";
 import {
+  ConfigurationError,
   PIPELINE_BANNER_PREFIX,
   arenaErrorEvent,
   completeEvent,
@@ -111,7 +112,7 @@ async function* selectSpeaker(
     const prepared = applyContextPipeline(
       [...messages, { role: "user", content: speakerSelectionPrompt(lastSpeaker) }],
       config.context,
-      { retrieveSnippets, ...context.contextTuning },
+      { retrieveSnippets, analytics: context.contextAnalytics, ...context.contextTuning },
     );
     const result = await context.llm.invoke(prepared, { signal: context.signal });
     text = result.text;
@@ -155,7 +156,7 @@ async function* streamSpeakerTurn(
   const prepared = applyContextPipeline(
     [...messages, { role: "user", content: roleInstruction }],
     config.context,
-    { retrieveSnippets, ...context.contextTuning },
+    { retrieveSnippets, analytics: context.contextAnalytics, ...context.contextTuning },
   );
   const definitions = bindTools && toolDefinitions.length > 0 ? toolDefinitions : undefined;
   stats.step += 1;
@@ -212,7 +213,10 @@ export class AutogenDriver implements AgentDriver {
       return;
     }
     if (runtime === "python") {
-      throw new Error(
+      // ConfigurationError, not a plain Error: the message is authored for the
+      // operator (install hint + README) and the sanitizer passes it through to
+      // the client, whereas a plain Error would surface as "Error".
+      throw new ConfigurationError(
         "ARENA_AUTOGEN_RUNTIME=python requires a Python interpreter with the autogen-agentchat package " +
           "(pip install -r packages/drivers/driver-autogen/python/requirements.txt); " +
           "see packages/drivers/driver-autogen/README.md",

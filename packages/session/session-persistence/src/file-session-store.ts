@@ -77,6 +77,33 @@ export const PersistedFileSchema = z.object({
   sessions: z.array(PersistedSessionItemSchema),
 });
 
+/**
+ * Parses a persisted whole-state document with per-item containment: a corrupt
+ * session drops alone, so one bad record can never wipe the rest of the ledger
+ * (a whole-file parse did exactly that). Null when the document carries no
+ * sessions array at all — the caller then starts empty / replays the log.
+ * Shared by both durable backends so they lose the same amount to corruption.
+ */
+export function persistedSessions(raw: unknown): { items: PersistedSessionItem[]; dropped: number } | null {
+  // Fast path: the whole document validates (the common case), one parse pass.
+  const strict = PersistedFileSchema.safeParse(raw);
+  if (strict.success) return { items: strict.data.sessions, dropped: 0 };
+  if (typeof raw !== "object" || raw === null || !Array.isArray((raw as { sessions?: unknown }).sessions)) {
+    return null;
+  }
+  const items: PersistedSessionItem[] = [];
+  let dropped = 0;
+  for (const item of (raw as { sessions: unknown[] }).sessions) {
+    const parsed = PersistedSessionItemSchema.safeParse(item);
+    if (!parsed.success) {
+      dropped += 1;
+      continue;
+    }
+    items.push({ record: { ...parsed.data.record }, entries: [...parsed.data.entries] });
+  }
+  return { items, dropped };
+}
+
 /** FileSessionStore construction ports (JsonFile keeps business code off disk IO). */
 export interface FileSessionStoreDeps {
   file: JsonFile;
@@ -272,30 +299,17 @@ export class FileSessionStore implements SessionStore {
       return;
     }
     if (raw === null) return;
-    const parsed = PersistedFileSchema.safeParse(raw);
-    if (parsed.success) {
-      this.loadItems(parsed.data.sessions);
-      return;
-    }
-    // Tolerant fallback: keep every well-formed session even when siblings are corrupt.
-    if (typeof raw !== "object" || raw === null || !Array.isArray((raw as { sessions?: unknown }).sessions)) {
+    const persisted = persistedSessions(raw);
+    if (persisted === null) {
       console.warn("[session-store] session file schema mismatch, starting empty");
       return;
     }
-    const sessions = (raw as { sessions: unknown[] }).sessions;
-    let dropped = 0;
-    const kept: { record: SessionRecord; entries: SessionEntry[] }[] = [];
-    for (const item of sessions) {
-      const single = PersistedSessionItemSchema.safeParse(item);
-      if (!single.success) {
-        dropped += 1;
-        continue;
-      }
-      kept.push({ record: { ...single.data.record }, entries: [...single.data.entries] });
+    if (persisted.dropped > 0) {
+      console.warn(
+        `[session-store] session file partially corrupt: kept ${persisted.items.length}, dropped ${persisted.dropped}`,
+      );
     }
-    console.warn(`[session-store] session file partially corrupt: kept ${kept.length}, dropped ${dropped}`);
-    if (kept.length === 0) return;
-    this.loadItems(kept);
+    this.loadItems(persisted.items);
   }
 
   /** Stores validated items with read-side caps and stale-active migration. */

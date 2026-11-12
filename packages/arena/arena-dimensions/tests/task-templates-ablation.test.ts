@@ -24,6 +24,26 @@ describe("ablation templates", () => {
     expect(getTemplate("orchestration_two_files")?.suggested_dimension).toBe("orchestration");
   });
 
+  it("scores the tool-combo regex template instead of rejecting its own pattern", () => {
+    const timeTemplate = getTemplate("time_until_midnight");
+    expect(timeTemplate?.judge.type).toBe("regex");
+    // The pattern must survive the ReDoS pre-filter and still match both unit forms.
+    expect(judgeAnswers({ a: "About 615 minutes remain." }, timeTemplate!.judge)["a"]?.passed).toBe(true);
+    expect(judgeAnswers({ a: "roughly 10.5 min left" }, timeTemplate!.judge)["a"]?.passed).toBe(true);
+    expect(judgeAnswers({ a: "noon, probably" }, timeTemplate!.judge)["a"]?.passed).toBe(false);
+  });
+
+  it("keeps every regex judge template runnable", () => {
+    // A template whose own pattern trips the ReDoS pre-filter can never score,
+    // silently turning a scored task into a guaranteed failure.
+    for (const template of listTemplates()) {
+      if (template.judge.type !== "regex") continue;
+      const result = judgeAnswers({ a: "0" }, template.judge)["a"];
+      expect(result?.reason ?? "", template.id).not.toContain("nested quantifier");
+      expect(result?.reason ?? "", template.id).not.toContain("Regex too long");
+    }
+  });
+
   it("judges the ablation templates deterministically", () => {
     const skill = getTemplate("skill_commit_format");
     const loop = getTemplate("loop_prime_race");

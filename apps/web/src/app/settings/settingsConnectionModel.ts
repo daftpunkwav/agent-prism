@@ -13,6 +13,32 @@ import { effectiveThinkingLevel, servableThinkingLevels } from "@agentprism/clie
 /** Displayed in place of a stored API key; never enters form state (empty means "keep stored"). */
 export const API_KEY_SENTINEL = "*".repeat(16);
 
+/**
+ * Field caps mirroring `LlmEndpointUpdateSchema` / `ProviderConfigUpdateSchema`
+ * (packages/contracts): the form must not let the operator type a value the server
+ * then rejects with a 422, so the same limits ride on the inputs themselves.
+ */
+export const CONNECTION_FIELD_LIMITS = {
+  provider_name: 100,
+  base_url: 500,
+  website_url: 500,
+  api_key: 4096,
+  label: 100,
+  model: 200,
+  notes: 500,
+} as const;
+
+/**
+ * Endpoint token-budget ceilings from `LlmEndpointUpdateSchema` (inclusive). The
+ * model dialog's number fields commit through these so a stray typed value is
+ * flagged in place instead of surfacing as a save-time 422.
+ */
+export const ENDPOINT_TOKEN_LIMITS = {
+  context_window: 10_000_000,
+  max_input_tokens: 10_000_000,
+  max_output_tokens: 128_000,
+} as const;
+
 /** Budget pairs exist only on anthropic_messages. Every other format stays on level mapping. */
 export function appliedThinkingMode(apiFormat: string, mode: string | undefined): "levels" | "budget" {
   return apiFormat === "anthropic_messages" && mode === "budget" ? "budget" : "levels";

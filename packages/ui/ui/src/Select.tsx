@@ -197,7 +197,11 @@ export function UiSelect({ value, onChange, options, disabled = false, ariaLabel
       event.preventDefault();
       closePopup(true);
     } else if (event.key === "Tab") {
-      setOpen(false);
+      // Close and hand focus back to the trigger: the default Tab must not run against
+      // a popup that unmounts in the same keystroke (focus would land on <body>, so a
+      // keyboard user loses their place). One more Tab then leaves the control normally.
+      event.preventDefault();
+      closePopup(true);
     }
   };
 

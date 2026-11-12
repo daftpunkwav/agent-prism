@@ -22,7 +22,7 @@ import { stripUnpairedToolTurns } from "./pair-safety.js";
 /** Default total character budget across the assembled messages. */
 export const TOKEN_BUDGET_CHARS = 24_000;
 
-/** Newest turns (plus pinned systems) never sacrificed, in message count. */
+/** Newest turns (plus pinned systems) never sacrificed, in message count; 0 pins none (everything but systems is droppable). */
 export const TOKEN_BUDGET_KEEP_TURNS = 6;
 
 function chars(message: LlmMessage): number {
@@ -50,15 +50,22 @@ export interface TokenBudgetOptions {
 export function applyTokenBudget(messages: LlmMessage[], options: TokenBudgetOptions = {}): LlmMessage[] {
   if (messages.length === 0) return [];
   const budget = options.budget ?? TOKEN_BUDGET_CHARS;
-  const keepTurns = options.keepTurns ?? TOKEN_BUDGET_KEEP_TURNS;
   const systems: LlmMessage[] = [];
   const rest: LlmMessage[] = [];
   for (const message of messages) {
     if (message.role === "system" && rest.length === 0) systems.push(message);
     else rest.push(message);
   }
-  const pinned = rest.slice(-keepTurns);
-  const candidates = rest.slice(0, -keepTurns);
+  // Normalize before slicing: `slice(-0)` is `slice(0)` (the whole list), so a
+  // 0 keepTurns — the settings knob allows 0 — would pin every message and
+  // silently disable the strategy. Clamped to the list length as well so an
+  // out-of-range knob can never make pinned and candidates overlap.
+  const requestedKeep = options.keepTurns ?? TOKEN_BUDGET_KEEP_TURNS;
+  const keepTurns = Number.isFinite(requestedKeep)
+    ? Math.min(rest.length, Math.max(0, Math.floor(requestedKeep)))
+    : Math.min(rest.length, TOKEN_BUDGET_KEEP_TURNS);
+  const pinned = keepTurns === 0 ? [] : rest.slice(-keepTurns);
+  const candidates = keepTurns === 0 ? rest : rest.slice(0, -keepTurns);
   const total = [...systems, ...rest].reduce((sum, message) => sum + chars(message), 0);
   if (total <= budget) return [...systems, ...rest];
   // Oldest-first within each priority tier: index asc, priority desc.
@@ -86,7 +93,14 @@ export function applyTokenBudget(messages: LlmMessage[], options: TokenBudgetOpt
             `[Budget ledger] dropped ${droppedCount} older message(s) to hold a ${budget}-char budget ` +
             `(tool results first, reasoning last). Re-read files with read/grep instead of guessing their content.`,
         }
-      : { role: "system", content: "[Budget ledger] transcript exceeds budget; no safe drop found, tail kept verbatim." };
+      : pinned.length > 0
+        ? { role: "system", content: "[Budget ledger] transcript exceeds budget; no safe drop found, tail kept verbatim." }
+        : {
+            role: "system",
+            content:
+              "[Budget ledger] transcript exceeds budget; every droppable message was cut and the required " +
+              "system text alone exceeds it.",
+          };
   // Dropping can orphan a leading tool result whose assistant turn was cut;
   // providers reject orphan tool messages, so strip them after the ledger line.
   const tail = [...kept, ...pinned];

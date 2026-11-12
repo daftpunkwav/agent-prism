@@ -253,6 +253,64 @@ describe("createChatModel decode passthrough", () => {
       expect((model as unknown as { temperature?: number }).temperature).toBe(0.7);
     }
   });
+
+  it("sends top_p / frequency_penalty / presence_penalty through the OpenAI SDK fields", () => {
+    const model = createChatModel({
+      provider: fixture("openai_chat"),
+      overrides: { topP: 0.4, frequencyPenalty: -0.5, presencePenalty: 0.6 },
+    });
+    const openai = model as unknown as {
+      topP?: number;
+      frequencyPenalty?: number;
+      presencePenalty?: number;
+      invocationParams: (options: unknown) => Record<string, unknown>;
+    };
+    // The SDK reads camelCase fields; snake_case keys are silently dropped, so a
+    // configured sampling parameter never reached the wire before.
+    expect(openai.topP).toBe(0.4);
+    expect(openai.frequencyPenalty).toBe(-0.5);
+    expect(openai.presencePenalty).toBe(0.6);
+    expect(openai.invocationParams({})).toMatchObject({
+      top_p: 0.4,
+      frequency_penalty: -0.5,
+      presence_penalty: 0.6,
+    });
+  });
+
+  it("omits sampling parameters when no override is configured", () => {
+    const model = createChatModel({ provider: fixture("openai_chat") });
+    const openai = model as unknown as { topP?: number; frequencyPenalty?: number };
+    expect(openai.topP).toBeUndefined();
+    expect(openai.frequencyPenalty).toBeUndefined();
+  });
+});
+
+describe("createChatModel OpenAI thinking effort", () => {
+  it("sends the configured level verbatim as reasoning_effort (vendor endpoints)", () => {
+    const model = createChatModel({
+      provider: fixture("openai_chat"),
+      overrides: { thinkingCapable: true, thinkingLevel: "xhigh" },
+    });
+    // Vendor model names never match the SDK's reasoning-model patterns, so the
+    // level must ride modelKwargs to reach the request body at all.
+    expect((model as unknown as { modelKwargs?: Record<string, unknown> }).modelKwargs).toEqual({
+      reasoning_effort: "xhigh",
+    });
+  });
+
+  it("sends no reasoning_effort when thinking is off or the model is not capable", () => {
+    const off = createChatModel({
+      provider: fixture("openai_chat"),
+      overrides: { thinkingCapable: true, thinkingLevel: "off" },
+    });
+    expect((off as unknown as { modelKwargs?: Record<string, unknown> }).modelKwargs?.reasoning_effort).toBeUndefined();
+
+    const incapable = createChatModel({
+      provider: fixture("openai_chat"),
+      overrides: { thinkingCapable: false, thinkingLevel: "high" },
+    });
+    expect((incapable as unknown as { modelKwargs?: Record<string, unknown> }).modelKwargs?.reasoning_effort).toBeUndefined();
+  });
 });
 
 describe("createChatModel budget-mode thinking", () => {

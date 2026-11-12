@@ -48,6 +48,15 @@ describe("parseShellCommand", { retry: 1 }, () => {
     expect(parseShellCommand("echo `date`").map(words)).toEqual([["date"], ["echo"]]);
   });
 
+  it("recurses into substitutions inside double quotes (a shell still runs them)", () => {
+    expect(parseShellCommand('echo "$(rm -rf /)"').map(words)).toEqual([["rm", "-rf", "/"], ["echo", ""]]);
+    expect(parseShellCommand('echo "`rm -rf /`"').map(words)).toEqual([["rm", "-rf", "/"], ["echo", ""]]);
+    // An escaped dollar is literal text, not a substitution.
+    expect(parseShellCommand('echo "\\$(rm -rf /)"').map(words)).toEqual([["echo", "$(rm -rf /)"]]);
+    // Single quotes never run substitutions.
+    expect(parseShellCommand("echo '$(rm -rf /)'").map(words)).toEqual([["echo", "$(rm -rf /)"]]);
+  });
+
   it("collects redirections with their targets", () => {
     const segment = parseShellCommand("cat x > /dev/null")[0]!;
     expect(segment.redirects).toEqual([{ op: ">", target: { text: "/dev/null", quoted: false } }]);
@@ -86,6 +95,22 @@ describe("LayeredSandboxPolicy blocks destruction", { retry: 1 }, () => {
     expect(blocked("echo `rm -rf /`")).toMatch(/^Blocked by sandbox policy/);
   });
 
+  it("reviews substitutions a double quote still runs", () => {
+    expect(blocked('echo "$(rm -rf /)"')).toMatch(/recursive forced removal/);
+    expect(blocked('echo "`rm -rf /`"')).toMatch(/recursive forced removal/);
+    // A harmless substitution in quotes is not a destruction shape.
+    expect(blocked('echo "$(date)"')).toBeNull();
+    // PowerShell runs the same `$()` syntax inside double quotes.
+    expect(blockedWin('Write-Output "$(Remove-Item -Recurse -Force C:\\Windows)"')).toMatch(/recursive forced removal/);
+  });
+
+  it("sees through a leading environment assignment", () => {
+    expect(blocked("FOO=1 rm -rf /")).toMatch(/recursive forced removal/);
+    expect(blocked("FOO=1 BAR=2 bash -c 'rm -rf /'")).toMatch(/^Blocked by sandbox policy/);
+    // The assignment itself runs nothing.
+    expect(blocked("FOO=1 ls -la")).toBeNull();
+  });
+
   it("blocks redirection into block devices", () => {
     for (const command of ["cat /dev/zero > /dev/sda", "echo x > /dev/nvme0n1"]) {
       expect(blocked(command, "linux"), command).toMatch(/^Blocked by sandbox policy/);
@@ -112,6 +137,26 @@ describe("LayeredSandboxPolicy blocks destruction", { retry: 1 }, () => {
     for (const command of ['powershell -Command "Remove-Item -Recurse -Force C:\\"', 'pwsh -c "Remove-Item -Recurse -Force C:\\"']) {
       expect(blockedWin(command), command).toMatch(/^Blocked by sandbox policy/);
     }
+  });
+
+  it("detects clustered POSIX wrapper flags and .exe interpreter heads", () => {
+    for (const command of ["bash -lc 'rm -rf /'", "sh -ec 'rm -rf /'", "zsh -xec 'rm -rf /*'"]) {
+      expect(blocked(command, "linux"), command).toMatch(/^Blocked by sandbox policy/);
+    }
+    for (const command of ["cmd.exe /c rm -rf /", 'powershell.exe -Command "Remove-Item -Recurse -Force C:\\"']) {
+      expect(blockedWin(command), command).toMatch(/^Blocked by sandbox policy/);
+    }
+    // A cluster without `c` carries no command string.
+    expect(blocked("bash -l", "linux")).toBeNull();
+  });
+
+  it("matches a program by its bare name when the path qualifies it", () => {
+    for (const command of ["/bin/rm -rf /", "/usr/bin/rm -rf /etc", "/sbin/mkfs.ext4 /dev/sda1", "/bin/bash -c 'rm -rf /'"]) {
+      expect(blocked(command, "linux"), command).toMatch(/^Blocked by sandbox policy/);
+    }
+    expect(blockedWin("C:\\Windows\\System32\\format.com C:")).toMatch(/drive formatting/);
+    // A scoped removal through a qualified path is still fine.
+    expect(blocked("/bin/rm -rf ./build", "linux")).toBeNull();
   });
 
   it("blocks Remove-Item of protected Windows directories, not a project folder", () => {
@@ -232,6 +277,13 @@ describe("isKnownSafeCommand", { retry: 1 }, () => {
     ]) {
       expect(isKnownSafeCommand(command, "linux"), command).toBe(false);
     }
+  });
+
+  it("rejects a quoted substitution of a writer instead of trusting the head", () => {
+    // The head is `echo`, but the substitution runs a write.
+    expect(isKnownSafeCommand('echo "$(git commit -m x)"', "linux")).toBe(false);
+    expect(isKnownSafeCommand('echo "$(rm -rf /)"', "linux")).toBe(false);
+    expect(isKnownSafeCommand('echo "$(date)"', "linux")).toBe(true);
   });
 
   it("never classifies an empty or sudo-only command as safe", () => {

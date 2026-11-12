@@ -84,7 +84,9 @@ export default function SessionsPage() {
       setEntries((prev) => ({ ...prev, [id]: [...detail.entries] }));
     } catch (err) {
       setError((err as Error).message);
-      setExpanded(null);
+      // Collapse only the row this request belonged to: a later expansion of another
+      // run must not be closed by this request's late failure (stale closure).
+      setExpanded((current) => (current === id ? null : current));
     }
   };
 

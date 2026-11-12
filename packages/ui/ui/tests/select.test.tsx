@@ -122,6 +122,17 @@ describe("UiSelect", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("Tab closes the popup and returns focus to the trigger", () => {
+    // Regression: the popup unmounted on Tab without refocusing, so the browser's
+    // default Tab ran against a detached node and focus fell to <body>.
+    render(<UiSelect value="a" onChange={() => {}} options={OPTIONS} ariaLabel="Pick" />);
+    const trigger = screen.getByRole("button", { name: "Pick" });
+    fireEvent.click(trigger);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Tab" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it("a background scroll that leaves the trigger in place keeps the popup open", () => {
     render(<UiSelect value="a" onChange={() => {}} options={OPTIONS} ariaLabel="Pick" />);
     fireEvent.click(screen.getByRole("button", { name: "Pick" }));

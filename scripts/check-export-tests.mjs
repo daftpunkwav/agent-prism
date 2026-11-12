@@ -20,13 +20,25 @@
  * PENDING: entries below have no test yet, grouped by the package that exports
  * them. The list must only ever shrink; delete a line when its symbol gains a
  * test. Adding a symbol here to silence the gate is the one thing this script
- * exists to prevent.
+ * exists to prevent. A line whose symbol no longer exists on the surface (renamed
+ * or removed export) is reported too: an inert exemption could otherwise be
+ * silently inherited by a future export that reuses the name. The same applies to
+ * a PENDING package that has left the workspace when this script runs on the real
+ * workspace root; fixture repositories (tests/gates) legitimately hold only a
+ * subset of the workspace, so they skip the absent-package half of that rule.
  */
 
 import fs from "node:fs";
 import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
+
+/**
+ * Distinguishes the real workspace from a fixture repository: tests/gates copy this
+ * script into a temp tree holding only the packages under test, so PENDING entries
+ * naming other packages must stay inert there.
+ */
+const IS_WORKSPACE_ROOT = fs.existsSync(path.join(ROOT, "pnpm-workspace.yaml"));
 
 const PENDING = {
   "@agentprism/application": ["firstIssueMessage"],
@@ -397,6 +409,17 @@ const stale = Object.entries(PENDING).flatMap(([pkgName, names]) =>
   names.filter((name) => referenced.get(pkgName)?.has(name) === true).map((name) => `${pkgName}: ${name}`),
 );
 
+// The same list-hygiene rule from the other direction: a pending name that is no
+// longer exported is an exemption nobody can reclaim, and a later export reusing the
+// name would silently inherit it. On the real workspace root a PENDING package that
+// is gone counts as the same inert exemption; fixture repositories hold a subset of
+// the workspace, so they only judge the packages they actually contain.
+const vanishedPending = Object.entries(PENDING).flatMap(([pkgName, names]) => {
+  const surface = surfaces.get(pkgName);
+  if (surface === undefined) return IS_WORKSPACE_ROOT ? names.map((name) => `${pkgName}: ${name}`) : [];
+  return names.filter((name) => !surface.has(name)).map((name) => `${pkgName}: ${name}`);
+});
+
 console.log(`[check-export-tests] packages=${pkgs.length} harness files=${harnessFiles.length} callable exports=${callableTotal}`);
 console.log(`[check-export-tests] pending (no test yet)=${pending.size} · forwarded re-exports=${forwardedTotal}`);
 
@@ -420,6 +443,14 @@ if (failures.length > 0) {
 if (stale.length > 0) {
   console.error(`\n[check-export-tests] ${stale.length} PENDING entry(ies) already have a test; delete these lines:`);
   for (const name of stale) console.error(`  ${name}`);
+  process.exit(1);
+}
+
+if (vanishedPending.length > 0) {
+  console.error(
+    `\n[check-export-tests] ${vanishedPending.length} PENDING entry(ies) no longer resolve to an export; delete these lines:`,
+  );
+  for (const name of vanishedPending) console.error(`  ${name}`);
   process.exit(1);
 }
 

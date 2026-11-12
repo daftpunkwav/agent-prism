@@ -132,7 +132,11 @@ async function* streamExecutorTurn(
   const { config, workspace } = context;
   const label = config.label;
   const workspaceName = workspace.name;
-  const prepared = applyContextPipeline(messages, config.context, { retrieveSnippets, ...context.contextTuning });
+  const prepared = applyContextPipeline(messages, config.context, {
+    retrieveSnippets,
+    analytics: context.contextAnalytics,
+    ...context.contextTuning,
+  });
   const definitions = context.tools.registry.listDefinitions();
   stats.step += 1;
   stats.turns += 1;
@@ -280,7 +284,7 @@ export class PlanExecuteDriver implements AgentDriver {
               applyContextPipeline(
                 [...messages, { role: "user", content: REPLAN_INSTRUCTION }],
                 config.context,
-                { retrieveSnippets, ...context.contextTuning },
+                { retrieveSnippets, analytics: context.contextAnalytics, ...context.contextTuning },
               ),
               { signal: context.signal },
             );

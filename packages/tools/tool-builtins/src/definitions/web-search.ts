@@ -117,7 +117,15 @@ async function executeWebSearch(
   try {
     response = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify(body), signal: linked });
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    // AbortSignal.timeout aborts with a DOMException named "TimeoutError" (a caller
+    // cancellation carries "AbortError"); without both names a real timeout fell
+    // through to the generic "search request failed" branch.
+    const errorName = error instanceof Error ? error.name : "";
+    if (errorName === "AbortError" || errorName === "TimeoutError" || timeoutSignal.aborted) {
+      if (signal?.aborted === true) {
+        // Caller cancellation is its own outcome, distinct from a timeout (registry contract).
+        return { result: "Error: aborted", fileDiff: null, ok: false, code: "aborted" };
+      }
       return { result: "Error: search timed out", fileDiff: null, ok: false, code: "workspace_error" };
     }
     return { result: `Error: search request failed (${error instanceof Error ? error.message : String(error)})`, fileDiff: null, ok: false, code: "workspace_error" };

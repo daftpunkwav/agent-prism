@@ -58,6 +58,23 @@ describe("matrix panel", () => {
     expect(screen.getByText("native=pass")).toBeDefined();
   });
 
+  it("aborts the in-flight matrix stream on unmount", async () => {
+    // Regression: switching the main tab unmounts the panel and used to leave the
+    // stream running (the backend keeps executing every scored template).
+    let captured: AbortSignal | undefined;
+    vi.mocked(streamMatrixRun).mockImplementationOnce(
+      ({ signal }: { signal?: AbortSignal }) =>
+        new Promise<void>(() => {
+          captured = signal;
+        }),
+    );
+    const view = renderPanel();
+    fireEvent.click(screen.getByText("Run full matrix"));
+    await waitFor(() => expect(captured).toBeDefined());
+    view.unmount();
+    await waitFor(() => expect(captured?.aborted).toBe(true));
+  });
+
   it("surfaces an in-stream error item through setError", async () => {
     vi.mocked(streamMatrixRun).mockImplementationOnce(async ({ onItem }) => {
       onItem({ type: "error", message: "boom" });

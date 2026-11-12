@@ -15,7 +15,7 @@ import { WorkspaceError } from "@agentprism/environment";
 
 import { boundText } from "./spill.js";
 import { globToRegExp } from "./glob.js";
-import { asWorkspaceView } from "./workspace-view.js";
+import { asWorkspaceView, normalizeBasePath } from "./workspace-view.js";
 
 export const GREP_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -144,7 +144,7 @@ async function executeGrep(workspace: ToolWorkspace, args: ToolArgs): Promise<To
     } catch {
       return { result: `Error: invalid regular expression: ${pattern}`, fileDiff: null, ok: false, code: "workspace_error" };
     }
-    const basePath = String(args.path ?? "");
+    const basePath = normalizeBasePath(args.path);
     const globFilter = String(args.glob ?? "").trim();
     // Same invalid-pattern reporting as the glob tool (a SyntaxError here must not escape as an exception).
     let globMatcher: RegExp | null = null;

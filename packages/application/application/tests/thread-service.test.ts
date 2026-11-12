@@ -15,9 +15,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { AtomicJsonFile } from "@agentprism/persistence";
+import { InMemorySessionStore } from "@agentprism/session";
 import type { ArenaRunRequest } from "@agentprism/contracts";
 import type { ArenaService } from "../src/arena-service.js";
 import { AppError } from "../src/errors.js";
+import { SessionService } from "../src/session-service.js";
 import { FileThreadStore } from "../src/thread-store.js";
 import { THREAD_BASELINE_FIELDS, ThreadService, type ThreadWorkspaces } from "../src/thread-service.js";
 
@@ -107,6 +109,14 @@ function makeService(arena: ArenaService, workspaces = fakeWorkspaces()) {
   const store = new FileThreadStore({ file: new AtomicJsonFile(tempFile()), idGenerator: ids, clock });
   const service = new ThreadService({ threads: store, arena, workspaceRegistry: workspaces, clock });
   return { service, store };
+}
+
+/** Service wired to a real in-memory execution ledger (agent-row settlement assertions). */
+function makeLedgerService(arena: ArenaService) {
+  const store = new FileThreadStore({ file: new AtomicJsonFile(tempFile()), idGenerator: ids, clock });
+  const sessions = new SessionService({ store: new InMemorySessionStore({ idGenerator: ids, clock }) });
+  const service = new ThreadService({ threads: store, arena, workspaceRegistry: fakeWorkspaces(), clock, sessions });
+  return { service, store, sessions };
 }
 
 async function drain(stream: AsyncGenerator<ArenaEvent>): Promise<ArenaEvent[]> {
@@ -269,6 +279,45 @@ describe("ThreadService.run (resume path)", () => {
 
     await drain(service.run(view.id, { question: "q" }));
     expect(await sessions.listSessions({ kind: "agent" })).toHaveLength(1);
+  });
+});
+
+describe("ThreadService.run ledger settlement", () => {
+  it("settles the agent row as cancelled when the consumer stops early", async () => {
+    const { arena } = fakeArena([
+      { ...baseEvent("thought"), content: "working" },
+      { ...baseEvent("complete"), metrics: { success: true } as ArenaEvent["metrics"] },
+    ]);
+    const { service, store, sessions } = makeLedgerService(arena);
+    const view = service.create({ title: "t", config: CONFIG });
+
+    // A client disconnect closes the SSE loop: the route breaks out of the
+    // generator, so the turn never produces its own terminal.
+    for await (const _event of service.run(view.id, { question: "q" })) break;
+
+    const rows = await sessions.listSessions({ kind: "agent" });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.status).toBe("cancelled");
+    expect(store.get(view.id).running).toBe(false);
+  });
+
+  it("books an abort-drained turn as cancelled and leaves the transcript untouched", async () => {
+    const { arena } = fakeArena([
+      { ...baseEvent("thought"), content: "the answer" },
+      { ...baseEvent("complete"), metrics: { success: true } as ArenaEvent["metrics"] },
+    ]);
+    const { service, sessions } = makeLedgerService(arena);
+    const view = service.create({ title: "t", config: CONFIG });
+    const controller = new AbortController();
+    controller.abort();
+
+    await drain(service.run(view.id, { question: "q" }, { signal: controller.signal }));
+
+    const rows = await sessions.listSessions({ kind: "agent" });
+    expect(rows[0]?.status).toBe("cancelled");
+    // The transcript is the resume anchor: a cancelled turn must not commit even
+    // when a success terminal was already in flight.
+    expect(service.getDetail(view.id).history).toHaveLength(0);
   });
 });
 

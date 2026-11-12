@@ -80,9 +80,12 @@ export function formatMention(path: string, options: { forceQuote?: boolean } = 
   return `@${clean}`;
 }
 
-/** Whether a mention path is resolvable in principle (relative, no traversal). */
+/** Whether a mention path is resolvable in principle (relative, no traversal; the `@dir/` directory form is allowed). */
 export function isResolvableMentionPath(path: string): boolean {
-  const clean = path.trim();
+  // A trailing slash is the natural directory notation for mentions (`@src/`); it
+  // carries no path segment, so it is normalized away before validation. Leaving it
+  // in made every `@dir/` mention "unresolvable" and its listing branch unreachable.
+  const clean = path.trim().replace(/\/+$/, "");
   if (clean === "" || clean.startsWith("/") || hasIllegalPathChars(clean)) return false;
   if (clean.includes("\\")) return false;
   return clean.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");

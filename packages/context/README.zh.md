@@ -23,5 +23,5 @@ checkpoint 等，位于 `harness/context/*`；本 family 持有其下的可复�
 | [`context-compaction/`](context-compaction/README.md) | checkpoint 式 compaction 信封，含 journal 与 undo，以及异步 summarizer port | harness `context/checkpoint-strategy.ts`，即 `checkpoint` 策略 |
 | [`context-instructions/`](context-instructions/README.md) | 分层 agent 指令：仓库默认值与 workspace `AGENTS.md` 覆盖，带 digest 刷新 | harness `prompt/instructions.ts` 与 `prompt/assembly.ts` |
 
-所有 leaf 都是纯的、确定性的：零依赖，或仅依赖 `contracts`，其中两个以结构性方式
-接触文件系统；它们在依赖图中位于 `harness` 之下。
+所有 leaf 都零依赖且确定性；文件系统访问是结构性的，由调用方的 workspace fs
+满足。它们在依赖图中位于 `harness` 之下。

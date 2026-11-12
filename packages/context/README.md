@@ -20,6 +20,6 @@ live inside `harness/context/*`; this family holds the reusable capabilities bel
 | [`context-compaction/`](context-compaction/README.md) | Checkpoint-style compaction envelopes with journal + undo and an async summarizer port | harness `context/checkpoint-strategy.ts` (`checkpoint` strategy) |
 | [`context-instructions/`](context-instructions/README.md) | Layered agent instructions: repo defaults + workspace `AGENTS.md` overrides with digest-based refresh | harness `prompt/instructions.ts` & `prompt/assembly.ts` |
 
-All leaves are pure and deterministic (zero dependencies, or `contracts` only for the
-two that touch the filesystem structurally) and sit below `harness` in the dependency
+All leaves are dependency-free and deterministic; filesystem access is structural,
+satisfied by the caller's workspace fs. They sit below `harness` in the dependency
 graph.

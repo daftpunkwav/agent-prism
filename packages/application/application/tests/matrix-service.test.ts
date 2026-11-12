@@ -137,4 +137,31 @@ describe("MatrixService", () => {
     if (report?.kind !== "report") throw new Error("missing report");
     expect(report.report.cells).toEqual([]);
   });
+
+  it("drops the in-flight cell when the client aborts mid-stream", async () => {
+    const controller = new AbortController();
+    const arena = {
+      listTemplates: vi.fn().mockReturnValue([
+        { id: "t1", question: "q", suggested_dimension: "framework", suggested_selections: ["native"] },
+      ]),
+      // A cancelled run's partial stream must not be judged into a scored cell.
+      run: vi.fn().mockImplementation(async function* () {
+        yield thought("a", "partial answer");
+        controller.abort();
+      }),
+      judge: vi.fn(),
+    };
+    const service = new MatrixService({ arena: arena as never, now: () => 0 });
+    const items = [];
+    for await (const item of service.runMatrix([{ template_id: "t1", selections: [] }], { signal: controller.signal })) {
+      items.push(item);
+    }
+    expect(items.filter((item) => item.kind === "progress").map((item) => item.kind === "progress" && item.status)).toEqual([
+      "started",
+    ]);
+    expect(arena.judge).not.toHaveBeenCalled();
+    const report = items.find((item) => item.kind === "report");
+    if (report?.kind !== "report") throw new Error("missing report");
+    expect(report.report.cells).toEqual([]);
+  });
 });

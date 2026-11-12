@@ -67,6 +67,15 @@ describe("FileBlobStore", () => {
     await expect(store.deleteSessionBlobs("s1")).resolves.toBe(false); // nothing left
   });
 
+  it("rejects an unsafe sequence number instead of embedding it in a filename", async () => {
+    for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "../escape" as unknown as number]) {
+      expect(() => FileBlobStore.fileName("s1", bad)).toThrow(/Invalid blob sequence/);
+    }
+    // The read path never throws: an invalid seq is just a miss.
+    await expect(store.loadBlob("s1", "../escape" as unknown as number)).resolves.toBeNull();
+    await expect(store.saveBlob("s1", -1, "x")).rejects.toThrow(/Invalid blob sequence/);
+  });
+
   it("purging a session with no directory reports false without throwing", async () => {
     const ghost = new FileBlobStore(join(dir, "does-not-exist"));
     await expect(ghost.deleteSessionBlobs("s1")).resolves.toBe(false);

@@ -16,6 +16,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { getCatalog } from "@/i18n/catalogs";
 import { GROUPS, GuideSection } from "../src/app/settings/GuideSection.js";
+import { SKINS } from "@/theme";
 
 /** Group keys come from the component itself, so a new group cannot slip past. */
 const GROUP_KEYS = GROUPS.map((group) => group.key);
@@ -48,6 +49,14 @@ describe("GuideSection", () => {
     }
   });
 
+  it.each(["en", "zh-CN"] as const)("has display copy for every registered skin (%s)", (locale) => {
+    // The picker resolves `settings.skin.<id>` through a dynamic (cast) key, so a new
+    // skin id without catalog copy would render the missing-key marker in production.
+    for (const skin of SKINS) {
+      expect(message(locale, `settings.skin.${skin}`), skin).toBeTruthy();
+    }
+  });
+
   it("renders the intro, every group heading, and the skin picker", () => {
     const { container } = renderSection();
     for (const key of GROUP_KEYS) {
@@ -59,5 +68,23 @@ describe("GuideSection", () => {
     expect(screen.queryByText(/^settings\.guide\./)).toBeNull();
     expect(screen.getByText(message("en", "settings.guide.intro") as string)).toBeTruthy();
     expect(screen.getByText(message("en", "settings.skin.label") as string)).toBeTruthy();
+  });
+
+  it("renders with the default skin when storage access throws", () => {
+    // Regression: the skin read was unguarded, so a storage-blocked environment
+    // (privacy mode / disabled storage) crashed the whole settings guide tab.
+    const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new Error("SecurityError: storage blocked");
+      },
+    });
+    try {
+      expect(() => renderSection()).not.toThrow();
+    } finally {
+      if (descriptor !== undefined) Object.defineProperty(window, "localStorage", descriptor);
+      cleanup();
+    }
   });
 });

@@ -193,6 +193,30 @@ describe("assertResolvedIpAllowed (post-DNS rebinding guard)", () => {
   });
 });
 
+describe("DNS absolute-form (trailing dot) hosts", () => {
+  it("normalizes the dot before denylist checks (dot-suffixed metadata host)", () => {
+    // "metadata.google.internal." is the DNS absolute form of the denylisted name;
+    // the URL parser keeps the dot on a name host, so the old string compare let it
+    // through as an ordinary name host.
+    expect(() => validateFetchUrl("https://metadata.google.internal./token")).toThrow(UrlValidationError);
+    expect(() => validateFetchUrl("https://Instance-Data./")).toThrow(UrlValidationError);
+    expect(() => validateLlmBaseUrl("https://METADATA.google.internal./v1")).toThrow(UrlValidationError);
+    expect(() => validateWebsiteUrl("https://kubernetes.default./")).toThrow(UrlValidationError);
+  });
+
+  it("keeps loopback local endpoints usable in the absolute form", () => {
+    // The same normalization is what makes the http-loopback allowance recognize
+    // the FQDN spelling instead of rejecting it as a non-loopback name host.
+    expect(validateLlmBaseUrl("http://localhost.:8000/v1")).toBe("http://localhost.:8000/v1");
+    expect(validateLlmBaseUrl("http://127.0.0.1.:11434/v1")).toBe("http://127.0.0.1.:11434/v1");
+  });
+
+  it("still accepts public names and addresses in the absolute form", () => {
+    expect(validateFetchUrl("https://example.com./x").hostname).toBe("example.com.");
+    expect(validateFetchUrl("https://8.8.8.8./").hostname).toBe("8.8.8.8");
+  });
+});
+
 describe("isLoopbackHost (shared single source)", () => {
   it.each(["localhost", "LOCALHOST", "127.0.0.1", "::1", "[::1]"])("accepts %s", (host) => {
     expect(isLoopbackHost(host)).toBe(true);

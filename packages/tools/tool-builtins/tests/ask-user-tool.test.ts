@@ -130,6 +130,36 @@ describe("liveAskUserTool", () => {
     }
   });
 
+  it("keeps the human's answers when the audit log write fails", async () => {
+    // Answers arrive before the log write. An unwritable log must degrade to a note:
+    // rejecting the call would discard a real answer and read to the model as failure.
+    const broken = {
+      name: "ws",
+      root: "/nonexistent",
+      cwd: () => "/nonexistent",
+      fs: {
+        readFile: () => {
+          throw new Error("missing");
+        },
+        writeFile: () => {
+          throw new Error("disk full");
+        },
+        deleteFile: () => {},
+        listFiles: () => [],
+        exists: () => false,
+      },
+    };
+    const tool = liveAskUserTool(async (questions) => ({
+      answered: true,
+      answers: questions.map((question) => ({ id: question.id, answer: "yes" })),
+    }));
+    const out = await tool.execute(broken as never, { questions: [{ id: "mode", question: "Proceed?" }] });
+    expect(out.ok).toBe(true);
+    expect(out.result).toContain("The human answered inline");
+    expect(out.result).toContain("[mode] yes");
+    expect(out.result).toContain("audit log write failed");
+  });
+
   it("validates args fail-closed before reaching the human channel", async () => {
     const ws = tempWorkspace();
     try {

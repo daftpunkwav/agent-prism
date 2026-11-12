@@ -189,6 +189,36 @@ describe("JsonlSessionStore recovery", () => {
     }
   });
 
+  it("keeps the well-formed sessions of a partially corrupt snapshot", async () => {
+    const { dir, store, cleanup } = backend();
+    try {
+      const first = store();
+      const kept = await first.create({ kind: "agent", title: "kept" });
+      const victim = await first.create({ kind: "arena", title: "dropped" });
+      await first.checkpoint();
+      // Corrupt one snapshot item in place: its sibling must still load, or a single
+      // bad record wipes the whole ledger (the JSONL log was truncated by the checkpoint).
+      const snapshotPath = path.join(dir, "snapshot.json");
+      const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf-8")) as {
+        version: number;
+        sessions: Array<{ record: { id: string; summary: unknown } }>;
+      };
+      const broken = snapshot.sessions.find((item) => item.record.id === victim.id);
+      if (broken === undefined) throw new Error("snapshot missing the victim session");
+      broken.record.summary = 42;
+      fs.writeFileSync(snapshotPath, JSON.stringify(snapshot), "utf-8");
+
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const second = store();
+      expect((await second.get(kept.id))?.title).toBe("kept");
+      expect(await second.get(victim.id)).toBeNull();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("snapshot partially corrupt: kept 1, dropped 1"));
+      warn.mockRestore();
+    } finally {
+      cleanup();
+    }
+  });
+
   it("counts corrupt log lines and keeps the rest of the record", async () => {
     const { dir, store, cleanup } = backend();
     try {

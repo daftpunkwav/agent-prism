@@ -19,22 +19,44 @@ const WORKSPACE_INSTRUCTION_FILES = ["AGENTS.md", "AGENTS.local.md"] as const;
 /** Rendered instruction budget in chars (matches the library default). */
 const INSTRUCTIONS_BUDGET_CHARS = 6000;
 
-/** Adapts a structural workspace fs to the instruction file port. */
-function asInstructionFiles(fs: { exists?(path: string): boolean; readFile(path: string): string }): InstructionFileAccess | null {
-  if (typeof fs.readFile !== "function") return null;
+/**
+ * Byte cap for one instruction-file read. The rendered block is capped far below
+ * this (a layer keeps at most 2500 chars), so only a bounded head of a huge file
+ * can reach the prompt anyway; a full read would materialize arbitrary workspace
+ * content — the agent's own tools can write these files — on every prompt
+ * assembly. Files under the cap are read exactly as before.
+ */
+const INSTRUCTION_FILE_READ_BYTES = 64 * 1024;
+
+/** Structural workspace fs surface; readFileHead is the environment layer's bounded read. */
+interface WorkspaceInstructionFs {
+  exists?(path: string): boolean;
+  readFile(path: string): string;
+  readFileHead?(path: string, maxBytes: number, startByte?: number): { text: string };
+}
+
+/** Adapts a structural workspace fs to the instruction file port (null when unusable). */
+function asInstructionFiles(fs: unknown): InstructionFileAccess | null {
+  if (fs === null || typeof fs !== "object") return null;
+  const candidate = fs as WorkspaceInstructionFs;
+  if (typeof candidate.readFile !== "function") return null;
   return {
-    exists: (path: string) => (typeof fs.exists === "function" ? fs.exists(path) : false),
-    readFile: (path: string) => fs.readFile(path),
+    exists: (path: string) => (typeof candidate.exists === "function" ? candidate.exists(path) : false),
+    readFile: (path: string) =>
+      typeof candidate.readFileHead === "function"
+        ? candidate.readFileHead(path, INSTRUCTION_FILE_READ_BYTES).text
+        : candidate.readFile(path),
   };
 }
 
 /**
  * Renders workspace instruction layers for the system prompt.
  * Empty string when the filesystem is unusable or no instruction file exists
- * (missing files are the quiet default, unreadable files skip loudly-counted).
+ * (missing files are the quiet default; unreadable files are counted by the
+ * library and an unexpected failure degrades to no block with a warning).
  */
 export function renderWorkspaceInstructions(fs: unknown): string {
-  const files = asInstructionFiles(fs as { exists?(path: string): boolean; readFile(path: string): string });
+  const files = asInstructionFiles(fs);
   if (files === null) return "";
   try {
     const { layers } = loadInstructionLayers(files, {
@@ -44,7 +66,12 @@ export function renderWorkspaceInstructions(fs: unknown): string {
     if (layers.length === 0) return "";
     const rendered = renderInstructions(layers, INSTRUCTIONS_BUDGET_CHARS);
     return rendered.text.trim();
-  } catch {
+  } catch (error) {
+    // Degrade to no instruction block, but leave a trace: a silently dropped
+    // block changes the system prompt without any evidence in the run.
+    console.warn(
+      `[harness] Workspace instructions unavailable (block skipped): ${error instanceof Error ? error.message : String(error)}`,
+    );
     return "";
   }
 }
@@ -64,7 +91,7 @@ export function renderWorkspaceInstructionsWithState(
   state: InstructionState,
   budgetChars: number = INSTRUCTIONS_BUDGET_CHARS,
 ): { text: string; changed: boolean; digest: string } {
-  const files = asInstructionFiles(fs as { exists?(path: string): boolean; readFile(path: string): string });
+  const files = asInstructionFiles(fs);
   if (files === null) return { text: "", changed: false, digest: state.current()?.digest ?? "" };
   try {
     const { snapshot, changed } = state.refresh(files, {
@@ -73,7 +100,10 @@ export function renderWorkspaceInstructionsWithState(
     });
     if (snapshot.layers.length === 0) return { text: "", changed, digest: snapshot.digest };
     return { text: snapshot.rendered.text.trim(), changed, digest: snapshot.digest };
-  } catch {
+  } catch (error) {
+    console.warn(
+      `[harness] Workspace instruction refresh failed (held state kept): ${error instanceof Error ? error.message : String(error)}`,
+    );
     return { text: "", changed: false, digest: state.current()?.digest ?? "" };
   }
 }

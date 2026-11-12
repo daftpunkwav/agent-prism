@@ -42,6 +42,28 @@ interface StructuralFs {
 export const SYMBOLS_MAX_FILES = 200;
 /** Max bytes read per file. */
 export const SYMBOLS_MAX_BYTES = 64 * 1024;
+/** Max chars in one action listing before a loud cut (a large file can define thousands of symbols). */
+export const SYMBOLS_MAX_OUTPUT_CHARS = 32 * 1024;
+
+/** Candidate files plus the size of the indexable workspace they were cut from. */
+interface CandidateIndex {
+  files: Array<{ path: string; text: string }>;
+  /** Indexable workspace files seen, before the SYMBOLS_MAX_FILES cap. */
+  total: number;
+}
+
+/** Loud coverage note: results from a capped index must never read as a whole-workspace verdict. */
+function coverageNote(index: CandidateIndex): string {
+  if (index.total <= SYMBOLS_MAX_FILES) return "";
+  return `\n…(indexed the first ${SYMBOLS_MAX_FILES} of ${index.total} indexable workspace files; results may be incomplete)`;
+}
+
+/** Head-cut with a loud marker, matching the bounded shape of every other read-only tool. */
+function capOutput(text: string, max = SYMBOLS_MAX_OUTPUT_CHARS): string {
+  if (text.length <= max) return text;
+  const marker = `\n…(output capped at ${max} chars; ${text.length} total)`;
+  return `${text.slice(0, Math.max(0, max - marker.length))}${marker}`;
+}
 
 function asFs(workspace: ToolWorkspace): StructuralFs | null {
   const fs = workspace.fs as Partial<StructuralFs> | null | undefined;
@@ -84,19 +106,22 @@ function fingerprintOf(fs: StructuralFs, candidates: readonly string[]): string 
     .join("|");
 }
 
-function loadCandidates(fs: StructuralFs): Array<{ path: string; text: string }> {
+function loadCandidates(fs: StructuralFs): CandidateIndex {
   let files: string[];
   try {
     // The scoped filesystem treats "" as the root; "." canonicalizes to null and lists nothing.
     files = fs.listFiles("", { recursive: true });
   } catch {
-    return [];
+    return { files: [], total: 0 };
   }
-  const candidates = files.filter((file) => isIndexable(file)).slice(0, SYMBOLS_MAX_FILES);
+  const indexable = files.filter((file) => isIndexable(file));
+  const candidates = indexable.slice(0, SYMBOLS_MAX_FILES);
   const fingerprint = fingerprintOf(fs, candidates);
   if (fingerprint !== null) {
     const cached = INDEX_CACHE.get(fs as object);
-    if (cached !== undefined && cached.fingerprint === fingerprint) return cached.files;
+    if (cached !== undefined && cached.fingerprint === fingerprint) {
+      return { files: cached.files, total: indexable.length };
+    }
   }
   const out: Array<{ path: string; text: string }> = [];
   for (const path of candidates) {
@@ -107,7 +132,7 @@ function loadCandidates(fs: StructuralFs): Array<{ path: string; text: string }>
     }
   }
   if (fingerprint !== null) INDEX_CACHE.set(fs as object, { fingerprint, files: out });
-  return out;
+  return { files: out, total: indexable.length };
 }
 
 function target(args: ToolArgs): string {
@@ -134,7 +159,9 @@ async function executeSymbols(workspace: ToolWorkspace, args: ToolArgs): Promise
     const defs = indexFiles([{ path: name, text }]);
     if (defs.length === 0) return { result: `(no symbols in ${name})`, fileDiff: null, ok: true };
     return {
-      result: defs.map((def) => `${def.kind} ${def.scope === "" ? "" : `${def.scope} > `}${def.name} (L${def.line})`).join("\n"),
+      result: capOutput(
+        defs.map((def) => `${def.kind} ${def.scope === "" ? "" : `${def.scope} > `}${def.name} (L${def.line})`).join("\n"),
+      ),
       fileDiff: null,
       ok: true,
     };
@@ -143,28 +170,29 @@ async function executeSymbols(workspace: ToolWorkspace, args: ToolArgs): Promise
     if (name === "") {
       return { result: `Error: ${action} needs a symbol or module name`, fileDiff: null, ok: false, code: "workspace_error" };
     }
-    const candidates = loadCandidates(fs);
+    const index = loadCandidates(fs);
+    const note = coverageNote(index);
     if (action === "search") {
-      const hits = searchSymbols(indexFiles(candidates), name).slice(0, 30);
-      if (hits.length === 0) return { result: `(no symbols matching ${JSON.stringify(name)})`, fileDiff: null, ok: true };
+      const hits = searchSymbols(indexFiles(index.files), name).slice(0, 30);
+      if (hits.length === 0) return { result: `(no symbols matching ${JSON.stringify(name)})${note}`, fileDiff: null, ok: true };
       return {
-        result: hits.map((hit) => `${hit.def.kind} ${hit.def.name} — ${hit.def.file}:L${hit.def.line}`).join("\n"),
+        result: `${hits.map((hit) => `${hit.def.kind} ${hit.def.name} — ${hit.def.file}:L${hit.def.line}`).join("\n")}${note}`,
         fileDiff: null,
         ok: true,
       };
     }
     if (action === "refs") {
-      const hits = findReferences(candidates, name).slice(0, 30);
-      if (hits.length === 0) return { result: `(no references to ${JSON.stringify(name)})`, fileDiff: null, ok: true };
+      const hits = findReferences(index.files, name).slice(0, 30);
+      if (hits.length === 0) return { result: `(no references to ${JSON.stringify(name)})${note}`, fileDiff: null, ok: true };
       return {
-        result: hits.map((hit) => `${hit.file}:L${hit.line}: ${hit.preview}`).join("\n"),
+        result: `${hits.map((hit) => `${hit.file}:L${hit.line}: ${hit.preview}`).join("\n")}${note}`,
         fileDiff: null,
         ok: true,
       };
     }
-    const dependents = findDependents(candidates, name).slice(0, 30);
-    if (dependents.length === 0) return { result: `(nothing imports ${JSON.stringify(name)})`, fileDiff: null, ok: true };
-    return { result: dependents.join("\n"), fileDiff: null, ok: true };
+    const dependents = findDependents(index.files, name).slice(0, 30);
+    if (dependents.length === 0) return { result: `(nothing imports ${JSON.stringify(name)})${note}`, fileDiff: null, ok: true };
+    return { result: `${dependents.join("\n")}${note}`, fileDiff: null, ok: true };
   }
   return { result: "Error: action must be one of defs, refs, search, dependents", fileDiff: null, ok: false, code: "workspace_error" };
 }

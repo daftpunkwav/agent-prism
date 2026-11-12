@@ -54,6 +54,20 @@ describe("grepTool", () => {
     }
   });
 
+  it("treats '.' as the workspace root", async () => {
+    const ws = tempWorkspace();
+    try {
+      ws.fs.writeFile("root.txt", "needle here\n");
+      // "." must normalize to the workspace root, not to an unlistable directory that
+      // reports a false "no matches" verdict.
+      const outcome = await grepTool.execute(ws, { pattern: "needle", path: "." });
+      expect(outcome.ok).toBe(true);
+      expect(outcome.result).toContain("root.txt:1:");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("rejects an invalid regex as a tool error", async () => {
     const ws = tempWorkspace();
     try {

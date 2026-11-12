@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ArenaEvent, LlmAdapter, LlmInvokeResult, LlmMessage, LlmStreamPart, ToolDefinition } from "@agentprism/contracts";
 import { PipelineConfigSchema } from "@agentprism/contracts";
-import { RagStoreCache } from "@agentprism/harness";
+import { createContextAnalytics, RagStoreCache } from "@agentprism/harness";
 import type { AgentExecutionContext } from "@agentprism/harness";
 import { MapToolRegistry } from "@agentprism/tool-registry";
 import { TokenTracker } from "@agentprism/telemetry";
@@ -126,6 +126,19 @@ describe("PlanExecuteDriver", () => {
     expect(banner?.content).toContain("temp=0");
     expect(banner?.content).toContain("model=");
     expect(banner?.content).toContain("max_steps=5");
+  });
+
+  it("records context analytics for the planner and every executor turn", async () => {
+    // One executor turn (max_steps=1): the seam records the planner pass plus the
+    // executor stream, so a fallback column's strategy-effectiveness log is real.
+    const context = contextWith(stubLlm(["1. Done"], [{ text: "final answer" }]));
+    context.config = PipelineConfigSchema.parse({ label: "col", harness: "bare", max_steps: 1 });
+    context.contextAnalytics = createContextAnalytics();
+
+    await collect(new PlanExecuteDriver(), context);
+
+    expect(context.contextAnalytics.usage.size).toBe(2);
+    expect(context.contextAnalytics.effectiveness.size).toBe(2);
   });
 });
 

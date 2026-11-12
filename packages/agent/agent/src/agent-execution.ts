@@ -153,6 +153,22 @@ export interface AgentRunSpec {
 /** Delegation ceiling: parent -> child only (a child never sees delegation tools). */
 const MAX_DELEGATION_DEPTH = 1;
 
+/** AbortError the run owner (arena runner, builder turn) turns into its cancelled terminal. */
+function abortError(): Error {
+  const aborted = new Error("Aborted");
+  aborted.name = "AbortError";
+  return aborted;
+}
+
+/**
+ * Cancellation checkpoint. Awaited work creates gaps after the driver loop
+ * (structured finalize, episodic settlement), and an abort landing there would
+ * otherwise let a cancelled run report a successful terminal.
+ */
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted === true) throw abortError();
+}
+
 /**
  * Memory policy token from the pipeline config ("none" and unknown tokens mean
  * stateless). The "none" fallback is defensive: PipelineConfigSchema already
@@ -287,6 +303,8 @@ function stampEvent(
  *   delegation depth, and abort signal.
  * @yields ArenaEvents stamped with run/execution identity, ending in exactly one
  *   terminal complete (plus an error event first when the run fails).
+ * @throws AbortError when the run is cancelled, before any terminal is yielded;
+ *   the caller that owns the cancel renders the cancelled terminal.
  */
 export async function* runAgentExecution(
   deps: AgentExecutionDeps,
@@ -412,11 +430,7 @@ export async function* runAgentExecution(
       }
       // Abort parity with direct tools (run rethrows AbortError): a cancelled
       // parent must stop, not read a failure memo and carry on.
-      if (spec.signal?.aborted) {
-        const aborted = new Error("Aborted");
-        aborted.name = "AbortError";
-        throw aborted;
-      }
+      throwIfAborted(spec.signal);
       for (let i = nestedEvents.length - 1; i >= 0; i -= 1) {
         const event = nestedEvents[i] as ArenaEvent;
         if (event.type === "complete" && event.metrics !== null) {
@@ -492,11 +506,7 @@ export async function* runAgentExecution(
                 const task = tasks[index] as string;
                 // Abort parity with direct tools: a cancelled parent stops the
                 // fan-out instead of joining a failure memo.
-                if (spec.signal?.aborted) {
-                  const aborted = new Error("Aborted");
-                  aborted.name = "AbortError";
-                  throw aborted;
-                }
+                throwIfAborted(spec.signal);
                 results[index] = await runDelegated(
                   task,
                   maxSteps,
@@ -675,11 +685,7 @@ export async function* runAgentExecution(
     // checkpoint for every backend — before the structured finalize spends
     // another LLM call on a run nobody is waiting for and before the held-back
     // complete would report a successful, partial answer.
-    if (spec.signal?.aborted === true) {
-      const aborted = new Error("Aborted");
-      aborted.name = "AbortError";
-      throw aborted;
-    }
+    throwIfAborted(spec.signal);
 
     // Structured profile: normalize the final answer through one schema-constrained
     // invoke so every downstream consumer reads the same canonical JSON. Fail-open:
@@ -761,6 +767,11 @@ export async function* runAgentExecution(
         }
       }
     }
+    // Late-cancel checkpoint: the finalize above is awaited work whose invoke is
+    // signal-aware but fails open (returns null), so an abort landing during it
+    // would be swallowed. Re-check before the terminal so a cancelled run can
+    // never be reported as a successful one.
+    throwIfAborted(spec.signal);
     if (heldComplete !== null) {
       yield stampEvent(heldComplete, label, spec.turn, spec.agentId, spec.runId, deps.clock.now());
     }
@@ -790,6 +801,10 @@ export async function* runAgentExecution(
     }
 
     if (!driverCompleted) {
+      // The episodic settlement above is awaited work between the loop and this
+      // synthesized terminal: re-check so its latency cannot flip a cancelled run
+      // into a successful fallback complete.
+      throwIfAborted(spec.signal);
       yield completeEvent({
         pipeline: label,
         workspace: workspaceName,

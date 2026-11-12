@@ -12,7 +12,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { AgentDriver, ArenaEvent } from "@agentprism/contracts";
+import type { AgentDriver, ArenaEvent, ColumnRuntime, MemoryServicePort } from "@agentprism/contracts";
+import { PipelineConfigSchema } from "@agentprism/contracts";
 import type { AgentExecutionContext } from "@agentprism/harness";
 import { runAgentExecution } from "../src/agent-execution.js";
 import { collect, testDeps, testSpec } from "./run-fixtures.js";
@@ -137,5 +138,106 @@ describe("runAgentExecution cancellation", () => {
     expect(events.some((event) => event.type === "error")).toBe(true);
     expect(events.at(-1)?.type).toBe("complete");
     expect(events.at(-1)?.metrics?.success).toBe(false);
+  });
+
+  it("never reports a success terminal when the abort lands during the structured finalize", async () => {
+    const deps = testDeps();
+    const controller = new AbortController();
+    // The finalize call is signal-aware but fails open: the abort surfaces as a
+    // swallowed invoke failure, so the terminal re-check owns the classification.
+    const llm = {
+      invoke: async () => {
+        controller.abort();
+        const aborted = new Error("Aborted");
+        aborted.name = "AbortError";
+        throw aborted;
+      },
+      stream: async function* () {},
+    } as unknown as ColumnRuntime["llm"];
+    const driver: AgentDriver = {
+      frameworkId: "late-cancel",
+      displayName: "LateCancel",
+      async *run(ctx: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
+        yield {
+          type: "thought",
+          pipeline: ctx.config.label,
+          workspace: ctx.workspace.name,
+          content: "raw answer",
+          turn: ctx.turn,
+          runId: ctx.identity.runId,
+          timestamp: ctx.clock.now(),
+        } as ArenaEvent;
+        yield completeSuccess(ctx);
+      },
+    };
+    const events: ArenaEvent[] = [];
+    let thrown: unknown = null;
+    try {
+      for await (const event of runAgentExecution(
+        deps,
+        testSpec(driver, {
+          signal: controller.signal,
+          columnRuntime: { llm, llmVendor: null, contextWindow: 128_000, maxInputTokens: 120_000 },
+          config: PipelineConfigSchema.parse({ label: "col", harness: "bare", prompt_profile: "structured" }),
+        }),
+      )) {
+        events.push(event);
+      }
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect((thrown as Error | null)?.name).toBe("AbortError");
+    expect(events.some((event) => event.type === "complete")).toBe(false);
+  });
+
+  it("never reports a success fallback terminal when the abort lands during episodic settlement", async () => {
+    const deps = testDeps();
+    const controller = new AbortController();
+    // Settlement runs after the driver yielded no terminal at all: the fallback
+    // success complete must still see the cancel that landed while it was awaited.
+    const memory = {
+      recallEpisodic: async () => [],
+      recallSemantic: async () => [],
+      recallAll: async () => ({ episodic: [], semantic: [] }),
+      recordEpisodic: async () => {
+        controller.abort();
+        return {};
+      },
+    } as unknown as MemoryServicePort;
+    const driver: AgentDriver = {
+      frameworkId: "settle-cancel",
+      displayName: "SettleCancel",
+      async *run(ctx: AgentExecutionContext): AsyncGenerator<ArenaEvent> {
+        yield {
+          type: "thought",
+          pipeline: ctx.config.label,
+          workspace: ctx.workspace.name,
+          content: "partial answer",
+          turn: ctx.turn,
+          runId: ctx.identity.runId,
+          timestamp: ctx.clock.now(),
+        } as ArenaEvent;
+      },
+    };
+    const events: ArenaEvent[] = [];
+    let thrown: unknown = null;
+    try {
+      for await (const event of runAgentExecution(
+        deps,
+        testSpec(driver, {
+          signal: controller.signal,
+          memory,
+          config: PipelineConfigSchema.parse({ label: "col", harness: "bare", memory: "episodic" }),
+        }),
+      )) {
+        events.push(event);
+      }
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect((thrown as Error | null)?.name).toBe("AbortError");
+    expect(events.some((event) => event.type === "complete")).toBe(false);
   });
 });

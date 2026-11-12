@@ -77,6 +77,17 @@ describe("normalizeRuntimeKnobs", () => {
     expect(next.harnessRetries).toEqual({ verify: 4, reflect: 5, selfEvolve: 2 });
   });
 
+  it("round-trips the crewaiProcess select in both directions", () => {
+    const base = defaultRuntimeKnobs(settingsStub());
+    const hierarchical = normalizeRuntimeKnobs({ crewaiProcess: "hierarchical" }, base);
+    expect(hierarchical.crewaiProcess).toBe("hierarchical");
+    // Regression: the select must be able to switch back, not only into hierarchical
+    // (the fixed-branch form ignored a legal "sequential" payload over that base).
+    expect(normalizeRuntimeKnobs({ crewaiProcess: "sequential" }, hierarchical).crewaiProcess).toBe("sequential");
+    // An unknown option still falls back to the base value instead of being stored.
+    expect(normalizeRuntimeKnobs({ crewaiProcess: "bogus" }, hierarchical).crewaiProcess).toBe("hierarchical");
+  });
+
   it("keeps every base value for a non-object payload", () => {
     const base = defaultRuntimeKnobs(settingsStub());
     expect(normalizeRuntimeKnobs(null, base)).toEqual(base);

@@ -46,6 +46,20 @@ describe("lsTool", () => {
     }
   });
 
+  it("treats '.' as the workspace root", async () => {
+    const ws = tempWorkspace();
+    try {
+      ws.fs.writeFile("root.txt", "x");
+      // The scoped filesystem canonicalizes "." to null, so an unnormalized base would
+      // silently list nothing instead of the root the model asked for.
+      const out = await lsTool.execute(ws, { path: "." });
+      expect(out.ok).toBe(true);
+      expect(out.result).toContain("root.txt");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("renders the recursive workspace tree", async () => {
     const ws = tempWorkspace();
     try {

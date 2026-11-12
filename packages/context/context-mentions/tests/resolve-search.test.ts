@@ -33,6 +33,26 @@ describe("resolveMentionBlock", () => {
     expect(block).toContain("(missing: unresolvable)");
     expect(resolveMentionBlock(fs({}), [])).toBe("");
   });
+
+  it("lists a directory mentioned with a trailing slash", () => {
+    const dirFs: MentionFileSystem = {
+      readFile: () => {
+        throw new Error("not a file");
+      },
+      listFiles: (dir: string) => (dir === "src" || dir === "src/" ? ["a.ts", "b.ts"] : []),
+      exists: (path: string) => path === "src" || path === "src/",
+    };
+    const block = resolveMentionBlock(dirFs, parseMentions("what is in @src/"));
+    expect(block).toContain("a.ts");
+    expect(block).not.toContain("(missing");
+    const empty = resolveMentionBlock(
+      { ...dirFs, listFiles: () => [] },
+      parseMentions("what is in @src/"),
+    );
+    // An empty directory still resolves to an (empty) listing, not a false miss.
+    expect(empty).toContain("@src/");
+    expect(empty).not.toContain("(missing");
+  });
 });
 
 describe("searchMentions", () => {

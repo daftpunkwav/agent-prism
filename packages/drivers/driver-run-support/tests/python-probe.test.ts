@@ -5,6 +5,11 @@
  *              real interpreter (importing a module that never exists), plus
  *              the failure-TTL expiry that keeps a transient fault from being
  *              pinned for the process lifetime.
+ *
+ * Real-interpreter assertions run only where a working Python exists (CI
+ * windows-latest): hosts that carry only the Windows Store stub (exit 9009) or
+ * no interpreter at all cannot exercise them. Missing-interpreter paths are
+ * deterministic everywhere and stay unskipped.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -32,6 +37,10 @@ vi.mock("node:child_process", async (importOriginal) => {
   };
 });
 
+// Resolve once, before the tests: null means this host has no interpreter that
+// can import a stdlib module, so the real-interpreter assertions below skip.
+const realInterpreter = await probeFrameworkRuntime("json");
+
 describe("runtimeFromEnv", () => {
   it("parses the knob and falls back to auto", () => {
     expect(runtimeFromEnv("python")).toBe("python");
@@ -42,17 +51,20 @@ describe("runtimeFromEnv", () => {
   });
 });
 
-describe("canImport", () => {
+describe.skipIf(realInterpreter === null)("canImport with a real interpreter", () => {
   it("caches the probe outcome per interpreter and module", async () => {
+    const interpreter = realInterpreter as string;
     // stdlib module: always importable on the probe interpreter.
-    expect(await canImport("python", "json")).toBe(true);
+    expect(await canImport(interpreter, "json")).toBe(true);
     // Second call must hit the cache (identical result, no spawn).
-    expect(await canImport("python", "json")).toBe(true);
+    expect(await canImport(interpreter, "json")).toBe(true);
     // Nonexistent module: cached false.
-    expect(await canImport("python", "no_such_module_xyz")).toBe(false);
-    expect(await canImport("python", "no_such_module_xyz")).toBe(false);
+    expect(await canImport(interpreter, "no_such_module_xyz")).toBe(false);
+    expect(await canImport(interpreter, "no_such_module_xyz")).toBe(false);
   });
+});
 
+describe("canImport failure caching (host-independent)", () => {
   it("short-circuits within the failure TTL and re-probes once it expires", async () => {
     // A missing interpreter fails the real spawn instantly (ENOENT): exactly the
     // transient fault the negative cache exists to absorb.
@@ -86,9 +98,15 @@ describe("interpreterCandidates", () => {
 });
 
 describe("probeFrameworkRuntime", () => {
-  it("finds an interpreter that imports a real module and null for an impossible one", async () => {
-    // "json" is stdlib on any real interpreter, so the probe resolves.
-    expect(await probeFrameworkRuntime("json", { ARENA_PYTHON: "python" })).toBe("python");
-    expect(await probeFrameworkRuntime("no_such_module_xyz", { ARENA_PYTHON: "python" })).toBeNull();
+  it("returns null for a module no candidate interpreter can import", async () => {
+    // Deterministic on every host: the forced interpreter cannot even spawn.
+    expect(await probeFrameworkRuntime("json", { ARENA_PYTHON: "no-such-python-binary" })).toBeNull();
+  });
+
+  it.skipIf(realInterpreter === null)("finds an interpreter that imports a real module", async () => {
+    // "json" is stdlib on any real interpreter, so the probe resolves to the
+    // interpreter it proved (the override pins that one candidate).
+    const interpreter = realInterpreter as string;
+    expect(await probeFrameworkRuntime("json", { ARENA_PYTHON: interpreter })).toBe(interpreter);
   });
 });

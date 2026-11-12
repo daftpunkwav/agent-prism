@@ -222,6 +222,9 @@ export function runProcess(options: ProcessOptions): Promise<ProcessResult> {
     const timer = setTimeout(() => {
       // First killer wins: an abort already in flight keeps its "aborted" outcome (and its own escalation).
       if (settled || killReason !== null) return;
+      // The direct child already exited (its stdio is still draining): killing now is
+      // a no-op and claiming a timeout would misreport a run that finished in budget.
+      if (child.exitCode !== null || child.signalCode !== null) return;
       killReason = "timeout";
       child.kill();
     }, timeoutSeconds * 1000);
@@ -257,12 +260,14 @@ export function runProcess(options: ProcessOptions): Promise<ProcessResult> {
         resolve({ kind: "aborted", stdout, stderr, exitCode: null });
         return;
       }
-      if (termSignal !== null && killReason !== "timeout") {
-        resolve({ kind: "error", stdout, stderr, exitCode: null, errorName: `Signal ${termSignal}` });
+      // The run this call killed owns its outcome: a child that traps SIGTERM and
+      // exits zero after the timeout is still a timeout, never a success.
+      if (killReason === "timeout") {
+        resolve({ kind: "timeout", stdout, stderr, exitCode: null });
         return;
       }
       if (termSignal !== null) {
-        resolve({ kind: "timeout", stdout, stderr, exitCode: null });
+        resolve({ kind: "error", stdout, stderr, exitCode: null, errorName: `Signal ${termSignal}` });
         return;
       }
       // Helper-level setup failure (the target never ran): exit 3 plus this spawn's
