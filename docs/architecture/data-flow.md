@@ -24,13 +24,15 @@ Sequencing rules pinned in code:
 
 - `stream.onAbort` on the route aborts an `AbortController` whose signal reaches the
   runner. A client abort books the session as `cancelled`, and abort wins over failure.
-  `runAgentExecution` re-checks the signal before its terminal events (after the awaited
-  finalize and settlement work), so a cancelled run can never report a successful
-  terminal. A consumer that stops reading before a terminal settles the opened ledger row
-  as `cancelled` in the service's `finally`, matching the abort path instead of leaving it
-  `active`. See `packages/transport/route-arena/src/arena.ts`,
-  `packages/agent/agent/src/agent-execution.ts`, `ArenaService.run`, and contracts
-  `SessionStatus`.
+  `runAgentExecution` re-checks the signal before each terminal event (after the awaited
+  finalize/settlement work), so a cancellation observed before a terminal withholds it.
+  A cancellation observed only after a success terminal was emitted does not retract that
+  terminal; ledger settlement follows the commit rule of the owning service (a committed
+  thread turn settles `completed`). A consumer that stops reading before a terminal
+  settles the opened ledger row as `cancelled` in the service's `finally`, matching the
+  abort path instead of leaving it `active`. See `packages/transport/route-arena/src/arena.ts`,
+  `packages/agent/agent/src/agent-execution.ts`, `ArenaService.run`,
+  `ThreadService.run`, and contracts `SessionStatus`.
 - In-stream exceptions are emitted as an `error` event with `pipeline: "system"` on the
   same SSE channel, so the stream never dies silently.
 - Session booking goes through the `SessionService` use-case layer wrapped in

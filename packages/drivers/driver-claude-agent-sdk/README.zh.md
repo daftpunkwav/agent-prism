@@ -19,6 +19,8 @@ Claude Agent SDK driver：在子进程中运行 Claude Code 的 agent 循环，A
 - CLI 解析顺序：`ARENA_CLAUDE_CODE_PATH` → 全局安装的 Claude Code；SDK 自带的
   每平台 ~245 MB 二进制已在 `pnpm-workspace.yaml`（`ignoredOptionalDependencies`）
   中跳过——想改回内置二进制，删掉对应条目即可。
+- run loop 由 CLI 自己持有：不调用共享 context pipeline（`applyContextPipeline`），
+  因此该列的 `context` strategy 与 strategy-effectiveness 行不适用。
 
 ## 依赖
 

@@ -26,12 +26,14 @@ Web (apps/web) ──► Next rewrite /api/* → 127.0.0.1:8281 (apps/web/next.c
 
 - 路由上的 `stream.onAbort` 中止一个 `AbortController`，其 signal 抵达 runner。
   客户端 abort 把 session 记为 `cancelled`，且 abort 优先于 failure。
-  `runAgentExecution` 在其终止事件前（在 await 的 finalize 与结算工作之后）重新检查
-  signal，因此被取消的 run 绝不报告成功终止。消费者在终止前停止读取时，service 的
-  `finally` 会把已打开的账本行结算为 `cancelled`，与 abort 路径一致，而不是留在
-  `active`。见 `packages/transport/route-arena/src/arena.ts`、
-  `packages/agent/agent/src/agent-execution.ts`、`ArenaService.run` 与 contracts
-  `SessionStatus`。
+  `runAgentExecution` 在每个终止事件前（在 await 的 finalize/结算工作之后）重新检查
+  signal，因此在终止前观察到的取消会抑制该终止。若取消只在成功终止发出之后才被观察
+  到，则不会撤回该终止；账本结算遵循所属 service 的提交规则（已提交的 thread turn
+  结算为 `completed`）。消费者在终止前停止读取时，service 的 `finally` 会把已打开的
+  账本行结算为 `cancelled`，与 abort 路径一致，而不是留在 `active`。见
+  `packages/transport/route-arena/src/arena.ts`、
+  `packages/agent/agent/src/agent-execution.ts`、`ArenaService.run`、
+  `ThreadService.run` 与 contracts `SessionStatus`。
 - 流内异常作为 `error` event 发出，`pipeline: "system"`，在同一 SSE 通道上，
   因此流绝不静默死亡。
 - Session 记账经 `SessionService` 用例层，并包在 `safeSession` 中。

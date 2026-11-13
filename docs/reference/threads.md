@@ -12,10 +12,12 @@ and `packages/contracts/contracts/src/thread.ts` for the contracts.
 - Resume is thread-level, not step-level. A turn commits only on successful completion,
   appending the question, the extracted answer, and the resolved workspace in one atomic
   write. A failed or aborted turn leaves the transcript untouched, so the next run
-  resumes from the last committed point. A cancelled turn never commits, even when a
-  success terminal was already in flight, and its ledger row settles as `cancelled` if
-  the consumer stops reading before a terminal. There is no mid-step pause, because the
-  run restarts the turn from the committed history.
+  resumes from the last committed point. A cancelled turn never commits: a cancellation
+  observed before the success terminal withholds it. Once the transcript is committed
+  (the success terminal was already processed), the ledger row always settles as
+  `completed`, even if cancellation is observed afterwards; a consumer that stops reading
+  before any terminal settles the row as `cancelled`. There is no mid-step pause, because
+  the run restarts the turn from the committed history.
 - History and workspace are replayed server-side. Every run goes through the full arena
   pipeline, covering concurrency slots, circuit breakers, events, workspace rehydration,
   and the sandbox and approval layers, with the thread's pinned `PipelineConfig`. The

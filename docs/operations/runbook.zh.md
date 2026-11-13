@@ -50,7 +50,8 @@ tools 与每列 verdict。cell 会消耗真实模型调用。
   per-path 队列、`.bak` 恢复），session op 日志 `data/sessions.jsonl` 以追加写入，
   重放时遏制损坏行。损坏的 provider 文件回退到 `.env` 播种。损坏的 session
   记录被遏制，而非致命。
-- 在支持 POSIX mode 的平台上，持久文件以 owner-only（`0o600`）创建、新数据目录以
+- 在支持 POSIX mode 的平台上，经 `@agentprism/persistence` 写入的文件（文档、日志、
+  `.bak` 副本）与 session blob sidecar 以 owner-only（`0o600`）创建，新建的数据目录以
   owner-only（`0o700`）创建；原子 rename 把该 mode 带到目标上，因此早先 world-readable
   的文件会被替换为私有文件，且每次写入都会把 `.bak` 副本重新设为 `0o600`。Windows
   忽略这些 mode，由其 ACL 控制访问。

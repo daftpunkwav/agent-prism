@@ -19,7 +19,9 @@ clusters (`bash -lc '…'`), and bare `sudo` plus leading `NAME=value` assignmen
 transparent to the destructive-shape review. The read-only allowlist is deliberately
 stricter: those prefixes disqualify a command (`PATH=… ls` is not known-safe), and heads
 that can write or execute through an argument carry guards (`find -exec`, `rg --pre`,
-`sort -o`, `git reflog expire`, and similar).
+`sort -o`, `git reflog expire`, and similar). Guarded long options are matched by
+unambiguous prefix (GNU `getopt_long` semantics), so an abbreviation such as
+`env --split=…` or `sort --out=…` is rejected exactly like the full spelling.
 
 Review order on the `beforeExecute` chain in `agent/src/tool-access.ts`
 `buildToolAccess` is: caller hook, then approval gate, then static analysis. The OS layer

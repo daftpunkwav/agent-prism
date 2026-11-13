@@ -237,7 +237,11 @@ builder palette，也不参与 `/api/arena/meta` 的按端点 thinking 轴投影
 
 写入统一经 `@agentprism/persistence`。文档型 store 原子写：`.tmp` 文件、rename、
 per-path 写队列与 `.bak` 副本。行式文件（session op 日志）经 per-path 队列追加，
-加载时跳过并计数截断或损坏的行，而非丢失整个 store。在支持 POSIX mode 的平台上，新文件以 owner-only（`0o600`）创建、新父目录以 owner-only（`0o700`）创建；原子替换会把 tmp 文件的 mode 带到目标上，因此早先 world-readable 的文件会被替换为私有文件，且每次写入都会把 `.bak` 副本重新设为 `0o600`。Windows 忽略这些 mode，由其 ACL 控制访问。
+加载时跳过并计数截断或损坏的行，而非丢失整个 store。在支持 POSIX mode 的平台上，经
+`@agentprism/persistence` 写入的文件（文档、行式日志及其 `.bak` 副本）与 session blob
+sidecar 以 owner-only（`0o600`）创建，新父目录以 owner-only（`0o700`）创建；原子替换会把
+tmp 文件的 mode 带到目标上，因此早先 world-readable 的文件会被替换为私有文件，且每次
+写入都会把 `.bak` 副本重新设为 `0o600`。Windows 忽略这些 mode，由其 ACL 控制访问。
 
 ## 前端配置
 

@@ -255,10 +255,12 @@ Writes go through `@agentprism/persistence`. Document stores write atomically: a
 file, a rename, a per-path write queue, and a `.bak` copy. Line-oriented files (the
 session op log) append through a per-path queue instead, and a torn or corrupt line is
 skipped and counted on load rather than losing the store. Where the platform honors POSIX
-modes, new files are created owner-only (`0o600`) and new parent directories owner-only
-(`0o700`); the atomic replace carries the tmp file's mode onto the target, so an earlier
-world-readable file is replaced by a private one, and the `.bak` copy is re-asserted to
-`0o600` on each write. Windows ignores the modes and its ACLs govern access.
+modes, files written through `@agentprism/persistence` (documents, line journals, and
+their `.bak` copies) and the session blob sidecar are created owner-only (`0o600`), and
+newly created parent directories owner-only (`0o700`); the atomic replace carries the tmp
+file's mode onto the target, so an earlier world-readable file is replaced by a private
+one, and the `.bak` copy is re-asserted to `0o600` on each write. Windows ignores the
+modes and its ACLs govern access.
 
 ## Frontend configuration
 

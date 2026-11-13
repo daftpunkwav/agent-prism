@@ -9,11 +9,11 @@ workspace glob `apps/*` 包含两个可运行的 application。它们位于依�
 | App | Package | 职责 | 入口 |
 |---|---|---|---|
 | [`server/`](server/) | `@agentprism/server` | 组合根与 HTTP host：settings、driver 注册、route 挂载、service 装配、端口监听 | `src/main.ts` |
-| [`web/`](web/) | `@agentprism/web` | Next.js 前端，含 arena、builder、sessions、threads 与 settings 页面 | `src/app` |
+| [`web/`](web/) | `@agentprism/web` | Next.js 前端，含 arena、builder、sessions、projects、guide、learn 与 settings 页面 | `src/app` |
 
 ## server/
 
-- `src/main.ts` 依次运行 `assemble()`、`startServer()`、`installSignalHandlers()`。
+- `src/main.ts` 依次运行 `assemble()`、`startServer()`，启动周期性 session checkpoint 与崩溃处理器，最后安装 signal handlers。
 - `src/assemble.ts` 是唯一的组合根。它是唯一允许构造 driver registry、调用
   `registerDriversBestEffort`、挂载 `register*Routes` leaf 的地方。
 - `src/load-drivers.ts` 定义 `builtinDriverLoaders`，即各 driver backend 的动态
