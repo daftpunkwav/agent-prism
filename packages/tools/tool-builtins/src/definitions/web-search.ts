@@ -82,6 +82,27 @@ function normalizeTavily(payload: unknown): SearchHit[] {
   });
 }
 
+/**
+ * Maps an abort-shaped failure to its terminal search outcome, or null when the error
+ * is not an abort/timeout. Both the request and the response-body read are governed by
+ * the same linked signal (AbortSignal.timeout aborts with "TimeoutError"; a caller
+ * cancellation carries "AbortError"), so both phases must map identically: a caller
+ * cancel is its own `aborted` outcome (registry contract), a deadline is the timeout
+ * message. Without this, a body-read timeout fell through to "unreadable response".
+ */
+function abortOutcome(
+  error: unknown,
+  signal: AbortSignal | undefined,
+  timeoutSignal: AbortSignal,
+): ToolExecutionResult | null {
+  const errorName = error instanceof Error ? error.name : "";
+  if (errorName !== "AbortError" && errorName !== "TimeoutError" && !timeoutSignal.aborted) return null;
+  if (signal?.aborted === true) {
+    return { result: "Error: aborted", fileDiff: null, ok: false, code: "aborted" };
+  }
+  return { result: "Error: search timed out", fileDiff: null, ok: false, code: "workspace_error" };
+}
+
 async function executeWebSearch(
   workspace: ToolWorkspace,
   args: ToolArgs,
@@ -117,17 +138,8 @@ async function executeWebSearch(
   try {
     response = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify(body), signal: linked });
   } catch (error) {
-    // AbortSignal.timeout aborts with a DOMException named "TimeoutError" (a caller
-    // cancellation carries "AbortError"); without both names a real timeout fell
-    // through to the generic "search request failed" branch.
-    const errorName = error instanceof Error ? error.name : "";
-    if (errorName === "AbortError" || errorName === "TimeoutError" || timeoutSignal.aborted) {
-      if (signal?.aborted === true) {
-        // Caller cancellation is its own outcome, distinct from a timeout (registry contract).
-        return { result: "Error: aborted", fileDiff: null, ok: false, code: "aborted" };
-      }
-      return { result: "Error: search timed out", fileDiff: null, ok: false, code: "workspace_error" };
-    }
+    const aborted = abortOutcome(error, signal, timeoutSignal);
+    if (aborted !== null) return aborted;
     return { result: `Error: search request failed (${error instanceof Error ? error.message : String(error)})`, fileDiff: null, ok: false, code: "workspace_error" };
   }
   if (!response.ok) {
@@ -144,6 +156,10 @@ async function executeWebSearch(
     });
     return { result: boundText(workspace, "web_search", lines.join("\n")), fileDiff: null, ok: true };
   } catch (error) {
+    // The body read is covered by the same timeout/cancel signal as the request: map
+    // an abort here as well instead of pretending the payload is unreadable.
+    const aborted = abortOutcome(error, signal, timeoutSignal);
+    if (aborted !== null) return aborted;
     if (error instanceof WorkspaceError) {
       return { result: error.message, fileDiff: null, ok: false, code: "workspace_error" };
     }
