@@ -296,6 +296,25 @@ describe("createChatModel OpenAI thinking effort", () => {
     expect((model as unknown as { modelKwargs?: Record<string, unknown> }).modelKwargs).toEqual({
       reasoning_effort: "xhigh",
     });
+    // Chat Completions carries the level as the flat reasoning_effort field.
+    const params = (model as unknown as { invocationParams: (options: unknown) => Record<string, unknown> }).invocationParams({});
+    expect(params["reasoning_effort"]).toBe("xhigh");
+    expect(params["reasoning"]).toBeUndefined();
+  });
+
+  it("sends the Responses-API reasoning object for openai_responses endpoints", () => {
+    const model = createChatModel({
+      provider: fixture("openai_responses"),
+      overrides: { thinkingCapable: true, thinkingLevel: "xhigh" },
+    });
+    expect((model as unknown as { modelKwargs?: Record<string, unknown> }).modelKwargs).toEqual({
+      reasoning: { effort: "xhigh" },
+    });
+    // The Responses API has no top-level reasoning_effort: a flat field would be
+    // rejected by strict endpoints, so the effort must ride the reasoning object.
+    const params = (model as unknown as { invocationParams: (options: unknown) => Record<string, unknown> }).invocationParams({});
+    expect(params["reasoning"]).toEqual({ effort: "xhigh" });
+    expect(params["reasoning_effort"]).toBeUndefined();
   });
 
   it("sends no reasoning_effort when thinking is off or the model is not capable", () => {
