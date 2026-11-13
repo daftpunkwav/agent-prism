@@ -156,6 +156,12 @@ async function executeGrep(workspace: ToolWorkspace, args: ToolArgs): Promise<To
       }
     }
     const files = view.fs.listFiles(basePath, { recursive: true });
+    // Mirror the glob tool's base-relative semantics for the include filter: listFiles
+    // returns paths relative to the WORKSPACE ROOT, so a separator pattern written
+    // relative to the searched base ("nested/*.py" under path "sub") must also be
+    // tested against the base-stripped path. normalizeBasePath guarantees the trailing
+    // shape needed for the prefix comparison.
+    const basePrefix = basePath === "" ? "" : `${basePath}/`;
     const lines: string[] = [];
     let truncated = false;
     // Byte budgets keep one call from pinning the event loop on a dependency tree:
@@ -165,9 +171,18 @@ async function executeGrep(workspace: ToolWorkspace, args: ToolArgs): Promise<To
     let headOnlyFiles = 0;
     for (const file of files) {
       if (globMatcher !== null) {
-        // ripgrep semantics: a pattern without "/" matches the file name, otherwise the path
-        const subject = globFilter.includes("/") ? file : file.split("/").pop() ?? file;
-        if (!globMatcher.test(subject)) continue;
+        // ripgrep semantics: a pattern without "/" matches the file name, otherwise the
+        // path. With a base directory a separator pattern may be written relative to
+        // that base, so accept either the root-relative or the base-stripped path.
+        const patternHasSlash = globFilter.includes("/");
+        const subject = patternHasSlash ? file : file.split("/").pop() ?? file;
+        const matches =
+          globMatcher.test(subject) ||
+          (patternHasSlash &&
+            basePrefix !== "" &&
+            file.startsWith(basePrefix) &&
+            globMatcher.test(file.slice(basePrefix.length)));
+        if (!matches) continue;
       }
       if (bytesLeft <= 0) {
         truncated = true;

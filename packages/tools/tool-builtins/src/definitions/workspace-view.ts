@@ -28,13 +28,42 @@ export function asWorkspaceView(workspace: ToolWorkspace): WorkspaceView {
 }
 
 /**
- * Normalizes a base-directory arg for the scoped filesystem: "." and "./" mean the
- * workspace root. The scoped filesystem treats "" as the root while "." canonicalizes
- * to null and list operations return nothing, so an unnormalized "." would make
- * ls/glob/grep silently act on an empty directory and report "no matches" instead of
- * the workspace verdict the model asked for.
+ * Normalizes a base-directory arg for the scoped filesystem. "" means the workspace
+ * root; "." and its relative spellings ("./", ".\\", "./src", "src/.") collapse to
+ * their canonical relative form.
+ *
+ * The scoped filesystem resolves "."/".."/separators internally, but the glob tool
+ * also compares the base as a literal string prefix, so the spelling must be canonical
+ * BEFORE the walk or base-relative patterns silently match nothing. ".." and absolute
+ * values are deliberately kept as-is: the scoped filesystem rejects them, closing the
+ * containment boundary downstream.
  */
 export function normalizeBasePath(raw: unknown): string {
-  const path = typeof raw === "string" ? raw.trim() : "";
-  return path === "." || path === "./" ? "" : path;
+  if (typeof raw !== "string") return "";
+  // Backslashes are path separators for the models this host serves (Windows), and the
+  // scoped filesystem already converts them; do it before any prefix comparison.
+  let path = raw.trim().replaceAll("\\", "/");
+  const absolute = path.startsWith("/");
+  path = path.replace(/\/{2,}/g, "/");
+  // Repeated current-directory prefixes are noise ("." , "./", "././src").
+  while (path.startsWith("./")) path = path.slice(2);
+  // Trailing separators and a trailing dot segment name the same directory ("src/",
+  // "src/."). Loop linearly: unanchored `/\/+$/` backtracking degrades quadratically.
+  for (;;) {
+    if (path === "/") break; // keep the absolute marker for the containment check
+    if (path.endsWith("/")) {
+      path = path.slice(0, -1);
+      continue;
+    }
+    if (path.endsWith("/.")) {
+      path = path.slice(0, -2);
+      continue;
+    }
+    break;
+  }
+  if (path === ".") return "";
+  // Preserve absoluteness even when stripping reduced the value to empty ("/", "/."):
+  // returning "" would silently expose the workspace root for an absolute arg.
+  if (path === "") return absolute ? "/" : "";
+  return path;
 }
