@@ -21,11 +21,13 @@ const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 /**
  * Loopback in any accepted spelling (bare/bracketed host, with or without brackets stripped).
- * Single source for loopback checks (URL policy and the runtime listen guard share it).
+ * Single source for loopback checks (URL policy and the runtime listen guard share it), so the
+ * DNS absolute form is normalized here as well: the listen guard passes the configured bind
+ * host directly, and "localhost." must classify exactly like "localhost".
  */
 export function isLoopbackHost(hostname: string): boolean {
-  const lowered = hostname.toLowerCase();
-  return LOOPBACK_HOSTS.has(lowered) || LOOPBACK_HOSTS.has(hostname.replace(/^\[|\]$/g, "").toLowerCase());
+  const normalized = normalizeHostname(hostname).toLowerCase();
+  return LOOPBACK_HOSTS.has(normalized) || LOOPBACK_HOSTS.has(normalized.replace(/^\[|\]$/g, ""));
 }
 
 /** Rejected website URL (non-http(s) scheme, traversal, or malformed host). */
@@ -51,14 +53,20 @@ function expandNumericIpv4(hostname: string): string | null {
 }
 
 /**
- * Strips the DNS absolute-form trailing dot ("localhost." → "localhost").
+ * Strips every DNS absolute-form trailing dot ("localhost..." → "localhost").
  * The WHATWG parser normalizes a numeric host's trailing dot away, but keeps it
  * on a name host; every denylist/loopback/range check therefore has to compare
  * the dotless spelling or "metadata.google.internal." resolves exactly like the
- * denylisted name and passes as an ordinary name host.
+ * denylisted name and passes as an ordinary name host. More than one dot is not
+ * a valid absolute form, but parsers/resolvers are lenient, so all of them are
+ * stripped; the loop stops at one character so a dot-only host stays non-empty.
  */
 function normalizeHostname(hostname: string): string {
-  return hostname.endsWith(".") ? hostname.slice(0, -1) : hostname;
+  let normalized = hostname;
+  while (normalized.length > 1 && normalized.endsWith(".")) {
+    normalized = normalized.slice(0, -1);
+  }
+  return normalized;
 }
 
 function parseHost(rawHostname: string): { kind: "name" | "ipv4" | "ipv6"; value: string } {
