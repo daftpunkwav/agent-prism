@@ -114,6 +114,9 @@ export function createUserSkill(input: { name: string; description: string; body
   if (config.fs === null || config.dir === null) throw new Error("user skills are not configured");
   const name = input.name.trim();
   if (!SKILL_NAME_RE.test(name)) throw new Error("name must be kebab-case (lowercase letters, digits, dashes)");
+  // Bundled names are read-only in every direction (create/update/delete): a user file
+  // with the same name would shadow the shipped runbook on the next discovery.
+  if (BUNDLED_SKILLS.some((skill) => skill.name === name)) throw new Error("bundled skills are read-only");
   const description = input.description.trim();
   if (description === "") throw new Error("description must not be empty");
   if (/\r?\n/.test(description)) {
