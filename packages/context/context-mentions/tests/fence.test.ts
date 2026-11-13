@@ -53,12 +53,13 @@ describe("escapeClosingTag", () => {
     expect(escapeClosingTag(text, "file_mention")).toBe(text);
   });
 
-  it("returns empty inputs unchanged", () => {
+  it("returns empty input unchanged", () => {
     expect(escapeClosingTag("", "file_mention")).toBe("");
-    expect(escapeClosingTag("text", "")).toBe("text");
   });
 
-  it("treats regex metacharacters in the tag name literally", () => {
-    expect(escapeClosingTag("</retrieved.doc>", "retrieved.doc")).toBe("<\\/retrieved.doc>");
+  it("supports every known fence tag", () => {
+    expect(escapeClosingTag("</workspace_instructions>", "workspace_instructions")).toBe("<\\/workspace_instructions>");
+    expect(escapeClosingTag("</retrieved_doc>", "retrieved_doc")).toBe("<\\/retrieved_doc>");
+    expect(escapeClosingTag("</file_mention>", "file_mention")).toBe("<\\/file_mention>");
   });
 });

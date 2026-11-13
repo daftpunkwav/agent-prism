@@ -9,10 +9,19 @@
  * helper is shared by the mention, RAG-snippet, and workspace-instruction fences.
  */
 
-/** Escapes regular-expression metacharacters so a tag name can be embedded literally. */
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+/** Fence tags rendered by the shared prompt blocks. */
+export type FenceTag = "workspace_instructions" | "retrieved_doc" | "file_mention";
+
+/**
+ * Literal patterns, one per known fence tag. Literals (never a tag-derived
+ * `RegExp`) keep the helper free of pattern injection; models do not parse markup
+ * case-sensitively, so case, whitespace, and attributes are all matched.
+ */
+const CLOSE_TAG_PATTERNS: Record<FenceTag, RegExp> = {
+  workspace_instructions: /<\/\s*workspace_instructions\b[^>]*>/gi,
+  retrieved_doc: /<\/\s*retrieved_doc\b[^>]*>/gi,
+  file_mention: /<\/\s*file_mention\b[^>]*>/gi,
+};
 
 /**
  * Neutralizes closing-tag lookalikes inside text mounted in a fenced prompt block.
@@ -23,13 +32,11 @@ function escapeRegExp(text: string): string {
  * after "<" keeps the text readable while it can no longer match the close tag.
  *
  * @param text Content rendered inside the fence (may be empty).
- * @param tag Tag name of the fence; must end with a word character for the `\b`
- *   boundary to behave.
+ * @param tag Fence tag known to the renderers.
  * @returns `text` with every closing-tag variant escaped.
  */
-export function escapeClosingTag(text: string, tag: string): string {
-  if (text === "" || tag === "") return text;
-  // <\/\s*TAG\b[^>]*>  →  <\/TAG...> for every case/whitespace/attribute variant.
-  const pattern = new RegExp(`<\\/\\s*${escapeRegExp(tag)}\\b[^>]*>`, "gi");
-  return text.replace(pattern, (match) => "<\\" + match.slice(1));
+export function escapeClosingTag(text: string, tag: FenceTag): string {
+  if (text === "") return text;
+  // Literal global patterns: String#replace resets lastIndex before scanning.
+  return text.replace(CLOSE_TAG_PATTERNS[tag], (match) => "<\\" + match.slice(1));
 }
