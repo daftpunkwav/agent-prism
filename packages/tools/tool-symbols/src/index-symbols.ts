@@ -85,7 +85,8 @@ function skipLeadingGenerics(text: string): string {
 function implContainerName(line: string): string | null {
   const head = /^\s*(?:pub\s+)?impl\b/.exec(line);
   if (head === null) return null;
-  const rest = skipLeadingGenerics(line.slice(head[0].length)).replace(/\{?\s*$/, "").trim();
+  let rest = skipLeadingGenerics(line.slice(head[0].length)).trimEnd();
+  if (rest.endsWith("{")) rest = rest.slice(0, -1).trimEnd();
   if (rest === "") return null;
   const forAt = rest.lastIndexOf(" for ");
   const target = (forAt === -1 ? rest : rest.slice(forAt + " for ".length)).trim();
