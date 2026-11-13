@@ -67,8 +67,8 @@
     "@agentprism/tool-mcp": "workspace:*",
     "@agentprism/tool-replay": "workspace:*",
     "@hono/node-server": "^2.1.6",
-    "@langchain/core": "^1.3.3",
-    "hono": "^4.13.16"
+    "@langchain/core": "^1.3.6",
+    "hono": "^4.13.17"
   },
   "devDependencies": {
     "@agentprism/session": "workspace:*",
