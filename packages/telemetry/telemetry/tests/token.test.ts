@@ -78,6 +78,14 @@ describe("TokenTracker ratios", () => {
     expect(stats.input_usage_pct).toBe(100);
   });
 
+  it("rounds fractional percentages to two decimals", () => {
+    const tracker = new TokenTracker({ contextWindow: 1_000, maxInputTokens: 7 });
+    tracker.addUsage({ inputTokens: 1, outputTokens: 0 });
+    const stats = tracker.asDict();
+    expect(stats.context_usage_pct).toBe(0.1);
+    expect(stats.input_usage_pct).toBe(14.29);
+  });
+
   it("exposes the configured window and output cap for the stats panel", () => {
     const tracker = new TokenTracker({ contextWindow: 2_000, maxInputTokens: 1_500, maxOutputTokens: 512 });
     const stats = tracker.asDict();
