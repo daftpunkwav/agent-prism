@@ -64,12 +64,14 @@ export class FileBlobStore implements SessionBlobStore {
   }
 
   async saveBlob(sessionId: string, seq: number, text: string): Promise<void> {
-    mkdirSync(this.dir, { recursive: true });
+    // Owner-only creation: blobs carry full ledger entry bodies, and the data
+    // directory may sit on a shared POSIX host. On Windows the mode is ignored.
+    mkdirSync(this.dir, { recursive: true, mode: 0o700 });
     const target = path.join(this.dir, FileBlobStore.fileName(sessionId, seq));
     // Torn-write containment: a crash mid-write must never leave a partial blob
     // that reads back as truncated ledger text. Same-volume rename is atomic.
     const tmp = `${target}.tmp`;
-    writeFileSync(tmp, text, "utf-8");
+    writeFileSync(tmp, text, { encoding: "utf-8", mode: 0o600 });
     renameSync(tmp, target);
   }
 
