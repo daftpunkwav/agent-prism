@@ -38,6 +38,26 @@ describe("indexFile", () => {
     expect(indexFiles([{ path: "b.ts", text: TS }, { path: "a.ts", text: TS }])[0]!.file).toBe("a.ts");
   });
 
+  it("scopes Rust impl methods under the impl target without emitting the impl block", () => {
+    // Methods inside an impl block are indented definitions; without a container frame
+    // they reported scope "" and looked top-level in the defs listing.
+    const rust = [
+      "impl Config {",
+      "  fn load(&self) -> u8 { 1 }",
+      "}",
+      "",
+      "pub impl<T> Display for Wrapper<T> {",
+      "  fn show(&self) {}",
+      "}",
+    ].join("\n");
+    const defs = indexFile("lib.rs", rust);
+    // The impl block is a scope, not a definition: no Config/Wrapper rows.
+    expect(defs.map((d) => d.name)).toEqual(["load", "show"]);
+    expect(defs[0]?.scope).toBe("impl Config");
+    // Trait impls scope under the target type the methods belong to.
+    expect(defs[1]?.scope).toBe("impl Wrapper");
+  });
+
   it("labels interfaces, enums, structs, and traits by their own kind", () => {
     // Regression: a shared alternative pattern recorded every construct as "class".
     const ts = [
