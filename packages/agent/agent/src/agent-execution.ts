@@ -787,7 +787,16 @@ export async function* runAgentExecution(
 
     // Episodic settlement: top-level runs distill one mini post-mortem per
     // execution (task, tools, outcome) so later sessions recall what worked.
+    // Cancel honesty: the memory write is best-effort and not signal-aware. A
+    // fallback run (no driver terminal) that was already cancelled must not teach a
+    // success experience for an answer whose terminal is withheld, so re-check before
+    // the write. A cancel landing inside the awaited write can still leave one success
+    // entry — the narrow, unavoidable window the fallback terminal checkpoint below
+    // keeps from turning into a success terminal. Driver-completed runs already
+    // yielded their terminal above, where throwing would fabricate a second terminal,
+    // so their settlement stays best-effort.
     if (subagentDepth === 0) {
+      if (!driverCompleted) throwIfAborted(spec.signal);
       await recordEpisodicExperience(memoryService, memoryPolicy, {
         task: spec.question.slice(0, 500),
         framework: spec.config.framework,

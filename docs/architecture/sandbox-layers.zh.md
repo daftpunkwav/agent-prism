@@ -18,7 +18,9 @@
 按簇匹配（`bash -lc '…'`），裸 `sudo` 与前导的 `NAME=value` 赋值对灾难性形态审查是
 透明的。只读 allowlist 刻意更严格：这些前缀会使命令失去已知安全资格
 （`PATH=… ls` 不算安全），而能通过参数写入或执行的 head 另带守卫（`find -exec`、
-`rg --pre`、`sort -o`、`git reflog expire` 等）。
+`rg --pre`、`sort -o`、`git reflog expire` 等）。受守卫的长选项按无歧义前缀匹配
+（GNU `getopt_long` 语义），因此 `env --split=…`、`sort --out=…` 这类缩写会被与完整
+拼写一样拒绝。
 
 `beforeExecute` 链上的审查顺序见 `agent/src/tool-access.ts` 的
 `buildToolAccess`：调用方 hook，然后审批闸门，然后静态分析。OS 层不是审查步骤。

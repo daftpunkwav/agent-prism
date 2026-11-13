@@ -30,8 +30,8 @@ each section.
   the held body through the same zod schema, so a shape error is `422` before any
   semantic check; `saveProvider` then answers `400` for a semantically invalid config.
   The `/api/settings/*` endpoints hand-validate and answer `400` for bad input, `409`
-  for a skill-name collision with a bundled or existing skill, and a mapped `5xx` when
-  a persisted store write fails.
+  for skill identity conflicts (bundled read-only, duplicate name), and let unexpected
+  store-write failures propagate to the shell's `500` mapping (skill CRUD included).
 - Health. `GET /api/health` and `GET /health` return
   `{"status":"ok","service":"arena"}`.
 
@@ -52,12 +52,12 @@ seam keeps booting. Settings endpoints validate by hand and answer `400` for bad
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | GET | `/api/settings/knobs` | read the current runtime knobs | returns `{knobs, fields}` |
-| PUT | `/api/settings/knobs` | hot-apply knob updates | always `200`: out-of-range or malformed fields clamp or fall back to the current value, and `knobs` in the response carries the effective values |
+| PUT | `/api/settings/knobs` | hot-apply knob updates | `200` for any valid JSON payload: out-of-range or malformed fields clamp or fall back to the current value, and `knobs` in the response carries the effective values; malformed JSON is `400`, a store write failure is `500` |
 | GET | `/api/settings/memory` | cross-session memory status | episodic and semantic counts and file paths |
 | POST | `/api/settings/memory/clear` | clear both memory stores | persists before answering, so a write failure becomes a mapped `5xx` |
 | GET | `/api/settings/skills` | list the effective skill catalog | `{skills}` with name, description, source, and enabled flag |
 | POST | `/api/settings/skills` | create a user skill | body `name`, `description`, `body`; `201`; `409` for a bundled or duplicate name |
-| PUT | `/api/settings/skills/:name` | update a user skill | body `description` and/or `body`; `400` for unknown names, `409` for bundled ones |
+| PUT | `/api/settings/skills/:name` | update a user skill | body `description` and/or `body`; a non-object body (`null`, array, scalar) is `400`; `400` for unknown names, `409` for bundled ones |
 | DELETE | `/api/settings/skills/:name` | delete a user skill | `{ok:true}`; same `400`/`409` split |
 | PUT | `/api/settings/skills/:name/enabled` | enable or disable a skill | body `enabled` boolean, else `400` |
 | GET | `/api/settings/mcp` | read the managed MCP server list | `{servers}` |

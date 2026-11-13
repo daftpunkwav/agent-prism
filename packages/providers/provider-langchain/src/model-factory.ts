@@ -166,9 +166,16 @@ export function createChatModel(options: CreateChatModelOptions): BaseChatModel 
       ...(overrides.presencePenalty !== undefined ? { presencePenalty: overrides.presencePenalty } : {}),
       // Thinking effort rides modelKwargs: the SDK's own `reasoning` mapping only
       // fires for OpenAI's own model-name patterns, while this repo drives vendor
-      // endpoints that must still receive the configured level verbatim.
+      // endpoints that must still receive the configured level verbatim. The wire
+      // spelling differs by protocol: Chat Completions takes `reasoning_effort`,
+      // the Responses API takes the `reasoning: { effort }` object.
       ...(thinking?.reasoningEffort !== undefined
-        ? { modelKwargs: { reasoning_effort: thinking.reasoningEffort } }
+        ? {
+            modelKwargs:
+              apiFormat === "openai_responses"
+                ? { reasoning: { effort: thinking.reasoningEffort } }
+                : { reasoning_effort: thinking.reasoningEffort },
+          }
         : {}),
     });
   }

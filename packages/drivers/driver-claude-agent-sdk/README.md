@@ -19,6 +19,8 @@ Arena tools served over an in-process MCP server.
 - The CLI is resolved from `ARENA_CLAUDE_CODE_PATH`, else a globally installed Claude Code;
   the SDK's ~245 MB per-platform binary is skipped in `pnpm-workspace.yaml`
   (`ignoredOptionalDependencies`) — remove an entry there to use the bundled binary instead.
+- The CLI owns its run loop: the shared context pipeline (`applyContextPipeline`) is not
+  called, so the column's `context` strategy and strategy-effectiveness rows do not apply.
 
 ## Dependencies
 

@@ -483,6 +483,21 @@ function shortOptionLetter(word: string, letters: string): boolean {
 }
 
 /**
+ * Long options accept unambiguous prefixes under GNU getopt_long: `--out=FILE`
+ * reaches `--output`, `--se=…` reaches `--set`, `--split=…` reaches
+ * `--split-string`. Comparing whole spellings therefore misses the very flag a
+ * guard rejects. The comparison is one-directional (`name.startsWith(typed)`)
+ * and deliberately fail closed: an ambiguous prefix that a real binary would
+ * refuse is refused here too, which costs a read-only spelling a normal
+ * approval, never containment. The bare `--` terminator never matches.
+ */
+function longOptionMatches(word: string, name: string): boolean {
+  if (!word.startsWith("--")) return false;
+  const typed = word.slice(2).split("=", 1)[0] ?? "";
+  return typed !== "" && name.startsWith(typed);
+}
+
+/**
  * Heads that are safe only under argument constraints; a guard returns true
  * when the argument words keep the command read-only. A guard must reject every
  * form carrying a write or exec argument: false positives (a write waved
@@ -491,38 +506,41 @@ function shortOptionLetter(word: string, letters: string): boolean {
 const HEAD_GUARDS: Record<string, (words: string[]) => boolean> = {
   find: (words) => !words.some((w) => /^-(delete|exec|execdir|ok|okdir|fls|fprint)/.test(w)),
   // `env CMD` runs the first non-assignment argument; only the print-only forms are read-only.
-  // -S/--split-string takes a command string, attached or not (`env -S'rm x'`).
+  // -S/--split-string takes a command string, attached or not (`env -S'rm x'`); GNU
+  // env accepts any unambiguous prefix of the long form (`--split=`, `--s=`).
   env: (words) =>
     words.slice(1).every(
       (w) =>
         ENV_ASSIGNMENT.test(w) ||
-        (w.startsWith("-") && !shortOptionLetter(w, "S") && !w.startsWith("--split-string")),
+        (w.startsWith("-") && !shortOptionLetter(w, "S") && !longOptionMatches(w, "split-string")),
     ),
   // --pre runs a program once per file.
   rg: (words) => !words.some((w) => w.startsWith("--pre")),
   // -C/--compile compiles the magic database to disk (clustered as `-Cm` too).
-  file: (words) => !words.some((w) => shortOptionLetter(w, "C") || w.startsWith("--compile")),
+  file: (words) => !words.some((w) => shortOptionLetter(w, "C") || longOptionMatches(w, "compile")),
   // -o/--output writes the listing to a file instead of stdout.
-  tree: (words) => !words.some((w) => shortOptionLetter(w, "o") || w.startsWith("--output")),
+  tree: (words) => !words.some((w) => shortOptionLetter(w, "o") || longOptionMatches(w, "output")),
   // -o writes a file, -T/--temporary-directory writes temp files, --compress-program runs a program.
   sort: (words) =>
     !words.some(
       (w) =>
         shortOptionLetter(w, "oT") ||
-        w.startsWith("--output") ||
-        w.startsWith("--temporary-directory") ||
-        w.startsWith("--compress-program"),
+        longOptionMatches(w, "output") ||
+        longOptionMatches(w, "temporary-directory") ||
+        longOptionMatches(w, "compress-program"),
     ),
   // POSIX uniq takes an optional output file: uniq [input [output]].
   uniq: (words) => words.slice(1).filter((w) => !w.startsWith("-")).length <= 1,
   // -o/--output writes the patch to a file (attached as `-ofile`, clustered as `-no`).
-  diff: (words) => !words.some((w) => shortOptionLetter(w, "o") || w.startsWith("--output")),
-  // -s/--set changes the system clock (attached as `-s20200101`).
-  date: (words) => !words.some((w) => shortOptionLetter(w, "s") || w.startsWith("--set")),
+  diff: (words) => !words.some((w) => shortOptionLetter(w, "o") || longOptionMatches(w, "output")),
+  // -s/--set changes the system clock (attached as `-s20200101`, abbreviated as `--se=`).
+  date: (words) => !words.some((w) => shortOptionLetter(w, "s") || longOptionMatches(w, "set")),
   // A bare operand sets the hostname; only the query flags are read-only. -F/--file
-  // sets it from a file (attached as `-F/tmp/names` or `--file=/tmp/names`).
+  // sets it from a file (attached as `-F/tmp/names`, abbreviated as `--fil=`).
   hostname: (words) =>
-    words.slice(1).every((w) => w.startsWith("-") && !shortOptionLetter(w, "F") && !w.startsWith("--file")),
+    words.slice(1).every(
+      (w) => w.startsWith("-") && !shortOptionLetter(w, "F") && !longOptionMatches(w, "file"),
+    ),
   git: (words) => isSafeGitInvocation(words.slice(1)),
   npm: (words) => ["ls", "ll", "list", "outdated"].includes(words[1] ?? ""),
   pnpm: (words) => ["ls", "ll", "list", "outdated"].includes(words[1] ?? ""),
@@ -567,15 +585,49 @@ const SAFE_GIT_SUBCOMMANDS = new Set([
   "stash",
 ]);
 
+/**
+ * `git branch` argument-free query flags. Every other form touches refs: a
+ * positional operand creates a branch, and -d/-D delete while -m/-M/-c/-C move
+ * or copy and the upstream flags rewrite config. Listing patterns after
+ * --list/--contains are operands too, so guards stay fail closed there.
+ */
+const SAFE_GIT_BRANCH_FLAGS = new Set([
+  "-a",
+  "--all",
+  "-r",
+  "--remotes",
+  "-l",
+  "--list",
+  "-v",
+  "-vv",
+  "--verbose",
+  "--show-current",
+  "--no-color",
+  "--color",
+  "--column",
+  "--no-column",
+  "--omit-empty",
+  "--abbrev",
+  "--no-abbrev",
+  "-i",
+  "--ignore-case",
+]);
+
 /** Argument guards for git subcommands that are read-only only in some forms. */
 function isSafeGitInvocation(args: string[]): boolean {
   const sub = args[0] ?? "";
   if (!SAFE_GIT_SUBCOMMANDS.has(sub)) return false;
   switch (sub) {
     case "branch":
-      return !args.some((w) => w === "-d" || w === "-D" || w === "--delete");
+      // Query-only: a positional operand is a new branch name and the mutating
+      // flags (-d/-D/-m/-M/-f/-c/-C/-u/--track/--set-upstream-to/…) move refs.
+      return args.slice(1).every((w) => SAFE_GIT_BRANCH_FLAGS.has(w));
     case "diff":
-      return !args.some((w) => w.startsWith("--output"));
+    case "log":
+    case "show":
+      // --output=FILE writes the patch/listing to disk. Prefix matching keeps the
+      // guard fail closed for abbreviated spellings as well.
+      return !args.some((w) => longOptionMatches(w, "output"));
     case "config": {
       if (args.some((w) => ["--get", "--get-all", "--list", "-l"].includes(w))) return true;
       return args.length <= 2; // `git config <key>` reads; `<key> <value>` writes

@@ -60,6 +60,34 @@ describe("lsTool", () => {
     }
   });
 
+  it("treats a Windows-style '.\\' as the workspace root", async () => {
+    const ws = tempWorkspace();
+    try {
+      ws.fs.writeFile("root.txt", "x");
+      // Windows PowerShell models spell the current directory ".\" — the scoped
+      // filesystem only understands forward slashes, so normalization must bridge it.
+      const out = await lsTool.execute(ws, { path: ".\\" });
+      expect(out.ok).toBe(true);
+      expect(out.result).toContain("root.txt");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
+  it("keeps an absolute base fail-closed instead of exposing the workspace root", async () => {
+    const ws = tempWorkspace();
+    try {
+      ws.fs.writeFile("root.txt", "x");
+      // Normalization must preserve absoluteness even for "/" (it trims to ""):
+      // mapping it to the root would silently answer an out-of-workspace request.
+      const out = await lsTool.execute(ws, { path: "/" });
+      expect(out.ok).toBe(true);
+      expect(out.result).toBe("(empty)");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("renders the recursive workspace tree", async () => {
     const ws = tempWorkspace();
     try {

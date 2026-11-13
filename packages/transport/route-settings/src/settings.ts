@@ -11,22 +11,27 @@
  * The controllers arrive on HttpApplicationDeps (composition root owns the
  * stores); absent controllers skip registration so a host without the seams
  * keeps booting. Skill writes reject bundled names and duplicate creates with
- * 409; unknown names and invalid input answer 400 (see skillErrorStatus).
- * MCP replace failures parse as 400 with the parser's message; a persistence
- * failure propagates to the shell's 5xx mapping instead.
+ * 409; unknown names and known validation defects answer 400 (see
+ * skillErrorStatus). Unexpected store failures (EACCES, ENOSPC, an unconfigured
+ * store) are rethrown to the shell's 5xx mapping instead of being misreported as
+ * bad input. MCP replace failures parse as 400 with the parser's message, and an
+ * MCP persistence failure likewise propagates to the 5xx mapping.
  *
  * Error-code contract (deliberately different from the schema-validated route
  * families): every settings endpoint validates by hand and answers 400 with a
- * `{detail}` body, while the arena/builder/threads families parse through zod
- * (parseJsonBody) and answer 422 for schema mismatches. Malformed JSON is 400
- * everywhere. The split is historical, not accidental drift: settings payloads
- * are operator state patches where a field-level 400 reads better than a 422;
- * keep new settings endpoints in the 400 family.
+ * `{detail}` body for malformed input, while the arena/builder/threads families
+ * parse through zod (parseJsonBody) and answer 422 for schema mismatches.
+ * Malformed JSON is 400 everywhere. The split is historical, not accidental
+ * drift: settings payloads are operator state patches where a field-level 400
+ * reads better than a 422; keep new settings endpoints in the 400 family.
+ * Non-object JSON bodies (null, arrays, scalars) answer 400 on every route that
+ * reads a field from the body.
  *
- * Knobs PUT always answers 200: invalid or out-of-range fields silently clamp
- * or fall back to the current value (normalize semantics), and the response's
- * `knobs` carries the effective values — clients detect a fallback by diffing
- * the request against the response.
+ * Knobs PUT answers 200 for every valid JSON payload: invalid or out-of-range
+ * fields silently clamp or fall back to the current value (normalize semantics),
+ * and the response's `knobs` carries the effective values — clients detect a
+ * fallback by diffing the request against the response. Malformed JSON is 400 and
+ * a store write failure is 500, like every other settings endpoint.
  */
 
 import type { HttpApplicationDeps } from "@agentprism/http-runtime";
@@ -43,6 +48,30 @@ function skillErrorDetail(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Recognized skill-store defects: validation messages and identity sentinels the
+ * store throws for bad operator input. Anything else (a filesystem error, an
+ * unconfigured store) is a host failure and must not be reported as bad input.
+ */
+const KNOWN_SKILL_ERROR_PREFIXES = [
+  "name must be ",
+  "description must be ",
+  "body must be ",
+  "unknown user skill",
+  "invalid skill name",
+] as const;
+
+/** Whether a skill-store error is a known validation/identity defect answerable with 400/409. */
+function isKnownSkillError(error: unknown): error is Error {
+  if (!(error instanceof Error)) return false;
+  const message = error.message;
+  return (
+    KNOWN_SKILL_ERROR_PREFIXES.some((prefix) => message.startsWith(prefix)) ||
+    message.includes("read-only") ||
+    message.includes("already exists")
+  );
+}
+
 function skillErrorStatus(error: unknown): 400 | 409 {
   const message = skillErrorDetail(error);
   // Defects answer 400 before the identity sentinels are consulted: the unknown-name
@@ -52,6 +81,11 @@ function skillErrorStatus(error: unknown): 400 | 409 {
   return message.includes("read-only") || message.includes("already exists") ? 409 : 400;
 }
 
+/** True for the plain JSON object subset the hand-validated routes read fields from. */
+function isRequestBodyObject(raw: unknown): raw is Record<string, unknown> {
+  return raw !== null && typeof raw === "object" && !Array.isArray(raw);
+}
+
 /**
  * Narrows a parsed JSON body to the plain object these hand-validated endpoints
  * read fields from. A body that is null, an array, or a scalar is a malformed
@@ -59,7 +93,7 @@ function skillErrorStatus(error: unknown): 400 | 409 {
  * per-field checks answer 400 instead of crashing a property read into a 500.
  */
 function requestBodyObject(raw: unknown): Record<string, unknown> {
-  return raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return isRequestBodyObject(raw) ? raw : {};
 }
 
 /** Registers the settings knob, memory, skill, and MCP routes. */
@@ -92,20 +126,25 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
       try {
         return c.json({ skill: skills.create({ name, description, body: bodyText }) }, 201);
       } catch (error) {
+        if (!isKnownSkillError(error)) throw error;
         return c.json({ detail: skillErrorDetail(error) }, skillErrorStatus(error));
       }
     });
     app.put("/api/settings/skills/:name", async (c) => {
       const name = c.req.param("name");
-      const body = requestBodyObject(await readJsonRaw(c));
+      const raw = await readJsonRaw(c);
+      // A non-object body is malformed input, not an empty patch: without this the
+      // update route silently answered 200 for null/array/scalar JSON.
+      if (!isRequestBodyObject(raw)) return c.json({ detail: "Request body must be a JSON object" }, 400);
       try {
         return c.json({
           skill: skills.update(name, {
-            description: typeof body.description === "string" ? body.description : undefined,
-            body: typeof body.body === "string" ? body.body : undefined,
+            description: typeof raw.description === "string" ? raw.description : undefined,
+            body: typeof raw.body === "string" ? raw.body : undefined,
           }),
         });
       } catch (error) {
+        if (!isKnownSkillError(error)) throw error;
         return c.json({ detail: skillErrorDetail(error) }, skillErrorStatus(error));
       }
     });
@@ -114,6 +153,7 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
         skills.remove(c.req.param("name"));
         return c.json({ ok: true });
       } catch (error) {
+        if (!isKnownSkillError(error)) throw error;
         return c.json({ detail: skillErrorDetail(error) }, skillErrorStatus(error));
       }
     });
@@ -124,7 +164,8 @@ export function registerSettingsRoutes(app: HttpApp, deps: HttpApplicationDeps):
         skills.setEnabled(c.req.param("name"), body.enabled);
         return c.json({ ok: true });
       } catch (error) {
-        return c.json({ detail: error instanceof Error ? error.message : String(error) }, 400);
+        if (!isKnownSkillError(error)) throw error;
+        return c.json({ detail: skillErrorDetail(error) }, skillErrorStatus(error));
       }
     });
   }

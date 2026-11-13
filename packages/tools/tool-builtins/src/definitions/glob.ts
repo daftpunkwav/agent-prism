@@ -141,7 +141,10 @@ export function globToRegExp(pattern: string): RegExp {
 async function executeGlob(workspace: ToolWorkspace, args: ToolArgs): Promise<ToolExecutionResult> {
   try {
     const view = asWorkspaceView(workspace);
-    const pattern = String(args.pattern ?? "").trim();
+    // A "./"-prefixed pattern is current-directory noise: strip it so "./*.ts" matches
+    // like "*.ts" (listFiles never returns "./" paths to match against).
+    let pattern = String(args.pattern ?? "").trim();
+    while (pattern.startsWith("./")) pattern = pattern.slice(2);
     if (pattern === "") {
       return { result: "Error: pattern must not be empty", fileDiff: null, ok: false, code: "workspace_error" };
     }

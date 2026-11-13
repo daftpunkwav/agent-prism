@@ -715,6 +715,79 @@ describe("BuilderService /compact", () => {
     expect(detail.session.history[0]).toEqual({ role: "user", content: "/compact now please", turn: 1 });
     expect(await sessions.listSessions({ kind: "builder" })).toHaveLength(1);
   });
+
+  it("aborting the caller during /compact stops the summarizer and leaves history uncompacted", async () => {
+    const harness = makeDriverHarness(["fake"], { block: false });
+    const sessions = makeSessionLedger();
+    // Summarizer invoke stays pending until the linked signal aborts, then rejects
+    // like a signal-aware adapter; the test records the signal it was handed.
+    let markStarted: () => void = () => {};
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const capturedSignals: AbortSignal[] = [];
+    const abortableRuntime: BuilderModelRuntimeFactory = {
+      create: (config) => ({
+        llm: {
+          async *stream() {
+            yield { text: "unused" };
+          },
+          invoke(_messages, invokeOptions) {
+            const signal = invokeOptions?.signal;
+            if (signal !== undefined) capturedSignals.push(signal);
+            markStarted();
+            return new Promise((_resolve, reject) => {
+              const abort = () => {
+                const aborted = new Error("Aborted");
+                aborted.name = "AbortError";
+                reject(aborted);
+              };
+              if (signal?.aborted === true) abort();
+              else signal?.addEventListener("abort", abort, { once: true });
+            });
+          },
+        },
+        llmVendor: { config },
+        contextWindow: 128_000,
+        maxInputTokens: 120_000,
+      }),
+    };
+    const service = makeService(harness, sessions, abortableRuntime);
+    const view = service.createSession(BuilderCreateRequestSchema.parse({ name: "D", composition: { framework: "fake" } }));
+    await collect(service.chatTurn(view.id, "hello"));
+
+    const controller = new AbortController();
+    const generator = service.chatTurn(view.id, "/compact", { signal: controller.signal });
+    const first = await generator.next();
+    expect(first.value).toMatchObject({ stream: "trace" });
+    const pending = generator.next();
+    await started;
+    controller.abort();
+
+    // The link must reach the summarizer (a dropped signal would leave this pending).
+    const outcome = await Promise.race([
+      pending.then(() => "resolved", () => "rejected"),
+      new Promise<string>((resolve) => setTimeout(() => resolve("timeout"), 2_000)),
+    ]);
+    expect(outcome).toBe("rejected");
+    await pending.catch(() => {});
+    expect(capturedSignals).toHaveLength(1);
+    expect(capturedSignals[0]?.aborted).toBe(true);
+
+    // The command applies only after a successful summarize: history is untouched.
+    const detail = await service.getSessionDetail(view.id);
+    expect(detail.session.turn_count).toBe(1);
+    expect(detail.session.history).toHaveLength(2);
+    expect(detail.session.history.at(-1)).toEqual({ role: "assistant", content: "Hello from fake", turn: 1 });
+    expect(detail.session.running).toBe(false);
+    expect(service.abortTurn(view.id)).toBe(false);
+
+    const rows = await sessions.listSessions({ kind: "builder" });
+    expect(rows).toHaveLength(2);
+    // The seed turn completed; the aborted compaction row is the cancelled one.
+    expect(rows.filter((row) => row.status === "cancelled")).toHaveLength(1);
+    expect(rows.filter((row) => row.status === "completed")).toHaveLength(1);
+  });
 });
 
 describe("BuilderService chat attachments", () => {

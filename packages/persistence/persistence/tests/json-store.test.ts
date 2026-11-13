@@ -1,17 +1,21 @@
 /**
  * @file JSON store tests
- * @description Covers atomicWriteJsonAsync concurrency.
+ * @description Covers atomicWriteJson concurrency and owner-only file modes.
  *
  * Responsibilities:
  * - Serialize concurrent async writes per path
+ * - Pin owner-only modes for the main file and the `.bak` on POSIX hosts
  */
 
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { atomicWriteJsonAsync, readJsonFile, sweepOrphanTempFiles } from "@agentprism/persistence";
+import { atomicWriteJson, atomicWriteJsonAsync, readJsonFile, sweepOrphanTempFiles } from "@agentprism/persistence";
+
+/** POSIX mode bits only; Windows ignores them, so the mode cases skip there. */
+const modeOf = (path: string): number => statSync(path).mode & 0o777;
 
 describe("atomicWriteJsonAsync concurrent serialization", () => {
   const dir = join(tmpdir(), `aprism-json-store-${randomUUID()}`);
@@ -120,5 +124,47 @@ describe("sweepOrphanTempFiles", () => {
     expect(sweepOrphanTempFiles(dir)).toBe(0);
     // Missing directory: not an error.
     expect(sweepOrphanTempFiles(join(dir, "absent"))).toBe(0);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("owner-only file modes (POSIX)", () => {
+  const dir = join(tmpdir(), `aprism-json-modes-${randomUUID()}`);
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** World-readable main file plus `.bak`, as a pre-upgrade data directory could hold. */
+  function seedWorldReadable(filePath: string): void {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(filePath, JSON.stringify({ v: 1 }), "utf-8");
+    writeFileSync(`${filePath}.bak`, JSON.stringify({ v: 0 }), "utf-8");
+    chmodSync(filePath, 0o644);
+    chmodSync(`${filePath}.bak`, 0o644);
+    expect(modeOf(filePath)).toBe(0o644);
+    expect(modeOf(`${filePath}.bak`)).toBe(0o644);
+  }
+
+  it("async write replaces a world-readable main file and re-asserts the .bak", async () => {
+    const filePath = join(dir, "async.json");
+    seedWorldReadable(filePath);
+
+    await atomicWriteJsonAsync(filePath, { v: 2 });
+
+    expect(modeOf(filePath)).toBe(0o600);
+    expect(modeOf(`${filePath}.bak`)).toBe(0o600);
+    expect(readJsonFile<{ v: number }>(filePath)).toEqual({ v: 2 });
+    expect(existsSync(`${filePath}.tmp`)).toBe(false);
+  });
+
+  it("sync write hardens both files as well", () => {
+    const filePath = join(dir, "sync.json");
+    seedWorldReadable(filePath);
+
+    atomicWriteJson(filePath, { v: 2 });
+
+    expect(modeOf(filePath)).toBe(0o600);
+    expect(modeOf(`${filePath}.bak`)).toBe(0o600);
+    expect(readJsonFile<{ v: number }>(`${filePath}.bak`)).toEqual({ v: 1 });
   });
 });

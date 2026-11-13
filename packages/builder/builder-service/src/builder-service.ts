@@ -301,12 +301,15 @@ export class BuilderService {
    * turn slot (guards, trace, ledger) but never increments the turn counter.
    *
    * @param id Builder session id (must exist and be idle).
+   * @param options Caller abort signal: a client disconnect during the summarize
+   *   call aborts it, the ledger row settles cancelled, and the history stays
+   *   uncompacted (the command applies only after a successful summarize).
    * @yields Trace entries then one turn chunk (answer names the char reduction,
    *   or explains the graceful failure); history persists only on success.
    * @throws BuilderError 404 on unknown sessions, 409 on concurrent turns, 422 on
    *   empty history; provider failures propagate after the ledger fail row.
    */
-  async *compactTurn(id: string): AsyncGenerator<BuilderStreamChunk> {
+  async *compactTurn(id: string, options: { signal?: AbortSignal } = {}): AsyncGenerator<BuilderStreamChunk> {
     const record = this.deps.store.get(id);
     this.assertIdle(record);
     if (record.history.length === 0) {
@@ -314,6 +317,11 @@ export class BuilderService {
     }
 
     const controller = new AbortController();
+    // Same link as chatTurn: the caller's signal is the client disconnect, and the
+    // summarizer call must stop with it instead of finishing maintenance nobody waits for.
+    const forwardAbort = () => controller.abort();
+    options.signal?.addEventListener("abort", forwardAbort, { once: true });
+    if (options.signal?.aborted) controller.abort();
     this.runs.set(id, { controller });
     this.deps.store.markRunning(id, true);
 
@@ -408,6 +416,7 @@ export class BuilderService {
       ledgerSettled = true;
       throw error;
     } finally {
+      options.signal?.removeEventListener("abort", forwardAbort);
       this.runs.delete(id);
       this.deps.store.markRunning(id, false);
       // A consumer that detached before the turn settled leaves an active ledger
@@ -441,7 +450,9 @@ export class BuilderService {
     const record = this.deps.store.get(id);
     this.assertIdle(record);
     if (message.trim() === "/compact") {
-      yield* this.compactTurn(id);
+      // Same caller signal as a normal turn: a client disconnect must abort the
+      // summarize call and cancel its ledger row instead of finishing maintenance.
+      yield* this.compactTurn(id, options);
       return;
     }
     if (message.length > BUILDER_MESSAGE_MAX_CHARS) {

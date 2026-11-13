@@ -11,6 +11,8 @@ Arena 的模型与工具端口之上。
 - 注册表工具绑定为 function tool；每次调用都经 `tools.execute`，并使用与
   LangChain 列相同的漂移护栏与结果提醒。
 - 温度/max tokens/thinking 来自列上配置好的模型，不再二次应用 SDK 侧 `modelSettings`。
+- run loop 由 SDK 自己持有：不调用共享 context pipeline（`applyContextPipeline`），
+  因此该列的 `context` strategy 与 strategy-effectiveness 行不适用。
 
 ## 依赖
 

@@ -78,6 +78,9 @@ describe("user skills", () => {
     expect(() => updateUserSkill("ok", { description: "line1\nline2" })).toThrow(/single line/);
     expect(() => updateUserSkill("commit", { body: "nope" })).toThrow(/read-only/);
     expect(() => deleteUserSkill("review")).toThrow(/read-only/);
+    // Bundled names are read-only for creation too: a user file with the same name
+    // would shadow the shipped runbook on the next discovery.
+    expect(() => createUserSkill({ name: "commit", description: "x", body: "y" })).toThrow(/read-only/);
     expect(() => deleteUserSkill("missing")).toThrow(/unknown user skill/);
     configureUserSkills({ fs: null, dir: null, settings: null });
   });
@@ -85,7 +88,9 @@ describe("user skills", () => {
   it("merges bundled, user, and workspace sources with later sources winning", () => {
     const env = memoryEnv();
     configureUserSkills({ fs: env.fs, dir: "skills", settings: env.settings });
-    createUserSkill({ name: "commit", description: "user commit override", body: "user rules" });
+    // A same-name user file can still exist on disk (written by an operator or before
+    // the create guard); merge precedence must keep handling the override.
+    env.files.set("skills/commit/SKILL.md", "---\ndescription: user commit override\n---\n\nuser rules\n");
     const workspaceRead = (path: string) =>
       path === ".skills/commit/SKILL.md" ? "---\ndescription: workspace commit\n---\n\nworkspace rules" : "";
     const { skills } = effectiveSkills(workspaceRead, () => [".skills/commit/SKILL.md"]);

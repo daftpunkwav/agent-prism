@@ -5,7 +5,8 @@
  * Responsibilities:
  * - Read and hot-apply runtime knobs
  * - Report and clear memory status
- * - Skill CRUD with 409 (identity) vs 400 (defect) error mapping
+ * - Skill CRUD with 409 (identity) vs 400 (defect) error mapping and 5xx for
+ *   unexpected store failures
  * - MCP list/replace with 400 on invalid input
  * - Skip registration when the controllers are absent
  */
@@ -154,12 +155,41 @@ describe("settings routes", () => {
     expect(detail.detail).toContain("command");
   });
 
+  it("answers 500 when a skill store write fails, not 400", async () => {
+    // EACCES/ENOSPC are host failures: they must reach the shell's 5xx mapping,
+    // never read as "your request was invalid".
+    const storeFailure = (): never => {
+      throw new Error("EACCES: permission denied, open 'data/skills/x/SKILL.md'");
+    };
+    const app = buildTestApp({
+      skills: {
+        list: () => [],
+        create: storeFailure,
+        update: storeFailure,
+        remove: storeFailure,
+        setEnabled: storeFailure,
+      },
+    });
+    const headers = { "Content-Type": "application/json" };
+    const attempts = [
+      { path: "/api/settings/skills", method: "POST", body: JSON.stringify({ name: "fresh", description: "d", body: "b" }) },
+      { path: "/api/settings/skills/user-a", method: "PUT", body: JSON.stringify({ description: "new" }) },
+      { path: "/api/settings/skills/user-a", method: "DELETE", body: undefined },
+      { path: "/api/settings/skills/user-a/enabled", method: "PUT", body: JSON.stringify({ enabled: true }) },
+    ] as const;
+    for (const { path, method, body } of attempts) {
+      const res = await app.request(path, { method, headers, ...(body === undefined ? {} : { body }) });
+      expect(res.status, `${method} ${path}`).toBe(500);
+    }
+  });
+
   it("answers 400, never a 500, for a JSON null settings body", async () => {
     // A JSON `null` is a valid body: a null property read used to escape the
     // hand-validation as a TypeError and surface as a 500.
     const app = buildTestApp();
     const cases = [
       { path: "/api/settings/skills", method: "POST" },
+      { path: "/api/settings/skills/user-a", method: "PUT" },
       { path: "/api/settings/skills/user-a/enabled", method: "PUT" },
       { path: "/api/settings/mcp", method: "PUT" },
     ] as const;

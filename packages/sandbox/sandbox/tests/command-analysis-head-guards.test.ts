@@ -78,6 +78,22 @@ describe("git subcommand guards", { retry: 1 }, () => {
     }
   });
 
+  it("accepts argument-free branch queries and log/show listings", () => {
+    for (const command of [
+      "git branch",
+      "git branch -l",
+      "git branch -a",
+      "git branch -r",
+      "git branch -v",
+      "git branch -vv",
+      "git branch --show-current",
+      "git log -1",
+      "git show HEAD~1",
+    ]) {
+      safe(command);
+    }
+  });
+
   it("rejects the forms that write", () => {
     for (const command of [
       "git remote add origin url",
@@ -89,6 +105,20 @@ describe("git subcommand guards", { retry: 1 }, () => {
       "git diff --output=patch.diff HEAD~1",
       "git branch -D feat",
       "git commit -m x",
+      // A positional operand creates a ref; -m/-f/-rd/-u move, force, or delete refs.
+      "git branch new",
+      "git branch -m main main2",
+      "git branch -M main main2",
+      "git branch -f main HEAD~1",
+      "git branch -rd origin/x",
+      "git branch -u origin/main",
+      "git branch --set-upstream-to=origin/main",
+      "git branch --edit-description",
+      // --output writes the listing to disk; prefixes reach it under git's parser too.
+      "git log --output=log.txt",
+      "git log --out=log.txt",
+      "git show --output=show.txt",
+      "git show --out=show.txt",
     ]) {
       unsafe(command);
     }
@@ -115,23 +145,32 @@ describe("heads with write or exec arguments", { retry: 1 }, () => {
       "env",
       "env FOO=1",
       "env -0",
+      "env --null",
       "sort in.txt",
       "sort -n in.txt",
+      "sort --stable in.txt",
+      "sort --check in.txt",
       "uniq in.txt",
       "uniq -c in.txt",
       "diff a b",
       "diff -u a b",
+      "diff --unified a b",
       "tree .",
+      "tree -d .",
+      "tree --gitignore .",
       "file README.md",
+      "file --mime README.md",
       "gcc --version",
       "gcc -v",
       "date +%s",
       "date -u",
       "date -R",
       "date +%Y-%m-%d",
+      "date --utc",
       "hostname",
       "hostname -f",
       "hostname -i",
+      "hostname --fqdn",
       "git reflog",
       "git reflog show HEAD@{1}",
     ]) {
@@ -146,6 +185,11 @@ describe("heads with write or exec arguments", { retry: 1 }, () => {
       "env FOO=1 rm -rf /",
       "env -S'echo hi'",
       "env --split-string=echo",
+      // GNU getopt_long accepts unambiguous long-option prefixes; they reach the
+      // guarded option and must be rejected exactly like the full spelling.
+      "env --split='rm -rf /'",
+      "env --s='rm -rf /'",
+      "env --sp='rm -rf /'",
       // --pre runs a program per file; --compress-program runs a compression program.
       "rg --pre rm pattern .",
       "sort --compress-program=rm in.txt",
@@ -153,26 +197,40 @@ describe("heads with write or exec arguments", { retry: 1 }, () => {
       "sort -o out.txt in.txt",
       "sort -oout.txt in.txt",
       "sort --output=out.txt in.txt",
+      "sort --out=out.txt in.txt",
+      "sort --ou=out.txt in.txt",
       "sort -T /tmp in.txt",
+      "sort --temp=/tmp in.txt",
+      "sort --comp=rm in.txt",
       "uniq in.txt out.txt",
       "diff -o patch.diff a b",
       "diff -opatch.diff a b",
       "diff --output=patch.diff a b",
+      "diff --outp=patch.diff a b",
+      "diff --out=patch.diff a b",
       "tree -o tree.txt",
       "tree -otree.txt",
       "tree --output=tree.txt",
+      "tree --outp=tree.txt",
+      "tree --out=tree.txt",
       "file -C -m magic",
       "file -Cm magic",
       "file --compile -m magic",
+      "file --com -m magic",
+      "file --comp -m magic",
       // System state and hostname setters, including attached option values.
       "date -s 2020-01-01",
       "date -s20200101",
       "date -us 20200101",
       "date --set=2020-01-01",
+      "date --se=2020-01-01",
+      "date --s=20200101",
       "hostname evil",
       "hostname -F names.txt",
       "hostname -F/tmp/names",
       "hostname --file=/tmp/names",
+      "hostname --fil=/tmp/names",
+      "hostname --fi=/tmp/names",
       // `git reflog` mutating subactions rewrite the reflog.
       "git reflog expire --expire=now --all",
       "git reflog delete HEAD@{1}",

@@ -40,10 +40,10 @@ export class InMemorySessionStore implements SessionStore {
   private readonly entries = new Map<string, SessionEntry[]>();
   private readonly blobs: SessionBlobStore;
   /**
-   * Per-session serial tail for async appends. The store has no IO port, so this
-   * map is its whole synchronization surface: appending awaits the blob sidecar,
-   * and two appends interleaving that await would both read `list.length` and
-   * claim the same seq (the durable backends serialize the same way).
+   * Per-session serial tail for session mutations. The store has no file IO, so
+   * this map is its whole synchronization surface: appends await the blob sidecar
+   * and a delete purges it, and interleaving either with another mutation would
+   * claim one seq twice or resurrect entries for an already-deleted session.
    */
   private readonly appendQueues = new Map<string, Promise<void>>();
 
@@ -53,7 +53,7 @@ export class InMemorySessionStore implements SessionStore {
     this.blobs = deps.blobs ?? new InMemoryBlobStore();
   }
 
-  /** Queues `task` behind every append already started for one session. */
+  /** Queues `task` behind every mutation already started for one session. */
   private enqueueAppend<T>(sessionId: string, task: () => Promise<T>): Promise<T> {
     const tail = this.appendQueues.get(sessionId) ?? Promise.resolve();
     // The same handler on both settle paths: a rejected predecessor must not
@@ -178,12 +178,19 @@ export class InMemorySessionStore implements SessionStore {
       .map((r) => ({ ...r }));
   }
 
-  /** Deletes record plus entries; false when unknown (no throw). */
+  /**
+   * Deletes record plus entries; false when unknown (no throw).
+   * Queued with the appends: a pending spill must settle before the erase, or its
+   * late mutation would re-add entries for a deleted id and its blob write could
+   * land after the purge (orphan blob).
+   */
   async delete(id: string): Promise<boolean> {
-    const existed = this.records.delete(id);
-    this.entries.delete(id);
-    if (existed) await this.blobs.deleteSessionBlobs(id);
-    return existed;
+    return this.enqueueAppend(id, async () => {
+      const existed = this.records.delete(id);
+      this.entries.delete(id);
+      if (existed) await this.blobs.deleteSessionBlobs(id);
+      return existed;
+    });
   }
 
   /** Full spilled text for one entry; null when inline or unavailable (read path never throws). */

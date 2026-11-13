@@ -66,6 +66,30 @@ describe("globTool", () => {
     }
   });
 
+  it("normalizes base-path spellings and a leading './' on the pattern", async () => {
+    const ws = tempWorkspace();
+    try {
+      ws.fs.writeFile("top.ts", "0");
+      ws.fs.writeFile("src/a.ts", "1");
+      ws.fs.writeFile("src/nested/b.ts", "2");
+      // These spellings canonicalize in the scoped filesystem, but the base-relative
+      // matcher compares the base as a literal prefix: before normalizeBasePath
+      // canonicalized them, "*.ts" under "./src" silently matched nothing.
+      for (const base of ["./src", ".\\src", "src/."]) {
+        const outcome = await globTool.execute(ws, { pattern: "*.ts", path: base });
+        expect(outcome.result, base).toBe("src/a.ts");
+      }
+      // A "./"-prefixed pattern is current-directory noise: "./*.ts" must match like
+      // "*.ts" instead of compiling into a literal "./" prefix no path starts with.
+      const dotted = await globTool.execute(ws, { pattern: "./*.ts", path: "./src" });
+      expect(dotted.result).toBe("src/a.ts");
+      const dottedRoot = await globTool.execute(ws, { pattern: "./*.ts", path: "./" });
+      expect(dottedRoot.result).toBe("top.ts");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("supports brace alternation", () => {
     const regex = globToRegExp("*.{ts,tsx}");
     expect(regex.test("a.ts")).toBe(true);

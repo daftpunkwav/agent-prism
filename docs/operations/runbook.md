@@ -49,11 +49,12 @@ Operational notes:
   rename, per-path queue, `.bak` recovery), and the session op log `data/sessions.jsonl`
   appends with corrupt-line containment on replay. A corrupt provider file falls back to
   the `.env` seed. A corrupt session record is contained rather than fatal.
-- On hosts that honor POSIX modes, persisted files are created owner-only (`0o600`) and
-  new data directories owner-only (`0o700`); the atomic rename carries that mode onto the
-  target, so an earlier world-readable file is replaced private, and the `.bak` copy is
-  re-asserted to `0o600` on every write. Windows ignores the modes, and its ACLs govern
-  access instead.
+- On hosts that honor POSIX modes, files written through `@agentprism/persistence`
+  (documents, journals, `.bak` copies) and the session blob sidecar are created owner-only
+  (`0o600`), and newly created data directories owner-only (`0o700`); the atomic rename
+  carries that mode onto the target, so an earlier world-readable file is replaced private,
+  and the `.bak` copy is re-asserted to `0o600` on every write. Windows ignores the modes,
+  and its ACLs govern access instead.
 - Sessions left `active` by a killed process flip to `failed` on the next load.
 - Oversized ledger entries live in `data/sessions.json.blobs/`. Deleting a session purges
   its blobs.

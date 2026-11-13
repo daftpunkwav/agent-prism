@@ -204,11 +204,23 @@ describe("DNS absolute-form (trailing dot) hosts", () => {
     expect(() => validateWebsiteUrl("https://kubernetes.default./")).toThrow(UrlValidationError);
   });
 
+  it("strips every trailing dot before the denylist checks (multi-dot absolute form)", () => {
+    // Only one trailing dot is a valid DNS absolute form, but parsers accept runs of
+    // them; a name host whose dots are not all stripped still resolves like the
+    // denylisted name while passing the string compare.
+    expect(() => validateFetchUrl("https://metadata.google.internal.../token")).toThrow(UrlValidationError);
+    expect(() => validateFetchUrl("https://instance-data../")).toThrow(UrlValidationError);
+    expect(() => validateLlmBaseUrl("https://kubernetes.default..../v1")).toThrow(UrlValidationError);
+    expect(() => validateWebsiteUrl("https://METADATA.google.internal../")).toThrow(UrlValidationError);
+  });
+
   it("keeps loopback local endpoints usable in the absolute form", () => {
     // The same normalization is what makes the http-loopback allowance recognize
     // the FQDN spelling instead of rejecting it as a non-loopback name host.
     expect(validateLlmBaseUrl("http://localhost.:8000/v1")).toBe("http://localhost.:8000/v1");
     expect(validateLlmBaseUrl("http://127.0.0.1.:11434/v1")).toBe("http://127.0.0.1.:11434/v1");
+    expect(validateLlmBaseUrl("http://localhost...:8000/v1")).toBe("http://localhost...:8000/v1");
+    expect(validateFetchUrl("http://localhost.../x").hostname).toBe("localhost...");
   });
 
   it("still accepts public names and addresses in the absolute form", () => {
@@ -222,10 +234,23 @@ describe("isLoopbackHost (shared single source)", () => {
     expect(isLoopbackHost(host)).toBe(true);
   });
 
+  it.each(["localhost.", "LOCALHOST..", "127.0.0.1.", "[::1].", "::1."])(
+    "accepts the DNS absolute form %s",
+    (host) => {
+      // The runtime listen guard calls this directly with the configured bind host,
+      // so the FQDN spelling must classify exactly like its dotless form.
+      expect(isLoopbackHost(host)).toBe(true);
+    },
+  );
+
   it.each(["example.com", "127.0.0.2", "::2", "::ffff:127.0.0.1", "localhost.example.com", ""])(
     "rejects %s",
     (host) => {
       expect(isLoopbackHost(host)).toBe(false);
     },
   );
+
+  it.each(["localhost.example.com.", "127.0.0.2.", "...", "."])("rejects absolute-form %s", (host) => {
+    expect(isLoopbackHost(host)).toBe(false);
+  });
 });

@@ -13,10 +13,12 @@
   重放会拒绝 JSON 合法但字段类型损坏的行（`at` 非有限数、`seq` 非整数或为负、`metadata`
   非对象），并按与其他损坏行相同的计数方式处理。
 
-共享加载规则：两个后端都按 session 条目隔离损坏（单条坏记录不会清空整个 ledger）；容器
-版本未知的快照不会被部分解读。超长条目溢出到 `SessionBlobStore` sidecar
+共享加载规则：两个后端都按 session 条目隔离损坏（单条坏记录不会清空整个 ledger）；
+JSONL 后端会拒绝部分解读容器版本未知的快照，file 后端则保留其宽容恢复路径（未知版本
+仍按同样的逐项遏制加载）。超长条目溢出到 `SessionBlobStore` sidecar
 （`FileBlobStore`），其文件名会清洗 session id 并做哈希，使清洗后相同的 id 仍互不串扰，
-并拒绝非安全整数的序列号，避免把非法值写进路径。
+并拒绝非安全整数的序列号，避免把非法值写进路径；在支持 POSIX mode 的平台上，sidecar 以
+owner-only（`0o600`）写入 `0o700` 目录。
 
 ## 依赖
 

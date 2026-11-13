@@ -12,9 +12,10 @@ contracts 见 `packages/contracts/contracts/src/thread.ts`。
 
 - Resume 是 thread 级，而非 step 级。一个 turn 仅在成功完成时提交，把问题、提取的
   答案与已解析的 workspace 在一次原子写入中追加。失败或中止的 turn 使 transcript
-  保持原样，因此下一次 run 从最后提交点恢复。被取消的 turn 绝不提交，即使成功终止
-  已在传递中；若消费者在终止前停止读取，其账本行会结算为 `cancelled`。不存在中途
-  暂停，因为 run 从已提交历史重启该 turn。
+  保持原样，因此下一次 run 从最后提交点恢复。被取消的 turn 绝不提交：在成功终止之前
+  观察到的取消会抑制该终止。一旦 transcript 已提交（成功终止已被处理），该 turn 的
+  账本行始终结算为 `completed`，即使之后才观察到取消；消费者在任何终止前停止读取时，
+  账本行结算为 `cancelled`。不存在中途暂停，因为 run 从已提交历史重启该 turn。
 - 历史与 workspace 在服务端重放。每次 run 都走完整 arena pipeline，覆盖并发槽、
   circuit breaker、events、workspace 重水化，以及 sandbox 与 approval 层，并携带该
   thread 的 pinned `PipelineConfig`。列 label 经 baseline `label` 覆盖被 pin 为

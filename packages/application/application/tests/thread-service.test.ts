@@ -319,6 +319,48 @@ describe("ThreadService.run ledger settlement", () => {
     // when a success terminal was already in flight.
     expect(service.getDetail(view.id).history).toHaveLength(0);
   });
+
+  it("keeps a committed turn completed when the caller aborts after the terminal", async () => {
+    const { arena } = fakeArena([
+      { ...baseEvent("thought"), content: "the answer" },
+      { ...baseEvent("complete"), metrics: { success: true } as ArenaEvent["metrics"] },
+    ]);
+    const { service, sessions } = makeLedgerService(arena);
+    const view = service.create({ title: "t", config: CONFIG });
+    const controller = new AbortController();
+
+    // The transcript committed while the success terminal was processed; an abort
+    // observed afterwards must not flip the settled row to cancelled.
+    for await (const event of service.run(view.id, { question: "q" }, { signal: controller.signal })) {
+      if (event.type === "complete") controller.abort();
+    }
+
+    const rows = await sessions.listSessions({ kind: "agent" });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.status).toBe("completed");
+    expect(service.getDetail(view.id).history).toHaveLength(2);
+  });
+
+  it("keeps a committed turn completed when the consumer stops right after the terminal", async () => {
+    const { arena } = fakeArena([
+      { ...baseEvent("thought"), content: "the answer" },
+      { ...baseEvent("complete"), metrics: { success: true } as ArenaEvent["metrics"] },
+    ]);
+    const { service, store, sessions } = makeLedgerService(arena);
+    const view = service.create({ title: "t", config: CONFIG });
+
+    // A dead SSE write at the terminal ends the generator by return after the
+    // transcript committed; the settle-on-return path must book completed.
+    for await (const event of service.run(view.id, { question: "q" })) {
+      if (event.type === "complete") break;
+    }
+
+    const rows = await sessions.listSessions({ kind: "agent" });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.status).toBe("completed");
+    expect(service.getDetail(view.id).history).toHaveLength(2);
+    expect(store.get(view.id).running).toBe(false);
+  });
 });
 
 describe("ThreadService.create", () => {

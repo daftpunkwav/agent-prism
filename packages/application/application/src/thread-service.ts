@@ -132,6 +132,8 @@ export class ThreadService {
    * transcript and reuses the stored workspace through the arena pipeline.
    * The transcript commits only on a successful completion; failures and
    * aborts leave it untouched so the next run resumes from the same point.
+   * A committed turn settles the ledger as completed even if the caller aborts
+   * afterwards, so the row always mirrors the transcript.
    *
    * @yields The single column's arena events (SSE-ready).
    */
@@ -180,12 +182,19 @@ export class ThreadService {
     // reading early ends the generator by return, and the finally below settles
     // that row instead of leaving it active forever.
     let settled = false;
+    // Whether streamTurn committed the transcript this turn. Commit is the source of
+    // truth for the ledger: once the transcript advanced, the row must settle
+    // completed, even when a later abort or consumer detach arrives.
+    const commitState = { committed: false };
     try {
-      yield* this.streamTurn(thread, request, options);
+      yield* this.streamTurn(thread, request, options, commitState);
       if (sessions !== undefined && ledger !== null) {
-        if (options.signal?.aborted === true) {
-          // Abort wins over success: a turn whose stream drained after the caller
-          // cancelled is a cancelled turn, never a completed one.
+        if (commitState.committed) {
+          // The transcript committed: the turn succeeded, whatever the signal says now.
+          await this.safeLedger("complete", () => sessions.completeSession(ledger.id));
+        } else if (options.signal?.aborted === true) {
+          // Abort wins over an uncommitted success: a turn whose stream drained after
+          // the caller cancelled is a cancelled turn, never a completed one.
           await this.safeLedger("cancel", () => sessions.cancelSession(ledger.id));
         } else {
           await this.safeLedger("complete", () => sessions.completeSession(ledger.id));
@@ -194,7 +203,10 @@ export class ThreadService {
       }
     } catch (error) {
       if (sessions !== undefined && ledger !== null) {
-        if (options.signal?.aborted) {
+        if (commitState.committed) {
+          // A post-commit throw: keep the ledger consistent with the committed transcript.
+          await this.safeLedger("complete", () => sessions.completeSession(ledger.id));
+        } else if (options.signal?.aborted) {
           await this.safeLedger("cancel", () => sessions.cancelSession(ledger.id));
         } else {
           await this.safeLedger("fail", () => sessions.failSession(ledger.id, sanitizeErrorMessage(error)));
@@ -204,9 +216,15 @@ export class ThreadService {
       throw error;
     } finally {
       if (sessions !== undefined && ledger !== null && !settled) {
-        // The turn never produced a terminal (consumer stopped reading): the
-        // consumer-owned cancel is the honest status, matching the abort path.
-        await this.safeLedger("cancel", () => sessions.cancelSession(ledger.id));
+        // The generator never reached its post-stream settle (consumer stopped
+        // reading). A committed turn settles completed because the transcript
+        // already advanced; an uncommitted one is the consumer-owned cancel,
+        // matching the abort path.
+        if (commitState.committed) {
+          await this.safeLedger("complete", () => sessions.completeSession(ledger.id));
+        } else {
+          await this.safeLedger("cancel", () => sessions.cancelSession(ledger.id));
+        }
       }
       this.deps.threads.markRunning(id, false);
     }
@@ -216,6 +234,7 @@ export class ThreadService {
     thread: ThreadRecord,
     request: ThreadRunRequest,
     options: { signal?: AbortSignal },
+    commitState: { committed: boolean },
   ): AsyncGenerator<ArenaEvent> {
     const label = `${THREAD_WORKSPACE_PREFIX}${thread.id}`;
     const arenaRequest = this.buildArenaRequest(thread, request.question, label);
@@ -250,6 +269,9 @@ export class ThreadService {
             // outgrow the wire budget, whichever mode renders it later.
             clampToolRoundsForWire(extractToolRounds(toolEvents)),
           );
+          // Publish the commit to the settlement in `run`: the ledger mirrors the
+          // transcript, never the signal that arrived after it advanced.
+          commitState.committed = true;
           if (event.workspace !== "") this.deps.workspaceRegistry.pin(event.workspace);
           // The committed turn IS the resume anchor: flush past the debounce so a
           // shutdown right after completion cannot lose it.

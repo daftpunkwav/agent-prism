@@ -11,6 +11,9 @@ and tool dispatch) over the Arena model and tool ports.
   with the same drift guard and result reminder the LangChain column uses.
 - Model settings (temperature, max tokens, thinking) come from the configured
   column model; SDK-side `modelSettings` are not re-applied.
+- The SDK owns its run loop: the shared context pipeline (`applyContextPipeline`)
+  is not called, so the column's `context` strategy and strategy-effectiveness
+  rows do not apply.
 
 ## Dependencies
 

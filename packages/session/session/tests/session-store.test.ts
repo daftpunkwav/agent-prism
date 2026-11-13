@@ -84,6 +84,52 @@ describe("SessionStore lifecycle", () => {
     expect((await store.get(created.id))?.entryCount).toBe(2);
   });
 
+  it("queues delete behind a pending append so the append settles first", async () => {
+    let releaseSpill = (): void => {};
+    const spillGate = new Promise<void>((resolve) => {
+      releaseSpill = resolve;
+    });
+    const calls: string[] = [];
+    // Gate-controlled sidecar: the append suspends inside saveBlob until released,
+    // which is the window a delete must not erase the session under.
+    const blobs = {
+      saveBlob: async () => {
+        calls.push("save-start");
+        await spillGate;
+        calls.push("save-end");
+      },
+      loadBlob: async () => null,
+      deleteSessionBlobs: async () => {
+        calls.push("purge");
+        return true;
+      },
+    };
+    const store = new InMemorySessionStore({
+      idGenerator: { next: () => "ses-race" },
+      clock: { now: () => 1700000000000 },
+      blobs,
+    });
+    const created = await store.create({ kind: "agent", title: "race" });
+    // Oversized content spills to the sidecar, so the append yields inside saveBlob.
+    const pending = store.appendEntry(created.id, { kind: "note", content: "x".repeat(9_000) });
+    for (let tick = 0; tick < 500 && !calls.includes("save-start"); tick += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+    }
+    expect(calls).toContain("save-start");
+
+    const deletion = store.delete(created.id);
+    releaseSpill();
+    await expect(pending).resolves.toMatchObject({ seq: 0 });
+    await expect(deletion).resolves.toBe(true);
+    // The purge runs after the spill landed, never before it: no orphan blob write
+    // may trail a completed delete.
+    expect(calls).toEqual(["save-start", "save-end", "purge"]);
+    expect(await store.get(created.id)).toBeNull();
+    await expect(store.listEntries(created.id)).rejects.toThrow(SessionNotFoundError);
+    await expect(store.readBlob(created.id, 0)).resolves.toBeNull();
+    await expect(store.delete(created.id)).resolves.toBe(false);
+  });
+
   it("lists newest-first with kind/status/limit filters", async () => {
     const store = testStore();
     await store.create({ kind: "arena", title: "a1" });

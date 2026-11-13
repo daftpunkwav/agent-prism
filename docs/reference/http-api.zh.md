@@ -26,8 +26,8 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
   workspace upsert、session export）在 schema 不匹配时返回 `422` 并附首个 zod issue
   消息。provider 保存与其连通性测试用同一 zod schema 解析请求 body，因此形态错误在
   任何语义检查之前返回 `422`；`saveProvider` 随后对语义非法的配置返回 `400`。
-  `/api/settings/*` 手写校验，坏输入返回 `400`，skill 名称与 bundled 或既有 skill
-  冲突返回 `409`，持久 store 写入失败映射为 `5xx`。
+  `/api/settings/*` 手写校验，坏输入返回 `400`，skill 身份冲突（bundled read-only、
+  重名）返回 `409`；意外的 store 写入失败会传播到 shell 的 `500` 映射（含 skill CRUD）。
 - 健康。`GET /api/health` 与 `GET /health` 返回
   `{"status":"ok","service":"arena"}`。
 
@@ -47,12 +47,12 @@ projects、builder、threads 的顺序挂载。事实来源为各节引用的 ro
 | 方法 | 路径 | 用途 | 备注 |
 |---|---|---|---|
 | GET | `/api/settings/knobs` | 读取当前 runtime knobs | 返回 `{knobs, fields}` |
-| PUT | `/api/settings/knobs` | 热应用 knob 更新 | 始终 `200`：越界或非法字段被 clamp 或回退到当前值，响应中的 `knobs` 为生效值 |
+| PUT | `/api/settings/knobs` | 热应用 knob 更新 | 任意合法 JSON payload 返回 `200`：越界或非法字段被 clamp 或回退到当前值，响应中的 `knobs` 为生效值；非法 JSON 返回 `400`，store 写入失败返回 `500` |
 | GET | `/api/settings/memory` | 跨 session 记忆状态 | episodic 与 semantic 的计数与文件路径 |
 | POST | `/api/settings/memory/clear` | 清空两个记忆 store | 先持久化再响应，写入失败映射为 `5xx` |
 | GET | `/api/settings/skills` | 列出生效的 skill 目录 | `{skills}`，含 name、description、source 与 enabled |
 | POST | `/api/settings/skills` | 创建用户 skill | body `name`、`description`、`body`；`201`；bundled 或重名返回 `409` |
-| PUT | `/api/settings/skills/:name` | 更新用户 skill | body `description` 和/或 `body`；未知名字 `400`，bundled `409` |
+| PUT | `/api/settings/skills/:name` | 更新用户 skill | body `description` 和/或 `body`；非对象 body（`null`、数组、标量）返回 `400`；未知名字 `400`，bundled `409` |
 | DELETE | `/api/settings/skills/:name` | 删除用户 skill | `{ok:true}`；同样区分 `400`/`409` |
 | PUT | `/api/settings/skills/:name/enabled` | 启用或停用 skill | body `enabled` 为 boolean，否则 `400` |
 | GET | `/api/settings/mcp` | 读取受管 MCP server 列表 | `{servers}` |

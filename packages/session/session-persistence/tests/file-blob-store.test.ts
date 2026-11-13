@@ -5,14 +5,18 @@
  * Responsibilities:
  * - Pin save/load round trips and the null-on-missing read degradation
  * - Lock filename sanitization and per-session purge semantics
+ * - Pin owner-only modes for the blob file and its directory on POSIX hosts
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FileBlobStore } from "../src/file-blob-store.js";
+
+/** POSIX mode bits only; Windows ignores them, so the mode cases skip there. */
+const modeOf = (path: string): number => statSync(path).mode & 0o777;
 
 describe("FileBlobStore", () => {
   let dir: string;
@@ -79,5 +83,29 @@ describe("FileBlobStore", () => {
   it("purging a session with no directory reports false without throwing", async () => {
     const ghost = new FileBlobStore(join(dir, "does-not-exist"));
     await expect(ghost.deleteSessionBlobs("s1")).resolves.toBe(false);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("FileBlobStore owner-only modes (POSIX)", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), `aprism-blob-mode-${randomUUID()}`));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("creates the blob file 0o600 and the blob directory 0o700", async () => {
+    const blobDir = join(dir, "blobs");
+    const store = new FileBlobStore(blobDir);
+    await store.saveBlob("s1", 0, "full session text");
+    const blobPath = join(blobDir, FileBlobStore.fileName("s1", 0));
+
+    expect(modeOf(blobDir)).toBe(0o700);
+    expect(modeOf(blobPath)).toBe(0o600);
+    // The torn-write twin must not leak the body either.
+    expect(existsSync(`${blobPath}.tmp`)).toBe(false);
   });
 });

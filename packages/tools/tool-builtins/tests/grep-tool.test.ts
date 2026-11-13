@@ -68,6 +68,26 @@ describe("grepTool", () => {
     }
   });
 
+  it("normalizes base-path spellings and matches a base-relative include glob", async () => {
+    const ws = tempWorkspace();
+    try {
+      ws.fs.writeFile("sub/a.py", "beta\n");
+      ws.fs.writeFile("sub/nested/b.py", "beta\n");
+      // "./sub" is a valid spelling of the same base; it must not search nothing.
+      const dotted = await grepTool.execute(ws, { pattern: "beta", path: "./sub" });
+      expect(dotted.ok).toBe(true);
+      expect(dotted.result).toContain("sub/a.py:1:");
+      expect(dotted.result).toContain("sub/nested/b.py:1:");
+      // listFiles paths are root-relative; a separator include written relative to the
+      // base ("nested/*.py" under path "sub") must be tested base-stripped too, or grep
+      // disagrees with the glob tool on the same pattern/base pair.
+      const nested = await grepTool.execute(ws, { pattern: "beta", path: "sub", glob: "nested/*.py" });
+      expect(nested.result).toBe("sub/nested/b.py:1: beta");
+    } finally {
+      ws.cleanup();
+    }
+  });
+
   it("rejects an invalid regex as a tool error", async () => {
     const ws = tempWorkspace();
     try {

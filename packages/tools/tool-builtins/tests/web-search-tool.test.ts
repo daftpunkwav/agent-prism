@@ -95,6 +95,60 @@ describe("webSearchTool", () => {
     }
   });
 
+  it("maps a timeout while reading the response body to the timeout message", async () => {
+    // The body read is governed by the same AbortSignal.timeout as the request; before
+    // the shared mapper a stalled payload surfaced as "unreadable search response".
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => {
+        throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      },
+    })) as unknown as typeof fetch;
+    try {
+      await withEnv(
+        { SEARCH_PROVIDER: "exa", SEARCH_API_KEY: "k", SEARCH_API_URL: "https://search.test/api" },
+        async () => {
+          const out = await webSearchTool.execute(workspace, { query: "prism" });
+          expect(out.ok).toBe(false);
+          expect(out.code).toBe("workspace_error");
+          expect(out.result).toBe("Error: search timed out");
+        },
+      );
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("keeps a caller abort during the body read as aborted", async () => {
+    const controller = new AbortController();
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => {
+        controller.abort();
+        throw new DOMException("Aborted", "AbortError");
+      },
+    })) as unknown as typeof fetch;
+    try {
+      await withEnv(
+        { SEARCH_PROVIDER: "exa", SEARCH_API_KEY: "k", SEARCH_API_URL: "https://search.test/api" },
+        async () => {
+          const out = await webSearchTool.execute(workspace, { query: "prism" }, controller.signal);
+          expect(out.ok).toBe(false);
+          expect(out.code).toBe("aborted");
+          expect(out.result).toBe("Error: aborted");
+        },
+      );
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   it("round-trips an exa-shaped localhost backend", async () => {
     const server = createServer((req, res) => {
       expect(req.headers["x-api-key"]).toBe("test-key");
