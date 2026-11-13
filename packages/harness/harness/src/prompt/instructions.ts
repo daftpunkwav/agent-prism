@@ -13,26 +13,31 @@
 
 import { InstructionState, loadInstructionLayers, renderInstructions, type InstructionFileAccess } from "@agentprism/context-instructions";
 
-/** Workspace files consulted for instruction layers (precedence high to low). */
+/** Workspace files consulted for instruction layers (precedence low to high). */
 const WORKSPACE_INSTRUCTION_FILES = ["AGENTS.md", "AGENTS.local.md"] as const;
 
 /** Rendered instruction budget in chars (matches the library default). */
 const INSTRUCTIONS_BUDGET_CHARS = 6000;
 
 /**
- * Byte cap for one instruction-file read. The rendered block is capped far below
- * this (a layer keeps at most 2500 chars), so only a bounded head of a huge file
- * can reach the prompt anyway; a full read would materialize arbitrary workspace
- * content — the agent's own tools can write these files — on every prompt
- * assembly. Files under the cap are read exactly as before.
+ * Byte cap for one instruction-file read. A full read would materialize arbitrary
+ * workspace content — the agent's own tools can write these files — on every prompt
+ * assembly. Files under the cap are read exactly as before; over the cap the read
+ * stops at 64 KiB, and the renderer may keep a head+tail of that READ WINDOW, so the
+ * adapter appends a truncation note: without it the retained tail would masquerade
+ * as the file's real end.
  */
 const INSTRUCTION_FILE_READ_BYTES = 64 * 1024;
+
+/** Appended to a truncated instruction-file read so the retained tail is not mistaken for the file end. */
+const INSTRUCTION_FILE_TRUNCATION_NOTE =
+  `\n\n…[instruction file truncated: only the first ${INSTRUCTION_FILE_READ_BYTES / 1024} KiB were read]…`;
 
 /** Structural workspace fs surface; readFileHead is the environment layer's bounded read. */
 interface WorkspaceInstructionFs {
   exists?(path: string): boolean;
   readFile(path: string): string;
-  readFileHead?(path: string, maxBytes: number, startByte?: number): { text: string };
+  readFileHead?(path: string, maxBytes: number, startByte?: number): { text: string; truncated?: boolean };
 }
 
 /** Adapts a structural workspace fs to the instruction file port (null when unusable). */
@@ -42,10 +47,11 @@ function asInstructionFiles(fs: unknown): InstructionFileAccess | null {
   if (typeof candidate.readFile !== "function") return null;
   return {
     exists: (path: string) => (typeof candidate.exists === "function" ? candidate.exists(path) : false),
-    readFile: (path: string) =>
-      typeof candidate.readFileHead === "function"
-        ? candidate.readFileHead(path, INSTRUCTION_FILE_READ_BYTES).text
-        : candidate.readFile(path),
+    readFile: (path: string) => {
+      if (typeof candidate.readFileHead !== "function") return candidate.readFile(path);
+      const head = candidate.readFileHead(path, INSTRUCTION_FILE_READ_BYTES);
+      return head.truncated === true ? head.text + INSTRUCTION_FILE_TRUNCATION_NOTE : head.text;
+    },
   };
 }
 
