@@ -115,6 +115,40 @@ async function renderAndType(question: string) {
   return input;
 }
 
+const DEPTH_WARNING = "Maximum update depth exceeded";
+
+/**
+ * Streams `events` token updates one per macrotask instead of batching them
+ * inside a single act(): every event commits and flushes its passive effects
+ * before the next lands, which is the churn that reached React's nested
+ * passive-update limit. Returns how many update-depth warnings React logged.
+ */
+async function streamTokenBurst(events: number, workspace: string | undefined) {
+  scriptStream();
+  await renderAndType("long streamed run");
+  const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    fireEvent.click(screen.getByRole("button", { name: en().action.run }));
+    await waitFor(() => expect(streamMock).toHaveBeenCalledOnce());
+    for (let index = 0; index < events; index += 1) {
+      emit?.({
+        type: "token_update",
+        pipeline: "Native",
+        token_stats: { input_tokens: index, output_tokens: index, total_tokens: 2 * index },
+        ...(workspace === undefined ? {} : { workspace }),
+      } as unknown as ArenaEvent);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    // The burst really reached column state: the last update's total rendered.
+    await waitFor(() =>
+      expect(screen.getByTitle(`${en().token.compactTotal}: ${2 * (events - 1)}`)).toBeDefined(),
+    );
+    return errorSpy.mock.calls.filter((call) => String(call[0]).includes(DEPTH_WARNING)).length;
+  } finally {
+    errorSpy.mockRestore();
+  }
+}
+
 describe("ArenaClient run orchestration", () => {
   it("runs both columns to completion, clears attachments, and unlocks the report/diff tabs", async () => {
     scriptStream();
@@ -217,5 +251,17 @@ describe("ArenaClient run orchestration", () => {
     });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: getCatalog("en").common.askTitle })).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: en().action.stop }));
+  });
+
+  it("keeps a long streamed run with a workspace free of update-depth warnings", async () => {
+    // Regression: the workspace mirror effect dispatched a state update per
+    // streamed event, so runs past ~50 events tripped React's 50-flush limit.
+    expect(await streamTokenBurst(60, "ws-native")).toBe(0);
+    expect(screen.getByRole("button", { name: en().results.workspaceToggle })).toBeDefined();
+  });
+
+  it("keeps a long streamed run without a workspace free of update-depth warnings", async () => {
+    // Same churn from the focus-label effect: it re-dispatched null per event.
+    expect(await streamTokenBurst(60, undefined)).toBe(0);
   });
 });
