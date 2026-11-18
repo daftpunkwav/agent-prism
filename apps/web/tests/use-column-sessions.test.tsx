@@ -92,6 +92,14 @@ describe("useColumnSessions", () => {
     expect(result.current.sessions.Native?.workspace).toBe("ws-native");
   });
 
+  it("re-remembers an unchanged workspace after reset", () => {
+    const { result } = renderSessions();
+    act(() => result.current.rememberWorkspace("Native", "ws-native"));
+    act(() => result.current.reset());
+    act(() => result.current.rememberWorkspace("Native", "ws-native"));
+    expect(result.current.sessions.Native?.workspace).toBe("ws-native");
+  });
+
   it("copies one transcript onto targets on explicit action, keeping their workspaces", () => {
     const { result } = renderSessions();
     act(() => result.current.pushColumnTurn("Native", "q", "a"));

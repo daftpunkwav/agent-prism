@@ -126,7 +126,12 @@ export function ArenaClient() {
 
   useEffect(() => {
     if (workspaceFocusLabel && workspaceChoices.some((c) => c.label === workspaceFocusLabel)) return;
-    setWorkspaceFocusLabel(workspaceChoices[0]?.label ?? null);
+    // Dispatch only on an actual change: workspaceChoices is a fresh array on every
+    // streamed event, and an unchanged setter call still counts toward React's
+    // nested passive-update limit (and costs a render).
+    const nextFocusLabel = workspaceChoices[0]?.label ?? null;
+    if (nextFocusLabel === workspaceFocusLabel) return;
+    setWorkspaceFocusLabel(nextFocusLabel);
   }, [workspaceChoices, workspaceFocusLabel]);
 
   const resolvePipelineLabel = useCallback(

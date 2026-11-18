@@ -10,7 +10,7 @@
 
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   clampToolRoundsForWire,
   MAX_COLUMN_SESSION_MESSAGES,
@@ -82,6 +82,13 @@ export function deriveTurn(messages: ChatMessage[]): number {
 export function useColumnSessions() {
   const t = useT();
   const [sessions, setSessions] = useState<Record<string, ColumnSessionState>>({});
+  /**
+   * Last workspace dispatched per column. The mirror effect upstream runs on every
+   * streamed event, and a dispatch whose updater bails out (`return prev`) still
+   * counts toward React's nested passive-update limit, so unchanged mirrors must
+   * return before scheduling the update at all.
+   */
+  const mirroredWorkspacesRef = useRef<Record<string, string>>({});
 
   const pushColumnTurn = useCallback(
     (label: string, question: string, answer: string, toolRounds?: ToolRound[]) => {
@@ -113,6 +120,8 @@ export function useColumnSessions() {
 
   const rememberWorkspace = useCallback((label: string, workspace: string) => {
     if (workspace.trim() === "") return;
+    if (mirroredWorkspacesRef.current[label] === workspace) return;
+    mirroredWorkspacesRef.current[label] = workspace;
     setSessions((prev) => {
       const current = prev[label] ?? { messages: [] };
       if (current.workspace === workspace) return prev;
@@ -136,6 +145,9 @@ export function useColumnSessions() {
   }, []);
 
   const reset = useCallback(() => {
+    // Clearing state without the mirror memory would swallow the next run's
+    // re-report of an unchanged workspace.
+    mirroredWorkspacesRef.current = {};
     setSessions({});
   }, []);
 
