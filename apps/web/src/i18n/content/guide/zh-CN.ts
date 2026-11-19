@@ -867,31 +867,31 @@ const dimensions: DimDoc[] = [
     summary:
       "选择执行纪律：自由 direct、动手前写计划的 plan-first、显式跟踪目标的 goal-first；检验计划与目标纪律如何改变任务完成度。",
     controls:
-      "config.orchestration 在新鲜工作区预置 plan 文档（plan_first）或 goal 文档（goal_first），并追加对应纪律行到 system prompt。",
+      "config.orchestration 只向 system prompt 追加对应纪律行；工作区初始为空，.agent-plan.md / .agent-goal.json 仅在 agent 调用 plan/goal 工具时产生。",
     options: [
       {
         value: "direct",
         label: "直接执行",
-        effect: "无预置、无纪律行；模型自由执行。",
+        effect: "无纪律行；模型自由执行。",
       },
       {
         value: "plan_first",
         label: "计划优先",
-        effect: "预置 .agent-plan.md，要求先经 plan 工具 propose 再动手。",
+        effect: "要求先经 plan 工具 propose 再动手；不预置文件。",
       },
       {
         value: "goal_first",
         label: "目标优先",
-        effect: "预置 .agent-goal.json，要求先 set 目标与完成标准。",
+        effect: "要求先 set 目标与完成标准；不预置文件。",
       },
     ],
     path: [
-      "预置只发生在新鲜工作区；追问轮复用 agent 已写的 plan/goal。",
-      "预置失败不影响其要纪律的执行；提示词纪律行依然生效。",
-      "plan/goal 工件落盘，随报告 artifacts 页带出。",
+      "每次运行工作区都从空白开始；提示词纪律行是宿主唯一的注入。",
+      "不再预置文件，任何写入失败都不会影响纪律；提示词行依然生效。",
+      "plan/goal 工件仅在 agent 实际写入时出现，随报告 artifacts 页带出。",
     ],
-    langChain: "同一种子与提示词行；纪律与框架无关。",
-    langGraph: "同一种子与提示词行；纪律与框架无关。",
+    langChain: "同一提示词行；纪律与框架无关。",
+    langGraph: "同一提示词行；纪律与框架无关。",
     modules: [
       "packages/agent/agent/src/agent-execution.ts",
       "packages/tools/tool-builtins/src/definitions/plan.ts",

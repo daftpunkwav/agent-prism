@@ -111,7 +111,7 @@ export const FIELD_SUBTITLES: Record<string, string> = {
   toolset: "Really filters the tool list each framework binds (bind_tools / create_agent / MCP allowlist / bridge catalogs)",
   mcp: "Bridges MCP filesystem/fetch servers into the tool list; off / fs / full changes what the model can call",
   skill: "Off disables the skill tool, on-demand loads via skill tool, preloaded injects runbooks into the prompt",
-  orchestration: "Direct runs free-form; plan-first seeds a plan doc, goal-first seeds a tracked objective",
+  orchestration: "Direct runs free-form; plan-first requires a written plan via the plan tool, goal-first an explicit tracked objective",
   memory: "Mounts cross-session memory into the prompt: none stateless, episodic past task experience, semantic project facts, full both",
   history_mode: "Cross-turn replay: minimal bare Q/A vs one-line tool summary vs full args + results appended to past answers",
 };

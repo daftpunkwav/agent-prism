@@ -4,11 +4,11 @@
  *
  * Responsibilities:
  * - Sanitize client-supplied workspace names into one path-safe segment
- * - Create an isolated workspace per run and write the task README
- * - Reuse a still-resident workspace for follow-up turns without rewriting files
+ * - Create an isolated, empty workspace per run
+ * - Reuse a still-resident workspace for follow-up turns without touching its files
  *
- * label/question are arena run-domain concepts, so this lives in the agent
- * layer; runtime only provides generic WorkspaceRegistry/Workspace primitives.
+ * label is an arena run-domain concept, so this lives in the agent layer;
+ * runtime only provides generic WorkspaceRegistry/Workspace primitives.
  */
 
 import type { Clock, IdGenerator } from "@agentprism/contracts";
@@ -71,20 +71,20 @@ export function isReusableWorkspaceName(name: string): boolean {
   return isSafeWorkspaceSegment(name);
 }
 
-/** Creates an isolated workspace for one column run and writes a task README; rolls back the protection mark on failure. */
+/**
+ * Creates an isolated, empty workspace for one column run; rolls back the
+ * protection mark on failure. The task text reaches the agent through the prompt,
+ * never as a seeded file, so every column starts from the same blank directory.
+ */
 export function createRunWorkspace(
   manager: WorkspaceRegistry,
-  options: { question: string; label: string; runId?: string; clock?: Clock; idGenerator?: IdGenerator },
+  options: { label: string; runId?: string; clock?: Clock; idGenerator?: IdGenerator },
 ): CreatedRunWorkspace {
   const runId = options.runId ?? newRunId(options.idGenerator);
   const name = newWorkspaceName(options.label, options.clock, options.idGenerator);
   manager.protect(name);
   try {
     const workspace = manager.create(name, runId);
-    // Labels are unconstrained display text (contracts label is a plain string): fold line
-    // breaks so a crafted label cannot escape the markdown heading into the task body.
-    const heading = options.label.replace(/[\r\n]+/g, " ");
-    workspace.fs.writeFile("README.md", `# ${heading}\n\nTask: ${options.question}\n`);
     return { workspace, name, runId, reused: false };
   } catch (error) {
     manager.unprotect(name);
@@ -94,12 +94,11 @@ export function createRunWorkspace(
 
 /**
  * Reuses a still-resident column workspace across follow-up turns, or creates a
- * new one. Does not rewrite README on reuse so files the agent already wrote stay intact.
+ * new one. Reuse never touches the tree, so files the agent already wrote stay intact.
  */
 export function resolveRunWorkspace(
   manager: WorkspaceRegistry,
   options: {
-    question: string;
     label: string;
     runId?: string;
     clock?: Clock;

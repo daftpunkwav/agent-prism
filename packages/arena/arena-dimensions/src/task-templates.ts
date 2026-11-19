@@ -297,8 +297,9 @@ export const TEMPLATES: TaskTemplate[] = [
     name: "Two-file discipline task",
     description:
       "Ablation task for the orchestration dimension (direct vs plan_first vs goal_first): a " +
-      "two-artifact chore where plan-first seeds a plan doc and goal-first seeds a tracked " +
-      "objective; scored on the DONE marker while artifacts and ablation rows show the discipline.",
+      "two-artifact chore where plan-first must record a plan and goal-first a tracked " +
+      "objective through the tools; scored on the DONE marker while artifacts and ablation " +
+      "rows show the discipline.",
     question:
       "Create plan_notes.md with exactly 3 lines, then create goal_notes.md with exactly 2 lines. " +
       "Reply with DONE only when both files exist.",

@@ -74,11 +74,11 @@ describe("WorkspaceRegistry root constraints", () => {
     try {
       const registry = new WorkspaceRegistry({ runsRoot, clock });
       expect(() =>
-        createRunWorkspace(registry, { question: "q", label: "L", runId: "../escape", clock }),
+        createRunWorkspace(registry, { label: "L", runId: "../escape", clock }),
       ).toThrow();
       // After rollback the registry has no leftover workspace; later creates still work.
       expect(registry.count()).toBe(0);
-      const created = createRunWorkspace(registry, { question: "q", label: "L", clock });
+      const created = createRunWorkspace(registry, { label: "L", clock });
       expect(created.workspace.name).toBeTruthy();
     } finally {
       rmSync(runsRoot, { recursive: true, force: true });

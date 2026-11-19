@@ -42,7 +42,7 @@ export const dimensions = {
     toolset: "真实过滤各框架实际绑定的工具列表（bind_tools / create_agent / MCP allowlist / 桥接工具目录）",
     mcp: "把 MCP filesystem/fetch 服务器桥接进工具列表；off / fs / full 决定模型可调用的工具",
     skill: "off 禁用 skill 工具；on-demand 经 skill 工具按需加载；preloaded 注入 runbook 到 prompt",
-    orchestration: "direct 自由执行；plan-first 预置 plan 文档；goal-first 预置可追踪目标",
+    orchestration: "direct 自由执行；plan-first 要求经 plan 工具写计划；goal-first 要求显式跟踪目标",
     memory: "跨会话记忆挂载进 prompt；none 无记忆，episodic 挂历史经验，semantic 挂项目事实，full 两者都挂",
     history_mode: "跨轮回放：minimal 仅裸问答对，tool_summary 每次工具调用一行摘要，full 附完整参数与结果",
   },

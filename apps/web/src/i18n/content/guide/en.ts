@@ -871,31 +871,31 @@ const dimensions: DimDoc[] = [
     summary:
       "Selects the execution discipline: free-form direct runs versus plan-first (write the plan, then execute it) versus goal-first (track an explicit objective); testing how plan and goal discipline change task completion.",
     controls:
-      "config.orchestration seeds a plan doc (plan_first) or a goal doc (goal_first) into fresh workspaces and appends the matching discipline line to the system prompt.",
+      "config.orchestration appends the matching discipline line to the system prompt only; workspaces start empty, and .agent-plan.md / .agent-goal.json appear only when the agent calls the plan/goal tools.",
     options: [
       {
         value: "direct",
         label: "Direct execution",
-        effect: "No seeding, no discipline line; the model works free-form.",
+        effect: "No discipline line; the model works free-form.",
       },
       {
         value: "plan_first",
         label: "Plan-first",
-        effect: "Seeds .agent-plan.md and instructs the model to propose via the plan tool before editing.",
+        effect: "Instructs the model to propose via the plan tool before editing; no file is seeded.",
       },
       {
         value: "goal_first",
         label: "Goal-first",
-        effect: "Seeds .agent-goal.json and instructs the model to set objective plus done criteria first.",
+        effect: "Instructs the model to set the objective plus done criteria first; no file is seeded.",
       },
     ],
     path: [
-      "Seeding happens on fresh workspaces only; follow-up turns keep the plan/goal the agent already wrote.",
-      "A seed failure never fails the run it was meant to discipline; the prompt line still applies.",
-      "Plan/goal artifacts persist in the workspace and ship in the report artifacts tab.",
+      "Every run starts from an empty workspace; the discipline line is the host's only contribution.",
+      "Nothing is seeded, so no write failure can affect the discipline; the prompt line still applies.",
+      "Plan/goal artifacts appear only when the agent writes them and ship in the report artifacts tab.",
     ],
-    langChain: "Same seeding and prompt line; the discipline is framework-neutral.",
-    langGraph: "Same seeding and prompt line; the discipline is framework-neutral.",
+    langChain: "Same prompt line; the discipline is framework-neutral.",
+    langGraph: "Same prompt line; the discipline is framework-neutral.",
     modules: [
       "packages/agent/agent/src/agent-execution.ts",
       "packages/tools/tool-builtins/src/definitions/plan.ts",

@@ -3,7 +3,7 @@
  * @description Locks MCP/skill/orchestration wiring in runAgentExecution.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { PipelineConfigSchema } from "@agentprism/contracts";
 import type { AgentExecutionContext } from "@agentprism/harness";
@@ -71,24 +71,20 @@ describe("skill policy wiring", () => {
   });
 });
 
-describe("orchestration seeding", () => {
-  it("plan_first seeds a plan doc, goal_first seeds a goal doc", async () => {
-    const planDeps = testDeps();
-    const planSpec = testSpec(captureDriver(() => {}), {
-      config: PipelineConfigSchema.parse({ label: "col", harness: "bare", orchestration: "plan_first" }),
-    });
-    const planEvents = await collect(planDeps, planSpec);
-    const planWs = terminalWorkspace(planEvents, "complete");
-    const planRoot = (planDeps.workspaceRegistry as unknown as { runsRoot: string }).runsRoot;
-    expect(readFileSync(join(planRoot, "r1", planWs, ".agent-plan.md"), "utf-8")).toContain("# Plan");
-
-    const goalDeps = testDeps();
-    const goalSpec = testSpec(captureDriver(() => {}), {
-      config: PipelineConfigSchema.parse({ label: "col", harness: "bare", orchestration: "goal_first" }),
-    });
-    const goalEvents = await collect(goalDeps, goalSpec);
-    const goalWs = terminalWorkspace(goalEvents, "complete");
-    const goalRoot = (goalDeps.workspaceRegistry as unknown as { runsRoot: string }).runsRoot;
-    expect(readFileSync(join(goalRoot, "r1", goalWs, ".agent-goal.json"), "utf-8")).toContain("active");
+describe("orchestration discipline", () => {
+  it("stays prompt-only: plan_first and goal_first seed nothing into the workspace", async () => {
+    for (const orchestration of ["plan_first", "goal_first"] as const) {
+      const deps = testDeps();
+      const spec = testSpec(captureDriver(() => {}), {
+        config: PipelineConfigSchema.parse({ label: "col", harness: "bare", orchestration }),
+      });
+      const events = await collect(deps, spec);
+      const workspaceName = terminalWorkspace(events, "complete");
+      const runsRoot = (deps.workspaceRegistry as unknown as { runsRoot: string }).runsRoot;
+      // A fresh column workspace starts empty: the discipline line lives in the
+      // prompt, and .agent-plan.md / .agent-goal.json appear only when the agent
+      // itself calls the plan/goal tools.
+      expect(readdirSync(join(runsRoot, "r1", workspaceName))).toEqual([]);
+    }
   });
 });
