@@ -22,16 +22,26 @@ describe("resolveRunWorkspace reuse", () => {
     expect(isReusableWorkspaceName("ok_name_1")).toBe(true);
   });
 
+  it("creates a blank workspace with no seeded files", () => {
+    const runsRoot = join(tmpdir(), `aprism-blank-${randomUUID()}`);
+    try {
+      const registry = new WorkspaceRegistry({ runsRoot, clock, ttlSeconds: 3600 });
+      const created = createRunWorkspace(registry, { label: "Native", runId: "run-a", clock });
+      expect(created.workspace.fs.listFiles("", { recursive: true })).toEqual([]);
+    } finally {
+      rmSync(runsRoot, { recursive: true, force: true });
+    }
+  });
+
   it("reuses a still-resident workspace and keeps files written in the first turn", () => {
     const runsRoot = join(tmpdir(), `aprism-reuse-${randomUUID()}`);
     try {
       const registry = new WorkspaceRegistry({ runsRoot, clock, ttlSeconds: 3600 });
-      const first = createRunWorkspace(registry, { question: "make snake", label: "Native", runId: "run-a", clock });
+      const first = createRunWorkspace(registry, { label: "Native", runId: "run-a", clock });
       first.workspace.fs.writeFile("snake.py", "print(1)\n");
       registry.unprotect(first.name);
 
       const second = resolveRunWorkspace(registry, {
-        question: "add scoring",
         label: "Native",
         runId: "run-b",
         clock,
@@ -56,11 +66,10 @@ describe("resolveRunWorkspace reuse", () => {
         ttlSeconds: 1,
         monotonicNow: () => monotonic,
       });
-      const first = createRunWorkspace(registry, { question: "q", label: "L", clock });
+      const first = createRunWorkspace(registry, { label: "L", clock });
       registry.unprotect(first.name);
       monotonic = 2;
       const second = resolveRunWorkspace(registry, {
-        question: "q2",
         label: "L",
         clock,
         existingName: first.name,
@@ -76,7 +85,7 @@ describe("resolveRunWorkspace reuse", () => {
     const runsRoot = join(tmpdir(), `aprism-rehydrate-${randomUUID()}`);
     try {
       const firstRegistry = new WorkspaceRegistry({ runsRoot, clock, ttlSeconds: 3600 });
-      const first = createRunWorkspace(firstRegistry, { question: "make snake", label: "Native", runId: "run-a", clock });
+      const first = createRunWorkspace(firstRegistry, { label: "Native", runId: "run-a", clock });
       first.workspace.fs.writeFile("snake.py", "print(1)\n");
       firstRegistry.unprotect(first.name);
 
@@ -86,7 +95,6 @@ describe("resolveRunWorkspace reuse", () => {
       expect(restored?.fs.readFile("snake.py")).toContain("print(1)");
 
       const followUp = resolveRunWorkspace(secondRegistry, {
-        question: "add scoring",
         label: "Native",
         runId: "run-b",
         clock,

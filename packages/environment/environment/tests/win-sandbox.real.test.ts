@@ -75,7 +75,7 @@ describe.skipIf(process.platform !== "win32")("windows restricted-token sandbox 
   }, 120_000);
 
   it("overwrites a pre-existing file inside the writable root", async () => {
-    // Created by the HOST before any grant, like workspace README seeds.
+    // Created by the HOST before any grant, like client attachment seeds.
     writeFileSync(path.join(root, "seeded.txt"), "original", "utf-8");
     const result = await sandboxed("[System.IO.File]::WriteAllText('.\\seeded.txt', 'rewritten')");
     expect(result.kind).toBe("ok");

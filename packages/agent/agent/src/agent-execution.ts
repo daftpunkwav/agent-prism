@@ -49,8 +49,6 @@ import { WorkspaceRegistry } from "@agentprism/runtime";
 import { buildMetrics, TokenTracker } from "@agentprism/telemetry";
 import { renderHistoryForMode } from "./history-render.js";
 import {
-  GOAL_STORE_FILE,
-  PLAN_STORE_FILE,
   RALPH_HANDOFF_CHARS,
   RALPH_TOOL_NAME,
   effectiveSkills,
@@ -312,7 +310,6 @@ export async function* runAgentExecution(
 ): AsyncGenerator<ArenaEvent> {
   const label = spec.config.label || spec.driver.displayName;
   const { workspace, name: workspaceName, reused: workspaceReused } = resolveRunWorkspace(deps.workspaceRegistry, {
-    question: spec.question,
     label,
     runId: spec.runId,
     clock: deps.clock,
@@ -354,28 +351,9 @@ export async function* runAgentExecution(
         workspace.fs.writeFile(file.name, file.content);
       }
     }
-    // Orchestration discipline seeding (fresh workspaces only; reused follow-ups
-    // keep the plan/goal the agent already wrote). Best-effort: a seed failure
-    // must never fail the run it was meant to discipline. "direct" (the schema
-    // default) seeds nothing.
-    const orchestration = spec.config.orchestration;
-    if (!workspaceReused && orchestration !== "direct") {
-      try {
-        if (orchestration === "plan_first" && !workspace.fs.exists(PLAN_STORE_FILE)) {
-          workspace.fs.writeFile(
-            PLAN_STORE_FILE,
-            `# Plan\n\n- Objective: ${spec.question.slice(0, 200)}\n- Steps: [propose the sequenced approach with the plan tool, then execute it]\n- Verification: [how the outcome will be checked]\n`,
-          );
-        } else if (orchestration === "goal_first" && !workspace.fs.exists(GOAL_STORE_FILE)) {
-          workspace.fs.writeFile(
-            GOAL_STORE_FILE,
-            `${JSON.stringify({ objective: spec.question.slice(0, 500), criteria: [], status: "active", detail: "" }, null, 2)}\n`,
-          );
-        }
-      } catch {
-        // Seed failures stay silent: the orchestration prompt note still disciplines the run.
-      }
-    }
+    // Workspaces start empty by contract. Orchestration discipline reaches the
+    // model through the prompt note only (harness orchestrationNote); plan/goal
+    // files appear only when the agent itself calls the plan/goal tools.
     // Delegation: the child shares the workspace (files stay visible to the parent).
     // (subagentDepth is hoisted above the try so the catch path shares it.)
     /**
